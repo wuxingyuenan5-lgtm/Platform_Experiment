@@ -1,6 +1,10 @@
 import type { MacroDashboardSeries, MarketDetailRow } from '@/api/hedgeResearch';
 
-import type { TerminalTableGroup, TerminalTableRow } from './marketTerminal';
+import type {
+  MarketTerminalPageConfig,
+  TerminalTableGroup,
+  TerminalTableRow,
+} from './marketTerminal';
 
 const UNAVAILABLE = '—';
 
@@ -46,7 +50,7 @@ function closeValue(value: number | null, unit: string): string {
 }
 
 export function prepareMacroMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
-  return cloneGroups(groups);
+  return prepareLiveMarketDetail(groups);
 }
 
 export function prepareCommodityMarketDetail(groups: TerminalTableGroup[]): TerminalTableGroup[] {
@@ -81,6 +85,7 @@ function prepareLiveMarketDetail(groups: TerminalTableGroup[]): TerminalTableGro
       d50: UNAVAILABLE,
       d200: UNAVAILABLE,
       x2050: UNAVAILABLE,
+      x50200: UNAVAILABLE,
     })),
   }));
 }
@@ -89,6 +94,9 @@ function prepareLiveMarketDetail(groups: TerminalTableGroup[]): TerminalTableGro
 // canonical series identifiers. Keep this mapping at the display boundary so
 // neither identifier leaks into the other contract.
 const LIVE_ROW_ID_BY_CATALOG_ID: Record<string, string> = {
+  'gold-gld': 'gold-gld-row',
+  'gold-gdx': 'gold-gdx-row',
+  'gold-gdxj': 'gold-gdxj-row',
   'gold-xauusd': 'gold-xau-row',
   'gold-xagusd': 'gold-slv-row',
   'gold-copper': 'gold-copper-row',
@@ -115,6 +123,64 @@ const LIVE_ROW_ID_BY_CATALOG_ID: Record<string, string> = {
   'crypto-hood': 'crypto-hood-row',
   'crypto-usdc': 'crypto-usdc-row',
 };
+
+export function mergeTerminalMarket(
+  config: MarketTerminalPageConfig,
+  remoteRows: MarketDetailRow[],
+): MarketTerminalPageConfig {
+  const bySymbol = new Map(remoteRows.map((row) => [row.symbol.replace(/^\^/, ''), row]));
+  const lookup = (symbol: string) => {
+    const row = bySymbol.get(symbol);
+    return row && !['error', 'no_data'].includes(row.status) ? row : undefined;
+  };
+  const cards = (items: NonNullable<MarketTerminalPageConfig['overviewCards']>) =>
+    items.map((item) => {
+      const row = lookup(item.symbol);
+      const change = numeric(row?.change1d);
+      return {
+        ...item,
+        price: closeValue(numeric(row?.close), row?.unit ?? 'price'),
+        change: signed(row?.change1d, 'percent'),
+        spark: (row?.spark30d ?? []).map(Number).filter(Number.isFinite),
+        tone: (change == null || change === 0
+          ? 'neutral'
+          : change > 0
+          ? 'positive'
+          : 'negative') as 'neutral' | 'positive' | 'negative',
+      };
+    });
+  return {
+    ...config,
+    updatedAt: '',
+    overviewChip: '',
+    detailGroups: mergeLiveMarketDetail(config.detailGroups, remoteRows),
+    overviewCards: cards(config.overviewCards ?? []),
+    moverCards: cards(config.moverCards ?? []),
+    breadthCards: config.breadthCards?.map((item) => ({
+      ...item,
+      value: UNAVAILABLE,
+      tag: '暂无数据',
+      delta: UNAVAILABLE,
+    })),
+    volatilityCards: config.volatilityCards?.map((item) => ({
+      ...item,
+      value: numeric(lookup(item.title)?.close)?.toFixed(2) ?? UNAVAILABLE,
+      badge: lookup(item.title) ? '最近观测' : '暂无数据',
+      badgeTone: 'neutral',
+    })),
+    rotationHeatmap: config.rotationHeatmap?.map((item) => {
+      const row = lookup(item.symbol);
+      return {
+        ...item,
+        d1: signed(row?.change1d, 'percent'),
+        w1: signed(row?.change1w, 'percent'),
+        m1: signed(row?.change1m, 'percent'),
+        ytd: signed(row?.changeYtd, 'percent'),
+        y1: signed(row?.change1y, 'percent'),
+      };
+    }),
+  };
+}
 
 function cryptoChange(points: Array<{ date: string; value: number }>, days: number): string {
   if (points.length < 2) return UNAVAILABLE;
@@ -232,6 +298,15 @@ export function mergeLiveMarketDetail(
         .filter(Number.isFinite);
       return {
         ...row,
+        ...(remote.qualityFlags?.includes('continuous_futures_not_spot')
+          ? { name: remote.name, symbol: remote.symbol }
+          : {}),
+        ...Object.fromEntries(
+          ['d10', 'd20', 'd50', 'd200', 'x2050', 'x50200'].map((key) => [
+            key,
+            remote.signals?.[key as keyof NonNullable<MarketDetailRow['signals']>] ?? UNAVAILABLE,
+          ]),
+        ),
         spark,
         price: closeValue(numeric(remote.close), remote.unit),
         d1: signed(remote.change1d, remote.changeUnit, remote.unit),

@@ -29,6 +29,17 @@ const risk: AppRouteModule = {
       },
     },
     {
+      path: 'data-audit',
+      name: 'DataAudit',
+      component: () => import('@/views/risk/data-audit/index.vue'),
+      meta: {
+        title: '数据审计',
+        icon: 'ant-design:database-outlined',
+        roles: internalRoles,
+        permissions: 'risk.read',
+      },
+    },
+    {
       path: 'users',
       name: 'RiskUserManagement',
       component: () => import('@/views/users/index.vue'),

@@ -643,6 +643,17 @@ def find_close_batch(
     return str(row["execution_batch_id"])
 
 
+def has_close_instruction(strategy_instance_id: str, idempotency_key: str) -> bool:
+    """Return whether this close key was persisted, even if its payload conflicts."""
+    with connection() as db:
+        row = db.execute(
+            "SELECT 1 FROM strategy_runs "
+            "WHERE strategy_instance_id=? AND action='close' AND idempotency_key=? LIMIT 1",
+            (strategy_instance_id, idempotency_key),
+        ).fetchone()
+    return row is not None
+
+
 def _plan_query(where_clause: str) -> str:
     return f"""
         SELECT id, strategy_instance_id, open_batch_id, close_batch_id, direction,

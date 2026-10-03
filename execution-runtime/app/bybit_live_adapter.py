@@ -25,6 +25,7 @@ from app.live_safety import validate_live_cancel, validate_live_write
 from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
+    GatewayAccountCapability,
     GatewayAdapterCapability,
     InternalCapitalTransferStepCommand,
     InternalCapitalTransferStepResponse,
@@ -59,28 +60,49 @@ class BybitLiveAdapter:
         self._account_snapshot_lock = RLock()
 
     def capability(self) -> GatewayAdapterCapability:
-        missing: list[str] = []
-        for account_id in self.settings.bybit_accounts:
+        account_ids = sorted(self.settings.bybit_accounts)
+        account_missing: dict[str, list[str]] = {}
+        for account_id in account_ids:
             inspection = inspect_credential_reference(
                 self.settings.bybit_credential_for_account(account_id),
                 required_fields=("API_KEY", "SECRET"),
             )
-            missing.extend(f"{account_id}:{field}" for field in inspection.missing_fields)
-        if not self.settings.bybit_accounts:
-            missing.append("BYBIT_ACCOUNT_IDS")
+            account_missing[account_id] = [
+                f"{account_id}:{field}" for field in inspection.missing_fields
+            ]
+        shared_missing: list[str] = []
+        if not account_ids:
+            shared_missing.append("BYBIT_ACCOUNT_IDS")
         if not self.settings.bybit_instruments:
-            missing.append("BYBIT_INSTRUMENT_MAP")
-        configured = not missing
-        operational = configured and self._dependency_available()
-        if configured and not operational:
-            missing.append("PYBIT_DEPENDENCY")
+            shared_missing.append("BYBIT_INSTRUMENT_MAP")
+        shared_configured = not shared_missing
+        dependency_available = self._dependency_available()
+        if shared_configured and not dependency_available:
+            shared_missing.append("PYBIT_DEPENDENCY")
+        shared_operational = shared_configured and dependency_available
+        account_statuses = [
+            GatewayAccountCapability(
+                accountId=account_id,
+                configured=shared_configured and not account_missing[account_id],
+                operational=shared_operational and not account_missing[account_id],
+                writeEnabled=(
+                    shared_operational
+                    and not account_missing[account_id]
+                    and self.settings.live_write_enabled
+                    and account_id in self.settings.allowed_live_accounts
+                ),
+                missingRequirements=sorted(set(shared_missing + account_missing[account_id])),
+            )
+            for account_id in account_ids
+        ]
         return GatewayAdapterCapability(
             adapter=self.name,
             environment="live",
-            configured=configured,
-            operational=operational,
-            writeEnabled=operational and self.settings.live_write_enabled,
-            accountIds=sorted(self.settings.bybit_accounts),
+            configured=any(item.configured for item in account_statuses),
+            operational=any(item.operational for item in account_statuses),
+            writeEnabled=any(item.write_enabled for item in account_statuses),
+            accountIds=account_ids,
+            accountStatuses=account_statuses,
             capabilities=[
                 "order_query",
                 "fill_query",
@@ -92,7 +114,13 @@ class BybitLiveAdapter:
                 "cancel_order_gated",
                 "account_risk_query",
             ],
-            missingRequirements=sorted(set(missing)),
+            missingRequirements=sorted(
+                set(shared_missing).union(
+                    requirement
+                    for requirements in account_missing.values()
+                    for requirement in requirements
+                )
+            ),
         )
 
     def submit_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
@@ -514,8 +542,12 @@ class BybitLiveAdapter:
                     fallback_quote: str = quote,
                 ) -> dict[str, object]:
                     limits = row.get("limits") or {}
+                    if not isinstance(limits, dict):
+                        raise ValueError("Invalid market limits")
                     amount_limits = limits.get("amount") or {}
                     precision = row.get("precision") or {}
+                    if not isinstance(amount_limits, dict) or not isinstance(precision, dict):
+                        raise ValueError("Invalid market amount limits or precision")
                     return {
                         "priceTick": str(precision.get("price") or "0"),
                         "minQuantity": str(amount_limits.get("min") or "0"),

@@ -11,13 +11,13 @@ from app.gateway_errors import (
     GatewayResultUnknownError,
 )
 from app.journal import (
-    JournalEventError,
+    JournalCommandConflictError,
     claim_command,
     get_events,
     mark_command_result_unknown,
     save_command_events,
 )
-from app.models import ExecutionEvent
+from app.models import ExecutionEvent, SubmitOrderCommand
 from app.runtime_contracts import (
     RuntimeExecutionEventV1,
     RuntimeSubmitOrderCommandV1,
@@ -36,7 +36,11 @@ def create_command_router(*, gateway: VenueGateway) -> APIRouter:
         tags=["commands"],
     )
     def submit_order(command: RuntimeSubmitOrderCommandV1) -> list[RuntimeExecutionEventV1]:
-        if not claim_command(command):
+        try:
+            claimed = claim_command(command)
+        except JournalCommandConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if not claimed:
             events = get_events(command.command_id)
             if not events:
                 raise HTTPException(
@@ -46,7 +50,7 @@ def create_command_router(*, gateway: VenueGateway) -> APIRouter:
             return version_execution_events(events)
 
         try:
-            events = gateway.place_order(command)
+            events = gateway.place_order(SubmitOrderCommand.model_validate(command.model_dump()))
         except (GatewayConfigurationError, GatewayRequestRejectedError) as exc:
             events = [
                 ExecutionEvent(
@@ -63,9 +67,20 @@ def create_command_router(*, gateway: VenueGateway) -> APIRouter:
                 command.command_id, command.platform_order_id, type(exc).__name__,
             )
             raise HTTPException(status_code=502, detail=str(exc)) from exc
+        except Exception as exc:
+            # An adapter may fail after sending. Keep the claimed identity and
+            # require evidence-based recovery; never classify this as rejection.
+            mark_command_result_unknown(command.command_id)
+            LOGGER.error(
+                "Runtime adapter failed command_id=%s error=%s",
+                command.command_id, type(exc).__name__,
+            )
+            raise HTTPException(
+                status_code=502, detail="Runtime execution outcome is unknown"
+            ) from exc
         try:
             save_command_events(command, events)
-        except JournalEventError as exc:
+        except Exception as exc:
             mark_command_result_unknown(command.command_id)
             LOGGER.warning(
                 "Runtime evidence rejected command_id=%s platform_order_id=%s error=%s",

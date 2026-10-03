@@ -85,18 +85,6 @@
       v-model:symbol="selectedFundingSymbol"
       v-model:resolution="fundingResolution"
     />
-    <FundingChartPanel
-      v-if="pairId === 'funding-btc'"
-      :data="fundingChart"
-      context-locked
-      exact-window
-      exchange="Bybit"
-      symbol="BTC"
-      range="current"
-      resolution="原生记录"
-      :start-date="start.slice(0, 10)"
-      :end-date="end.slice(0, 10)"
-    />
     <FundingDetailPanel
       v-if="pairId === 'funding-btc'"
       :rows="history?.data?.rows || []"
@@ -300,7 +288,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+  import { computed, onUnmounted, ref, watch } from 'vue';
+  import { useKeepAliveActive } from '@/hooks/web/useKeepAliveActive';
   import CrossVenueResearchAnalysis from '../spread-carry/components/CrossVenueResearchAnalysis.vue';
   import {
     researchDraft,
@@ -319,9 +308,8 @@
   } from '@/api/platform/strategyResearch';
   import ResearchHistoryPanel from './ResearchHistoryPanel.vue';
   import FundingMarketBoard from '../funding-carry/components/FundingMarketBoard.vue';
-  import FundingChartPanel from '../funding-carry/components/FundingChartPanel.vue';
   import FundingDetailPanel from '../funding-carry/components/FundingDetailPanel.vue';
-  import type { FundingMarketBoardData, FundingChartPanelData } from '../funding-carry/types';
+  import type { FundingMarketBoardData } from '../funding-carry/types';
 
   const props = defineProps<{ pairId: 'cross-gold' | 'funding-btc' }>();
   const venue = ref('Bybit');
@@ -428,6 +416,8 @@
   let lastHistoryRead = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
+  let polling = false;
+  const pageActive = useKeepAliveActive();
   let lastFundingRead = 0;
   const fundingSymbols = ref('BTC,ETH,SOL,XAUT,CRCL,MSTR');
   const fundingSymbolOptions = computed(() =>
@@ -456,15 +446,6 @@
         rows: [],
       },
   );
-  const fundingChart = computed<FundingChartPanelData>(
-    () =>
-      (funding.value?.data?.fundingChart as unknown as FundingChartPanelData) || {
-        title: 'Bybit 指示资金费率',
-        legendFunding: '指示资金费率',
-        legendPrice: '',
-        points: [],
-      },
-  );
   const borrowObservations = computed(
     () =>
       (history.value?.data?.borrowObservations ||
@@ -473,6 +454,7 @@
   );
   let fundingRequest = 0;
   async function loadFunding() {
+    if (!pageActive.value) return;
     const request = ++fundingRequest;
     const result = await researchFunding({
       symbols: fundingSymbols.value,
@@ -484,6 +466,7 @@
     if (request === fundingRequest && !stopped) funding.value = result;
   }
   watch([fundingSymbols, fundingSearch, fundingSort], () => {
+    if (!pageActive.value) return;
     void loadFunding().catch(() => {
       error.value = '资费列表读取失败，请重试';
     });
@@ -495,7 +478,8 @@
     await loadHistory();
   }
   async function poll() {
-    if (stopped) return;
+    if (stopped || !pageActive.value || polling) return;
+    polling = true;
     try {
       if (!document.hidden) {
         const reads: Promise<void>[] = [
@@ -536,9 +520,18 @@
     } catch {
       error.value = '研究数据暂不可用，请检查服务与访问权限。';
     } finally {
-      if (!stopped) timer = setTimeout(poll, 5000);
+      polling = false;
+      if (!stopped && pageActive.value) timer = setTimeout(poll, 5000);
     }
   }
+  watch(pageActive, (active) => {
+    if (active) {
+      void poll();
+    } else if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  });
   async function loadHistory() {
     if (historyLoading.value) return;
     historyLoading.value = true;
@@ -749,9 +742,6 @@
     if (options.length && !options.includes(selectedFundingSymbol.value)) {
       selectedFundingSymbol.value = options[0];
     }
-  });
-  onMounted(() => {
-    void poll();
   });
   onUnmounted(() => {
     stopped = true;

@@ -1,4 +1,5 @@
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
+import { useKeepAliveActive } from '@/hooks/web/useKeepAliveActive';
 
 import {
   getCrossSpreadHistory,
@@ -47,6 +48,7 @@ function requestErrorMessage(error: unknown, fallback: string) {
 }
 
 export function useCrossVenueExecutionWorkspace() {
+  const pageActive = useKeepAliveActive();
   const ranges = CROSS_SPREAD_RANGES;
   const selectedPair = ref('XAUTUSDT-XAUUSD');
   const selectedRange = ref('15m');
@@ -89,6 +91,7 @@ export function useCrossVenueExecutionWorkspace() {
   const spreadHistory = ref<{ label: string; value: number }[]>([]);
   let snapshotTimer: number | undefined;
   let tradingRulePolls = 0;
+  let workspaceActive = false;
 
   const bybitQuote = computed<MarketQuoteResult | null>(() => snapshot.value?.bybit.quote || null);
   const mt5Quote = computed<MarketQuoteResult | null>(() => snapshot.value?.mt5.quote || null);
@@ -241,12 +244,14 @@ export function useCrossVenueExecutionWorkspace() {
     confirmOrder,
     confirmSummary,
     confirmVisible,
+    clearUnreceivedPendingExecution,
     executionLogs,
     executionMessage,
     executionMessageTone,
     limitEvidence,
     openConfirm,
     openPartialClose,
+    pendingDraftAbsent,
     prepareOpenDraft,
     setExecutionMessage,
     submitLoading,
@@ -347,7 +352,10 @@ export function useCrossVenueExecutionWorkspace() {
   }
 
   function isPageVisible() {
-    return typeof document === 'undefined' || document.visibilityState === 'visible';
+    return (
+      pageActive.value &&
+      (typeof document === 'undefined' || document.visibilityState === 'visible')
+    );
   }
 
   function stopSnapshotPolling() {
@@ -373,6 +381,7 @@ export function useCrossVenueExecutionWorkspace() {
   }
 
   function handleVisibilityChange() {
+    if (!pageActive.value) return;
     if (!isPageVisible()) {
       stopSnapshotPolling();
       return;
@@ -461,7 +470,9 @@ export function useCrossVenueExecutionWorkspace() {
     setExecutionMessage('止盈止损已更新；本次操作未触发平仓。', 'is-success');
   }
 
-  onMounted(async () => {
+  async function activateWorkspace() {
+    if (workspaceActive || !pageActive.value) return;
+    workspaceActive = true;
     await Promise.all([
       refreshInstruments(),
       refreshExitPlans().then((errorMessage) => {
@@ -472,13 +483,24 @@ export function useCrossVenueExecutionWorkspace() {
       refreshSnapshot(),
       refreshTradingRules(),
     ]);
+    if (!workspaceActive || !pageActive.value) return;
     document.addEventListener('visibilitychange', handleVisibilityChange);
     startSnapshotPolling();
+  }
+
+  function deactivateWorkspace() {
+    workspaceActive = false;
+    stopSnapshotPolling();
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }
+
+  watch(pageActive, (active) => {
+    if (active) void activateWorkspace();
+    else deactivateWorkspace();
   });
 
   onUnmounted(() => {
-    stopSnapshotPolling();
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    deactivateWorkspace();
   });
 
   return {
@@ -497,6 +519,7 @@ export function useCrossVenueExecutionWorkspace() {
     confirmOrder,
     confirmSummary,
     confirmVisible,
+    clearUnreceivedPendingExecution,
     executionLogs,
     executionMessage,
     executionMessageTone,
@@ -514,6 +537,7 @@ export function useCrossVenueExecutionWorkspace() {
     openLimitStrategy,
     openConfirm,
     openPartialClose,
+    pendingDraftAbsent,
     overviewRows,
     refreshAbnormalPositions: async () => {
       await Promise.allSettled([refreshExitPlans(), refreshSnapshot(), refreshObservability()]);

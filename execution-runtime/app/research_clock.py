@@ -11,7 +11,9 @@ def sample_clock(client):
     elapsed = after_mono - before_mono
     if response.get("retCode") != 0 or not 0 <= elapsed <= 1_000_000_000:
         raise ValueError("clock_sample_unavailable_or_rtt_exceeds_1s")
-    if abs((after_ns - before_ns) - elapsed) > 10_000_000:
+    # Windows wall-clock reads can differ from monotonic elapsed by one timer tick.
+    # The 100 ms conservative drift allowance below still covers this tolerance.
+    if abs((after_ns - before_ns) - elapsed) > 25_000_000:
         raise ValueError("local_clock_stepped_during_sample")
     server_ns = int(response["result"]["timeNano"])
     if server_ns <= 0 or abs(server_ns - after_ns) > 60_000_000_000:

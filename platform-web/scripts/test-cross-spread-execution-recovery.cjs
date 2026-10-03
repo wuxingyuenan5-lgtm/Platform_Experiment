@@ -27,6 +27,11 @@ function computed(getter) {
   };
 }
 
+function watch(source, callback, options) {
+  if (options?.immediate) callback(source());
+  return () => {};
+}
+
 function settleAsyncWork() {
   return new Promise((resolve) => setImmediate(resolve));
 }
@@ -99,7 +104,7 @@ function fixture() {
     },
   };
   const load = createLoader({
-    vue: { ref, computed },
+    vue: { ref, computed, watch },
     '@/store/modules/user': { useUserStore: () => ({ authentication: { user: { role: 'ceo' } } }) },
     '@/api/platform/crossSpreadLifecycle': {
       prepareCrossSpreadExecution: (...args) => state.preflight(...args),
@@ -301,6 +306,57 @@ test('only explicit rejection plus authoritative absence releases an unaccepted 
   assert.ok(f.recovery.readExecutionDraft());
   assert.match(f.execution.executionMessage.value, /身份不一致/);
   assert.equal(f.writes.length, 2);
+});
+
+test('an absent original instruction can release the local lock without placing a new order', async () => {
+  const f = fixture();
+  f.recovery.persistExecutionDraft({
+    kind: 'CLOSE',
+    idempotencyKey: 'old-close-key',
+    planId: 'plan-a',
+    payload: { quantityOz: '1', executionMode: 'market', limitStrategy: 'fok' },
+  });
+  await f.execution.resumePendingExecution();
+  assert.equal(f.execution.pendingDraftAbsent.value, true);
+  assert.ok(f.recovery.readExecutionDraft());
+  await f.execution.clearUnreceivedPendingExecution();
+  assert.equal(f.recovery.readExecutionDraft(), null);
+  assert.deepEqual(f.reads, ['old-close-key', 'old-close-key', 'old-close-key']);
+  assert.equal(f.writes.length, 0);
+});
+
+test('clicking close verifies an absent old instruction and opens the normal confirmation', async () => {
+  const f = fixture();
+  f.recovery.persistExecutionDraft({
+    kind: 'CLOSE',
+    idempotencyKey: 'old-close-key',
+    planId: 'plan-a',
+    payload: { quantityOz: '1', executionMode: 'market', limitStrategy: 'fok' },
+  });
+  await f.execution.resumePendingExecution();
+  await f.execution.openConfirm('CLOSE_ALL');
+  assert.equal(f.recovery.readExecutionDraft(), null);
+  assert.equal(f.execution.confirmVisible.value, true);
+  assert.equal(f.writes.length, 0);
+  assert.deepEqual(f.reads, ['old-close-key', 'old-close-key', 'old-close-key']);
+});
+
+test('clicking close keeps the old lock if the final verification fails', async () => {
+  const f = fixture();
+  f.recovery.persistExecutionDraft({
+    kind: 'CLOSE',
+    idempotencyKey: 'old-close-key',
+    planId: 'plan-a',
+    payload: { quantityOz: '1', executionMode: 'market', limitStrategy: 'fok' },
+  });
+  await f.execution.resumePendingExecution();
+  f.state.lookup = async () => {
+    throw new Error('read failed');
+  };
+  await f.execution.openConfirm('CLOSE_ALL');
+  assert.ok(f.recovery.readExecutionDraft());
+  assert.equal(f.execution.confirmVisible.value, false);
+  assert.equal(f.writes.length, 0);
 });
 
 test('partial close recovery preserves quantity and never resubmits the close', async () => {

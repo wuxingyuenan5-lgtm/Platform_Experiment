@@ -3,13 +3,14 @@
 import json
 import time
 from bisect import bisect_left
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from functools import lru_cache
 
 from app.account_performance import stamp
 from app.config import get_settings
 from app.database import connection
+from app.pnl_reporting import day_start
 
 
 def is_cross(db, instance_id):
@@ -77,7 +78,7 @@ def _load_sessions(database_path, instance_id, bucket):
         if not is_cross(db, instance_id):
             return None
         rows = db.execute(
-            "SELECT substr(observed_at,1,10) day, max(observed_at) latest, count(*) n "
+            "SELECT date(observed_at,'+8 hours') day, max(observed_at) latest, count(*) n "
             "FROM market_spread_snapshots WHERE strategy_key='cross_venue_spread' "
             "AND strategy_instance_id=? AND observed_at>=? AND observed_at<=? "
             "GROUP BY day ORDER BY day",
@@ -99,7 +100,9 @@ def _load_sessions(database_path, instance_id, bucket):
             observations[row["day"]] = valid
         else:
             excluded[row["day"]] = "market_closed" if closed_only else "session_marks_unavailable"
-        day_end = min(stamp(row["day"] + "T00:00:00Z") + timedelta(days=1), datetime.now(UTC))
+        day_end = min(
+            day_start(date.fromisoformat(row["day"]) + timedelta(days=1)), datetime.now(UTC)
+        )
         if (day_end - stamp(latest["asOf"])).total_seconds() > 300:
             # A known quote earlier in a day is a usable as-of valuation, but
             # does not prove the day's close or an entire holiday closure.
@@ -110,6 +113,7 @@ def _load_sessions(database_path, instance_id, bucket):
 @lru_cache(maxsize=512)
 def _day_session(database_path, instance_id, day, latest_at, count):
     # Historical days reuse their exact archive revision; a backfill changes count.
+    start = day_start(date.fromisoformat(day)).isoformat()
     with connection() as db:
         latest = json.loads(
             db.execute(
@@ -134,7 +138,7 @@ def _day_session(database_path, instance_id, day, latest_at, count):
             "!='quote_stale' "
             "AND COALESCE(json_extract(payload_json,'$.bybit.executionBlockReason'),'') "
             "!='quote_stale' ORDER BY observed_at DESC LIMIT 1",
-            (instance_id, day, latest_at),
+            (instance_id, start, latest_at),
         ).fetchone()
         non_closed = None
         if row is None:
@@ -144,7 +148,7 @@ def _day_session(database_path, instance_id, day, latest_at, count):
                 "AND observed_at>=? AND observed_at<=? "
                 "AND COALESCE(json_extract(payload_json,'$.mt5.marketStatus'),'unknown') "
                 "!='closed' LIMIT 1",
-                (instance_id, day, latest_at),
+                (instance_id, start, latest_at),
             ).fetchone()
     closed_only = latest.get("mt5", {}).get("marketStatus") == "closed" and not non_closed
     return json.loads(row[0]) if row else None, latest, closed_only

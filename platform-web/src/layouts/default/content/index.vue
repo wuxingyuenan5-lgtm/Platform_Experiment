@@ -1,5 +1,5 @@
 <template>
-  <div :class="[prefixCls, getLayoutContentMode]" v-loading="getOpenPageLoading && getPageLoading">
+  <div :class="[prefixCls, getLayoutContentMode]">
     <div :class="[prefixClsScroll]">
       <PageLayout />
       <LayoutFooter />
@@ -11,7 +11,6 @@
   import PageLayout from '@/layouts/page/index.vue';
   import { useDesign } from '@/hooks/web/useDesign';
   import { useRootSetting } from '@/hooks/setting/useRootSetting';
-  import { useTransitionSetting } from '@/hooks/setting/useTransitionSetting';
   import { useContentViewHeight } from './useContentViewHeight';
   import { createAsyncComponent } from '@/utils/factory/createAsyncComponent';
   import { riskInit } from '@/layouts/default/risk/index';
@@ -20,8 +19,7 @@
 
   const { prefixCls } = useDesign('layout-content');
   const { prefixCls: prefixClsScroll } = useDesign('layout-content-scroll');
-  const { getOpenPageLoading } = useTransitionSetting();
-  const { getLayoutContentMode, getPageLoading } = useRootSetting();
+  const { getLayoutContentMode } = useRootSetting();
   const LayoutFooter = createAsyncComponent(() => import('@/layouts/default/footer/index.vue'));
   useContentViewHeight();
   const { renderMsg } = riskInit();

@@ -12,13 +12,18 @@ from threading import Event
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
+from app import application
 from app.config import get_settings
 from app.database import connection, initialize_database
-from app.main import app
 from app.schema_migrations import apply_platform_migrations
-from app.strategies.instruction_service import execute_instruction
+from app.strategies.instruction_service import (
+    CreateStrategyInstructionRequest,
+    create_instruction,
+    execute_instruction,
+    get_instruction,
+)
 
 FUNDING_INSTANCE = "strategy_funding_instruction_unit_test"
 REPO_ROOT = Path(os.environ.get("VG_REPO_ROOT") or Path(__file__).resolve().parents[2])
@@ -30,8 +35,7 @@ if not RUNTIME_PYTHON.exists():
 
 @pytest.fixture(autouse=True)
 def generic_instruction_fixture(monkeypatch):
-    """Exercise the generic engine on a test instance; controlled desks use dedicated routes."""
-    from app import application
+    """Exercise the service directly; controlled HTTP entrypoints have separate tests."""
 
     initialize = application.initialize_database
 
@@ -61,6 +65,7 @@ def generic_instruction_fixture(monkeypatch):
                 )
 
     monkeypatch.setattr(application, "initialize_database", initialize_test_instance)
+    monkeypatch.setattr(sys.modules[__name__], "initialize_database", initialize_test_instance)
 
 
 def _payload(*, key: str, quantity: str = "1") -> dict[str, object]:
@@ -153,139 +158,126 @@ def _set_quote(journal_dir: Path, *, symbol: str, bid: str, ask: str, last: str 
         )
 
 
-def test_instruction_replay_returns_the_original_frozen_plan_and_one_batch(
-    tmp_path: Path,
-) -> None:
-    get_settings().database_path = str(tmp_path / "instruction-replay.db")
-    url = f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions"
-
-    with TestClient(app) as client:
-        first = client.post(url, json=_payload(key="instruction-001"))
-        second = client.post(url, json=_payload(key="instruction-001"))
-
-        assert first.status_code == 200, first.text
-        assert second.status_code == 200, second.text
-        assert second.json() == first.json()
-        assert first.json()["status"] == "accepted"
-        assert first.json()["executionPlan"]["schemaVersion"] == "1"
-        assert first.json()["executionPlan"]["legs"][0]["executionPolicy"] == "post_only_chase"
-        assert first.json()["executionPlan"]["simulationCompatibilityPolicy"] is None
-        assert first.json()["executionBatchId"]
-        assert first.json()["requestedBy"] == get_settings().development_user_id
-
-        fetched = client.get(f"/api/v1/strategy-instructions/{first.json()['instructionId']}")
-        assert fetched.status_code == 200
-        assert fetched.json() == first.json()
-
-
-def test_instruction_rejects_idempotency_key_reused_for_different_parameters(
-    tmp_path: Path,
-) -> None:
-    get_settings().database_path = str(tmp_path / "instruction-conflict.db")
-    url = f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions"
-
-    with TestClient(app) as client:
-        assert client.post(url, json=_payload(key="instruction-002")).status_code == 200
-        conflict = client.post(url, json=_payload(key="instruction-002", quantity="2"))
-
-    assert conflict.status_code == 409
-    assert conflict.json()["detail"] == (
-        "Idempotency key is already used by a different strategy instruction payload"
+def _create(payload):
+    return create_instruction(
+        FUNDING_INSTANCE, CreateStrategyInstructionRequest.model_validate(payload),
+        requested_by="isolated-owner",
     )
 
 
-def test_instruction_idempotency_includes_business_reason_and_position_group(
-    tmp_path: Path,
-) -> None:
-    get_settings().database_path = str(tmp_path / "instruction-business-fingerprint.db")
-    url = f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions"
-    with TestClient(app) as client:
-        assert (
-            client.post(url, json=_payload(key="instruction-business-fingerprint")).status_code
-            == 200
-        )
-        changed_reason = client.post(
-            url,
-            json={
-                **_payload(key="instruction-business-fingerprint"),
-                "reason": "different CEO reason",
-            },
-        )
-
-    assert changed_reason.status_code == 409
+def test_instruction_replay_returns_the_original_frozen_plan_and_one_batch() -> None:
+    initialize_database()
+    first = _create(_payload(key="instruction-001"))
+    second = _create(_payload(key="instruction-001"))
+    assert second == first
+    assert first["status"] == "accepted"
+    assert first["executionPlan"]["schemaVersion"] == "1"
+    assert first["executionPlan"]["legs"][0]["executionPolicy"] == "post_only_chase"
+    assert first["executionPlan"]["simulationCompatibilityPolicy"] is None
+    assert first["executionBatchId"]
+    assert first["requestedBy"] == "isolated-owner"
+    assert get_instruction(first["instructionId"]) == first
 
 
-def test_instruction_idempotency_normalizes_decimal_parameters(tmp_path: Path) -> None:
-    get_settings().database_path = str(tmp_path / "instruction-normalized-fingerprint.db")
-    url = f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions"
-    first_payload = _payload(key="instruction-normalized-fingerprint", quantity="1")
-    first_payload["parameters"]["perpetualQuantity"] = 1
-    first_payload["parameters"]["spotQuantity"] = 1
-    with TestClient(app) as client:
-        first = client.post(url, json=first_payload)
-        replay = client.post(url, json=_payload(key="instruction-normalized-fingerprint"))
-
-    assert first.status_code == 200, first.text
-    assert replay.status_code == 200, replay.text
-    assert replay.json()["instructionId"] == first.json()["instructionId"]
+def test_instruction_rejects_idempotency_key_reused_for_different_parameters() -> None:
+    initialize_database()
+    _create(_payload(key="instruction-002"))
+    with pytest.raises(HTTPException) as error:
+        _create(_payload(key="instruction-002", quantity="2"))
+    assert error.value.status_code == 409
 
 
-def test_close_instruction_fails_closed_without_position_group(tmp_path: Path) -> None:
-    get_settings().database_path = str(tmp_path / "instruction-close.db")
-    with TestClient(app) as client:
-        response = client.post(
-            f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions",
-            json={
-                "idempotencyKey": "close-without-position-group",
-                "action": "close",
-                "parameters": {
-                    "perpetualSymbol": "BTCUSDT",
-                    "perpetualQuantity": "1",
-                    "spotSymbol": "BTCUSDT",
-                    "spotQuantity": "1",
-                },
-            },
-        )
-    assert response.status_code == 423
-    assert response.json()["detail"] == "Position Group close planning is unavailable"
+@pytest.mark.parametrize("change", [{"reason": "different reason"}, {"positionGroupId": "other"}])
+def test_instruction_idempotency_includes_business_reason_and_position_group(change) -> None:
+    initialize_database()
+    payload = _payload(key="instruction-business-fingerprint")
+    _create(payload)
+    with pytest.raises(HTTPException) as error:
+        _create({**payload, **change})
+    assert error.value.status_code == 409
 
 
-def test_instruction_rejects_unknown_parameters_and_unmapped_symbols(tmp_path: Path) -> None:
-    get_settings().database_path = str(tmp_path / "instruction-validation.db")
-    url = f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions"
-    with TestClient(app) as client:
-        unknown = client.post(
-            url,
-            json={
-                **_payload(key="instruction-extra"),
-                "parameters": {**_payload(key="x")["parameters"], "accountId": "spoofed"},
-            },
-        )
-        unmapped = client.post(
-            url,
-            json={
-                **_payload(key="instruction-eth"),
-                "parameters": {**_payload(key="x")["parameters"], "perpetualSymbol": "ETHUSDT"},
-            },
-        )
-
-    assert unknown.status_code == 422
-    assert unknown.json()["detail"] == "Invalid strategy instruction parameters"
-    assert unmapped.status_code == 422
-    assert "Authoritative crypto_perp" in unmapped.json()["detail"]
+def test_instruction_idempotency_normalizes_decimal_parameters() -> None:
+    initialize_database()
+    payload = _payload(key="instruction-normalized-fingerprint")
+    payload["parameters"]["perpetualQuantity"] = 1
+    payload["parameters"]["spotQuantity"] = 1
+    first = _create(payload)
+    replay = _create(_payload(key="instruction-normalized-fingerprint"))
+    assert replay["instructionId"] == first["instructionId"]
 
 
-def test_instruction_preserves_account_ids_in_capability_snapshot(tmp_path: Path) -> None:
-    get_settings().database_path = str(tmp_path / "instruction-account-id.db")
-    with TestClient(app) as client:
-        response = client.post(
-            f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions",
-            json=_payload(key="instruction-account-id"),
-        )
+def test_close_instruction_fails_closed_without_position_group() -> None:
+    initialize_database()
+    with pytest.raises(HTTPException) as error:
+        _create({**_payload(key="close-without-position-group"), "action": "close"})
+    assert error.value.status_code == 423
+    assert error.value.detail == "Position Group close planning is unavailable"
 
-    assert response.status_code == 200, response.text
-    snapshot = response.json()["executionPlan"]["accountCapabilitySnapshot"]
-    assert snapshot == {"account_sim_usdt": "trade_and_read"}
+
+def test_instruction_rejects_unknown_parameters_and_unmapped_symbols() -> None:
+    initialize_database()
+    for key, changes, detail in (
+        ("extra", {"accountId": "spoofed"}, "Invalid strategy instruction parameters"),
+        ("eth", {"perpetualSymbol": "ETHUSDT"}, "Authoritative crypto_perp"),
+    ):
+        payload = _payload(key=key)
+        payload["parameters"].update(changes)
+        with pytest.raises(HTTPException) as error:
+            _create(payload)
+        assert error.value.status_code == 422
+        assert detail in error.value.detail
+
+
+def test_instruction_preserves_account_ids_in_capability_snapshot() -> None:
+    initialize_database()
+    response = _create(_payload(key="instruction-account-id"))
+    assert response["executionPlan"]["accountCapabilitySnapshot"] == {
+        "account_sim_usdt": "trade_and_read"
+    }
+
+
+def test_planning_does_not_reserve_database_writer(monkeypatch) -> None:
+    from app.strategies import instruction_service
+
+    initialize_database()
+    original = instruction_service.build_plan
+
+    def build_without_lock(*args):
+        # Represents an unrelated account-sync writer while native specs are read.
+        with sqlite3.connect(get_settings().database_path, timeout=0.1) as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("UPDATE accounts SET status=status WHERE id='account_sim_usdt'")
+        return original(*args)
+
+    monkeypatch.setattr(instruction_service, "build_plan", build_without_lock)
+    result = _create(_payload(key="no-writer-during-planning"))
+    assert result["status"] == "accepted"
+
+
+def test_concurrent_planning_publishes_one_frozen_instruction(monkeypatch) -> None:
+    from threading import Barrier
+
+    from app.strategies import instruction_service
+
+    initialize_database()
+    original = instruction_service.build_plan
+    barrier = Barrier(2)
+
+    def concurrent_plan(*args):
+        plan = original(*args)
+        barrier.wait(timeout=5)
+        return plan
+
+    monkeypatch.setattr(instruction_service, "build_plan", concurrent_plan)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(_create, _payload(key="concurrent-plan")) for _ in range(2)]
+        results = [future.result(timeout=10) for future in futures]
+    assert results[0] == results[1]
+    with connection() as db:
+        assert db.execute("SELECT count(*) FROM strategy_runs").fetchone()[0] == 1
+        assert db.execute("SELECT count(*) FROM execution_batches").fetchone()[0] == 1
+        assert db.execute("SELECT count(*) FROM execution_batch_legs").fetchone()[0] == 2
 
 
 def test_pending_instruction_batch_is_claimed_once_and_replay_does_not_duplicate_commands(
@@ -346,21 +338,17 @@ def test_pending_instruction_batch_is_claimed_once_and_replay_does_not_duplicate
             )
         _set_quote(journal_dir, symbol="BTCUSDT", bid="100", ask="100.1")
 
-        with TestClient(app) as client:
-            created = client.post(
-                f"/api/v1/strategies/{FUNDING_INSTANCE}/instructions",
-                json=_payload(key="instruction-dispatch-claim"),
-            )
-            assert created.status_code == 200, created.text
-            instruction_id = created.json()["instructionId"]
-
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                first = pool.submit(execute_instruction, instruction_id)
-                assert first_submit_started.wait(timeout=5)
-                replay = pool.submit(execute_instruction, instruction_id)
+        created = _create(_payload(key="instruction-dispatch-claim"))
+        instruction_id = created["instructionId"]
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(execute_instruction, instruction_id)
+            assert first_submit_started.wait(timeout=5)
+            replay = pool.submit(execute_instruction, instruction_id)
+            try:
                 replay_result = replay.result(timeout=5)
+            finally:
                 release_first_submit.set()
-                result = first.result(timeout=10)
+            result = first.result(timeout=10)
 
         assert replay_result.status == "executing"
         assert result.status == "hedged"

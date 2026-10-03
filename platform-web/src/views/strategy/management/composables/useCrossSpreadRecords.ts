@@ -1,5 +1,5 @@
 import { buildTradeRecords, recordTime } from './strategyTradeRecords';
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, type Ref } from 'vue';
 import { nativeAmount, settlementLabel } from './strategyRecordPresentation';
 
 import {
@@ -92,9 +92,17 @@ const crossSpreadTabs: StrategyTableTab[] = [
   { key: 'settlements', label: '原币结算流水' },
 ];
 
-export function useCrossSpreadRecords() {
-  const loading = ref(false);
-  const error = ref('');
+export function useCrossSpreadRecords(activeTab: Ref<string> = ref('positions')) {
+  const recordsLoading = ref(false);
+  const positionsLoading = ref(false);
+  const recordsError = ref('');
+  const positionsError = ref('');
+  const loading = computed(() =>
+    activeTab.value === 'positions' ? positionsLoading.value : recordsLoading.value,
+  );
+  const error = computed(() =>
+    activeTab.value === 'positions' ? positionsError.value : recordsError.value,
+  );
   const abnormalOrders = ref<CrossSpreadPositionOverviewResult['abnormalOrders']>([]);
 
   const orders = ref<OrderDetailResult[]>([]);
@@ -176,19 +184,22 @@ export function useCrossSpreadRecords() {
     };
   });
 
-  async function load() {
+  async function loadRecords() {
     const generation = refreshGeneration;
     if (disposed) return;
-    loading.value = true;
-    error.value = '';
+    recordsLoading.value = true;
+    recordsError.value = '';
     try {
-      const [orderRows, fillRows, batchRows, snapshot, financials] = await Promise.all([
-        getOrders(STRATEGY_INSTANCE_ID),
-        getFills(STRATEGY_INSTANCE_ID),
+      const [orderRows, fillRows, batchRows, financials] = await Promise.all([
+        fetchStrategyQuery(['cross-spread', 'orders', STRATEGY_INSTANCE_ID], () =>
+          getOrders(STRATEGY_INSTANCE_ID),
+        ),
+        fetchStrategyQuery(['cross-spread', 'fills', STRATEGY_INSTANCE_ID], () =>
+          getFills(STRATEGY_INSTANCE_ID),
+        ),
         fetchStrategyQuery(['cross-spread', 'execution-batches', STRATEGY_INSTANCE_ID], () =>
           getExecutionBatches(STRATEGY_INSTANCE_ID),
         ),
-        fetchStrategyQuery(['cross-spread', 'snapshot'], () => getCrossSpreadSnapshot()),
         fetchStrategyQuery(['cross-spread', 'pnl', STRATEGY_INSTANCE_ID], () =>
           getStrategyPnl(STRATEGY_INSTANCE_ID),
         ),
@@ -198,6 +209,24 @@ export function useCrossSpreadRecords() {
       fills.value = fillRows;
       batches.value = batchRows.filter((batch) => batch.strategyKey === 'cross_venue_spread');
       finance.value = financials;
+    } catch (caught: unknown) {
+      if (!disposed && generation === refreshGeneration)
+        recordsError.value = caught instanceof Error ? caught.message : '订单数据加载失败';
+    } finally {
+      if (!disposed && generation === refreshGeneration) recordsLoading.value = false;
+    }
+  }
+
+  async function loadPositions() {
+    const generation = refreshGeneration;
+    if (disposed) return;
+    positionsLoading.value = true;
+    positionsError.value = '';
+    try {
+      const snapshot = await fetchStrategyQuery(['cross-spread', 'snapshot'], () =>
+        getCrossSpreadSnapshot(),
+      );
+      if (disposed || generation !== refreshGeneration) return;
       const overview = snapshot.positionOverview;
       abnormalOrders.value = overview?.abnormalOrders ?? [];
       const abnormal = new Set((overview?.abnormalOrders ?? []).map((row) => row.planId));
@@ -220,19 +249,19 @@ export function useCrossSpreadRecords() {
       mt5Positions.value = rows('mt5');
     } catch (caught: unknown) {
       if (!disposed && generation === refreshGeneration)
-        error.value =
+        positionsError.value =
           typeof caught === 'object' && caught !== null
-            ? (caught as { message?: string }).message ?? '订单数据加载失败'
-            : '订单数据加载失败';
+            ? (caught as { message?: string }).message ?? '持仓数据加载失败'
+            : '持仓数据加载失败';
     } finally {
-      if (!disposed && generation === refreshGeneration) loading.value = false;
+      if (!disposed && generation === refreshGeneration) positionsLoading.value = false;
     }
   }
 
   function refresh(): Promise<void> {
     if (disposed) return Promise.resolve();
     refreshGeneration += 1;
-    return load();
+    return Promise.all([loadRecords(), loadPositions()]).then(() => undefined);
   }
 
   onBeforeUnmount(() => {

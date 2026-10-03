@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "variable-global-platform-api"
-version = "0.11.3"
+version = "0.11.4"
 description = "Platform API modular monolith"
 requires-python = ">=3.12"
 dependencies = [
@@ -50,6 +50,11 @@ venvPath = "."
 venv = ".venv"
 typeCheckingMode = "standard"
 include = [
+  "app/account_history_sync.py",
+  "app/catalog_routes.py",
+  "app/data_audit.py",
+  "app/data_audit_calendar.py",
+  "app/strategy_management_projection.py",
   "app/venue_identity_repository.py",
   "app/live_venue_snapshot_sync.py",
   "app/strategy_financial_readmodel.py",
@@ -60,6 +65,8 @@ include = [
   "app/operational_metrics.py",
   "app/runtime_transport.py",
   "app/strategies/funding_schemas.py",
+  "app/strategies/funding_exit_service.py",
+  "app/strategies/funding_exit_repository.py",
   "app/cross_spread_observability_schemas.py",
   "app/a_share_research_policy.py",
   "app/auth.py",

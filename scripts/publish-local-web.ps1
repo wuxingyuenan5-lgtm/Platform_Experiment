@@ -28,13 +28,35 @@ try {
 } finally { Pop-Location }
 
 Assert-File (Join-Path $BuildDist 'index.html') 'Built Platform Web index'
+Assert-File (Join-Path $BuildDist 'manifest.json') 'Built Platform Web manifest'
 if (-not (Test-Path -LiteralPath (Join-Path $BuildDist 'assets') -PathType Container)) {
   throw 'Built Platform Web assets directory is missing.'
 }
 Assert-File (Join-Path $BuildDist '_app.config.js') 'Generated formal brand configuration'
 
 New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null
-Get-ChildItem -LiteralPath $BuildDist -Force | Copy-Item -Destination $ReleaseDir -Recurse -Force
+$manifest = Get-Content -LiteralPath (Join-Path $BuildDist 'manifest.json') -Raw | ConvertFrom-Json
+$manifestFiles = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($entry in $manifest.PSObject.Properties.Value) {
+  foreach ($relativePath in @($entry.file) + @($entry.css) + @($entry.assets)) {
+    if ([string]::IsNullOrWhiteSpace([string]$relativePath)) { continue }
+    $normalizedPath = ([string]$relativePath).Replace('/', '\')
+    if ([IO.Path]::IsPathRooted($normalizedPath) -or $normalizedPath.StartsWith('..\')) {
+      throw "Manifest contains an unsafe output path: $relativePath"
+    }
+    [void]$manifestFiles.Add($normalizedPath)
+  }
+}
+if ($manifestFiles.Count -eq 0) { throw 'Built Platform Web manifest contains no output files.' }
+foreach ($relativePath in $manifestFiles) {
+  $sourcePath = Join-Path $BuildDist $relativePath
+  Assert-File $sourcePath 'Manifest-listed Platform Web output'
+  $destinationPath = Join-Path $ReleaseDir $relativePath
+  $destinationDirectory = Split-Path -Parent $destinationPath
+  New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
+  Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+}
+Get-ChildItem -LiteralPath $BuildDist -Force | Where-Object { $_.Name -notin @('assets', 'manifest.json') } | Copy-Item -Destination $ReleaseDir -Recurse -Force
 $caddyConfig = Join-Path $ReleaseRoot "$stamp.Caddyfile"
 $releaseForCaddy = $ReleaseDir.Replace('\', '/')
 $caddyText = (Get-Content -LiteralPath $Template -Raw).Replace('{$PLATFORM_WEB_RELEASE_DIR}', ('"' + $releaseForCaddy + '"'))

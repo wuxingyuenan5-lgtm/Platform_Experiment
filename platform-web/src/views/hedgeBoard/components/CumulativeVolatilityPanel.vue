@@ -189,15 +189,15 @@
         />
         <line
           v-if="hoverIndex !== null"
-          :x1="xForTimestamp(dates[hoverIndex])"
-          :x2="xForTimestamp(dates[hoverIndex])"
+          :x1="xForSlot(hoverIndex)"
+          :x2="xForSlot(hoverIndex)"
           :y1="plot.top"
           :y2="plot.bottom"
           class="cumulative-volatility__hover-line"
         />
       </svg>
       <div v-if="hoverIndex !== null" class="cumulative-volatility__tooltip" role="status">
-        <strong>{{ formatDateTime(dates[hoverIndex]) }}</strong>
+        <strong>{{ hoverSessionDate }} · 各盘第 {{ hoverSampleIndex + 1 }} 个采样点（UTC）</strong>
         <span v-for="series in plottedSeries" :key="series.key">
           <i :style="{ background: series.color }"></i>{{ series.label }}：{{
             valueAt(series, hoverIndex)
@@ -225,7 +225,16 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, defineComponent, onMounted, PropType, ref, watch } from 'vue';
+  import {
+    computed,
+    defineComponent,
+    onMounted,
+    onBeforeUnmount,
+    PropType,
+    ref,
+    shallowRef,
+    watch,
+  } from 'vue';
 
   import {
     getCumulativeVolatility,
@@ -280,7 +289,8 @@
   ];
   const days = ref<number>(365);
   const precision = ref<CumulativeVolatilityInterval>('15m');
-  const response = ref<CumulativeVolatilityData | null>(null);
+  const response = shallowRef<CumulativeVolatilityData | null>(null);
+  const fullResponse = shallowRef<CumulativeVolatilityData | null>(null);
   const status = ref<'loading' | 'ready' | 'error'>('loading');
   const hoverIndex = ref<number | null>(null);
   const hiddenSessions = ref<Set<string>>(new Set());
@@ -290,6 +300,7 @@
   const customStartDate = ref('');
   const customEndDate = ref('');
   let requestSerial = 0;
+  let rangeTimer: ReturnType<typeof setTimeout> | undefined;
 
   const plot = { left: 76, right: 1120, top: 22, bottom: 300 };
   const sessionSeries = [
@@ -300,20 +311,18 @@
 
   const points = computed(() => response.value?.points ?? []);
   const allDates = computed(() =>
-    [...new Set(points.value.map((point) => point.timestamp))].sort(),
+    [...new Set((fullResponse.value?.points ?? []).map((point) => point.timestamp))].sort(),
   );
   const availableStartDate = computed(() => allDates.value[0]?.slice(0, 10) ?? '');
   const availableEndDate = computed(() => allDates.value.at(-1)?.slice(0, 10) ?? '');
   const startIndex = ref(0);
   const endIndex = ref(0);
-  const minWindowSize = computed(() =>
-    Math.max(4, Math.min(allDates.value.length, Math.ceil(allDates.value.length * 0.08))),
-  );
+  const minWindowSize = computed(() => Math.min(4, allDates.value.length));
   const dates = computed(() => allDates.value.slice(startIndex.value, endIndex.value + 1));
   const valueMap = computed(() => {
     const maps = new Map<string, Map<string, number>>();
     sessionSeries.forEach((series) => maps.set(series.key, new Map()));
-    points.value.forEach((point) => {
+    (fullResponse.value?.points ?? []).forEach((point) => {
       const value = Number(point.value);
       if (!Number.isFinite(value) || !maps.has(point.session)) return;
       maps.get(point.session)!.set(point.timestamp, value);
@@ -352,10 +361,6 @@
             .map((point) => point.sessionDate as string),
         ),
     );
-    const commonDates = [...(datesBySession[0] ?? [])].filter((date) =>
-      datesBySession.slice(1).every((sessionDates) => sessionDates.has(date)),
-    );
-    if (commonDates.length) return commonDates.sort();
     return [...new Set(datesBySession.flatMap((sessionDates) => [...sessionDates]))].sort();
   });
   const pointsBySession = computed(() => {
@@ -489,14 +494,14 @@
     });
     return path.trim();
   });
-  const pointByTimestamp = computed(() => {
-    const result = new Map<string, (typeof points.value)[number]>();
-    points.value.forEach((point) => result.set(point.timestamp, point));
-    return result;
-  });
+  const hoverSessionDate = computed(() =>
+    hoverIndex.value == null
+      ? undefined
+      : visibleSessionDates.value[Math.floor(hoverIndex.value / samplesPerSessionDay.value)],
+  );
+  const hoverSampleIndex = computed(() => (hoverIndex.value ?? 0) % samplesPerSessionDay.value);
   const hoverPrice = computed(() => {
-    const timestamp = hoverIndex.value == null ? undefined : dates.value[hoverIndex.value];
-    const sessionDate = timestamp ? pointByTimestamp.value.get(timestamp)?.sessionDate : undefined;
+    const sessionDate = hoverSessionDate.value;
     if (!sessionDate) return null;
     return priceByDate.value.get(sessionDate) ?? null;
   });
@@ -509,22 +514,6 @@
     return xForSlot(
       Math.max(0, visibleSessionDates.value.indexOf(sessionDate)) * samplesPerSessionDay.value,
     );
-  }
-
-  function xForTimestamp(timestamp: string | undefined) {
-    if (!timestamp) return plot.left;
-    for (const [, byDate] of pointsBySession.value) {
-      for (const [sessionDate, group] of byDate) {
-        const sampleIndex = group.findIndex((point) => point.timestamp === timestamp);
-        if (sampleIndex >= 0) {
-          return xForSlot(
-            visibleSessionDates.value.indexOf(sessionDate) * samplesPerSessionDay.value +
-              sampleIndex,
-          );
-        }
-      }
-    }
-    return plot.left;
   }
 
   function yForValue(value: number) {
@@ -557,13 +546,12 @@
     return value.slice(5, 16).replace('T', ' ');
   }
 
-  function formatDateTime(value: string | undefined) {
-    if (!value) return '—';
-    return value.replace('T', ' ').replace('Z', ' UTC').slice(0, 19);
-  }
-
   function valueAt(series: { key: string }, index: number) {
-    const value = visibleValueMap.value.get(series.key)?.get(dates.value[index]);
+    const sessionDate = visibleSessionDates.value[Math.floor(index / samplesPerSessionDay.value)];
+    const point = pointsBySession.value.get(series.key)?.get(sessionDate)?.[
+      index % samplesPerSessionDay.value
+    ];
+    const value = point ? Number(point.value) : null;
     return value == null ? '—' : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
   }
 
@@ -578,31 +566,25 @@
     if (!dates.value.length) return;
     const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 1200;
-    let nearest = 0;
-    let distance = Number.POSITIVE_INFINITY;
-    dates.value.forEach((timestamp, index) => {
-      const candidate = xForTimestamp(timestamp);
-      const candidateDistance = Math.abs(candidate - x);
-      if (candidateDistance < distance) {
-        nearest = index;
-        distance = candidateDistance;
-      }
-    });
-    hoverIndex.value = nearest;
+    const ratio = Math.max(0, Math.min(1, (x - plot.left) / (plot.right - plot.left)));
+    hoverIndex.value = Math.round(ratio * plotSlotCount.value);
   }
 
   function onRangeStartChange(value: number) {
     startIndex.value = value;
+    customRangeApplied.value = true;
   }
 
   function onRangeEndChange(value: number) {
     endIndex.value = value;
+    customRangeApplied.value = true;
   }
 
   function selectPresetRange(value: number) {
     customRangeOpen.value = false;
     customRangeApplied.value = false;
     days.value = value;
+    applyPresetIndices();
   }
 
   function openCustomRange() {
@@ -630,28 +612,70 @@
   }
 
   async function load() {
+    clearTimeout(rangeTimer);
     const serial = ++requestSerial;
     status.value = 'loading';
     hoverIndex.value = null;
     try {
-      const result = await getCumulativeVolatility(props.asset, days.value, precision.value);
+      const result = await getCumulativeVolatility(props.asset, 365, precision.value);
       if (serial !== requestSerial) return;
       response.value = result.data;
-      startIndex.value = 0;
-      endIndex.value = Math.max(0, allDates.value.length - 1);
+      fullResponse.value = result.data;
+      applyPresetIndices();
       customRangeApplied.value = false;
       customRangeOpen.value = false;
-      status.value = result.data.points.length ? 'ready' : 'error';
+      if (!result.data.points.length) status.value = 'error';
     } catch (error) {
       if (serial !== requestSerial) return;
       console.warn('[hedgeBoard] cumulative volatility unavailable', props.asset, error);
       response.value = null;
+      fullResponse.value = null;
       status.value = 'error';
     }
   }
 
+  function applyPresetIndices() {
+    const last = allDates.value.at(-1);
+    if (!last) return;
+    const cutoff = Date.parse(last) - days.value * 86_400_000;
+    startIndex.value = Math.max(
+      0,
+      allDates.value.findIndex((date) => Date.parse(date) >= cutoff),
+    );
+    endIndex.value = allDates.value.length - 1;
+    // Also reapply when the preset was already selected but the slider moved.
+    scheduleWindowRead();
+  }
+
+  function scheduleWindowRead() {
+    clearTimeout(rangeTimer);
+    const serial = ++requestSerial;
+    hoverIndex.value = null;
+    if (!allDates.value.length) return;
+    status.value = 'loading';
+    rangeTimer = setTimeout(async () => {
+      try {
+        const result = await getCumulativeVolatility(props.asset, 365, precision.value, {
+          start: allDates.value[startIndex.value],
+          end: allDates.value[endIndex.value],
+        });
+        if (serial !== requestSerial) return;
+        response.value = result.data;
+        status.value = 'ready';
+      } catch {
+        if (serial !== requestSerial) return;
+        status.value = 'error';
+      }
+    }, 180);
+  }
+
   onMounted(load);
-  watch([days, precision, () => props.asset], load);
+  watch([precision, () => props.asset], load);
+  watch([startIndex, endIndex], scheduleWindowRead);
+  onBeforeUnmount(() => {
+    clearTimeout(rangeTimer);
+    requestSerial += 1;
+  });
 </script>
 
 <style scoped lang="less">

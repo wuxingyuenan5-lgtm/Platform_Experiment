@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, time
@@ -13,6 +14,8 @@ from fastapi import FastAPI
 
 from app.a_share_research_policy import classify_market_breadth, classify_speculation
 from app.config import get_settings
+from app.data_audit_calendar import calendar_snapshot
+from app.database_connection import read_only_connection
 from app.research_a_share_repository import (
     finish_refresh,
     publish_refresh,
@@ -34,6 +37,7 @@ from app.research_service import _PROVIDER, collect_a_share_dashboard
 
 _REFRESH_LOCK = asyncio.Lock()
 _CHINA = ZoneInfo("Asia/Shanghai")
+_LOGGER = logging.getLogger(__name__)
 
 
 def _history_return(points: list[AShareIndexHistoryPoint], sessions: int) -> float | None:
@@ -53,7 +57,15 @@ def _history_ytd(points: list[AShareIndexHistoryPoint]) -> float | None:
 
 def _scheduled_refresh_due(now: datetime | None = None) -> bool:
     local = (now or datetime.now(UTC)).astimezone(_CHINA)
-    return local.weekday() < 5 and local.time() >= time(15, 5)
+    if local.time() < time(15, 5):
+        return False
+    try:
+        with read_only_connection() as db:
+            calendar = calendar_snapshot(db, local.date().isoformat())
+    except Exception:
+        _LOGGER.exception("A-share trading calendar is unavailable for scheduled refresh")
+        return False
+    return bool(calendar and local.date().isoformat() in calendar["days"])
 
 
 async def _collect[T](awaitable: Awaitable[T], seconds: float = 90) -> T:
@@ -61,7 +73,9 @@ async def _collect[T](awaitable: Awaitable[T], seconds: float = 90) -> T:
 
 
 def _quote_date(row: Any) -> str | None:
-    observed = row.observed_at
+    observed = row.get("observed_at") if isinstance(row, dict) else row.observed_at
+    if isinstance(observed, str):
+        observed = datetime.fromisoformat(observed)
     return observed.astimezone(_CHINA).date().isoformat() if observed else None
 
 
@@ -95,62 +109,138 @@ def _breadth(spots: Any, emotion: Any) -> AShareBreadthSnapshot | Exception:
     )
 
 
-def _crowding(dashboard: Any, trade_date: str | None) -> None:
-    # Continue the existing four-industry series from the same complete market
-    # and Shenwan aggregation. The historical innovation-drug series keeps its
-    # own observation date; it is never advanced without a source observation.
+def _crowding(
+    dashboard: Any,
+    trade_date: str | None,
+    spots: list[Any] | BaseException,
+    sector_quotes: list[dict[str, Any]] | BaseException,
+    innovation: dict[str, Any] | BaseException,
+) -> None:
+    # Persist direct sector-board quotes only when all fields and dates align.
     from app.research_data_schemas import ResearchModuleResult, ResearchSourceMeta
 
     previous = read_dataset("crowding") or {}
-    aggregation = dashboard.shenwan.data
-    if not trade_date or aggregation is None:
+    if not trade_date:
         if previous:
             dashboard.crowding = ResearchModuleResult(
                 meta=ResearchSourceMeta(
-                    source="申万二级行业成交额",
+                    source="申万二级行业成交额 / 创新药BK1106",
                     fetched_at=dashboard.generated_at,
                     status="error",
-                    message="本次行业数据不完整",
+                    message="本次未取得有效的A股交易日",
                 ),
                 data=None,
             )
         return
-    codes = {"通信设备": "801102", "计算机设备": "801101", "元件": "801083", "半导体": "801081"}
-    sectors = {row.sw_l2_code: row for row in aggregation.sw2_all}
-    targets = {}
-    for name, code in codes.items():
-        row = sectors.get(code)
-        targets[name] = {
-            "code": code,
-            "amount100m": float(row.turnover_yuan / Decimal("1e8")) if row else None,
-            "amountShareOfA": float(row.market_share_pct / 100) if row else None,
-            "turnoverPct": None,
+    latest = previous.get("latest")
+    history = list(previous.get("history", []))
+    sectors_complete = False
+    sector_message: str | None = None
+    if isinstance(sector_quotes, list) and isinstance(spots, list):
+        amount_total = sum((row.turnover_yuan for row in spots), Decimal("0"))
+        quote_by_code = {str(row.get("code")): row for row in sector_quotes}
+        required_codes = {"801102", "801101", "801083", "801081"}
+        if amount_total <= 0 or set(quote_by_code) != required_codes:
+            sector_message = "四行业板块报价或全A成交额不完整"
+        else:
+            targets: dict[str, dict[str, Any]] = {}
+            for name, code in (
+                ("通信设备", "801102"),
+                ("计算机设备", "801101"),
+                ("元件", "801083"),
+                ("半导体", "801081"),
+            ):
+                quote = quote_by_code[code]
+                observed = quote.get("observed_at")
+                quote_date = (
+                    observed.astimezone(_CHINA).date().isoformat()
+                    if isinstance(observed, datetime)
+                    else None
+                )
+                amount = quote.get("amount_yuan")
+                turnover = quote.get("turnover_pct")
+                if (
+                    quote_date != trade_date
+                    or not isinstance(amount, Decimal)
+                    or amount <= 0
+                    or not isinstance(turnover, Decimal)
+                    or turnover < 0
+                ):
+                    sector_message = "四行业板块报价与全A交易日不一致或指标缺失"
+                    targets = {}
+                    break
+                targets[name] = {
+                    "code": code,
+                    "amount100m": float(amount / Decimal("1e8")),
+                    "amountShareOfA": float(amount / amount_total),
+                    "turnoverPct": float(turnover),
+                }
+            if targets:
+                values = list(targets.values())
+                sectors_complete = len(targets) == 4
+                latest = {
+                    "date": trade_date,
+                    "targets": targets,
+                    "combined": {
+                        "amount100m": sum(value["amount100m"] for value in values)
+                        if sectors_complete
+                        else None,
+                        "amountShareOfA": sum(value["amountShareOfA"] for value in values)
+                        if sectors_complete
+                        else None,
+                    },
+                }
+                history = [row for row in history if row.get("date") != trade_date]
+                history = sorted([*history, latest], key=lambda row: row["date"])[-2000:]
+    elif isinstance(sector_quotes, BaseException):
+        sector_message = "四行业板块报价读取失败，保留最近有效数据"
+
+    innovation_history = list(previous.get("innovationHistory", []))
+    quote_date = _quote_date(innovation) if isinstance(innovation, dict) else None
+    total_amount = (
+        sum((row.turnover_yuan for row in spots), Decimal("0"))
+        if isinstance(spots, list)
+        else Decimal("0")
+    )
+    if (
+        isinstance(innovation, dict)
+        and quote_date == trade_date
+        and total_amount > 0
+        and innovation.get("amount_yuan") is not None
+        and innovation.get("turnover_pct") is not None
+    ):
+        innovation_row = {
+            "date": trade_date,
+            "amount100m": float(innovation["amount_yuan"] / Decimal("1e8")),
+            "amountShareOfA": float(innovation["amount_yuan"] / total_amount),
+            "turnoverPct": float(innovation["turnover_pct"]),
+            "source": innovation.get("source"),
         }
-    values = list(targets.values())
-    complete = all(value["amount100m"] is not None for value in values)
-    latest = {
-        "date": trade_date,
-        "targets": targets,
-        "combined": {
-            "amount100m": sum(value["amount100m"] for value in values) if complete else None,
-            "amountShareOfA": sum(value["amountShareOfA"] for value in values)
-            if complete
-            else None,
-        },
-    }
-    history = [row for row in previous.get("history", []) if row.get("date") != trade_date]
-    history = sorted([*history, latest], key=lambda row: row["date"])[-2000:]
+        innovation_history = [
+            row for row in innovation_history if row.get("date") != trade_date
+        ]
+        innovation_history = sorted(
+            [*innovation_history, innovation_row], key=lambda row: row["date"]
+        )[-2000:]
+    innovation_complete = any(row.get("date") == trade_date for row in innovation_history)
+    complete = sectors_complete and innovation_complete
+    messages = []
+    if not sectors_complete:
+        messages.append(sector_message or "四行业成交额、成交额占比或换手率未取得本交易日完整数据")
+    if not innovation_complete:
+        messages.append("创新药成交额、成交额占比或换手率未取得本交易日数据")
     dashboard.crowding = ResearchModuleResult(
         meta=ResearchSourceMeta(
-            source="申万二级行业成交额 / 全市场成交额",
+            source="东方财富四行业板块报价 / 全A成交额 / 东方财富创新药BK1106",
             fetched_at=dashboard.generated_at,
             source_timestamp=datetime.fromisoformat(trade_date).replace(hour=15, tzinfo=_CHINA),
             status="ready" if complete else "partial",
+            message="；".join(messages) or None,
         ),
         data={
             "history": history,
             "latest": latest,
-            "innovationHistory": previous.get("innovationHistory", []),
+            "innovationHistory": innovation_history,
         },
     )
 
@@ -165,29 +255,35 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
         not force
         and latest
         and latest["status"] == "ready"
-        and (
-            latest["targetTradeDate"] == today
-            or datetime.fromisoformat(latest["startedAt"]).astimezone(_CHINA).date().isoformat()
-            == today
-        )
+        and latest["targetTradeDate"] == today
     ):
         return "up_to_date"
     if _REFRESH_LOCK.locked():
         return "busy"
     async with _REFRESH_LOCK:
-        run_id = uuid4().hex
+        run_id = f"a-share-{uuid4().hex}"
         start_refresh(run_id, None)
         try:
             codes = read_tracked_codes()
             previous = read_stock_pool(codes)
             prior_by_code = {row["code"]: row for row in previous["focusStocks"]}
-            indices, spots, memberships, emotion, histories = await asyncio.gather(
-                _collect(_PROVIDER.index_snapshots(), 180),
-                _collect(_PROVIDER.a_share_spot(), 180),
-                _collect(_PROVIDER.shenwan_memberships()),
-                _collect(_PROVIDER.short_term_emotion()),
-                _collect(_PROVIDER.stock_daily_histories(codes), 240),
-                return_exceptions=True,
+            # Keep heterogeneous gather groups within its typed tuple overloads.
+            (indices, spots, memberships, emotion), (sector_quotes, innovation, histories) = (
+                await asyncio.gather(
+                    asyncio.gather(
+                        _collect(_PROVIDER.index_snapshots(), 180),
+                        _collect(_PROVIDER.a_share_spot(), 180),
+                        _collect(_PROVIDER.shenwan_memberships()),
+                        _collect(_PROVIDER.short_term_emotion()),
+                        return_exceptions=True,
+                    ),
+                    asyncio.gather(
+                        _collect(_PROVIDER.sector_crowding_snapshot()),
+                        _collect(_PROVIDER.innovation_drug_snapshot()),
+                        _collect(_PROVIDER.stock_daily_histories(codes), 240),
+                        return_exceptions=True,
+                    ),
+                )
             )
             breadth = _breadth(spots, emotion)
             dashboard = await collect_a_share_dashboard(
@@ -234,7 +330,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             ):
                 dashboard.breadth.meta.status = "partial"
                 dashboard.breadth.meta.message = "涨跌分布与涨跌停池未取得同一交易日的完整数据"
-            _crowding(dashboard, trade_date)
+            _crowding(dashboard, trade_date, spots, sector_quotes, innovation)
             member_by_code = (
                 {row.security_code: row for row in memberships}
                 if isinstance(memberships, list)
@@ -446,5 +542,23 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 async def _run_periodic(interval_seconds: float) -> None:
     while True:
-        await refresh_a_share_research()
+        try:
+            result = await refresh_a_share_research()
+            if result in {"error", "partial"}:
+                status = read_refresh_status() or {}
+                _LOGGER.warning(
+                    "A-share scheduled refresh result=%s run_id=%s target_trade_date=%s "
+                    "error_code=%s message=%s",
+                    result,
+                    status.get("runId"),
+                    status.get("targetTradeDate"),
+                    status.get("errorCode"),
+                    status.get("message"),
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # A one-off database/provider/runtime error must not kill the in-process
+            # scheduler permanently. The next interval retries from persisted state.
+            _LOGGER.exception("A-share scheduled refresh cycle crashed; it will retry")
         await asyncio.sleep(max(60.0, interval_seconds))

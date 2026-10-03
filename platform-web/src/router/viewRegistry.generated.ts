@@ -20,6 +20,7 @@ export const viewRegistry = {
   'notification/index': () => import('@/views/notification/index.vue'),
   'platform/index': () => import('@/views/platform/index.vue'),
   'reports/index': () => import('@/views/reports/index.vue'),
+  'risk/data-audit/index': () => import('@/views/risk/data-audit/index.vue'),
   'risk/detail/index': () => import('@/views/risk/detail/index.vue'),
   'settings/index': () => import('@/views/settings/index.vue'),
   'strategy/index': () => import('@/views/strategy/index.vue'),

@@ -57,11 +57,59 @@ INDEX_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
 _CSI_THEME_INDEX_CODES = frozenset({"931071", "931238", "932082", "H30590"})
 _CSI_INDEX_PERFORMANCE_URL = "https://www.csindex.com.cn/csindex-home/perf/index-perf"
 
-_EM_ALL_A_URL = "https://push2delay.eastmoney.com/api/qt/clist/get"
+_EM_ALL_A_PATH = "/api/qt/clist/get"
+_EM_STOCK_QUOTE_PATH = "/api/qt/stock/get"
+_EM_DELAY_HOSTS = ("push2delay2.eastmoney.com", "push2delay.eastmoney.com")
+_EM_DELAY_HOST_INDEX = 0
 _EM_ALL_A_FIELDS = "f2,f3,f5,f6,f8,f9,f12,f14,f18,f20,f23,f109,f124"
 _EM_ALL_A_FILTER = "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048"
 _EM_SECTOR_FLOW_FILTER = "m:90+t:2"
 _EM_SECTOR_FLOW_FIELDS = "f12,f14,f3,f62,f104,f105,f106"
+_CROWDING_SECTORS = {
+    "通信设备": ("801102", "BK0448"),
+    "计算机设备": ("801101", "BK0735"),
+    "元件": ("801083", "BK0459"),
+    "半导体": ("801081", "BK1036"),
+}
+
+
+async def _eastmoney_json(
+    client: httpx.AsyncClient,
+    path: str,
+    params: dict[str, str],
+    headers: dict[str, str],
+) -> dict[str, Any]:
+    """Read an Eastmoney payload through its working delay-node pool.
+
+    Eastmoney's default delay node currently completes TLS then resets requests;
+    the sibling delay2 node serves the same API and fields. Keep a successful
+    node first for the process and fail over without changing data semantics.
+    """
+    global _EM_DELAY_HOST_INDEX
+    start = _EM_DELAY_HOST_INDEX
+    errors: list[BaseException] = []
+    for offset in range(len(_EM_DELAY_HOSTS)):
+        index = (start + offset) % len(_EM_DELAY_HOSTS)
+        host = _EM_DELAY_HOSTS[index]
+        try:
+            response = await client.get(
+                f"https://{host}{path}", params=params, headers=headers
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
+                raise ValueError("eastmoney_clist_payload_missing_data")
+            _EM_DELAY_HOST_INDEX = index
+            return payload
+        except (httpx.HTTPError, ValueError) as exc:
+            errors.append(exc)
+    raise ResearchProviderError("eastmoney_quote_nodes_unavailable") from errors[-1]
+
+
+async def _eastmoney_clist(
+    client: httpx.AsyncClient, params: dict[str, str], headers: dict[str, str]
+) -> dict[str, Any]:
+    return await _eastmoney_json(client, _EM_ALL_A_PATH, params, headers)
 
 
 class AShareResearchProvider:
@@ -84,6 +132,114 @@ class AShareResearchProvider:
             # It is never used by the browser and an empty fallback cannot
             # overwrite a persisted complete snapshot.
             return await self._akshare_a_share_spot()
+
+    async def innovation_drug_snapshot(self) -> dict[str, Any]:
+        """Collect the close snapshot used by the innovation-drug crowding series."""
+        params = {
+            "secid": "90.BK1106",
+            "fields": "f43,f47,f48,f86,f168,f170",
+            "mpi": "1000",
+            "invt": "2",
+            "fltt": "2",
+            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+        }
+        headers = {
+            "User-Agent": self._user_agent,
+            "Referer": "https://quote.eastmoney.com/",
+        }
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
+            ) as client:
+                payload = await _eastmoney_json(client, _EM_STOCK_QUOTE_PATH, params, headers)
+        except (httpx.HTTPError, ValueError) as exc:
+            raise ResearchProviderError("innovation_drug_quote_unavailable") from exc
+        row = payload.get("data") or {}
+        amount = _decimal(row.get("f48"))
+        turnover_raw = _decimal(row.get("f168"))
+        timestamp = _integer(row.get("f86"))
+        return_raw = _decimal(row.get("f170"))
+        if amount is None or turnover_raw is None or timestamp is None:
+            raise ResearchProviderError("innovation_drug_quote_incomplete")
+        return {
+            "observed_at": datetime.fromtimestamp(timestamp, UTC),
+            "amount_yuan": amount,
+            # The dashboard contract stores percentage points (3.27 means 3.27%),
+            # while the chart converts that value to a fraction for percent axes.
+            "turnover_pct": turnover_raw,
+            "return_pct": (
+                return_raw / Decimal("100")
+                if return_raw is not None
+                else None
+            ),
+            "source": "东方财富创新药BK1106",
+        }
+
+    async def sector_crowding_snapshot(self) -> list[dict[str, Any]]:
+        """Read the four selected Eastmoney industry-board close snapshots."""
+        headers = {
+            "User-Agent": self._user_agent,
+            "Referer": "https://quote.eastmoney.com/center/boardlist.html#boards-BK0448",
+        }
+        base_params = {
+            "fields": "f43,f47,f48,f86,f168",
+            "mpi": "1000",
+            "invt": "2",
+            "fltt": "2",
+            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+        }
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
+            ) as client:
+                payloads = await asyncio.gather(
+                    *(
+                        _eastmoney_json(
+                            client,
+                            _EM_STOCK_QUOTE_PATH,
+                            {**base_params, "secid": f"90.{board_code}"},
+                            headers,
+                        )
+                        for _, board_code in _CROWDING_SECTORS.values()
+                    )
+                )
+        except (httpx.HTTPError, ValueError) as exc:
+            raise ResearchProviderError("sector_crowding_quote_unavailable") from exc
+
+        result: list[dict[str, Any]] = []
+        for (name, (code, board_code)), payload in zip(
+            _CROWDING_SECTORS.items(), payloads, strict=True
+        ):
+            row = payload.get("data") or {}
+            amount = _decimal(row.get("f48"))
+            turnover = _decimal(row.get("f168"))
+            timestamp = _integer(row.get("f86"))
+            if (
+                amount is None
+                or turnover is None
+                or timestamp is None
+                or amount < 0
+                or turnover < 0
+            ):
+                raise ResearchProviderError(f"sector_crowding_quote_incomplete_{code}")
+            result.append(
+                {
+                    "name": name,
+                    "code": code,
+                    "board_code": board_code,
+                    "amount_yuan": amount,
+                    "turnover_pct": turnover,
+                    "observed_at": datetime.fromtimestamp(timestamp, UTC),
+                    "source": f"东方财富行业板块{board_code}",
+                }
+            )
+        dates = {
+            item["observed_at"].astimezone(ZoneInfo("Asia/Shanghai")).date()
+            for item in result
+        }
+        if len(dates) != 1:
+            raise ResearchProviderError("sector_crowding_quote_date_mismatch")
+        return result
 
     async def sector_fund_flow(self) -> list[dict[str, Any]]:
         """Read live industry flow directly from Eastmoney's public quote feed.
@@ -110,13 +266,12 @@ class AShareResearchProvider:
                 timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
             ) as client:
                 responses = await asyncio.gather(
-                    client.get(_EM_ALL_A_URL, params={**params, "po": "1"}, headers=headers),
-                    client.get(_EM_ALL_A_URL, params={**params, "po": "0"}, headers=headers),
+                    _eastmoney_clist(client, {**params, "po": "1"}, headers),
+                    _eastmoney_clist(client, {**params, "po": "0"}, headers),
                 )
                 raw_rows: list[dict[str, Any]] = []
                 for response in responses:
-                    response.raise_for_status()
-                    payload = response.json().get("data") or {}
+                    payload = response.get("data") or {}
                     diff = payload.get("diff") or []
                     raw_rows.extend(list(diff.values()) if isinstance(diff, dict) else list(diff))
         except (httpx.HTTPError, ValueError) as exc:
@@ -168,9 +323,8 @@ class AShareResearchProvider:
             async with httpx.AsyncClient(
                 timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
             ) as client:
-                response = await client.get(_EM_ALL_A_URL, params=params, headers=headers)
-                response.raise_for_status()
-                diff = (response.json().get("data") or {}).get("diff") or []
+                payload = await _eastmoney_clist(client, params, headers)
+                diff = (payload.get("data") or {}).get("diff") or []
         except (httpx.HTTPError, ValueError) as exc:
             raise ResearchProviderError("market_turnover_top_request_failed") from exc
         raw_rows = list(diff.values()) if isinstance(diff, dict) else list(diff)
@@ -216,11 +370,10 @@ class AShareResearchProvider:
             async with httpx.AsyncClient(
                 timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
             ) as client:
-                first = await client.get(
-                    _EM_ALL_A_URL, params={**base_params, "pn": "1"}, headers=headers
+                first_payload = await _eastmoney_clist(
+                    client, {**base_params, "pn": "1"}, headers
                 )
-                first.raise_for_status()
-                first_data = first.json().get("data") or {}
+                first_data = first_payload.get("data") or {}
                 total = int(first_data.get("total") or 0)
                 first_rows = (
                     list((first_data.get("diff") or {}).values())
@@ -234,14 +387,13 @@ class AShareResearchProvider:
                 # Vibe limits pagination concurrency to avoid upstream bursts.
                 for start in range(2, page_count + 1, 3):
                     requests = [
-                        client.get(
-                            _EM_ALL_A_URL, params={**base_params, "pn": str(page)}, headers=headers
+                        _eastmoney_clist(
+                            client, {**base_params, "pn": str(page)}, headers
                         )
                         for page in range(start, min(start + 3, page_count + 1))
                     ]
-                    for response in await asyncio.gather(*requests):
-                        response.raise_for_status()
-                        diff = (response.json().get("data") or {}).get("diff") or []
+                    for payload in await asyncio.gather(*requests):
+                        diff = (payload.get("data") or {}).get("diff") or []
                         pages.append(list(diff.values()) if isinstance(diff, dict) else list(diff))
         except (httpx.HTTPError, ValueError, ResearchProviderError) as exc:
             if isinstance(exc, ResearchProviderError):
@@ -741,14 +893,20 @@ class AShareResearchProvider:
         for offset in range(0, 8):
             candidate = date.today() - timedelta(days=offset)
             date_text = candidate.strftime("%Y%m%d")
-            zt, zb, dt, previous = await asyncio.gather(
+            pool_results = await asyncio.gather(
                 self._limit_pool("getTopicZTPool", date_text, "fbt:asc"),
                 self._limit_pool("getTopicZBPool", date_text, "zttj:desc"),
                 self._limit_pool("getTopicDTPool", date_text, "fund:asc"),
                 self._limit_pool("getYesterdayZTPool", date_text, "zs:desc"),
             )
+            source_dates = {source_date for source_date, rows in pool_results if rows}
+            if len(source_dates) != 1 or None in source_dates:
+                continue
+            zt, zb, dt, previous = (rows for _, rows in pool_results)
             if zt or zb or dt:
-                selected_date = candidate
+                selected_date = next(iter(source_dates))
+                if selected_date is None or selected_date > candidate:
+                    continue
                 pools = {"zt": zt, "zb": zb, "dt": dt, "previous": previous}
                 break
         if selected_date is None:
@@ -803,7 +961,9 @@ class AShareResearchProvider:
             trade_date=selected_date,
         )
 
-    async def _limit_pool(self, endpoint: str, trade_date: str, sort: str) -> list[dict[str, Any]]:
+    async def _limit_pool(
+        self, endpoint: str, trade_date: str, sort: str
+    ) -> tuple[date | None, list[dict[str, Any]]]:
         params = {
             "ut": "7eea3edcaed734bea9cbfc24409ed989",
             "dpt": "wz.ztzt",
@@ -825,6 +985,8 @@ class AShareResearchProvider:
                     },
                 )
                 response.raise_for_status()
-                return (response.json().get("data") or {}).get("pool") or []
+                data = response.json().get("data") or {}
+                source_date = datetime.strptime(str(data.get("qdate")), "%Y%m%d").date()
+                return source_date, data.get("pool") or []
         except (httpx.HTTPError, ValueError):
-            return []
+            return None, []

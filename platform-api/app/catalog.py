@@ -9,6 +9,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from app.database import connection
+from app.pnl_reporting import reporting_date
 from app.schemas import (
     AccountResponse,
     AccountRiskSnapshotResponse,
@@ -34,6 +35,123 @@ from app.schemas import (
 )
 from app.trading import decimal_text, submit_order
 from app.v1_readiness import get_strategy_v1_readiness
+
+
+def _funding_current_positions(
+    account_id: str,
+    finance_positions: list[dict[str, object]],
+) -> tuple[list[PositionResponse], dict[str, object]]:
+    """Project Funding inventory from open order groups, never from lifetime fills.
+
+    Fills remain the authority for historical PnL. Current Funding exposure is
+    owned by the opening instruction group because spot fees and later closes
+    make a lifetime signed-fill net an unreliable current position.
+    """
+    from app.strategies.funding_workspace import list_funding_position_groups
+    from app.strategies.instruction_service import get_instruction
+    from app.strategy_financial_readmodel import position_exposure, position_notional
+
+    grouped: dict[tuple[str, str, str, str, str], dict[str, object]] = {}
+    instrument_ids: set[str] = set()
+    for group in list_funding_position_groups(scope="active"):
+        instruction = get_instruction(str(group["openInstructionId"]))
+        plan = instruction.get("executionPlan")
+        if not isinstance(plan, dict) or not isinstance(plan.get("legs"), list):
+            continue
+        legs_by_role = {
+            str(leg.get("role")): leg
+            for leg in plan["legs"]
+            if isinstance(leg, dict)
+        }
+        for role, quantity_field, side_field in (
+            ("spot_leg", "remainingSpotHolding", "spotSide"),
+            ("perpetual_leg", "remainingPerpetualQuantity", "perpetualSide"),
+        ):
+            leg = legs_by_role.get(role)
+            if not leg or str(leg.get("accountId") or "") != account_id:
+                continue
+            raw_quantity = group.get(quantity_field)
+            if raw_quantity is None:
+                # Missing spot-fee evidence is unknown inventory, not zero and
+                # not a reason to resurrect an old fill-derived quantity.
+                continue
+            quantity = Decimal(str(raw_quantity))
+            if quantity <= 0:
+                continue
+            instrument_id = str(leg.get("instrumentId") or "")
+            side = str(leg.get("side") or group.get(side_field) or "").lower()
+            if not instrument_id or side not in {"buy", "sell"}:
+                continue
+            instrument_ids.add(instrument_id)
+            key = (instrument_id, role, side, str(leg.get("externalSymbol") or ""), account_id)
+            current = grouped.setdefault(
+                key,
+                {
+                    "quantity": Decimal("0"),
+                    "multiplier": (
+                        Decimal(str(leg["contractMultiplier"]))
+                        if leg.get("contractMultiplier") is not None
+                        else None
+                    ),
+                    "asOf": str(group.get("asOf") or ""),
+                },
+            )
+            current["quantity"] = Decimal(str(current["quantity"])) + quantity
+            current["asOf"] = max(str(current["asOf"]), str(group.get("asOf") or ""))
+
+    if not grouped:
+        return [], {"positionValue": None, "positionValueNet": None, "positionValueCurrency": None}
+
+    placeholders = ",".join("?" for _ in instrument_ids)
+    with connection() as db:
+        specs = {
+            str(row["id"]): dict(row)
+            for row in db.execute(
+                "SELECT id,instrument_code,instrument_type,quote_currency,settle_currency "
+                f"FROM instruments WHERE id IN ({placeholders})",
+                sorted(instrument_ids),
+            ).fetchall()
+        }
+    marks = {
+        str(row.get("instrumentId") or ""): row
+        for row in finance_positions
+        if row.get("instrumentId")
+    }
+    projected: list[dict[str, object]] = []
+    result: list[PositionResponse] = []
+    for (instrument_id, role, side, symbol, account), item in grouped.items():
+        spec = specs.get(instrument_id)
+        if spec is None:
+            continue
+        unsigned_quantity = Decimal(str(item["quantity"]))
+        quantity = unsigned_quantity if side == "buy" else -unsigned_quantity
+        mark = marks.get(instrument_id, {})
+        price_raw = mark.get("currentPrice")
+        price = Decimal(str(price_raw)) if price_raw is not None else None
+        multiplier = (
+            str(item["multiplier"]) if item.get("multiplier") is not None else None
+        )
+        value = position_notional(
+            mark={}, quantity=quantity, price=price, multiplier=multiplier
+        )
+        currency = str(spec.get("quote_currency") or "")
+        row: dict[str, object] = {
+            "accountId": account,
+            "instrumentId": instrument_id,
+            "netQuantity": str(quantity),
+            "averagePrice": None,
+            "symbol": symbol or str(spec["instrument_code"]),
+            "instrumentType": str(spec["instrument_type"]),
+            "category": "spot" if role == "spot_leg" else "linear",
+            "currency": str(spec.get("settle_currency") or currency),
+            "currentPrice": str(price) if price is not None else None,
+            "positionValue": str(value) if value is not None else None,
+            "positionValueCurrency": currency or None,
+            "asOf": str(item["asOf"]) or None,
+        }
+        projected.append(row)
+        result.append(PositionResponse.model_validate(row))
+    return result, position_exposure(projected)
 
 
 class ManagementDeskMetadata(TypedDict):
@@ -641,7 +759,7 @@ def get_strategy_account_snapshot(
             """,
             (binding.account_id, binding.account_id),
         ).fetchall()
-        # One closing per UTC day on the account's current measurement scope and
+        # One closing per Beijing day on the account's current measurement scope and
         # currency, so day-over-day P&L never spans a scope or currency change.
         daily_rows = db.execute(
             """
@@ -680,18 +798,21 @@ def get_strategy_account_snapshot(
         performance_cutoff = coverage_row["end_at"] if coverage_row else None
         from app.account_performance import stamp
 
-        if performance_cutoff:
+        cutoff_time = stamp(performance_cutoff) if performance_cutoff else None
+        if cutoff_time:
             risk_history_rows = [
-                row for row in risk_history_rows if stamp(row["as_of"]) <= stamp(performance_cutoff)
+                row for row in risk_history_rows if stamp(row["as_of"]) <= cutoff_time
             ]
         daily_by_date = {}
+        daily_times = {}
         for row in daily_rows:
-            if performance_cutoff and stamp(row["as_of"]) > stamp(performance_cutoff):
+            observed_at = stamp(row["as_of"])
+            if cutoff_time and observed_at > cutoff_time:
                 continue
-            day = stamp(row["as_of"]).date().isoformat()
-            current = daily_by_date.get(day)
-            if current is None or stamp(row["as_of"]) > stamp(current["as_of"]):
+            day = reporting_date(observed_at).isoformat()
+            if day not in daily_times or observed_at > daily_times[day]:
                 daily_by_date[day] = row
+                daily_times[day] = observed_at
         daily_rows = [daily_by_date[day] for day in sorted(daily_by_date)]
 
     account = get_account(binding.account_id)
@@ -783,7 +904,7 @@ def get_strategy_account_snapshot(
         ):
             daily_pnl_points.append(
                 StrategyDailyPnlPointResponse(
-                    date=point.as_of.astimezone(UTC).date().isoformat(),
+                    date=reporting_date(point.as_of).isoformat(),
                     currency=point.currency or "",
                     pnl=amount,
                     returnRate=rate,
@@ -828,10 +949,9 @@ def get_strategy_account_snapshot(
         orders, fills, orders_total, fills_total = [], [], 0, 0
     from app.strategy_financial_readmodel import get_strategy_financials
 
-    # Funding spot holdings live in the venue balance snapshot rather than the
-    # account-level ``positions`` table.  Use the existing strategy readmodel
-    # to project both owned legs for the summary read too; otherwise the capital
-    # page can only see the perpetual leg and reports a false net short.
+    # Funding needs the historical finance readmodel for PnL, but current
+    # exposure is projected below from active opening groups. Lifetime fill net
+    # can retain fee dust after a group is fully closed.
     needs_funding_positions = strategy.strategy_key == "funding_arbitrage" and not account_scope
     finance = (
         get_strategy_financials(
@@ -840,8 +960,15 @@ def get_strategy_account_snapshot(
         if include_details or needs_funding_positions
         else None
     )
+    funding_exposure: dict[str, object] | None = None
     if finance is not None and not account_scope and not is_cross_spread:
-        positions = [PositionResponse.model_validate(row) for row in finance["positions"]]
+        if strategy.strategy_key == "funding_arbitrage":
+            positions, funding_exposure = _funding_current_positions(
+                binding.account_id,
+                finance.get("positions", []),
+            )
+        else:
+            positions = [PositionResponse.model_validate(row) for row in finance["positions"]]
     pnl = None
     if (
         include_details
@@ -858,6 +985,8 @@ def get_strategy_account_snapshot(
     risk_payload = json.loads(display_risk_row["payload_json"]) if display_risk_row else {}
     if account_scope or is_cross_spread:
         positions, exposure = monitor_position_valued(positions)
+    elif strategy.strategy_key == "funding_arbitrage":
+        exposure = funding_exposure or {}
     else:
         exposure = finance.get("exposure") if finance is not None else {}
         if not isinstance(exposure, dict):

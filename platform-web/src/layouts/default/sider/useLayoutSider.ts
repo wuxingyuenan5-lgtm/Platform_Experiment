@@ -85,7 +85,6 @@ export function useDragLine(siderRef: Ref<any>, dragBarRef: Ref<any>, mix = fals
   function handleMouseMove(ele: HTMLElement, wrap: HTMLElement, clientX: number) {
     document.onmousemove = function (innerE) {
       let iT = (ele as any).left + (innerE.clientX - clientX);
-      innerE = innerE || window.event;
       const maxT = 800;
       const minT = unref(getMiniWidthNumber);
       iT < 0 && (iT = 0);

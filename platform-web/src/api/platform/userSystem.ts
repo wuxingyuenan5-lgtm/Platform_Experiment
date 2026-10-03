@@ -360,7 +360,11 @@ export async function loginUser(username: string, password: string): Promise<Aut
 
 export async function getCurrentAuthentication(): Promise<AuthenticationState> {
   if (authenticationRefresh) return authenticationRefresh;
-  authenticationRefresh = request<AuthenticationState>({ method: 'GET', url: '/auth/me' })
+  authenticationRefresh = request<AuthenticationState>({
+    method: 'GET',
+    url: '/auth/me',
+    headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
+  })
     .then(acceptAuthenticationState)
     .finally(() => {
       authenticationRefresh = null;

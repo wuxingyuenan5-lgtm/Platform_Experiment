@@ -281,6 +281,7 @@ export function useCrossSpreadFinance() {
       choices.map(({ key, label, account, total }) => {
         const points = (account?.equityHistory || [])
           .map((point) => ({
+            asOf: point.asOf,
             date: formatTime(point.asOf),
             value: total ? point.totalAssets : point.equity,
             drawdown: total ? point.totalAssetsDrawdown : point.equityDrawdown,
@@ -291,6 +292,7 @@ export function useCrossSpreadFinance() {
           key,
           {
             title: label,
+            timestamps: points.map((point) => point.asOf),
             xLabels: points.map((point) => point.date),
             netValueData: points.map((point) => Number(point.value)),
             drawdownData: points.map((point) =>
@@ -315,6 +317,7 @@ export function useCrossSpreadFinance() {
     const lastSessionPoint = sessionPoints.at(-1);
     metricSeries['totalAssets:mt5_open'] = {
       title: '全账户总资产',
+      timestamps: sessionPoints.map((point) => point.asOf),
       xLabels: sessionPoints.map((point) => formatTime(point.asOf)),
       netValueData: sessionPoints.map((point) => Number(point.totalAssets)),
       drawdownData: sessionPoints.map((point) =>

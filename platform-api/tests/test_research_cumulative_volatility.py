@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -6,10 +6,10 @@ import app.research_cumulative_volatility as cumulative
 from app.config import get_settings
 from app.database import initialize_database
 from app.research_cumulative_volatility import (
+    _rebase_points_to_window,
     calculate_cumulative_volatility,
     read_cumulative_volatility,
 )
-from app.research_cumulative_volatility import _rebase_points_to_window
 
 
 def _candle(timestamp: str, close: float) -> list[object]:
@@ -118,3 +118,88 @@ def test_refresh_publishes_read_model_from_shared_strategy_archive(monkeypatch) 
     assert result["source"] == cumulative.SOURCE
     assert result["points"]
     assert get_settings().database_path
+
+
+@pytest.mark.parametrize("interval", ["15m", "1h", "4h"])
+def test_custom_window_rebases_in_backend_without_changing_stored_history(interval) -> None:
+    from app.research_a_share_repository import start_refresh, write_history_points
+
+    initialize_database()
+    start_refresh("window-test", None)
+    origin = datetime.now(UTC).replace(microsecond=0) - timedelta(days=10)
+    stamps = [(origin + timedelta(days=i)).isoformat().replace("+00:00", "Z") for i in range(3)]
+    records = [
+        (stamp, f"btc:{session}:{interval}", {
+            "timestamp": stamp, "session": session, "sessionDate": stamp[:10],
+            "interval": interval, "value": str(10 * (n + 1) + i), "price": "100",
+        })
+        for i, stamp in enumerate(stamps)
+        for n, session in enumerate(("asia", "europe", "americas"))
+    ]
+    write_history_points("window-test", cumulative.DATASET, records, source=cumulative.SOURCE)
+    full = read_cumulative_volatility("btc", 30, interval)
+    selected = read_cumulative_volatility(
+        "btc", 30, interval,
+        start=origin + timedelta(days=1), end=origin + timedelta(days=2),
+    )
+    assert len(selected["points"]) == 6
+    for session in ("asia", "europe", "americas"):
+        points = [p for p in selected["points"] if p["session"] == session]
+        assert [p["value"] for p in points] == ["0", "1"]
+    assert selected["availableFrom"] == stamps[0]
+    assert selected["availableTo"] == stamps[-1]
+    assert read_cumulative_volatility("btc", 30, interval)["points"] == full["points"]
+    historical = read_cumulative_volatility("btc", 30, interval, end=origin)
+    assert historical["asOf"] == stamps[-1]
+
+
+def test_custom_window_rejects_naive_or_reversed_timestamps() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="timezone"):
+        read_cumulative_volatility(start=now.replace(tzinfo=None))
+    with pytest.raises(ValueError, match="after"):
+        read_cumulative_volatility(start=now, end=now - timedelta(days=1))
+
+
+def test_provisional_refresh_replaces_bucket_and_keeps_other_assets(monkeypatch) -> None:
+    import json
+
+    from app.database import connection
+    from app.research_a_share_repository import start_refresh, write_history_points
+
+    initialize_database()
+    start_refresh("sample-test", None)
+    day = (datetime.now(UTC) - timedelta(days=1)).date().isoformat()
+
+    def record(asset, time, value):
+        stamp = f"{day}T{time}:00Z"
+        return (stamp, f"{asset}:europe:4h", {
+            "asset": asset, "timestamp": stamp, "session": "europe", "sessionDate": day,
+            "interval": "4h", "value": str(value), "price": "100",
+        })
+
+    initial = [record("btc", "07:10", 2), record("btc", "07:15", 3),
+               record("gold", "07:10", 9), record("btc", "11:10", 4)]
+    write_history_points("sample-test", cumulative.DATASET, initial, source=cumulative.SOURCE)
+    result = read_cumulative_volatility("btc", 30, "4h")
+    assert [p["timestamp"][11:16] for p in result["points"]] == ["07:15", "11:10"]
+    assert [p["value"] for p in result["points"]] == ["0", "1"]
+    replacement = [record("btc", "07:20", 3.5)]
+    cumulative._publish_samples("sample-test", replacement, set())
+    with connection() as db:
+        rows = db.execute(
+            "SELECT entity_code,payload_json FROM research_a_share_history"
+        ).fetchall()
+    assert len(rows) == 3
+    assert any(r["entity_code"].startswith("gold:") for r in rows)
+    assert "07:20" in next(json.loads(r["payload_json"])["timestamp"] for r in rows
+                           if json.loads(r["payload_json"])["value"] == "3.5")
+
+    def fail_write(*args, **kwargs):
+        raise RuntimeError("publication failure")
+
+    monkeypatch.setattr(cumulative, "write_history_points", fail_write)
+    with pytest.raises(RuntimeError, match="publication failure"):
+        cumulative._publish_samples("sample-test", [record("btc", "07:25", 4)], {"btc"})
+    timestamp = read_cumulative_volatility("btc", 30, "4h")["points"][0]["timestamp"]
+    assert timestamp.endswith("07:20:00Z")

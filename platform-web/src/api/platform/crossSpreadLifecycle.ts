@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { createStrategyApi, strategyData } from './strategyApi';
 import type { components } from './generated/strategy';
 
@@ -79,13 +80,29 @@ export type CrossSpreadPreflightInput = components['schemas']['CrossSpreadPrefli
 export type CrossSpreadPreflightResult = components['schemas']['CrossSpreadPreflightResponse'];
 
 export async function getCrossSpreadInstruction(idempotencyKey: string) {
-  const instructions = strategyData(
-    await api.GET('/api/v1/strategies/{strategy_instance_id}/instructions', {
-      params: { path: { strategy_instance_id: 'strategy_cross_venue_spread_instance_default' } },
-    }),
-  );
-  const instruction = instructions.find((item) => item.idempotencyKey === idempotencyKey);
-  if (!instruction) return null;
+  let response;
+  try {
+    response = await api.GET(
+      '/api/v1/strategies/{strategy_instance_id}/instructions/by-idempotency/{idempotency_key}',
+      {
+        params: {
+          path: {
+            strategy_instance_id: 'strategy_cross_venue_spread_instance_default',
+            idempotency_key: idempotencyKey,
+          },
+        },
+      },
+    );
+  } catch (error) {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 404 &&
+      error.response.data?.detail === 'Strategy instruction not found'
+    )
+      return null;
+    throw error;
+  }
+  const instruction = strategyData(response) as Record<string, unknown>;
   if (
     typeof instruction.instructionId !== 'string' ||
     typeof instruction.status !== 'string' ||

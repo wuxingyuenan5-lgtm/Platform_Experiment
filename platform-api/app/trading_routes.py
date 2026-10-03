@@ -52,8 +52,11 @@ from app.strategies.capital_transfer import (
     get_funding_transfer,
     get_funding_transfer_quote,
 )
+from app.strategies.funding_exit_service import configure_exit
 from app.strategies.funding_schemas import (
     FundingExecutionContextResponse,
+    FundingExitPlanRequest,
+    FundingExitPlanResponse,
     FundingPositionGroupResponse,
     FundingWorkspaceResponse,
 )
@@ -104,6 +107,11 @@ class FundingInstructionRequest(BaseModel):
         default=None, alias="perpetualLimitPrice", gt=0, max_digits=28, decimal_places=18
     )
     target_open_instruction_id: str | None = Field(default=None, alias="targetOpenInstructionId")
+
+
+class FundingCloseRecoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=128)
 
 
 def create_trading_router(api_prefix: str) -> APIRouter:
@@ -299,6 +307,17 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         require_principal(http_request)
         return list_funding_position_groups(scope=scope)
 
+    @router.patch(
+        f"{api_prefix}/trading/funding/exit-plans/{{open_instruction_id}}",
+        response_model=FundingExitPlanResponse,
+        tags=["trading"],
+    )
+    def configure_funding_exit_plan(
+        open_instruction_id: str, request: FundingExitPlanRequest, http_request: Request,
+    ) -> FundingExitPlanResponse:
+        return configure_exit(open_instruction_id, request,
+                              actor=require_principal(http_request).user_id)
+
     @router.get(
         f"{api_prefix}/trading/funding/instructions",
         response_model=FundingWorkspaceResponse,
@@ -345,6 +364,21 @@ def create_trading_router(api_prefix: str) -> APIRouter:
     ) -> dict[str, object]:
         require_principal(http_request)
         return get_funding_instruction_workspace(instruction_id)
+
+    @router.post(
+        f"{api_prefix}/trading/funding/instructions/{{instruction_id}}/recover-close",
+        response_model=FundingWorkspaceResponse,
+        tags=["trading"],
+    )
+    def funding_close_recovery(
+        instruction_id: str,
+        payload: FundingCloseRecoveryRequest,
+        http_request: Request,
+    ) -> dict[str, object]:
+        from app.strategies.funding_close_recovery import recover_funding_close
+
+        principal = require_principal(http_request)
+        return recover_funding_close(instruction_id, payload.idempotency_key, principal.user_id)
 
     @router.post(
         f"{api_prefix}/trading/commands",

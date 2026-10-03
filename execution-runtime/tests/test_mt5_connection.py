@@ -15,7 +15,10 @@ def terminal_process(executable: str | None, ppid: int | None = None):
     info = {"name": "terminal64.exe", "exe": executable}
     if ppid is not None:
         info["ppid"] = ppid
-    return SimpleNamespace(pid=4321, info=info, terminate=Mock(), wait=Mock(), kill=Mock())
+    return SimpleNamespace(
+        pid=4321, info=info, exe=Mock(return_value=executable),
+        terminate=Mock(), wait=Mock(), kill=Mock(),
+    )
 
 
 @pytest.mark.parametrize("portable", [False, True])
@@ -83,6 +86,33 @@ def test_background_maintenance_rechecks_only_the_configured_terminal(tmp_path, 
     maintain_background_terminal(terminal)
     assert hide.call_count == 2
     hide.assert_called_with(4321, require_window=False)
+
+
+def test_background_maintenance_resolves_only_terminal_candidates(tmp_path, monkeypatch):
+    import psutil
+
+    from app.mt5_connection import maintain_background_terminal
+
+    terminal = str(tmp_path / "terminal64.exe")
+    unrelated = terminal_process("C:/other/editor.exe")
+    unrelated.info["name"] = "editor.exe"
+    inaccessible = terminal_process(None)
+    inaccessible.exe.side_effect = psutil.AccessDenied(pid=123)
+    exited = terminal_process(None)
+    exited.exe.side_effect = psutil.NoSuchProcess(pid=124)
+    expected = terminal_process(terminal)
+    expected.info["name"] = "TERMINAL64.EXE"
+
+    def processes(attrs):
+        assert attrs == ["name"]
+        return [unrelated, inaccessible, exited, expected]
+
+    monkeypatch.setattr(psutil, "process_iter", processes)
+    hide = Mock()
+    monkeypatch.setattr("app.mt5_connection._finish_background_startup", hide)
+    maintain_background_terminal(terminal)
+    unrelated.exe.assert_not_called()
+    hide.assert_called_once_with(expected.pid, require_window=False)
 
 
 def test_failed_sdk_attachment_still_hides_terminal(monkeypatch):

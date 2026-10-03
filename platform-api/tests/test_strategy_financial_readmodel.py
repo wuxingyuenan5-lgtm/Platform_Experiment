@@ -49,6 +49,34 @@ def order(identity, strategy, side, quantity, price):
         )
 
 
+def test_account_daily_closings_and_amounts_follow_beijing_midnight():
+    from app.catalog import get_strategy_account_snapshot
+
+    with connection() as db:
+        for at, equity in [
+            ("2026-09-01T15:59:59+00:00", "100"),
+            ("2026-09-01T16:00:00+00:00", "101"),
+            ("2026-09-02T15:59:59+00:00", "105"),
+            ("2026-09-02T16:00:00+00:00", "108"),
+        ]:
+            db.execute(
+                "INSERT INTO account_risk_snapshots(account_id,as_of,currency,equity,"
+                "asset_scope,data_quality_state,created_at,payload_json) "
+                "VALUES (?,?,'USDT',?,'unified_trading','complete',?,'{}')",
+                (ACCOUNT, at, equity, at),
+            )
+        db.execute(
+            "INSERT INTO account_capital_coverage VALUES(?, 'unified_trading',?,?,?)",
+            (ACCOUNT, "2026-09-01T00:00:00+00:00", "2026-09-03T00:00:00+00:00", NOW),
+        )
+    result = get_strategy_account_snapshot(FUNDING, account_id=ACCOUNT, include_details=False)
+    daily = result.model_dump(by_alias=True, mode="json")["dailyPnl"]
+    assert [(p["date"], p["equityClose"]) for p in daily] == [
+        ("2026-09-01", "100"), ("2026-09-02", "105"), ("2026-09-03", "108")
+    ]
+    assert [p["pnl"] for p in daily] == [None, "5", "3"]
+
+
 def fill(identity, order_id, quantity, price, fee, currency="USDT"):
     with connection() as db:
         _persist_venue_event(
@@ -193,6 +221,28 @@ def test_unassigned_funding_and_foreign_currency_are_not_fabricated_totals():
     assert account["fundingPnl"] == "8"  # Preserve the receipt at its proven account scope.
 
 
+@pytest.mark.parametrize("offset", [-2592000, -301, -300, 0, 300, 301, 2592000])
+def test_historical_fx_requires_nearby_valuation_and_preserves_native_fee(offset):
+    order("fx", FUNDING, "buy", "1", "2000")
+    fill("fx-fill", "fx", "1", "2000", "1", "USD")
+    observed = (datetime.fromisoformat(NOW) + timedelta(seconds=offset)).isoformat()
+    with connection() as db:
+        db.executemany(
+            "INSERT INTO account_valuation_rates (account_id,currency,as_of,usd_rate) "
+            "VALUES (?,?,?,?)",
+            [(ACCOUNT, "USD", observed, "1"), (ACCOUNT, "USDT", observed, "0.5")],
+        )
+    result = get_strategy_financials(FUNDING)
+    if abs(offset) <= 300:
+        assert Decimal(result["fees"]) == Decimal("2")
+        assert "historical_fx_unavailable" not in result["issues"]
+    else:
+        assert result["fees"] is None
+        assert "historical_fx_unavailable" in result["issues"]
+    native = next(row for row in result["byCurrency"] if row["currency"] == "USD")
+    assert Decimal(native["fees"]) == Decimal("1")
+
+
 @pytest.mark.parametrize("outside_exposure", ["before_open", "after_close"])
 def test_instrument_history_does_not_assign_settlement_outside_position(outside_exposure):
     order("open", FUNDING, "buy", "1", "2000")
@@ -289,9 +339,10 @@ def test_native_mt5_close_without_opening_history_does_not_create_position():
 
 
 def test_retained_two_leg_marks_include_matching_mt5_carry():
+    from app.pnl_reporting import day_start, reporting_date
     from app.strategy_daily_valuation import daily_marks
 
-    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = day_start(reporting_date(datetime.now(UTC)))
     yesterday = today - timedelta(days=1)
     at = today - timedelta(seconds=30)
     bybit_key = (ACCOUNT, INSTRUMENT, "")
@@ -370,8 +421,8 @@ def test_retained_two_leg_marks_include_matching_mt5_carry():
         lambda account, currency, amount, stamp: amount,
     )
     assert reasons == {}
-    assert marks[yesterday.date().isoformat()] == Decimal("2.5")
-    assert marks[today.date().isoformat()] == Decimal("2.5")
+    assert marks[reporting_date(yesterday).isoformat()] == Decimal("2.5")
+    assert marks[reporting_date(today).isoformat()] == Decimal("2.5")
 
 
 @pytest.mark.parametrize("mode", ["live", "simulation"])
@@ -711,7 +762,13 @@ def test_native_receipt_controls_close_quantity_and_missing_fee_blocks_submissio
 
     # The submit boundary is intercepted so this test cannot dispatch an order.
     monkeypatch.setattr(workspace, "create_instruction", record_request)
-    monkeypatch.setattr(workspace, "_execute_funding_instruction", lambda item: item)
+    monkeypatch.setattr(workspace, "get_funding_instruction_workspace", lambda item: item)
+    monkeypatch.setattr(workspace, "funding_account_binding", lambda *_: {
+        "trading_mode": "live", "account_id": ACCOUNT,
+    })
+    monkeypatch.setattr(workspace, "get_funding_controlled_live_readiness", lambda **_: {
+        "ready": True,
+    })
     group = workspace._funding_group_snapshot(instruction_id="open", batch_id="batch")
     assert group["spotFeeAdjusted"] is True
     if fee is None or currency == "UNKNOWN":
@@ -934,8 +991,9 @@ def test_mixed_currency_positions_never_combine_into_one_exposure():
 def test_cross_session_freeze_and_reopen_preserves_real_costs():
     from app.catalog import get_strategy_pnl
     from app.cross_session_valuation import _load_sessions, load_sessions
+    from app.pnl_reporting import day_start, reporting_date
 
-    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=3)
+    start = day_start(reporting_date(datetime.now(UTC))) - timedelta(days=3)
     order("session", CROSS, "buy", "1", "100")
     fill("session-fill", "session", "1", "100", "0.2")
     with connection() as db:
@@ -1132,12 +1190,13 @@ def test_cross_filtered_capital_recomputes_drawdown_and_retains_archive_baseline
 
 
 def test_background_projection_http_read_never_recomputes_and_preserves_failure(monkeypatch):
-    from app import catalog
-    from app.strategy_management_projection import request_projection, read_projection, refresh_one
-    from app.schemas import StrategyPnlResponse
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+
+    from app import catalog
     from app.catalog_routes import create_catalog_router
+    from app.schemas import StrategyPnlResponse
+    from app.strategy_management_projection import read_projection, refresh_one, request_projection
 
     request_projection(FUNDING, None, "pnl")
     with pytest.raises(HTTPException) as error:
@@ -1159,7 +1218,10 @@ def test_background_projection_http_read_never_recomputes_and_preserves_failure(
     )
     app = FastAPI()
     app.include_router(create_catalog_router("/api/v1"))
-    response = TestClient(app).get(f"/api/v1/strategies/instances/{FUNDING}/pnl")
+    # Another producer owns the writer reservation, but published reads still work.
+    with connection() as writer:
+        writer.execute("BEGIN IMMEDIATE")
+        response = TestClient(app).get(f"/api/v1/strategies/instances/{FUNDING}/pnl")
     assert response.status_code == 200
     assert response.json()["netPnl"] == "2.9"
     with connection() as db:
@@ -1168,6 +1230,92 @@ def test_background_projection_http_read_never_recomputes_and_preserves_failure(
     assert stale.net_pnl == Decimal("2.9")
     assert stale.data_quality_state == "stale"
     assert "management_projection_stale" in stale.issues
+
+
+@pytest.mark.parametrize(
+    "module_name,worker,monitor",
+    [
+        ("strategy_management_projection", "refresh_one", "run_management_projection_monitor"),
+        ("account_history_sync", "sync_due_histories", "run_history_sync_monitor"),
+    ],
+)
+def test_monitor_database_checks_do_not_run_on_event_loop(
+    monkeypatch, module_name, worker, monitor
+):
+    import asyncio
+    import importlib
+    import threading
+    from contextlib import contextmanager
+
+    module = importlib.import_module(f"app.{module_name}")
+    database_threads = []
+
+    @contextmanager
+    def observed_connection():
+        database_threads.append(threading.get_ident())
+        with connection() as db:
+            yield db
+
+    def finished(*args):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(module, "connection", observed_connection)
+    monkeypatch.setattr(module, worker, lambda: False)
+    if hasattr(module, "prepare_keys"):
+        monkeypatch.setattr(module, "prepare_keys", lambda: None)
+    monkeypatch.setattr(module.monitor_health, "finish", finished)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(getattr(module, monitor)())
+    assert database_threads
+    assert threading.get_ident() not in database_threads
+
+
+def test_detail_demand_renews_after_read_without_blocking_published_payload():
+    import asyncio
+
+    from fastapi import BackgroundTasks, FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.catalog_routes import create_catalog_router
+    from app.schemas import StrategyAccountSnapshotResponse
+    from app.strategy_management_projection import read_projection, request_projection
+
+    request_projection(FUNDING, None, "detail")
+    old = (datetime.now(UTC) - timedelta(minutes=20)).isoformat()
+    payload = StrategyAccountSnapshotResponse(
+        strategyInstanceId=FUNDING, dataQualityState="complete", isStale=False
+    )
+    with connection() as db:
+        db.execute(
+            "UPDATE strategy_management_projection SET payload_json=?,updated_at=?,requested_at=?",
+            (payload.model_dump_json(by_alias=True), datetime.now(UTC).isoformat(), old),
+        )
+    tasks = BackgroundTasks()
+    with connection() as writer:
+        writer.execute("BEGIN IMMEDIATE")
+        result = read_projection(FUNDING, kind="detail", background_tasks=tasks)
+        assert result.strategy_instance_id == FUNDING
+        assert (
+            writer.execute("SELECT requested_at FROM strategy_management_projection").fetchone()[0]
+            == old
+        )
+    assert len(tasks.tasks) == 1
+    asyncio.run(tasks())
+    with connection() as db:
+        assert (
+            db.execute("SELECT requested_at FROM strategy_management_projection").fetchone()[0]
+            > old
+        )
+        db.execute("UPDATE strategy_management_projection SET requested_at=?", (old,))
+    app = FastAPI()
+    app.include_router(create_catalog_router("/api/v1"))
+    response = TestClient(app).get(f"/api/v1/strategies/instances/{FUNDING}/account-snapshot")
+    assert response.status_code == 200
+    with connection() as db:
+        assert (
+            db.execute("SELECT requested_at FROM strategy_management_projection").fetchone()[0]
+            > old
+        )
 
 
 def test_legacy_history_requires_changing_quote_not_poll_time():

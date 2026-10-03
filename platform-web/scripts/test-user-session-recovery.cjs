@@ -64,9 +64,11 @@ for (const status of [undefined, 503, 429]) {
   test(`temporary auth read failure ${status} can recover the original cookie without login`, async () => {
     const original = axios.defaults.adapter;
     const requests = [];
+    const suppliedCsrf = [];
     let unavailable = false;
     axios.defaults.adapter = async (config) => {
       requests.push([config.method, config.url]);
+      suppliedCsrf.push(config.headers.get('X-CSRF-Token'));
       if (unavailable) {
         throw new axios.AxiosError('temporarily unavailable', 'ERR_NETWORK', config, null,
           status === undefined ? undefined : {
@@ -95,6 +97,7 @@ for (const status of [undefined, 503, 429]) {
       assert.equal(store.getAuthentication.session.sessionId, 'original');
       assert.equal(store.getSessionUnavailable, false);
       assert.deepEqual(requests, [['get', '/auth/me'], ['get', '/auth/me'], ['get', '/auth/me']]);
+      assert.deepEqual(suppliedCsrf, [undefined, 'isolated-csrf', 'isolated-csrf']);
     } finally {
       axios.defaults.adapter = original;
     }

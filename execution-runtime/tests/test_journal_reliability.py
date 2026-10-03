@@ -141,3 +141,37 @@ def test_journal_status_exposes_bounded_recovery_diagnostics(tmp_path: Path) -> 
     assert status["oldestResultUnknownAt"] is not None
     assert status["oldestResultUnknownAgeSeconds"] >= 5
     assert status["staleProcessingCount"] == 0
+
+
+@pytest.mark.parametrize("failure", ["adapter", "persistence"])
+def test_unexpected_dispatch_failure_is_unknown_and_never_resubmitted(
+    tmp_path: Path, monkeypatch, failure: str,
+) -> None:
+    import sqlite3
+
+    get_settings().journal_path = str(tmp_path / "unexpected-failure.db")
+
+    class FailingGateway:
+        name = "failing"
+        calls = 0
+
+        def place_order(self, command):
+            self.calls += 1
+            if failure == "adapter":
+                raise RuntimeError("adapter failed after sending")
+            return build_events()
+
+    def fail_save(*args):
+        raise sqlite3.OperationalError("write failed")
+
+    if failure == "persistence":
+        monkeypatch.setattr("app.command_routes.save_command_events", fail_save)
+    gateway = FailingGateway()
+    command = build_command()
+    with TestClient(create_app(gateway), raise_server_exceptions=False) as client:
+        response = client.post("/commands/orders", json=command.model_dump(mode="json"))
+        assert response.status_code == 502
+        assert get_command(command.command_id).status == "result_unknown"
+        repeated = client.post("/commands/orders", json=command.model_dump(mode="json"))
+        assert repeated.status_code == 409
+    assert gateway.calls == 1

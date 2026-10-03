@@ -11,6 +11,8 @@ from app.config import get_settings
 from app.credential_security import router as credential_security_router
 from app.cross_spread_exit_routes import router as cross_spread_exit_router
 from app.cross_spread_observability_routes import router as cross_spread_observability_router
+from app.data_audit import lifespan as data_audit_lifespan
+from app.data_audit import router as data_audit_router
 from app.database import initialize_database
 from app.disaster_recovery import router as disaster_recovery_router
 from app.eod_reconciliation_routes import router as eod_reconciliation_router
@@ -43,7 +45,7 @@ from app.user_cache_control import UserNoStoreMiddleware
 from app.user_routes import router as user_router
 from app.venue_reconciliation_routes import router as venue_reconciliation_router
 
-PLATFORM_VERSION = "0.11.3"
+PLATFORM_VERSION = "0.11.4"
 
 configure_trade_command_port(create_trade_command)
 
@@ -51,10 +53,12 @@ configure_trade_command_port(create_trade_command)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     from app.account_history_sync import run_history_sync_monitor
+    from app.strategies.funding_exit_service import run_funding_exit_monitor
 
     initialize_database()
     stop = asyncio.Event()
     runner = asyncio.create_task(funding_runner.run_funding_instruction_monitor(stop))
+    funding_exit_monitor = asyncio.create_task(run_funding_exit_monitor(stop))
     snapshot_monitor = asyncio.create_task(live_venue_snapshot_sync.run_snapshot_sync_monitor())
     history_monitor = asyncio.create_task(run_history_sync_monitor())
     from app.strategy_management_projection import run_management_projection_monitor
@@ -65,6 +69,7 @@ async def lifespan(_: FastAPI):
             research_lifespan(_),
             research_overseas_lifespan(_),
             strategy_research_lifespan(_),
+            data_audit_lifespan(_),
         ):
             yield
     finally:
@@ -79,6 +84,7 @@ async def lifespan(_: FastAPI):
         try:
             await runner
         finally:
+            await funding_exit_monitor
             try:
                 await snapshot_monitor
             except asyncio.CancelledError:
@@ -126,6 +132,7 @@ def create_application() -> FastAPI:
     application.include_router(cross_spread_exit_router)
     application.include_router(cross_spread_observability_router)
     application.include_router(research_router)
+    application.include_router(data_audit_router)
     application.include_router(strategy_research_router)
     application.include_router(research_watchlist_router)
     application.include_router(user_router)

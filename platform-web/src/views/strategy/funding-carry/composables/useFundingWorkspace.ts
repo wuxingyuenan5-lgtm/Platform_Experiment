@@ -6,7 +6,8 @@ import {
   strategySession,
 } from '@/api/platform/strategyQueries';
 import { useUserStore } from '@/store/modules/user';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useKeepAliveActive } from '@/hooks/web/useKeepAliveActive';
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import { Modal } from 'ant-design-vue';
 import Decimal from 'decimal.js';
 
@@ -45,7 +46,7 @@ function normalizeWorkspaceState(workspace: Record<string, unknown> | undefined 
  */
 type FreshFundingDraft = FundingPendingDraft & { executionPolicy: FundingExecutionPolicy };
 
-export function useFundingWorkspace() {
+export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) {
   const userStore = useUserStore();
   const readCurrentDraft = () =>
     userStore.authentication?.user.role === 'ceo'
@@ -55,6 +56,9 @@ export function useFundingWorkspace() {
   const contextReady = ref(false);
   const instructionPollAttempt = ref(0);
   const mounted = ref(false);
+  const now = ref(Date.now());
+  let freshnessTimer: ReturnType<typeof setInterval> | undefined;
+  const pageActive = useKeepAliveActive();
   const visibility = useDocumentVisibility();
   const instructionPollDelays = [1_000, 2_000, 3_000];
   const submitting = ref(false);
@@ -125,7 +129,7 @@ export function useFundingWorkspace() {
     () =>
       userStore.authentication?.user.role === 'ceo' &&
       contextReady.value &&
-      !loading.value &&
+      now.value - contextQuery.dataUpdatedAt.value < 10_000 &&
       readiness.value.ready === true &&
       !submitting.value &&
       !pendingDraft.value,
@@ -143,6 +147,7 @@ export function useFundingWorkspace() {
     () =>
       readyToTrade.value &&
       validExecutionPrice.value &&
+      !positionsQuery.isError.value &&
       !!selectedCloseGroup.value &&
       (!selectedCloseGroup.value.spotFeeAdjusted ||
         selectedCloseGroup.value.remainingSpotQuantity != null) &&
@@ -174,29 +179,22 @@ export function useFundingWorkspace() {
       enabled: computed(
         () =>
           mounted.value &&
+          pageActive.value &&
+          executionVisible.value &&
           !!strategySession.value.userId &&
           visibility.value === 'visible' &&
           !submitting.value,
       ),
-      refetchInterval: 15_000,
+      refetchInterval: 3_000,
     },
     strategyQueryClient,
   );
   const loading = contextQuery.isFetching;
   watch(
-    contextQuery.isFetching,
-    (fetching) => {
-      if (fetching) {
-        contextReady.value = false;
-      }
-    },
-    { flush: 'sync' },
-  );
-  watch(
     [contextQuery.data, contextQuery.isFetching, contextQuery.error],
     ([next, fetching, caught]) => {
-      contextReady.value = false;
       if (caught) {
+        contextReady.value = false;
         error.value = caught instanceof Error ? caught.message : '行情暂时不可用';
         return;
       }
@@ -223,11 +221,18 @@ export function useFundingWorkspace() {
 
   const positionsQuery = useQuery(
     {
-      queryKey: computed(() =>
-        strategyQueryKey('funding', 'positions', context.value?.accountId, 'all'),
-      ),
+      queryKey: computed(() => strategyQueryKey('funding', 'positions', 'all')),
       queryFn: ({ signal }) => getFundingPositionGroups('all', signal),
-      enabled: computed(() => mounted.value && !!strategySession.value.userId),
+      enabled: computed(
+        () =>
+          mounted.value &&
+          pageActive.value &&
+          executionVisible.value &&
+          visibility.value === 'visible' &&
+          !!strategySession.value.userId &&
+          !submitting.value,
+      ),
+      refetchInterval: 3_000,
     },
     strategyQueryClient,
   );
@@ -260,6 +265,7 @@ export function useFundingWorkspace() {
       enabled: computed(
         () =>
           mounted.value &&
+          pageActive.value &&
           !!strategySession.value.userId &&
           !submitting.value &&
           visibility.value === 'visible' &&
@@ -304,7 +310,7 @@ export function useFundingWorkspace() {
     await contextQuery.refetch({ cancelRefetch: false });
   }
   async function refreshPositionGroups() {
-    await positionsQuery.refetch({ cancelRefetch: true, throwOnError: true });
+    await positionsQuery.refetch({ cancelRefetch: false, throwOnError: true });
   }
   async function refreshInstruction(options: { silent?: boolean } = {}) {
     if (!pendingDraft.value) return;
@@ -405,7 +411,6 @@ export function useFundingWorkspace() {
       if (disposed || sessionGeneration !== strategySession.value.generation) return;
       applyInstructionResponse(response);
       instructionPollAttempt.value = 0;
-      await refreshPositionGroups();
       return response;
     } catch (caught) {
       error.value = caught instanceof Error ? caught.message : '提交结果待确认，请恢复原指令';
@@ -481,25 +486,41 @@ export function useFundingWorkspace() {
     { flush: 'sync' },
   );
   function recoverPendingInstruction() {
-    if (pendingDraft.value && !submitting.value) void refreshInstruction({ silent: true });
+    if (
+      pageActive.value &&
+      visibility.value === 'visible' &&
+      pendingDraft.value &&
+      !submitting.value
+    )
+      void refreshInstruction({ silent: true });
   }
   watch(visibility, (state) => {
-    if (state === 'visible') recoverPendingInstruction();
+    if (state === 'visible' && pageActive.value) recoverPendingInstruction();
+  });
+  watch(pageActive, (active) => {
+    if (active && visibility.value === 'visible') recoverPendingInstruction();
   });
   onMounted(() => {
     mounted.value = true;
-    recoverPendingInstruction();
+    freshnessTimer = setInterval(() => {
+      now.value = Date.now();
+    }, 1_000);
     window.addEventListener('online', recoverPendingInstruction);
   });
   onBeforeUnmount(() => {
     disposed = true;
+    if (freshnessTimer) clearInterval(freshnessTimer);
     window.removeEventListener('online', recoverPendingInstruction);
   });
 
   return {
     loading,
     submitting,
-    error,
+    error: computed(
+      () =>
+        error.value ||
+        (positionsQuery.isError.value ? '持仓刷新失败，显示上次结果；暂不可平仓' : null),
+    ),
     context,
     positionGroups,
     selectedPerpetualSymbol,

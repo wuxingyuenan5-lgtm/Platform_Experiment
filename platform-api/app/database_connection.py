@@ -35,4 +35,24 @@ def connection() -> Iterator[sqlite3.Connection]:
         db.close()
 
 
-__all__ = ["connection", "database_path"]
+@contextmanager
+def read_only_connection() -> Iterator[sqlite3.Connection]:
+    """Open a query-only handle without a commit boundary.
+
+    The local database uses rollback journaling for SQLite-version safety. A
+    normal connection can therefore participate in writer lock hand-off even
+    for a SELECT followed by the shared connection context's commit. Research
+    projections are read-only consumers and should not do that.
+    """
+    path = database_path()
+    db = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=30)
+    db.row_factory = sqlite3.Row
+    db.execute("PRAGMA query_only = ON")
+    db.execute("PRAGMA busy_timeout = 30000")
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+__all__ = ["connection", "database_path", "read_only_connection"]

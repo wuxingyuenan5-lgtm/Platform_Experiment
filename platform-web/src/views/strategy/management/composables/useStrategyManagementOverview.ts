@@ -19,11 +19,16 @@ export function useStrategyManagementOverview() {
     strategyQueryClient,
   );
   const items = computed(() =>
-    query.isError.value
-      ? []
-      : [...(query.data.value ?? [])].sort((left, right) => left.sortOrder - right.sortOrder),
+    [...(query.data.value ?? [])].sort((left, right) => left.sortOrder - right.sortOrder),
   );
-  const error = computed(() => (query.isError.value ? '策略管理总览暂不可用' : null));
+  const error = computed(() =>
+    query.isError.value && query.data.value === undefined ? '策略管理总览暂不可用' : null,
+  );
+  const refreshError = computed(() =>
+    query.isError.value && query.data.value !== undefined
+      ? '策略管理总览刷新失败，显示上次成功结果'
+      : null,
+  );
   const byDesk = computed(
     () =>
       Object.fromEntries(items.value.map((item) => [item.deskKey, item])) as Partial<
@@ -36,6 +41,7 @@ export function useStrategyManagementOverview() {
     // Background refresh must not unmount the desk and reset its metric/calendar controls.
     loading: computed(() => query.isFetching.value && query.data.value === undefined),
     error,
+    refreshError,
     empty: computed(() => !query.isFetching.value && !error.value && !items.value.length),
     hasData: computed(() => !query.isFetching.value && !error.value && !!items.value.length),
     refresh: () => query.refetch({ cancelRefetch: false }),

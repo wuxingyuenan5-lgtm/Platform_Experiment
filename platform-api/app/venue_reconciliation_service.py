@@ -9,7 +9,6 @@ from uuid import uuid4
 
 from app import venue_reconciliation_repository as repository
 from app import venue_reconciliation_runtime_client as runtime_client
-from app.database import connection
 from app.financial_facts import CreateFinancialFactRequest, record_financial_fact
 from app.trading import (
     apply_execution_events,
@@ -164,31 +163,12 @@ def reconcile_order_snapshot(
     )
     imported_fact_ids.append(order_fact.fact_id)
 
-    from app.live_venue_snapshot_sync import _persist_venue_event
-    from app.venue_identity_repository import load_order_identities
-
-    with connection() as db:
-        identities = load_order_identities(db)
-        confirmed = sum(
-            (
-                Decimal(row[0])
-                for row in db.execute(
-                    "SELECT quantity FROM fills WHERE order_id=? AND origin='runtime_confirmation'",
-                    (order_id,),
-                )
-            ),
-            Decimal(0),
+    try:
+        confirmed = repository.persist_validated_native_fills(
+            order_id, row["account_id"], source, external_order["externalOrderId"], fills
         )
-        for fill in fills:
-            if (
-                fill["externalOrderId"] != external_order["externalOrderId"]
-                or fill["source"] != source
-                or identities.resolve(row["account_id"], fill) != order_id
-            ):
-                raise ReconciliationServiceError(
-                    "Venue execution identity conflicts with local order"
-                )
-            _persist_venue_event(db, row["account_id"], "trade_fill", fill)
+    except ValueError as exc:
+        raise ReconciliationServiceError(str(exc)) from exc
     request = request_from_order_row(row)
     events: list[dict[str, object]] = []
     for fill in fills:
@@ -313,64 +293,10 @@ def resolve_owner_accepted_missing_external_order(
         raise ReconciliationDifferenceNotFoundError(
             "Venue still has an order record or could not prove it absent"
         )
-    with connection() as db:
-        proof = db.execute(
-            """
-            SELECT 1 FROM reconciliation_differences
-            WHERE entity_type = 'order' AND difference_type = 'missing_external'
-              AND local_reference = ? AND status = 'accepted'
-            LIMIT 1
-            """,
-            (order_id,),
-        ).fetchone()
-        if proof is None:
-            raise ReconciliationDifferenceNotFoundError(
-                "Accepted missing-external reconciliation evidence is required"
-            )
-        leg = db.execute(
-            "SELECT batch_id FROM execution_batch_legs WHERE order_id = ?",
-            (order_id,),
-        ).fetchone()
-        batch_id = str(leg["batch_id"]) if leg is not None else None
-        if batch_id is not None:
-            unsafe = db.execute(
-                """
-                SELECT 1 FROM execution_batch_legs
-                WHERE batch_id = ? AND status IN ('filled', 'partially_filled', 'acknowledged')
-                LIMIT 1
-                """,
-                (batch_id,),
-            ).fetchone()
-            if unsafe is not None:
-                raise ReconciliationDifferenceNotFoundError(
-                    "Batch contains external execution evidence and cannot be closed as absent"
-                )
-        reason = "Owner-accepted reconciliation confirmed no external venue order"
-        db.execute(
-            "UPDATE orders SET status = 'rejected', updated_at = ? WHERE id = ?",
-            (now_iso(), order_id),
-        )
-        if batch_id is not None:
-            db.execute(
-                """
-                UPDATE execution_batch_legs
-                SET status = 'rejected', failure_reason = ?, updated_at = ?
-                WHERE order_id = ?
-                """,
-                (reason, now_iso(), order_id),
-            )
-            db.execute(
-                """
-                UPDATE execution_batches
-                SET status = 'failed', requires_manual_intervention = 0,
-                    failure_reason = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (reason, now_iso(), batch_id),
-            )
-    repository.audit(
-        "result_unknown_absent_order_resolved", "order", order_id, {"batchId": batch_id}
-    )
+    try:
+        repository.resolve_accepted_absent_order(order_id)
+    except ValueError as exc:
+        raise ReconciliationDifferenceNotFoundError(str(exc)) from exc
     return reconcile_order_with_venue(order_id)
 
 

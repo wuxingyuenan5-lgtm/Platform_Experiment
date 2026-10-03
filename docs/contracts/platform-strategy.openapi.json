@@ -5436,6 +5436,22 @@
         "title": "FundingBalanceQuote",
         "type": "object"
       },
+      "FundingCloseRecoveryRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotencykey",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey"
+        ],
+        "title": "FundingCloseRecoveryRequest",
+        "type": "object"
+      },
       "FundingEvent": {
         "additionalProperties": false,
         "properties": {
@@ -5735,6 +5751,175 @@
           "asOf"
         ],
         "title": "FundingExecutionContextResponse",
+        "type": "object"
+      },
+      "FundingExitPlanRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "expectedRevision": {
+            "minimum": 0,
+            "title": "Expectedrevision",
+            "type": "integer"
+          },
+          "stopLossSpread": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stoplossspread"
+          },
+          "takeProfitSpread": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Takeprofitspread"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "enabled"
+        ],
+        "title": "FundingExitPlanRequest",
+        "type": "object"
+      },
+      "FundingExitPlanResponse": {
+        "properties": {
+          "closeInstructionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closeinstructionid"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "lastError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lasterror"
+          },
+          "openInstructionId": {
+            "title": "Openinstructionid",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "stopLossSpread": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stoplossspread"
+          },
+          "takeProfitSpread": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Takeprofitspread"
+          },
+          "triggerReason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "take_profit",
+                  "stop_loss"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggerreason"
+          },
+          "triggerSpread": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggerspread"
+          },
+          "triggeredAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggeredat"
+          },
+          "updatedAt": {
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "openInstructionId",
+          "revision",
+          "enabled",
+          "takeProfitSpread",
+          "stopLossSpread",
+          "triggeredAt",
+          "triggerReason",
+          "triggerSpread",
+          "closeInstructionId",
+          "lastError",
+          "updatedAt"
+        ],
+        "title": "FundingExitPlanResponse",
         "type": "object"
       },
       "FundingInstructionRequest": {
@@ -6066,6 +6251,7 @@
             "enum": [
               "close_group",
               "flatten_open",
+              "finish_close",
               "reconcile"
             ],
             "title": "Abnormalaction",
@@ -6109,6 +6295,16 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Cumulativespotfill",
             "type": "string"
+          },
+          "exitPlan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FundingExitPlanResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "fees": {
             "anyOf": [
@@ -6213,6 +6409,40 @@
               }
             ],
             "title": "Pnl"
+          },
+          "recoveryCloseInstructionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recoverycloseinstructionid"
+          },
+          "recoveryIdempotencyKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recoveryidempotencykey"
+          },
+          "recoverySpotQuantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recoveryspotquantity"
           },
           "remainingClosableQuantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -6809,6 +7039,100 @@
           "updatedAt"
         ],
         "title": "InternalCapitalTransferResponse",
+        "type": "object"
+      },
+      "KillSwitchResponse": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "scopeId": {
+            "title": "Scopeid",
+            "type": "string"
+          },
+          "scopeType": {
+            "enum": [
+              "global",
+              "strategy",
+              "account"
+            ],
+            "title": "Scopetype",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "title": "Updatedat",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scopeType",
+          "scopeId",
+          "enabled",
+          "actor",
+          "version",
+          "updatedAt"
+        ],
+        "title": "KillSwitchResponse",
+        "type": "object"
+      },
+      "KillSwitchUpdateRequest": {
+        "properties": {
+          "actor": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Actor",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotencykey",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "enabled",
+          "actor"
+        ],
+        "title": "KillSwitchUpdateRequest",
         "type": "object"
       },
       "LiveTradingSessionApprovalRequest": {
@@ -11467,7 +11791,7 @@
   },
   "info": {
     "title": "Platform API",
-    "version": "0.11.2"
+    "version": "0.11.3"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -12881,6 +13205,116 @@
         ]
       }
     },
+    "/api/v1/risk/kill-switches/{scope_type}/{scope_id}": {
+      "get": {
+        "operationId": "read_kill_switch_api_v1_risk_kill_switches__scope_type___scope_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope_type",
+            "required": true,
+            "schema": {
+              "title": "Scope Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "scope_id",
+            "required": true,
+            "schema": {
+              "title": "Scope Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillSwitchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Kill Switch",
+        "tags": [
+          "execution-risk"
+        ]
+      },
+      "put": {
+        "operationId": "change_kill_switch_api_v1_risk_kill_switches__scope_type___scope_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scope_type",
+            "required": true,
+            "schema": {
+              "title": "Scope Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "scope_id",
+            "required": true,
+            "schema": {
+              "title": "Scope Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KillSwitchUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillSwitchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Kill Switch",
+        "tags": [
+          "execution-risk"
+        ]
+      }
+    },
     "/api/v1/security/credential-references": {
       "get": {
         "operationId": "credential_references_api_v1_security_credential_references_get",
@@ -13985,6 +14419,59 @@
           }
         },
         "summary": "Create Strategy Instruction",
+        "tags": [
+          "strategies"
+        ]
+      }
+    },
+    "/api/v1/strategies/{strategy_instance_id}/instructions/by-idempotency/{idempotency_key}": {
+      "get": {
+        "operationId": "strategy_instruction_by_idempotency_api_v1_strategies__strategy_instance_id__instructions_by_idempotency__idempotency_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_instance_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Instance Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "idempotency_key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Strategy Instruction By Idempotency Api V1 Strategies  Strategy Instance Id  Instructions By Idempotency  Idempotency Key  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Strategy Instruction By Idempotency",
         "tags": [
           "strategies"
         ]
@@ -15220,6 +15707,58 @@
         ]
       }
     },
+    "/api/v1/trading/funding/exit-plans/{open_instruction_id}": {
+      "patch": {
+        "operationId": "configure_funding_exit_plan_api_v1_trading_funding_exit_plans__open_instruction_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "open_instruction_id",
+            "required": true,
+            "schema": {
+              "title": "Open Instruction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundingExitPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundingExitPlanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Configure Funding Exit Plan",
+        "tags": [
+          "trading"
+        ]
+      }
+    },
     "/api/v1/trading/funding/instructions": {
       "get": {
         "operationId": "funding_instruction_by_idempotency_api_v1_trading_funding_instructions_get",
@@ -15338,6 +15877,58 @@
           }
         },
         "summary": "Funding Instruction Workspace",
+        "tags": [
+          "trading"
+        ]
+      }
+    },
+    "/api/v1/trading/funding/instructions/{instruction_id}/recover-close": {
+      "post": {
+        "operationId": "funding_close_recovery_api_v1_trading_funding_instructions__instruction_id__recover_close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instruction_id",
+            "required": true,
+            "schema": {
+              "title": "Instruction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundingCloseRecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundingWorkspaceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Funding Close Recovery",
         "tags": [
           "trading"
         ]

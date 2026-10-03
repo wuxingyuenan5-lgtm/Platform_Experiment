@@ -15,6 +15,8 @@ Browser Session 是正常网页登录凭证。有效的 CEO 登录会话通过 C
 
 Cross/Funding 批次的 RiskAction 同样受 CEO 会话边界约束，包括故障后的平仓处置。CEO 的显式权限包含现有风险接口使用的 `risk:manage`；技术负责人、员工、会员和 API-Key admin 不能借通用风险接口绕过这两个策略的交易授权。
 
+Funding 原平仓 `recover-close` 补现货入口同样要求 CEO Browser Session、CSRF 和 `trading.write`；恢复审计的 actor 取认证主体，不接受客户端指定交易人。
+
 策略交易权限按数据库中实例关联的 `strategy_definitions.strategy_key` 判定，不以默认实例 ID、实例名称或客户端自报类型作为授权依据。批次风险处置沿持久化批次解析实际实例。所有 Cross/Funding 实例均须使用专用指令与生命周期入口；通用 Command、Batch、Run、Instruction 入口即使由 CEO 调用也不能绕过该链路。缺省实例的受控 Batch 同样拒绝；旧裸 Order 入口按账户的活动交易绑定识别受控策略。拒绝发生在创建订单、批次、资源占用及 Runtime 调用之前，内部获准执行链保持原有入口。
 
 旧 LiveTradingSession 的表、公共结构和兼容接口保留历史与审计语义。它的批准、过期、额度、次数、品种集合和验收窗口不参与正常订单授权，也不能绕过其他安全检查。
@@ -166,6 +168,8 @@ X-CSRF-Token
 ```
 
 CSRF 原始值只存在于当前浏览器内存；数据库保存哈希。用户系统或持仓客户端收到 401 时清除内存 CSRF。API-Key 请求不使用 Browser CSRF 机制。
+
+受保护导航仍逐次调用 `/auth/me` 验证服务端 Session。浏览器已有内存 CSRF 时随该 GET 携带 `X-CSRF-Token`；仅当其哈希与本次已认证 Session 的哈希恒定时间比较一致时复用原值，避免每次点击都轮换 CSRF 并争用 SQLite 写锁。冷启动、未携带或不匹配时继续签发并持久化新 CSRF；停用、撤销、权限、空闲与绝对到期检查不缓存或跳过。
 
 页面刷新及 API 正常重启通过原 Cookie 重新读取持久化 Session，不创建新会话或延长绝对有效期。`/auth/me` 的网络错误、408、429 和无明确认证失效代码的 5xx 表示暂时无法完成验证：已验证并加载的页面保留展示状态，拒绝新的受保护导航并提示稍后重试；冷启动没有已验证会话时进入现有连接重试页，不放行保护路由、不误报密码失效。重试只读取原会话。明确的 401、账号停用或认证失效继续清理身份并进入登录流程，不能使用缓存身份放行。30 分钟空闲按成功的认证请求续期，后台策略执行不替浏览器续期。
 
@@ -320,3 +324,5 @@ The browser role set is CEO, technical lead, employee and member. Capability and
 ## Strategy research request permissions
 
 `/api/v1/research/strategies/**` keeps the existing authenticated research boundary. GET and pure `POST /scenario` require `research.read`. Persisted experiment creation/cancellation and draft saving require `research.write` in both middleware classification and route dependencies; browser CSRF remains mandatory. Cross-gold broker-scoped reads additionally require existing `trade.read`. Experiment/draft lookup is restricted to the authenticated owner. Research parameter import is a user-triggered form/prepare action and cannot grant trading authority or skip normal CEO, quote, quantity, risk or unknown-result checks. The generic admin-write fallback and all existing execution permissions remain unchanged for other routes.
+
+Funding `PATCH /trading/funding/exit-plans/{open_instruction_id}` requires `trading.write`, existing CEO trade authority and browser CSRF. The configured actor is taken from the authenticated principal; callers cannot supply an actor or execution credentials. Saving thresholds grants no Live Write permission. Read-only strategy roles may view plan status through existing Funding position reads.

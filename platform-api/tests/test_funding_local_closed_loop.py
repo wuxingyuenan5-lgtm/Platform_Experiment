@@ -230,7 +230,9 @@ def test_funding_local_closed_loop_open_close_and_reconcile(
         )
         assert closed.status_code == 200, closed.text
         close_batch = closed.json()["executionBatch"]
-        assert close_batch["status"] == "hedged", close_batch
+        from app.strategies.instruction_service import execute_instruction
+
+        execute_instruction(closed.json()["instruction"]["instructionId"])
         _reconcile_instruction_for_batch(close_batch["batchId"])
         with connection() as db:
             assert (

@@ -508,19 +508,21 @@ def get_current_authentication(
     *,
     user_id: str,
     session_id: str,
+    verified_csrf_token: str | None = None,
 ) -> AuthenticationResponse:
-    csrf_token = generate_secret_token()
+    csrf_token = verified_csrf_token or generate_secret_token()
     with connection() as db:
         profile = get_user_profile(db, user_id)
         if profile is None:
             raise UserServiceError(404, "user_not_found", "User does not exist")
         sessions = list_active_user_sessions(db, user_id)
         current_session = _find_current_session(sessions, session_id)
-        rotate_session_csrf(
-            db,
-            session_id=session_id,
-            csrf_token_hash=hash_secret_token(csrf_token),
-        )
+        if verified_csrf_token is None:
+            rotate_session_csrf(
+                db,
+                session_id=session_id,
+                csrf_token_hash=hash_secret_token(csrf_token),
+            )
     return _authentication_response(
         profile=profile,
         current_session=current_session,

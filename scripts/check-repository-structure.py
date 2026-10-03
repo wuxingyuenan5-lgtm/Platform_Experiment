@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import re
+import runpy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,8 @@ EXPECTED_SERVICES = {
     "execution-runtime": ROOT / "execution-runtime",
 }
 ALLOWED_TOP_LEVEL_DIRECTORIES = {
+    # Ignored local output of the configured relative SQLite paths, not a service.
+    "data",
     "config",
     "deploy",
     "docs",
@@ -43,14 +46,6 @@ FORBIDDEN_BACKEND_IMPORTS = {"MetaTrader5", "binance", "ccxt", "ib_insync", "pyb
 HISTORICAL_WORKFLOW_PATTERN = re.compile(
     r"(?:0[-.]9[-.]2|0[-.]9[-.]3|phase[-_ ]?[0-6])", re.IGNORECASE
 )
-
-
-def next_patch_version(version: str) -> str:
-    parts = version.split(".")
-    if len(parts) != 3 or not all(part.isdigit() for part in parts):
-        return version
-    major, minor, patch = (int(part) for part in parts)
-    return f"{major}.{minor}.{patch + 1}"
 
 
 def imported_top_levels(path: Path) -> set[str]:
@@ -138,26 +133,13 @@ def check_documents(errors: list[str]) -> None:
         if not (ROOT / relative).is_file():
             errors.append(f"{relative}: required active entrypoint is missing")
     current = ROOT / "docs/BASELINE.md"
-    version_path = ROOT / "VERSION"
-    stable_version = version_path.read_text(encoding="utf-8").strip()
-    candidate_version = next_patch_version(stable_version)
     if current.is_file():
+        authority = runpy.run_path(str(Path(__file__).with_name("check-documentation-consistency.py")))
+        errors.extend(authority["validate_current_authority"](ROOT))
         source = current.read_text(encoding="utf-8")
-        for anchor in (
-            f"Stable baseline: Platform `{stable_version}`",
-            f"Current candidate target: Platform `{candidate_version}`",
-            "Platform Live Write and Runtime Live Write remain disabled by default",
-            f"The Platform {candidate_version} candidate scope includes",
-            "remain unverified",
-            "must not be assumed",
-        ):
-            if anchor not in source:
-                errors.append(f"docs/BASELINE.md missing durable anchor: {anchor}")
-        for volatile in ("Active branch:", "Active review:", "Draft PR"):
-            if volatile in source:
-                errors.append(
-                    f"docs/BASELINE.md persists volatile Git/GitHub fact: {volatile}"
-                )
+        candidate = re.search(r"Current candidate target: Platform `([^`]+)`\.", source)
+        if candidate and f"The Platform {candidate.group(1)} candidate scope includes" not in source:
+            errors.append("docs/BASELINE.md candidate scope must match its declared target")
     database = ROOT / "docs/database/README.md"
     if (
         database.is_file()

@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Query, Request
 
 from app.account_read_service import get_pnl as read_pnl
 from app.account_read_service import get_position as read_position
@@ -42,6 +42,7 @@ from app.strategies.instruction_service import (
     CreateStrategyInstructionRequest,
     create_instruction,
     get_instruction,
+    get_instruction_by_idempotency,
     list_instructions,
 )
 from app.strategy_runs import create_strategy_run, list_strategy_runs
@@ -100,6 +101,7 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
     )
     def strategy_account_snapshot(
         strategy_instance_id: str,
+        background_tasks: BackgroundTasks,
         account_id: str | None = Query(default=None, alias="accountId"),
         include_details: bool = Query(default=True, alias="includeDetails"),
     ) -> StrategyAccountSnapshotResponse:
@@ -109,6 +111,7 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
             strategy_instance_id,
             account_id=account_id,
             kind="detail" if include_details else "summary",
+            background_tasks=background_tasks,
         )
 
     @router.post(
@@ -154,6 +157,15 @@ def create_catalog_router(api_prefix: str) -> APIRouter:
     )
     def strategy_instructions(strategy_instance_id: str) -> list[dict[str, object]]:
         return list_instructions(strategy_instance_id)
+
+    @router.get(
+        f"{api_prefix}/strategies/{{strategy_instance_id}}/instructions/by-idempotency/{{idempotency_key}}",
+        tags=["strategies"],
+    )
+    def strategy_instruction_by_idempotency(
+        strategy_instance_id: str, idempotency_key: str
+    ) -> dict[str, object]:
+        return get_instruction_by_idempotency(strategy_instance_id, idempotency_key)
 
     @router.get(f"{api_prefix}/strategy-instructions/{{instruction_id}}", tags=["strategies"])
     def strategy_instruction(instruction_id: str) -> dict[str, object]:

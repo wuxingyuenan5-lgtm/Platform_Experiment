@@ -8,6 +8,29 @@ const compiler = require('@vue/compiler-sfc');
 const { renderToString } = require('vue/server-renderer');
 const loadModule = require('./load-strategy-module.cjs');
 
+test('PnL calendar uses Beijing dates and never presents partial totals as complete', () => {
+  const { todayBeijing, buildPnlCalendar } = loadModule()(
+    'src/views/strategy/management/composables/strategyPnlCalendar.ts',
+  );
+  assert.equal(todayBeijing(new Date('2026-09-30T15:59:59Z')), '2026-09-30');
+  assert.equal(todayBeijing(new Date('2026-09-30T16:00:00Z')), '2026-10-01');
+  assert.equal(todayBeijing(new Date('2026-12-31T16:00:00Z')), '2027-01-01');
+  const points = [
+    { date: '2026-09-01', pnl: 10, rate: 1, quality: 'complete' },
+    { date: '2026-09-02', pnl: null, rate: null, quality: 'missing_history' },
+  ];
+  const calendar = (mode = 'daily') =>
+    buildPnlCalendar(points, 'USD', mode, { year: 2026, month: 9 });
+  assert.equal(calendar().summaryAmount, '--');
+  assert.equal(calendar('monthly').summaryAmount, '--');
+  points[1].quality = 'market_closed';
+  assert.equal(calendar().summaryAmount, '+10.00 USD');
+  assert.equal(calendar().summaryRateText, '+1.00%');
+  points[1] = { date: '2026-09-02', pnl: 5, rate: null, quality: 'complete' };
+  assert.equal(calendar().summaryAmount, '+15.00 USD');
+  assert.equal(calendar().summaryRateText, '--');
+});
+
 test('Cross records use owned logical legs and cannot import shared-account Funding positions', async () => {
   const scopes = [];
   const getOwned = async (id) => {
@@ -91,6 +114,7 @@ function component(relative) {
     if (name === '@/store/modules/user')
       return { useUserStore: () => ({ authentication: { user: { role: 'ceo' } } }) };
     if (name.startsWith('@/api/')) return {};
+    if (name === './FundingBasisPanel.vue') return { default: { render: () => null } };
     return require(name);
   };
   new Function('require', 'module', 'exports', code)(dependencies, mod, mod.exports);

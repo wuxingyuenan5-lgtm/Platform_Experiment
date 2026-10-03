@@ -7,14 +7,25 @@ import json
 import os
 import shutil
 import sqlite3
+import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 from app.config import get_settings
-from app.database_connection import connection
+from app.database_connection import connection, read_only_connection
 from app.strategy_research_series import METHOD, QUALITY, Deriver, stable_hash
 
 SCHEMA = "strategy-research.parquet.v1"
+_CAPTURE_STATUS_CACHE: tuple[str, float, dict] | None = None
+_CAPTURE_STATUS_LOCK = threading.Lock()
+_CAPTURE_STATUS_TTL_SECONDS = 30.0
+
+
+def invalidate_capture_status_cache():
+    global _CAPTURE_STATUS_CACHE
+    with _CAPTURE_STATUS_LOCK:
+        _CAPTURE_STATUS_CACHE = None
 
 
 def root_path():
@@ -167,11 +178,12 @@ def publish(batch):
             state_json=excluded.state_json,status_json=excluded.status_json""",
             (batch["nextCursor"], json.dumps(deriver.state), json.dumps(batch.get("capture", {}))),
         )
+    invalidate_capture_status_cache()
     return part_id
 
 
 def parts():
-    with connection() as db:
+    with read_only_connection() as db:
         rows = db.execute("SELECT * FROM research_strategy_parts ORDER BY rowid").fetchall()
     return [dict(row) for row in rows]
 
@@ -229,9 +241,20 @@ def read_rows(
 
 
 def capture_status():
+    global _CAPTURE_STATUS_CACHE
+    cache_path = str(get_settings().database_path)
+    now_monotonic = time.monotonic()
+    with _CAPTURE_STATUS_LOCK:
+        if (
+            _CAPTURE_STATUS_CACHE is not None
+            and _CAPTURE_STATUS_CACHE[0] == cache_path
+            and now_monotonic - _CAPTURE_STATUS_CACHE[1] < _CAPTURE_STATUS_TTL_SECONDS
+        ):
+            return dict(_CAPTURE_STATUS_CACHE[2])
     entries = parts()
     checkpoint_row = checkpoint()
-    size = sum((root_path() / p["path"]).stat().st_size for p in entries)
+    folder = root_path()
+    size = sum((folder / p["path"]).stat().st_size for p in entries)
     elapsed = (
         (
             datetime.fromisoformat(entries[-1]["last_at"])
@@ -240,9 +263,9 @@ def capture_status():
         if entries
         else 0
     )
-    free = shutil.disk_usage(root_path() if root_path().exists() else root_path().parent).free
+    free = shutil.disk_usage(folder if folder.exists() else folder.parent).free
     per_day = str(int(size / elapsed * 86400)) if elapsed > 0 else None
-    return {
+    result = {
         "runtime": json.loads(checkpoint_row["status_json"]),
         "publishedThrough": entries[-1]["last_at"] if entries else None,
         "historyStart": entries[0]["first_at"] if entries else None,
@@ -258,6 +281,35 @@ def capture_status():
         "backup": "not_verified",
         "theoreticalTradingDuration": None,
         "calendarCoverage": "unverified",
+    }
+    with _CAPTURE_STATUS_LOCK:
+        _CAPTURE_STATUS_CACHE = (cache_path, time.monotonic(), result)
+    return dict(result)
+
+
+def capture_metadata():
+    """Return the small manifest subset needed by ordinary HTTP envelopes.
+
+    Full ``capture_status`` also stats every archived Parquet file to report
+    byte totals. That is appropriate for the explicit status endpoint but made
+    every chart read perform thousands of Windows file-stat calls. Ordinary
+    reads only need publication bounds and the manifest version.
+    """
+    with read_only_connection() as db:
+        rows = db.execute(
+            "SELECT first_at,last_at,checksum FROM research_strategy_parts ORDER BY rowid"
+        ).fetchall()
+        checkpoint_row = db.execute(
+            "SELECT cursor,status_json FROM research_strategy_capture WHERE id=1"
+        ).fetchone()
+    checksums = [row["checksum"] for row in rows]
+    return {
+        "runtime": json.loads(checkpoint_row["status_json"]) if checkpoint_row else {},
+        "publishedThrough": rows[-1]["last_at"] if rows else None,
+        "historyStart": rows[0]["first_at"] if rows else None,
+        "parts": len(rows),
+        "dataVersion": stable_hash(checksums),
+        "cursor": checkpoint_row["cursor"] if checkpoint_row else None,
     }
 
 

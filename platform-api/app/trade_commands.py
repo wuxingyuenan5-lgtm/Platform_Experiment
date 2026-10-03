@@ -225,14 +225,25 @@ def _submit_claimed_command(
             cross_spread_guard=cross_spread_guard,
         )
     except HTTPException:
-        update_trade_command_status(trade_command_id, "rejected")
+        _synchronize_dispatch_failure(trade_command_id, fallback="rejected")
         raise
     except Exception:
-        update_trade_command_status(trade_command_id, "failed")
+        _synchronize_dispatch_failure(trade_command_id, fallback="failed")
         raise
 
     update_trade_command_status(trade_command_id, order.status)
     return get_trade_command(trade_command_id)
+
+
+def _synchronize_dispatch_failure(trade_command_id: str, *, fallback: str) -> None:
+    # Once an order exists its evidence owns the outcome. Transport/contract
+    # errors must not turn an uncertain order into a definitively rejected command.
+    with connection() as db:
+        db.execute(
+            "UPDATE trade_commands SET status=COALESCE("
+            "(SELECT status FROM orders WHERE command_id=?), ?), updated_at=? WHERE id=?",
+            (trade_command_id, fallback, now_iso(), trade_command_id),
+        )
 
 
 def assert_trade_command_request_matches(row, request: CreateTradeCommandRequest) -> None:

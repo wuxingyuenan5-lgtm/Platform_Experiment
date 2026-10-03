@@ -1281,6 +1281,8 @@ def test_funding_execution_modes_complete_and_partial_close_without_duplicate_or
         execution_policy="market",
     )
     close_id = closed["instruction"]["instructionId"]
+    assert closed["workspaceState"]["executionState"] == "accepted"
+    assert execute_instruction(close_id).status == "hedged"
     assert execute_instruction(close_id).status == "completed"
     group = list_funding_position_groups(scope="active")[0]
     assert Decimal(group["remainingClosableQuantity"]) == Decimal("0.75")
@@ -1397,7 +1399,10 @@ def test_live_funding_plan_freezes_native_spot_precision_and_rejects_wrong_marke
     # The perpetual target is authoritative.  The spot leg must include the
     # 0.1% base-asset fee, so 0.002 perpetual requires 0.002002 gross spot.
     instruction_id = _make_instruction(
-        "funding-live-native-rules", quantity="0.002", spot_quantity="0.002002", execution_policy="fok"
+        "funding-live-native-rules",
+        quantity="0.002",
+        spot_quantity="0.002002",
+        execution_policy="fok",
     )
     plan = get_instruction(instruction_id)["executionPlan"]
     assert plan["legs"][0]["priceTick"] == "0.1"

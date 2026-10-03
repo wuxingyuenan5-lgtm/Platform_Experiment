@@ -27,6 +27,7 @@ from app.cross_spread_exit_repository import (
     find_plan_by_open_batch,
     get_exit_plan,
     has_accepted_missing_external_order_difference,
+    has_close_instruction,
     list_exit_plans,
     load_batch_fill_summaries,
     mark_plan_closed,
@@ -43,14 +44,8 @@ from app.cross_spread_exit_schemas import (
     CrossSpreadMarketOpenRequest,
     CrossSpreadOpenResult,
     CrossSpreadOrderIntentResponse,
-    LimitStrategy,
     CrossSpreadPendingOpenTriggerResponse,
-)
-from app.cross_spread_open_trigger_repository import (
-    claim_open_trigger,
-    create_open_trigger,
-    finish_open_trigger,
-    list_pending_open_triggers,
+    LimitStrategy,
 )
 from app.cross_spread_limit_execution import (
     get_bybit_catalog_tick_size,
@@ -61,12 +56,19 @@ from app.cross_spread_limit_policy import (
     CrossSpreadFokPrice,
     derive_cross_spread_fok_price,
 )
+from app.cross_spread_open_trigger_repository import (
+    claim_open_trigger,
+    create_open_trigger,
+    finish_open_trigger,
+    list_pending_open_triggers,
+)
 from app.cross_spread_order_intent import (
     SyntheticOrderIntent,
     build_close_intent,
     build_open_intent,
     command_action,
 )
+from app.cross_spread_position_reconciliation import assert_close_positions
 from app.execution_batches import find_batch_by_idempotency_key, get_execution_batch
 from app.schemas import CrossSpreadMarketCommandRequest
 
@@ -105,9 +107,12 @@ def open_cross_spread_market(request: CrossSpreadMarketOpenRequest) -> CrossSpre
             limitExecution=_limit_response(limit_execution, request.limit_strategy),
             exitPlan=None,
             pendingTrigger=CrossSpreadPendingOpenTriggerResponse(
-                triggerId=pending["id"], direction=request.direction,
-                quantityOz=request.quantity_oz, limitSpread=request.limit_spread,
-                limitStrategy=request.limit_strategy, status="pending",
+                triggerId=pending["id"],
+                direction=request.direction,
+                quantityOz=request.quantity_oz,
+                limitSpread=limit_execution.limit_spread,
+                limitStrategy=request.limit_strategy,
+                status="pending",
                 createdAt=pending["created_at"],
             ),
         )
@@ -204,6 +209,26 @@ def close_cross_spread_market(
         raise HTTPException(
             status_code=422,
             detail="Close quantity exceeds remaining group quantity",
+        )
+    if current_plan.status == "closed":
+        completed = (
+            get_execution_batch(current_plan.close_batch_id)
+            if current_plan.close_batch_id is not None
+            else None
+        )
+        if completed is None or completed.status != "hedged":
+            raise HTTPException(409, "Exit plan is already closed by venue reconciliation")
+        # Reading a completed result needs neither fresh quotes nor new execution gates.
+        return CrossSpreadCloseResult(
+            executionBatch=completed,
+            orderIntent=_intent_response(
+                build_close_intent(
+                    current_plan.direction,
+                    execution_mode,
+                    trigger_reason=current_plan.trigger_reason or "MANUAL",
+                )
+            ),
+            exitPlan=current_plan,
         )
     if (
         idempotency_key is not None
@@ -560,13 +585,19 @@ def _close_claimed_plan(
         else _limit_exit_idempotency_key(plan, limit_strategy)
     )
     try:
+        bybit_reduce_only = _bybit_close_reduces_live_position(plan, close_quantity)
+    except Exception:
+        mark_plan_manual_intervention(plan.plan_id, close_batch_id=plan.close_batch_id)
+        raise
+    try:
         if intent.execution_type == "MARKET":
             batch = submit_cross_spread_market_command(
                 command_request,
                 idempotency_key=command_key,
+                bybit_reduce_only=bybit_reduce_only,
                 mt5_reduce_only=True,
                 mt5_position_id=plan.mt5_position_id,
-                allow_netting_close=True,
+                allow_netting_close=not bybit_reduce_only,
             )
         else:
             assert limit_execution is not None
@@ -583,15 +614,23 @@ def _close_claimed_plan(
                 ),
                 target_spread=limit_execution.limit_spread,
                 idempotency_key=command_key,
+                bybit_reduce_only=bybit_reduce_only,
                 mt5_reduce_only=True,
                 mt5_position_id=plan.mt5_position_id,
-                allow_netting_close=True,
+                allow_netting_close=not bybit_reduce_only,
             )
     except Exception:
-        mark_plan_manual_intervention(
-            plan.plan_id,
-            close_batch_id=find_close_batch(plan, command_key, close_quantity),
-        )
+        close_batch_id = find_close_batch(plan, command_key, close_quantity)
+        if close_batch_id is None and not has_close_instruction(
+            plan.strategy_instance_id, command_key
+        ):
+            # Plan normalization can reject a deterministic preflight before the
+            # instruction and batch exist. In that case nothing reached Runtime,
+            # so keep the position group retryable instead of fabricating a
+            # manual-intervention order.
+            release_exit_plan_claim(plan.plan_id)
+        else:
+            mark_plan_manual_intervention(plan.plan_id, close_batch_id=close_batch_id)
         raise
 
     if (
@@ -622,6 +661,18 @@ def _close_claimed_plan(
         orderIntent=_intent_response(intent),
         limitExecution=_limit_response(limit_execution, limit_strategy),
         exitPlan=updated,
+    )
+
+
+def _bybit_close_reduces_live_position(
+    plan: CrossSpreadExitPlanResponse, close_quantity: Decimal
+) -> bool:
+    """Use the same verified observation for drift checks and reduce-only choice."""
+    net_quantity = assert_close_positions(plan)
+    return (
+        net_quantity >= close_quantity
+        if plan.direction == "LONG_SPREAD"
+        else net_quantity <= -close_quantity
     )
 
 
@@ -738,9 +789,7 @@ def _prepare_limit_execution(
 def _evaluate_pending_open_triggers() -> None:
     for row in list_pending_open_triggers():
         try:
-            request = CrossSpreadMarketOpenRequest.model_validate(
-                json.loads(row["request_json"])
-            )
+            request = CrossSpreadMarketOpenRequest.model_validate(json.loads(row["request_json"]))
             intent = build_open_intent(
                 request.direction, request.execution_mode, trigger_reason="STRATEGY"
             )

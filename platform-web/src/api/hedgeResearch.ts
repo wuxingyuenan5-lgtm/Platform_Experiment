@@ -2,6 +2,7 @@ import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from '
 
 import {
   clearUserSystemSessionMemory,
+  getCurrentAuthentication,
   getUserSystemCsrfToken,
   UserSystemApiError,
 } from '@/api/platform/userSystem';
@@ -210,12 +211,14 @@ export interface AShareDashboardResponse {
   }> | null;
   marketHistory?: Array<{
     observedAt: string;
+    source?: string | null;
     up?: number | null;
     down?: number | null;
     flat?: number | null;
     limitUp?: number | null;
     limitDown?: number | null;
     totalAmountYuan?: string | number | null;
+    amountChangePct?: string | number | null;
     marketBreadthPct?: string | number | null;
   }>;
 }
@@ -282,6 +285,7 @@ export interface MarketDetailRow {
   distance52wHigh?: string | number | null;
   spark30d: Array<string | number>;
   spark90d?: Array<string | number>;
+  signals?: Partial<Record<'d10' | 'd20' | 'd50' | 'd200' | 'x2050' | 'x50200', string | null>>;
 }
 
 export interface MarketDetailResponse {
@@ -356,10 +360,11 @@ const client: AxiosInstance = axios.create({
   withCredentials: true,
 });
 
-client.interceptors.request.use((config) => {
-  const csrf = getUserSystemCsrfToken();
-  if (!['get', 'head', 'options'].includes((config.method || 'get').toLowerCase()) && csrf) {
-    config.headers.set('X-CSRF-Token', csrf);
+client.interceptors.request.use(async (config) => {
+  if (!['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
+    if (!getUserSystemCsrfToken()) await getCurrentAuthentication();
+    const csrf = getUserSystemCsrfToken();
+    if (csrf) config.headers.set('X-CSRF-Token', csrf);
   }
   return config;
 });
@@ -391,6 +396,34 @@ export async function researchRequest<T>(config: AxiosRequestConfig): Promise<T>
   const response = await client.request<T>(config);
   return response.data;
 }
+
+export interface MarketLayoutGroup {
+  label: string;
+  rows: Array<{ id: string; name: string; symbol: string; tvSymbol?: string }>;
+}
+
+export interface MarketLayoutResponse {
+  groups: MarketLayoutGroup[] | null;
+  rowVersion: number;
+  updatedAt: string | null;
+}
+
+export const getMarketLayout = (marketId: string) =>
+  researchRequest<MarketLayoutResponse>({
+    method: 'GET',
+    url: `/me/research-market-layout/${marketId}`,
+  });
+
+export const saveMarketLayout = (
+  marketId: string,
+  groups: MarketLayoutGroup[] | null,
+  expectedVersion: number,
+) =>
+  researchRequest<MarketLayoutResponse>({
+    method: 'PUT',
+    url: `/me/research-market-layout/${marketId}`,
+    data: { groups, expectedVersion },
+  });
 
 export const getAShareDashboard = () =>
   researchRequest<AShareDashboardResponse>({
@@ -429,7 +462,7 @@ export const getMacroExpectations = () =>
     url: '/research/macro/expectations',
   });
 
-export const getMarketDetail = (marketId: 'macro' | 'gold' | 'crypto') =>
+export const getMarketDetail = (marketId: 'macro' | 'gold' | 'crypto' | 'us' | 'global') =>
   researchRequest<MarketDetailResponse>({
     method: 'GET',
     url: `/research/market-detail/${marketId}`,
@@ -616,9 +649,10 @@ export const getCumulativeVolatility = (
   asset: 'btc' | 'gold',
   days: number = 7,
   interval: CumulativeVolatilityInterval = '15m',
+  window?: { start: string; end: string },
 ) =>
   researchRequest<CumulativeVolatilityResponse>({
     method: 'GET',
     url: '/research/cumulative-volatility',
-    params: { asset, days, interval },
+    params: { asset, days, interval, ...window },
   });

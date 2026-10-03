@@ -266,6 +266,7 @@ def test_close_summary_separates_authoritative_pending_and_uncertain_quantity(
 
 
 def test_position_groups_exclude_fully_closed_group_from_active_scope(monkeypatch) -> None:
+    monkeypatch.setattr("app.strategies.funding_exit_repository.list_plans", lambda: [])
     instructions = [
         {
             "instructionId": "open-1",
@@ -288,7 +289,7 @@ def test_position_groups_exclude_fully_closed_group_from_active_scope(monkeypatc
 
     assert funding_workspace.list_funding_position_groups(scope="active") == []
     assert funding_workspace.list_funding_position_groups(scope="history") == [
-        {"lifecycleState": "history", "instructionId": "open-1"}
+        {"lifecycleState": "history", "instructionId": "open-1", "exitPlan": None}
     ]
 
 
@@ -600,3 +601,52 @@ def test_funding_net_delta_distinguishes_fee_error_from_planned_rounding(
     if abnormal:
         assert "手续费未配平" in row["abnormalReason"]
         assert row["abnormalAction"] == "close_group"
+
+
+def test_large_catalog_matches_pairs_without_quadratic_scan(monkeypatch):
+    from contextlib import contextmanager
+
+    from app.database import connection, initialize_database
+
+    initialize_database()
+    at = "2026-10-02T00:00:00Z"
+    with connection() as db:
+        for index in range(250):
+            for kind, suffix in (("crypto_spot", "spot"), ("crypto_perp", "perp")):
+                identity = f"perf-{index}-{suffix}"
+                db.execute(
+                    "INSERT INTO instruments (id,instrument_code,name,instrument_type,"
+                    "base_currency,"
+                    "quote_currency,settle_currency,quantity_unit,data_quality_state,created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (identity, identity, identity, kind, f"PERF{index}", "USDT", "USDT",
+                     "coin", "complete", at),
+                )
+                db.execute(
+                    "INSERT INTO instrument_mappings VALUES (?,?,?,?,?,?,?)",
+                    (identity, identity, "venue_crypto", f"perf{index}usdt", "direct",
+                     "active", at),
+                )
+                db.execute(
+                    "INSERT INTO contract_specifications VALUES (?,?,?,?,?,?,?,?,?)",
+                    (identity, identity, "v1", "0.01", "0.001", "0.001", "1", at,
+                     "partial" if index == 249 else "complete"),
+                )
+        db.execute("UPDATE instrument_mappings SET status='inactive' WHERE id='perf-248-spot'")
+    steps = [0]
+
+    @contextmanager
+    def budgeted_connection():
+        with connection() as db:
+            def progress():
+                steps[0] += 1000
+                return int(steps[0] > 200_000)
+            db.set_progress_handler(progress, 1000)
+            yield db
+
+    monkeypatch.setattr(funding_workspace, "connection", budgeted_connection)
+    pairs = funding_workspace._list_local_funding_pairs("venue_crypto", "PERF")
+    assert len(pairs) == 248
+    assert all(pair["spotSymbol"] == pair["perpetualSymbol"] for pair in pairs)
+    assert {pair["baseAsset"] for pair in pairs} == {f"PERF{i}" for i in range(248)}
+    assert steps[0] < 200_000

@@ -58,6 +58,12 @@ Forbidden directions:
 - operational projection to formal-accounting input;
 - composition root to duplicated business rules.
 
+## Web interaction lifecycle
+
+Protected navigation continues to verify the server-side session, including revisits. Its progress indicator is non-blocking and follows the current navigation through success, cancellation or failure; page switching does not add a fixed loading delay or wait for an exit animation. Only routes that observe their own query changes opt into `reuseOnQueryChange`; strategy management and execution reuse the page instance for internal selections, while other routes retain their existing identity behavior. This is not a platform-wide resident page cache.
+
+The shared ECharts hook retains the latest options while a chart is outside the viewport and paints when it approaches visibility. Page deactivation and disposal still stop painting; this scheduling changes neither API refresh intervals nor numerical, timestamp, missing-data or trading-freshness rules.
+
 ## Data authority
 
 | Data | Authority |
@@ -70,7 +76,7 @@ Forbidden directions:
 | Monitoring position/PnL | operational projections |
 | Auditable economic truth | immutable `financial_facts` |
 | Formal position/PnL/NAV | rebuildable formal projections |
-| Safety and approval | risk and Live Trading Session modules |
+| Safety and approval | CEO Browser Session, account bindings, execution risk and independent Live Write gates; legacy Live Trading Sessions are not normal trading prerequisites |
 
 ## Key data flows
 
@@ -94,7 +100,7 @@ Authoritative venue evidence / imported statements
   -> formal projections
 ```
 
-Research freshness, model output and operational projections are deliberately separate. Formal projections are rebuilt only from immutable financial facts; operational projections are never accounting inputs. Reusing research data in another module does not transfer authority: the receiving module must authenticate the user and apply its own contract. Only the trading flow may reach `execution-runtime`, and only through the versioned command boundary and existing Live Write gates.
+Research freshness, model output and operational projections are deliberately separate. Formal projections are rebuilt only from immutable financial facts; operational projections are never accounting inputs. Reusing research data in another module does not transfer authority: the receiving module must authenticate the user and apply its own contract. Platform may use the existing Runtime read contracts for account observations, history and research market data. Order side effects remain exclusive to the versioned trading command boundary and existing Live Write gates; a read contract never grants trading authority or new external connectivity.
 
 ## Strategy implementation choice (2026-09-08)
 
@@ -123,6 +129,23 @@ Hedge Board keeps the TradingView popup and current market-detail sparklines. Th
 
 ## Convergence rules
 
+Standardize the execution mechanics, not the financial or source semantics:
+
+| Shared mechanic | Domain-owned rule that must remain distinct |
+|---|---|
+| Managed background startup, durable logs and failure reporting | Each producer's cadence, market calendar, retry budget and freshness deadline |
+| Bounded queries, indexed reads and persisted serving projections | Account, strategy, currency and asset-scope identity; current observations versus economic history |
+| Page activation and chart visibility lifecycle | Each panel's observation window, sampling method and display precision |
+| Explicit source, observation, fetch and completion metadata | Native time precision, broker clock provenance, timezone, session and settlement semantics |
+
+Do not normalize monetary values through floating point or round stored values
+for presentation. Do not convert missing values into zero, mark failed/stale
+sources healthy, or impose one timezone/calendar/freshness threshold across
+research and execution. Performance changes must preserve values, ownership,
+ordering and quality states; benchmark the affected path separately from health
+endpoints. A faster health probe does not establish faster business queries or
+browser interaction.
+
 - Split a module only when it separates a real policy, persistence or side-effect boundary.
 - Do not introduce a service, database, queue, global DI container or event bus for organizational symmetry.
 - SQLite remains the current local Platform database.
@@ -132,4 +155,4 @@ Hedge Board keeps the TradingView popup and current market-detail sparklines. Th
 
 ## Pretrade strategy observation boundary
 
-Strategy research uses the same three deployable units. Runtime owns native public Bybit capture and fixed-account MT5 Tick access, recoverable spool and versioned read-only batch export. Platform owns archival Parquet, short SQLite manifest/cursor transactions, background experiment workers and authenticated research APIs. Web renders those APIs and can transfer user-owned parameters to existing execution forms. No queue service, microservice, second ledger or execution kernel is added. Research caches/results cannot become execution prices, fills or risk authority. Detailed temporal, statistical and numeric semantics belong only to [Research Data](../contracts/RESEARCH_DATA.md#strategy-pretrade-research-v1); persistence belongs to the [database guide](../database/README.md#strategy-research-schema-version-30).
+Strategy research uses the same three deployable units. Runtime owns native public Bybit capture and fixed-account MT5 Tick access, recoverable spool and versioned read-only batch export. Platform owns archival Parquet, short SQLite manifest/cursor transactions, background experiment workers and authenticated research APIs. Archive publication and serving projections run in one Platform-owned spawned process so JSON/Parquet CPU work does not hold the HTTP process Python lock. The API retains the existing research lease and writer lock, waits for an in-flight write before cancellation releases that lock, and recreates a failed pool from the durable cursor. This worker is part of the existing Platform deployable. Web renders those APIs and can transfer user-owned parameters to existing execution forms. No queue service, microservice, second ledger or execution kernel is added. Research caches/results cannot become execution prices, fills or risk authority. Detailed temporal, statistical and numeric semantics belong only to [Research Data](../contracts/RESEARCH_DATA.md#strategy-pretrade-research-v1); persistence belongs to the [database guide](../database/README.md#strategy-research-schema-version-30).

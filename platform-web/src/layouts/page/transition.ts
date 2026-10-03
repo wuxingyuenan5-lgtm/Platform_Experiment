@@ -6,6 +6,10 @@ export interface DefaultContext {
   route: RouteLocation;
 }
 
+export function getPageKey(route: RouteLocation): string {
+  return route.meta.reuseOnQueryChange ? route.path : route.fullPath;
+}
+
 export function getTransitionName({
   route,
   openCache,

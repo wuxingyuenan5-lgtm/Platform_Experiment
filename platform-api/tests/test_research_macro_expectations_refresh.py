@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 import json
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -61,7 +61,10 @@ def test_category_does_not_match_fed_inside_unrelated_words() -> None:
 def test_election_topic_wins_over_country_keyword() -> None:
     now = datetime(2026, 9, 15, tzinfo=UTC)
     row = _market(
-        question="Will United Russia (ER) gain the most seats in the next Russian parliamentary election?"
+        question=(
+            "Will United Russia (ER) gain the most seats "
+            "in the next Russian parliamentary election?"
+        )
     )
 
     event = _event_from_market(row, now)

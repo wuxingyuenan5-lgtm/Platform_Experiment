@@ -23,6 +23,7 @@ from app.cross_spread_order_intent import (
     build_open_intent,
     market_command_action,
 )
+from app.cross_spread_synthetic_service import _bybit_close_reduces_live_position
 from app.execution_schemas import ExecutionBatchResponse
 from app.schemas import BatchLegResponse
 
@@ -34,6 +35,64 @@ def synthetic_live_gate(monkeypatch):
     from app.config import get_settings
 
     monkeypatch.setattr(get_settings(), "live_trading_enabled", True)
+    monkeypatch.setattr(synthetic_service, "assert_close_positions", lambda *_: None)
+    monkeypatch.setattr(
+        synthetic_service, "_bybit_close_reduces_live_position", lambda *_args: False
+    )
+    monkeypatch.setattr(
+        synthetic_service, "assert_cross_spread_market_executable", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(
+        synthetic_service, "assert_cross_spread_native_trading_rules", lambda: None
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "load_batch_fill_summaries",
+        lambda *_args: {"bybit_leg": type("Fill", (), {"quantity": Decimal("1")})()},
+    )
+
+
+def test_close_uses_reduce_only_only_for_a_matching_live_net_position(monkeypatch):
+    monkeypatch.setattr(synthetic_service, "assert_close_positions", lambda _: Decimal("2"))
+
+    assert _bybit_close_reduces_live_position(exit_plan(), Decimal("1")) is True
+    assert _bybit_close_reduces_live_position(exit_plan(), Decimal("3")) is False
+    assert (
+        _bybit_close_reduces_live_position(exit_plan(direction="SHORT_SPREAD"), Decimal("1"))
+        is False
+    )
+    monkeypatch.setattr(synthetic_service, "assert_close_positions", lambda _: Decimal("0"))
+    assert _bybit_close_reduces_live_position(exit_plan(), Decimal("1")) is False
+
+
+def test_matching_live_net_close_submits_venue_enforced_reduce_only(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        synthetic_service, "_bybit_close_reduces_live_position", lambda *_args: True
+    )
+    monkeypatch.setattr(
+        synthetic_service,
+        "submit_cross_spread_market_command",
+        lambda request, **kwargs: (
+            captured.update(request=request, kwargs=kwargs)
+            or batch_response("reduced-close", direction=request.action)
+        ),
+    )
+    monkeypatch.setattr(synthetic_service, "mark_plan_closing", lambda *_args: None)
+    monkeypatch.setattr(
+        synthetic_service,
+        "load_batch_fill_summaries",
+        lambda *_args: {"bybit_leg": type("Fill", (), {"quantity": Decimal("1")})()},
+    )
+    monkeypatch.setattr(
+        synthetic_service, "mark_plan_closed", lambda *_args: exit_plan(status="closed")
+    )
+
+    synthetic_service._close_claimed_plan(exit_plan(status="triggered"), execution_mode="market")
+
+    assert captured["kwargs"]["bybit_reduce_only"] is True
+    assert captured["kwargs"]["mt5_reduce_only"] is True
+    assert captured["kwargs"]["allow_netting_close"] is False
 
 
 def batch_response(

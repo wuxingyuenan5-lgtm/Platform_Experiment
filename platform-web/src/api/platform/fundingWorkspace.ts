@@ -7,6 +7,18 @@ export type FundingExecutionContext = components['schemas']['FundingExecutionCon
 export type FundingWorkspaceResponse = components['schemas']['FundingWorkspaceResponse'];
 export type FundingPositionGroup = components['schemas']['FundingPositionGroupResponse'];
 
+export async function saveFundingExitPlan(
+  openInstructionId: string,
+  input: components['schemas']['FundingExitPlanRequest'],
+) {
+  return strategyData(
+    await api.PATCH('/api/v1/trading/funding/exit-plans/{open_instruction_id}', {
+      params: { path: { open_instruction_id: openInstructionId } },
+      body: input,
+    }),
+  );
+}
+
 export async function getFundingExecutionContext(
   params?: {
     perpetualSymbol?: string;
@@ -76,6 +88,15 @@ export async function closeFundingAbnormalOpen(batchId: string, actor: string) {
         actor,
         reason: 'Owner confirmed closing the abnormal Funding opening fills',
       },
+    }),
+  );
+}
+
+export async function recoverFundingClose(instructionId: string, idempotencyKey: string) {
+  return strategyData(
+    await api.POST('/api/v1/trading/funding/instructions/{instruction_id}/recover-close', {
+      params: { path: { instruction_id: instructionId } },
+      body: { idempotencyKey },
     }),
   );
 }

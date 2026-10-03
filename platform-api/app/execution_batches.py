@@ -627,6 +627,10 @@ def _claim_batch_execution_resources(
     reservation_keys: set[tuple[str, str]] = set()
     prepared_legs = []
     reservation_timestamps = now_iso()
+    batch_key_row = db.execute(
+        "SELECT idempotency_key FROM execution_batches WHERE id = ?", (batch_id,)
+    ).fetchone()
+    batch_key = str(batch_key_row["idempotency_key"]) if batch_key_row else None
     for leg in legs:
         account_id = leg.account_id or default_account_id
         spec = db.execute(
@@ -660,14 +664,27 @@ def _claim_batch_execution_resources(
         )
         base_currency = str(spec["base_currency"])
         quote_currency = str(spec["quote_currency"])
-        reservation_keys.add(
-            (
-                account_id,
-                base_currency
-                if normalized_type == "crypto_spot" and leg.side == "sell"
-                else quote_currency,
-            )
+        intent = (
+            db.execute(
+                "SELECT reduce_only FROM order_execution_intents WHERE idempotency_key = ?",
+                (f"{batch_key}:{leg.role}",),
+            ).fetchone()
+            if batch_key
+            else None
         )
+        reduce_only = bool(intent["reduce_only"]) if intent else False
+        # A venue-enforced derivatives reduction cannot increase exposure or
+        # initial margin. The venue still verifies the live position at submit.
+        needs_balance_reservation = not (reduce_only and normalized_type != "crypto_spot")
+        if needs_balance_reservation:
+            reservation_keys.add(
+                (
+                    account_id,
+                    base_currency
+                    if normalized_type == "crypto_spot" and leg.side == "sell"
+                    else quote_currency,
+                )
+            )
         prepared_legs.append(
             (
                 leg,
@@ -681,6 +698,7 @@ def _claim_batch_execution_resources(
                     else None
                 ),
                 str(spec["account_environment"]).lower() == "live",
+                needs_balance_reservation,
             )
         )
 
@@ -742,7 +760,10 @@ def _claim_batch_execution_resources(
         quote_currency,
         contract_multiplier,
         use_venue_margin,
+        needs_balance_reservation,
     ) in prepared_legs:
+        if not needs_balance_reservation:
+            continue
         reservation_key, amount = _reservation_requirement_for_leg(
             leg,
             account_id=account_id,

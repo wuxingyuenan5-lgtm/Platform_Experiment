@@ -18,6 +18,7 @@
 
       <ErrorAction v-if="getUseErrorHandle" :class="`${prefixCls}-action__item error-action`" />
 
+      <DataAuditIndicator />
       <Notify
         v-if="getShowNotice && route.path != '/notification/index'"
         :class="`${prefixCls}-action__item notify-item`"
@@ -56,6 +57,7 @@
   import { useRoute } from 'vue-router';
   import LayoutMenu from '../menu/index.vue';
   import { ErrorAction, FullScreen, Notify } from './components';
+  import DataAuditIndicator from './components/DataAuditIndicator.vue';
   import UserDropDown from './components/user-dropdown/index.vue';
 
   const route = useRoute();
@@ -71,13 +73,8 @@
   const { getShowTopMenu, getSplit } = useMenuSetting();
   const { getUseErrorHandle, getShowSettingButton, getSettingButtonPosition } = useRootSetting();
 
-  const {
-    getHeaderTheme,
-    getShowFullScreen,
-    getShowNotice,
-    getShowHeader,
-    getShowSearch,
-  } = useHeaderSetting();
+  const { getHeaderTheme, getShowFullScreen, getShowNotice, getShowHeader, getShowSearch } =
+    useHeaderSetting();
 
   const { getShowLocalePicker } = useLocale();
   const { getIsMobile } = useAppInject();

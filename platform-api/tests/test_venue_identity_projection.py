@@ -77,6 +77,8 @@ def operational_fill(identity, order_id, quantity="1"):
 
 
 def test_same_native_tickets_in_two_accounts_are_distinct_and_replay_once():
+    from app.venue_identity_repository import load_order_identities
+
     with connection() as db:
         for account in ("mt5-live-main", "account_mt5_short_term_a"):
             fill = receipt(source="mt5_live", accountId=account, instrumentId="instrument_xau_usd")
@@ -84,6 +86,19 @@ def test_same_native_tickets_in_two_accounts_are_distinct_and_replay_once():
             assert _persist_fills(db, account, [fill])[0] == 0
         assert db.execute("SELECT COUNT(*) FROM fills").fetchone()[0] == 2
         assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 2
+        identities = load_order_identities(db, account_ids=["mt5-live-main"])
+        assert len(identities.rows) == 1
+        assert all(row["account_id"] == "mt5-live-main" for row in identities.rows.values())
+        assert load_order_identities(db, account_ids=[]).rows == {}
+
+
+def test_account_scope_keeps_competing_native_order_owners_fail_closed():
+    from app.strategy_financial_readmodel import _native_fills_for_orders
+
+    persisted_order("owned-first", strategy=CROSS)
+    persisted_order("owned-second", strategy=FUNDING)
+    with connection() as db:
+        assert _native_fills_for_orders(db, {"owned-first"}) is None
 
 
 def test_late_alias_uses_command_owner_without_rewriting_original_records():
@@ -491,6 +506,37 @@ def test_native_time_correction_requires_exact_accepted_evidence(accept, changed
         )
     if accept and not changed:
         assert list_fills(CROSS)[0].occurred_at == datetime(2026, 9, 1, 4, tzinfo=UTC)
+        from app.strategy_financial_readmodel import _native_fills_for_orders
+
+        with connection() as db:
+            rows = _native_fills_for_orders(db, {"owned"})
+        assert rows and json.loads(rows[0]["payload_json"])["occurredAt"] == new["occurredAt"]
+
+
+def test_native_fee_read_batches_correction_queries_without_caching_receipts():
+    from app.strategy_financial_readmodel import _native_fills_for_orders
+    from app.venue_reconciliation_repository import ensure_schema
+
+    persisted_order("owned", strategy=CROSS, quantity="50")
+    ensure_schema()
+    with connection() as db:
+        for index in range(50):
+            _persist_venue_event(db, ACCOUNT, "trade_fill", receipt(
+                platformOrderId="owned", externalFillId=f"fill-{index}"
+            ))
+    with connection() as db:
+        queries = []
+        db.set_trace_callback(queries.append)
+        rows = _native_fills_for_orders(db, {"owned"})
+        assert rows is not None and len(rows) == 50
+        assert len(queries) <= 8  # Independent of historical fill count.
+        db.set_trace_callback(None)
+        _persist_venue_event(db, ACCOUNT, "trade_fill", receipt(
+            platformOrderId="owned", externalFillId="new-fill", fee="0.123456789"
+        ))
+        latest = _native_fills_for_orders(db, {"owned"})
+        assert latest is not None and len(latest) == 51
+        assert any(json.loads(row["payload_json"])["fee"] == "0.123456789" for row in latest)
 
 
 @pytest.mark.parametrize(

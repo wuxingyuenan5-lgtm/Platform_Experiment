@@ -126,8 +126,11 @@ def fetch_crypto_daily_prices(asset: str, start_date: str, end_date: str) -> dic
             "category": "linear",
             "symbol": symbol,
             "interval": "D",
-            "start": int(datetime.combine(start, datetime.min.time(), tzinfo=UTC).timestamp() * 1000),
-            "end": int(datetime.combine(end, datetime.min.time(), tzinfo=UTC).timestamp() * 1000) - 1,
+            "start": int(
+                datetime.combine(start, datetime.min.time(), tzinfo=UTC).timestamp() * 1000
+            ),
+            "end": int(datetime.combine(end, datetime.min.time(), tzinfo=UTC).timestamp() * 1000)
+            - 1,
             "limit": 1000,
         },
     )

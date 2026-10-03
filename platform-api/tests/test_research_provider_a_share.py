@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import ssl
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
+import httpx
 import pytest
 
 from app import research_provider_a_share as a_share
 from app.research_data_schemas import AShareIndexSnapshot
 from app.research_provider_a_share import AShareResearchProvider
+from app.research_providers import FreeResearchProvider
 
 pytestmark = pytest.mark.unit
 
@@ -40,7 +43,7 @@ class _Response:
         return None
 
     def json(self) -> dict[str, Any]:
-        return {"data": {"pool": [{"c": "600000"}]}}
+        return {"data": {"qdate": 20260731, "pool": [{"c": "600000"}]}}
 
 
 class _Client:
@@ -77,6 +80,121 @@ def test_a_share_spot_preserves_field_normalization() -> None:
     assert result[0].security_name == "测试股份"
     assert result[0].turnover_yuan == Decimal("12345")
     assert result[0].return_pct == Decimal("3.2")
+
+
+def test_eastmoney_clist_uses_delay2_node_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(a_share, "_EM_DELAY_HOST_INDEX", 0)
+    monkeypatch.setattr(a_share.httpx, "AsyncClient", _Client)
+
+    async def run() -> dict[str, Any]:
+        async with a_share.httpx.AsyncClient() as client:
+            return await a_share._eastmoney_clist(client, {"pn": "1"}, {})
+
+    assert asyncio.run(run()) == {
+        "data": {"qdate": 20260731, "pool": [{"c": "600000"}]}
+    }
+    assert _Client.request is not None
+    assert _Client.request["url"] == (
+        "https://push2delay2.eastmoney.com/api/qt/clist/get"
+    )
+
+
+def test_eastmoney_clist_fails_over_after_node_disconnect(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts: list[str] = []
+    monkeypatch.setattr(a_share, "_EM_DELAY_HOST_INDEX", 0)
+
+    class FailoverClient:
+        async def get(self, url: str, **_: Any) -> _Response:
+            attempts.append(url)
+            if "push2delay2" in url:
+                raise httpx.ConnectError("node reset", request=httpx.Request("GET", url))
+            return _Response()
+
+    async def run() -> dict[str, Any]:
+        return await a_share._eastmoney_clist(FailoverClient(), {"pn": "1"}, {})
+
+    assert asyncio.run(run())["data"]["pool"][0]["c"] == "600000"
+    assert attempts == [
+        "https://push2delay2.eastmoney.com/api/qt/clist/get",
+        "https://push2delay.eastmoney.com/api/qt/clist/get",
+    ]
+
+
+def test_innovation_drug_snapshot_normalizes_quote_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    class QuoteResponse(_Response):
+        def json(self) -> dict[str, Any]:
+            return {
+                "data": {
+                    "f43": 1495.63,
+                    "f47": 50728424,
+                    "f48": 80353669607.0,
+                    "f86": 1790149171,
+                    "f168": 3.27,
+                    "f170": -0.02,
+                }
+            }
+
+    class QuoteClient(_Client):
+        async def get(self, url: str, **kwargs: Any) -> QuoteResponse:
+            type(self).request = {"url": url, **kwargs}
+            return QuoteResponse()
+
+    monkeypatch.setattr(a_share, "_EM_DELAY_HOST_INDEX", 0)
+    monkeypatch.setattr(a_share.httpx, "AsyncClient", QuoteClient)
+
+    result = asyncio.run(_provider().innovation_drug_snapshot())
+
+    assert result["amount_yuan"] == Decimal("80353669607")
+    assert result["turnover_pct"] == Decimal("3.27")
+    assert result["return_pct"] == Decimal("-0.0002")
+    assert result["observed_at"].isoformat() == "2026-09-23T07:39:31+00:00"
+    assert QuoteClient.request is not None
+    assert QuoteClient.request["url"] == (
+        "https://push2delay2.eastmoney.com/api/qt/stock/get"
+    )
+
+
+def test_sector_crowding_snapshot_collects_direct_board_amount_and_turnover(monkeypatch) -> None:
+    class QuoteResponse(_Response):
+        def json(self) -> dict[str, Any]:
+            return {
+                "data": {
+                    "f43": 1000,
+                    "f47": 123456,
+                    "f48": 123456789000,
+                    "f86": 1790149171,
+                    "f168": 3.52,
+                }
+            }
+
+    class QuoteClient(_Client):
+        async def get(self, url: str, **kwargs: Any) -> QuoteResponse:
+            type(self).request = {"url": url, **kwargs}
+            return QuoteResponse()
+
+    monkeypatch.setattr(a_share, "_EM_DELAY_HOST_INDEX", 0)
+    monkeypatch.setattr(a_share.httpx, "AsyncClient", QuoteClient)
+
+    result = asyncio.run(_provider().sector_crowding_snapshot())
+
+    assert [row["code"] for row in result] == ["801102", "801101", "801083", "801081"]
+    assert all(row["amount_yuan"] == Decimal("123456789000") for row in result)
+    assert all(row["turnover_pct"] == Decimal("3.52") for row in result)
+    assert all(row["observed_at"].isoformat() == "2026-09-23T07:39:31+00:00" for row in result)
+    assert QuoteClient.request is not None
+    assert QuoteClient.request["url"] == "https://push2delay2.eastmoney.com/api/qt/stock/get"
+
+
+def test_free_provider_exposes_sector_crowding_adapter() -> None:
+    provider = FreeResearchProvider()
+    expected = [{"code": "801102", "amount_yuan": Decimal("1")}]
+
+    async def collect():
+        return expected
+
+    provider._a_share.sector_crowding_snapshot = collect
+
+    assert asyncio.run(provider.sector_crowding_snapshot()) == expected
 
 
 def test_index_snapshots_preserve_partial_success(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -134,7 +252,9 @@ def test_tencent_hk_quote_uses_native_amount_and_hk_timestamp(monkeypatch):
 def test_short_term_emotion_preserves_pool_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
     provider = _provider()
 
-    async def fake_pool(endpoint: str, _trade_date: str, _sort: str) -> list[dict[str, Any]]:
+    async def fake_pool(
+        endpoint: str, _trade_date: str, _sort: str
+    ) -> tuple[date, list[dict[str, Any]]]:
         pools = {
             "getTopicZTPool": [
                 {"c": "1", "n": "二板股", "lbc": 2, "amount": "300"},
@@ -144,7 +264,7 @@ def test_short_term_emotion_preserves_pool_mapping(monkeypatch: pytest.MonkeyPat
             "getTopicDTPool": [{"c": "4"}],
             "getYesterdayZTPool": [{"c": "5"}, {"c": "6"}],
         }
-        return pools[endpoint]
+        return date(2026, 9, 24), pools[endpoint]
 
     monkeypatch.setattr(provider, "_limit_pool", fake_pool)
 
@@ -158,6 +278,7 @@ def test_short_term_emotion_preserves_pool_mapping(monkeypatch: pytest.MonkeyPat
     assert result.leaders[0].security_code == "000001"
     assert result.leaders[0].turnover_yuan == Decimal("300")
     assert next(item.stock_count for item in result.ladder if item.board_count == "2板") == 1
+    assert result.trade_date == date(2026, 9, 24)
 
 
 def test_limit_pool_preserves_eastmoney_http_contract(
@@ -168,7 +289,7 @@ def test_limit_pool_preserves_eastmoney_http_contract(
 
     result = asyncio.run(provider._limit_pool("getTopicZTPool", "20260731", "fbt:asc"))
 
-    assert result == [{"c": "600000"}]
+    assert result == (date(2026, 7, 31), [{"c": "600000"}])
     assert _Client.init_kwargs == {
         "timeout": 7.5,
         "trust_env": False,

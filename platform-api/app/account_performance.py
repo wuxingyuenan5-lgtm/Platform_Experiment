@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.database import connection
+from app.pnl_reporting import reporting_date
 from app.venue_reconciliation import runtime_get
 
 log = logging.getLogger(__name__)
@@ -172,8 +173,10 @@ def _classified_intervals(db, account_id, points, scope, value_key):
         (stamp(r[0]), stamp(r[1]))
         for r in db.execute(
             "SELECT start_at,end_at FROM account_capital_coverage WHERE account_id=? "
-            "AND asset_scope=? ORDER BY start_at",
-            (account_id, scope),
+            "AND asset_scope=? AND julianday(end_at)>=julianday(?) "
+            "AND julianday(start_at)<=julianday(?) ORDER BY start_at",
+            (account_id, scope, stamp(points[0].as_of).isoformat(),
+             stamp(points[-1].as_of).isoformat()),
         )
     ]
     # Coverage is a union of windows. Merge it once so each interval can advance
@@ -354,7 +357,10 @@ def daily_pnl(db, account_id, points, scope, value_key):
     for index, (initial, final, flow, denominator, reason) in enumerate(
         _classified_intervals(db, account_id, points, scope, value_key), start=1
     ):
-        if (stamp(points[index].as_of).date() - stamp(points[index - 1].as_of).date()).days > 1:
+        if (
+            reporting_date(stamp(points[index].as_of))
+            - reporting_date(stamp(points[index - 1].as_of))
+        ).days > 1:
             reason = "missing_daily_baseline"
         if reason:
             result.append((None, None, reason))

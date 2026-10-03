@@ -52,8 +52,16 @@ def maintain_background_terminal(terminal_path: str) -> None:
     import psutil
 
     terminal = Path(terminal_path).resolve()
-    for process in psutil.process_iter(["name", "exe"]):
-        if process.info["exe"] and Path(process.info["exe"]).resolve() == terminal:
+    # This runs before worker IPC reads. Resolve paths only for matching process
+    # names; resolving every executable on the host can block each quote for >500ms.
+    for process in psutil.process_iter(["name"]):
+        if str(process.info["name"] or "").casefold() != terminal.name.casefold():
+            continue
+        try:
+            executable = process.exe()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+        if executable and Path(executable).resolve() == terminal:
             _finish_background_startup(process.pid, require_window=False)
 
 

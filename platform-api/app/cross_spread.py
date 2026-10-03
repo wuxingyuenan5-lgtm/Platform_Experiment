@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Literal
 
 import httpx
 from fastapi import HTTPException
@@ -65,7 +66,7 @@ class CrossSpreadLiveSizing:
     mt5_multiplier: Decimal
 
 
-def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
+def get_cross_spread_snapshot(*, record_history: bool = False) -> CrossSpreadSnapshotResponse:
     settings = get_settings()
     try:
         response = runtime_transport.get(
@@ -88,11 +89,14 @@ def get_cross_spread_snapshot() -> CrossSpreadSnapshotResponse:
             detail="Platform Execution Runtime is unavailable",
         ) from exc
     snapshot = CrossSpreadSnapshotResponse.model_validate(response.json())
-    save_cross_spread_market_snapshot(
-        snapshot,
-        strategy_key=STRATEGY_KEY,
-        strategy_instance_id=STRATEGY_INSTANCE_ID,
-    )
+    # Only the background sampler writes history. Display and execution reads
+    # must not wait for the sampling lock or a database write transaction.
+    if record_history:
+        save_cross_spread_market_snapshot(
+            snapshot,
+            strategy_key=STRATEGY_KEY,
+            strategy_instance_id=STRATEGY_INSTANCE_ID,
+        )
     return snapshot
 
 
@@ -162,7 +166,9 @@ def get_cross_spread_trading_rules() -> CrossSpreadTradingRulesResponse:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
     snapshot = get_cross_spread_snapshot()
 
-    def venue_rule(venue: str, spec, state) -> CrossSpreadVenueTradingRuleResponse:
+    def venue_rule(
+        venue: Literal["bybit", "mt5"], spec, state
+    ) -> CrossSpreadVenueTradingRuleResponse:
         return CrossSpreadVenueTradingRuleResponse(
             venue=venue,
             source=spec.source,
@@ -323,6 +329,8 @@ def prepare_cross_spread_market_command(
     request: CrossSpreadPreflightRequest,
 ) -> dict[str, object]:
     """Prepare read-only admission facts before final user confirmation."""
+    if request.action.startswith("CLOSE_") and request.exit_plan_id is None:
+        raise HTTPException(422, "Close preflight requires a selected position group")
     if request.exit_plan_id is not None:
         from app.cross_spread_close_recovery import prepare_unsubmitted_mt5_close
         from app.cross_spread_exit_repository import get_exit_plan
@@ -332,11 +340,18 @@ def prepare_cross_spread_market_command(
         expected = "CLOSE_LONG" if plan.direction == "LONG_SPREAD" else "CLOSE_SHORT"
         if request.action != expected:
             raise HTTPException(409, "Close action does not match the selected position group")
+        if plan.status not in {"active", "manual_intervention"}:
+            raise HTTPException(409, "Position group is closed or already being processed")
+        if request.quantity_oz > plan.quantity_oz:
+            raise HTTPException(422, "Close quantity exceeds remaining group quantity")
         if plan.status == "manual_intervention" and plan.close_batch_id:
             batch = get_execution_batch(plan.close_batch_id)
             if any(leg.role == "bybit_leg" and leg.status == "filled" for leg in batch.legs):
                 prepare_unsubmitted_mt5_close(plan, request.quantity_oz)
                 return {"status": "ready", "preparedAt": datetime.now(UTC).isoformat()}
+        from app.cross_spread_position_reconciliation import assert_close_positions
+
+        assert_close_positions(plan)
     assert_cross_spread_market_executable(is_close=request.action.startswith("CLOSE_"))
     sizing = _load_live_cross_spread_sizing()
     mt5_quantity = request.quantity_oz / sizing.mt5_multiplier

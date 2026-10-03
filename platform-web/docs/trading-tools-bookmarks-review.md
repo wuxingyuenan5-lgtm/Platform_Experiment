@@ -283,6 +283,8 @@
   - 域名：`arkm.com`
 - [区块链浏览器查询|欧科云链 OKLink](https://www.oklink.com/zh-hans)
   - 域名：`www.oklink.com`
+- [交易所链上资金监控｜ OKLink](https://www.oklink.com/zh-hans/cex-list)
+  - 域名：`www.oklink.com`
 - [Hyperliquid 统计数据](https://hyperscreener.asxn.xyz/home)
   - 域名：`hyperscreener.asxn.xyz`
 

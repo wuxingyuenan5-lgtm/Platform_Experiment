@@ -10,7 +10,7 @@ import type {
  * 盈亏日历：把后端逐日读数聚合成日/月两级视图。
  *
  * 只做区间求和与按日复利，不重建口径、不补零：某日 `pnl` 为 null 时不显示 0，
- * 而是在悬浮说明里给出后端判定的原因。切日时区固定 UTC，与后端
+ * 而是在悬浮说明里给出后端判定的原因。切日时区固定北京时间，与后端
  * `dailyPnl[].date` 一致，避免浏览器本地时区把跨夜交易日挪到相邻格。
  */
 
@@ -35,8 +35,8 @@ const qualityNotes: Record<string, string> = {
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
-function todayUtc(): string {
-  const now = new Date();
+export function todayBeijing(at = new Date()): string {
+  const now = new Date(at.getTime() + 8 * 60 * 60 * 1000);
   return `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}`;
 }
 
@@ -78,7 +78,9 @@ function finite(value: number | null | undefined): number | null {
 }
 
 function aggregate(points: StrategyPnlDayPoint[]) {
-  const hasUnavailable = points.some((point) => finite(point.pnl) === null);
+  const hasUnavailable = points.some(
+    (point) => finite(point.pnl) === null && point.quality !== 'market_closed',
+  );
   const valued = points
     .map((point) => ({
       pnl: finite(point.pnl),
@@ -92,8 +94,8 @@ function aggregate(points: StrategyPnlDayPoint[]) {
   const rated = valued.filter((point) => point.rate !== null);
   const growth = rated.reduce((acc, point) => acc * (1 + (point.rate as number) / 100), 1);
   return {
-    pnl,
-    rate: rated.length && !hasUnavailable ? (growth - 1) * 100 : null,
+    pnl: hasUnavailable ? null : pnl,
+    rate: rated.length === valued.length && !hasUnavailable ? (growth - 1) * 100 : null,
     days: valued.length,
   };
 }
@@ -156,7 +158,7 @@ export function buildPnlCalendar(
         tone: toneOf(summary.pnl),
         title:
           summary.pnl === null
-            ? `${key} · 该月无可估值的交易日`
+            ? `${key} · 数据不完整或无可估值的交易日`
             : `${key} · 月盈亏 ${full(summary.pnl, currency)} · 收益率 ${percent(
                 summary.rate,
               )} · 已确认 ${summary.days} 个交易日`,
@@ -172,7 +174,9 @@ export function buildPnlCalendar(
       summaryRateText: percent(rate),
       summaryTone: toneOf(pnl),
       note: days
-        ? `按 UTC 切月 · 已剔除出入金 · 已确认 ${days} 个交易日`
+        ? `北京时间切月 · 已剔除出入金 · 已确认 ${days} 个交易日${
+            pnl === null ? '；数据不完整，暂不汇总' : ''
+          }`
         : '该年暂无可估值的交易日',
       weekdayLabels: [],
       cells,
@@ -183,7 +187,7 @@ export function buildPnlCalendar(
   const monthPrefix = `${year}-${pad(month)}`;
   const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  const today = todayUtc();
+  const today = todayBeijing();
   const byDate = new Map(points.map((point) => [point.date, point]));
   const cells: StrategyPnlCalendarCell[] = [];
   for (let lead = 0; lead < firstWeekday; lead += 1) cells.push(blankCell(`lead-${lead}`));
@@ -206,7 +210,9 @@ export function buildPnlCalendar(
     summaryRateText: percent(rate),
     summaryTone: toneOf(pnl),
     note: days
-      ? `按 UTC 切日 · 已剔除出入金 · 已确认 ${days} 个交易日；进行中的当日待资金流核对后显示`
+      ? `北京时间切日 · 已剔除出入金 · 已确认 ${days} 个交易日${
+          pnl === null ? '；数据不完整，暂不汇总' : ''
+        }`
       : '本月暂无可估值的交易日',
     weekdayLabels,
     cells,

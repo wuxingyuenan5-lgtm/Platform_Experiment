@@ -1,6 +1,7 @@
 """Synthetic transport fixtures; no external account or market connection."""
 
 import time
+from datetime import UTC, datetime
 
 import pytest
 
@@ -214,6 +215,47 @@ def test_capture_health_advances_only_for_accepted_native_events():
     capture.spool.capture = lambda *a, **k: False
     capture._capture_bybit("quality", stream, "public", {"reason": "disconnected"})
     assert capture.source_health == before
+
+
+def test_mt5_research_yield_is_deferred_without_source_gap(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.research_market_capture import ResearchCapture
+
+    observed = datetime.now(UTC).isoformat()
+    settings = SimpleNamespace(
+        mt5_primary_account_id="account-mt5",
+        mt5_accounts={"account-mt5"},
+        live_write_enabled=False,
+        research_mt5_poll_seconds=0,
+    )
+    capture = ResearchCapture(settings, None)
+    capture.spool = SimpleNamespace(
+        root=tmp_path,
+        error=None,
+        capture=lambda *args, **kwargs: pytest.fail("planned yield recorded as a source gap"),
+    )
+    capture.bybit_clock = {}
+    capture.source_health["mt5"] = {"status": "empty_range", "lastReadAt": observed}
+
+    class Gateway:
+        def get_research_ticks(self, **_kwargs):
+            capture.stop_event.set()
+            raise RuntimeError("Research yielded to account operations")
+
+    capture.gateway = Gateway()
+    monkeypatch.setattr(
+        "app.research_clock.conservative_utc_now", lambda _: datetime.now(UTC)
+    )
+
+    capture._mt5()
+
+    assert capture.source_health["mt5:XAUUSD"] == {
+        "status": "deferred",
+        "reason": "research_yielded_to_account_operations",
+        "at": capture.source_health["mt5:XAUUSD"]["at"],
+        "lastReadAt": observed,
+    }
 
 
 def test_research_clock_rejects_slow_response_and_host_step(monkeypatch):

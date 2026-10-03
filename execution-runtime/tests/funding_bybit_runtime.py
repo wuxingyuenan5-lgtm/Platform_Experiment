@@ -145,7 +145,9 @@ class NativeClient(MarketClient):
             fee = (
                 quantity * Decimal("0.001")
                 if spot_buy
-                else quantity * Decimal("79000") * (Decimal("0.001") if order["category"] == "spot" else Decimal("0.00055"))
+                else quantity
+                * Decimal("79000")
+                * (Decimal("0.001") if order["category"] == "spot" else Decimal("0.00055"))
             )
             rows.append(
                 {

@@ -20,6 +20,7 @@ const strategy: AppRouteModule = {
       component: () => import('@/views/platform/index.vue'),
       meta: {
         title: '交易平台',
+        reuseOnQueryChange: true,
         icon: 'ant-design:dashboard-outlined',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
       },
@@ -30,6 +31,7 @@ const strategy: AppRouteModule = {
       component: () => import('@/views/strategy/index.vue'),
       meta: {
         title: '策略管理',
+        reuseOnQueryChange: true,
         icon: 'ant-design:apartment-outlined',
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
       },

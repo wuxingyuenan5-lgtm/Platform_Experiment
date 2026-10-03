@@ -22,6 +22,10 @@
     </section>
 
     <template v-else>
+      <section v-if="overviewRefreshError" class="strategy-sync-alert" role="alert">
+        <strong>策略总览刷新失败</strong><span>显示上次成功结果</span>
+        <button type="button" @click="refreshManagementOverview">重新刷新</button>
+      </section>
       <section class="strategy-top-toolbar">
         <div class="strategy-top-toolbar__left">
           <CompactSegmentTabs :items="deskTabs" v-model="activeDesk" />
@@ -95,11 +99,19 @@
 
         <StrategyRuntimePanel :cards="capitalProfile.comparisonCards" />
 
-        <StrategyCapitalNetValueBoard :curve="capitalProfile.curve" />
+        <StrategyCapitalNetValueBoard :key="activeDesk" :curve="capitalProfile.curve" />
 
         <StrategyCurveGrid
           v-if="capitalProfile.metricCurves?.length"
           :curves="capitalProfile.metricCurves"
+        />
+        <StrategyExecutionRiskPanel
+          v-if="
+            (activeDesk === 'funding' || activeDesk === 'crossSpread') &&
+            activeOverview?.strategyInstanceId
+          "
+          :key="activeOverview.strategyInstanceId"
+          :strategy-instance-id="activeOverview.strategyInstanceId"
         />
       </template>
 
@@ -146,7 +158,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+  import { computed, onBeforeUnmount, ref, watch } from 'vue';
+  import { useKeepAliveActive } from '@/hooks/web/useKeepAliveActive';
   import { useRoute, useRouter } from 'vue-router';
   import { createStrategyClient } from '@/api/platform/strategyClient';
   import {
@@ -155,6 +168,7 @@
   } from '@/api/platform/fundingWorkspace';
   import type { StrategyManagementOverviewResult } from '@/api/platform/trading.types';
   import CompactSegmentTabs from '../shared/CompactSegmentTabs.vue';
+  import StrategyExecutionRiskPanel from '../shared/StrategyExecutionRiskPanel.vue';
   import { useCrossSpreadFinance } from './composables/useCrossSpreadFinance';
   import { useCrossSpreadRecords } from './composables/useCrossSpreadRecords';
   import {
@@ -198,7 +212,7 @@
     tabs: liveCrossSpreadTabs,
     tables: liveCrossSpreadTables,
     refresh: refreshCrossSpreadRecords,
-  } = useCrossSpreadRecords();
+  } = useCrossSpreadRecords(activeRecordTab);
 
   const {
     pnlProfile,
@@ -210,6 +224,7 @@
     byDesk: strategyOverviewByDesk,
     empty: overviewEmpty,
     error: overviewError,
+    refreshError: overviewRefreshError,
     items: strategyOverview,
     loading: overviewLoading,
     refresh: refreshStrategyOverview,
@@ -590,6 +605,7 @@
   );
 
   const monitorWarning = ref('');
+  const pageActive = useKeepAliveActive();
   const monitorClient = createStrategyClient(5000);
   let monitorReadPending = false;
   let disposed = false;
@@ -624,23 +640,33 @@
 
   let monitorTimer: ReturnType<typeof setInterval> | null = null;
   function refreshVisibleAccount() {
-    if (disposed) return;
+    if (disposed || !pageActive.value) return;
     if (document.visibilityState !== 'visible') return;
     void refreshMonitorHealth();
     void refreshStrategyOverview();
     if (activeDesk.value === 'crossSpread') {
-      void refreshCrossSpreadFinance(activeSection.value === 'pnl' ? 'pnl' : 'capital');
       if (activeSection.value === 'orders') void refreshCrossSpreadRecords();
+      else void refreshCrossSpreadFinance(activeSection.value);
     } else if (isAccountStrategy(activeDesk.value)) {
       void refreshAccountSnapshots(activeDesk.value, activeSection.value);
       if (activeDesk.value === 'funding') void refreshFundingGroups();
     }
   }
-  onMounted(() => {
-    void refreshMonitorHealth();
-    monitorTimer = setInterval(refreshVisibleAccount, 30_000);
-    document.addEventListener('visibilitychange', refreshVisibleAccount);
-  });
+  watch(
+    pageActive,
+    (active) => {
+      if (active) {
+        refreshVisibleAccount();
+        monitorTimer = setInterval(refreshVisibleAccount, 30_000);
+        document.addEventListener('visibilitychange', refreshVisibleAccount);
+      } else {
+        if (monitorTimer) clearInterval(monitorTimer);
+        monitorTimer = null;
+        document.removeEventListener('visibilitychange', refreshVisibleAccount);
+      }
+    },
+    { immediate: true },
+  );
   onBeforeUnmount(() => {
     disposed = true;
     if (monitorTimer) clearInterval(monitorTimer);
@@ -650,13 +676,12 @@
   watch(
     () => [activeDesk.value, activeSection.value] as const,
     ([desk, section], previous) => {
+      if (!pageActive.value) return;
       const previousDesk = previous?.[0];
       const previousSection = previous?.[1];
       if (desk === 'crossSpread') {
-        if (desk !== previousDesk) {
-          void refreshCrossSpreadFinance(section === 'pnl' ? 'pnl' : 'capital');
-        } else if (section === 'pnl' && previousSection !== 'pnl') {
-          void refreshCrossSpreadFinance('pnl');
+        if (section !== 'orders' && (desk !== previousDesk || section !== previousSection)) {
+          void refreshCrossSpreadFinance(section);
         }
         if (section === 'orders' && (desk !== previousDesk || section !== previousSection)) {
           void refreshCrossSpreadRecords();

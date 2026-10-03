@@ -70,6 +70,10 @@ CCXT 在当前实现中只负责标准解析、端点成本和限流时序。它
 
 Spot 数量步长/最小名义金额与合约数量步长分别使用场所规格。CCXT 通用 `amount.max` 不能代替 Bybit 原生市价订单上限；平台继续保留 `maxMarketQuantity`。规范化不是丢弃 Venue 证据或降低 Decimal 精度的理由。
 
+Runtime 的同账户、类别、标的和参数相同的并发报价读取合并为一次外部请求；报价缓存为 1 秒，仍保留交易所原始来源时间。不同读取键独立进行网络请求，CCXT 解析器锁只保护内存解析，不能覆盖网络等待。失败不写入缓存；账户杠杆变更后，变更前在途的保证金读取不得覆盖新代缓存。
+
+双腿规格可共享同一账户正在进行的权限读取；完成或失败后立即移除共享结果，下一次校验重新查询，不能把权限改成定时缓存。
+
 静态市场规格可由市场读取器缓存；含账户/终端交易权限的完整规格快照不能整体缓存。下发前重新读取当前权限，避免计划创建后撤销 Spot 权限仍被旧快照判为可交易。Platform 的实盘 Crypto 委托使用已确认的原生最小数量、步长和价格 tick，本地目录 Seed 不替代这些规则。
 
 - `get_open_orders`
@@ -133,6 +137,8 @@ Platform 将 Runtime 的终态聚合 Fill 与后续 Venue component execution �
 跨所行情也必须显式传入 `bybitAccountId` 与 `mt5AccountId` 并通过同一 Gateway/Worker 读取，不能选择任意“首个账户”。MT5 行情使用 `symbol_info.currency_profit` 作为报价币，账户现金与结算币来自账户证据；缺失报价币时标注 UNKNOWN/partial。Swap 字段、合约乘数及 Position Ticket 保留原生值，不能从 XAUUSD 名称推断账户现金币。
 
 MT5 报价读取还须确认 `terminal_info.connected`：终端信息缺失或经纪商连接中断时，即使 SDK 留有账户信息和正数缓存 Tick，也不能生成可执行报价；后续读取确认连接恢复后才能继续。观察时间只证明本次读取时刻，不能用来证明经纪商缓存 Tick 的源时钟或停机期间行情。
+
+MT5 账户风险与账户快照读取也必须确认 `terminal_info.connected`，断线时不得把缓存的账号资料和余额判为同步成功。账户快照的 `identity` 保留 SDK 返回的 `login`、`server` 和 `company`，实盘接入验收同时核对三者；经纪商服务器目录属于该 Terminal 的数据目录，单独配置 Server 名称不能证明对应服务商已装载。
 
 MT5 Python SDK 不提供周历 `SymbolInfoSessionTrade` 窗口，Runtime 不得把 `trade_mode` 或正数缓存 Tick 当作周末/日内开市证据。跨所黄金使用 Runtime 的 `VG_RUNTIME_CROSS_SPREAD_MT5_TRADING_SCHEDULE` 与服务器时区计算周历，`VG_RUNTIME_CROSS_SPREAD_MT5_SESSION_OVERRIDES` 覆盖节假日和临时维护；Bybit 默认时区标识为 `Bybit/MT5`，按其公布的 UTC+2/UTC+3 切换日期计算，不能套用北京时间或 `Europe/Athens` 的夏令时日期。`VG_RUNTIME_CROSS_SPREAD_AUTO_EXIT_GUARD_MINUTES` 只作用于后台自动 TP/SL，边界期间人工开平仍按独立能力门处理。配置应以 [Bybit TradFi FAQ](https://www.cbybit.com/en/help-center/article/FAQ-TradFi-MT5)、[MT5 合约规格](https://www.bybitglobal.com/en/help-center/article/Contracts-Available-on-TradFi-MT5-and-Specifications) 及最新运营通知为准。
 
@@ -277,7 +283,7 @@ VG_SECRET_MT5_LIVE_001_PASSWORD
 VG_SECRET_MT5_LIVE_001_SERVER
 ```
 
-`/gateway/capabilities` 和 Instrument Specification 只返回字段是否齐全、权限布尔值、适配器能力和缺失要求，不返回任何凭证值。
+`/gateway/capabilities` 和 Instrument Specification 只返回字段是否齐全、权限布尔值、适配器能力和缺失要求，不返回任何凭证值。Bybit 与 MT5 的 `accountStatuses` 按账户报告配置、运行和写入准入；单一账户缺少凭证或连接失败只影响该账户，适配器汇总状态表示至少一个账户可用。共享依赖故障仍影响所有账户，Runtime Live Write 与账户白名单继续分别控制写入。
 
 ## 10. Account 与 Instrument 路由
 

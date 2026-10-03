@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from concurrent.futures import Future
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal
+from threading import Lock
+from typing import Any, Literal
 
 from app.bybit_fill_confirming_adapter import BybitFillConfirmingAdapter
+from app.config import Settings
 from app.gateway_errors import (
     GatewayConfigurationError,
     GatewayRequestRejectedError,
@@ -25,6 +28,37 @@ from app.order_semantics import normalize_bybit_order_status
 
 class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
     """Route-independent Bybit reads used during bounded live acceptance."""
+
+    def __init__(self, settings: Settings, client: Any | None = None) -> None:
+        super().__init__(settings, client)
+        self._permission_lock = Lock()
+        self._permission_reads: dict[str, Future[dict[str, Any]]] = {}
+
+    def _api_key_readiness(self, account_id: str) -> dict[str, Any]:
+        # Spot and perpetual specs need the same account permissions. Share only
+        # an in-flight read, never a cached authorization from a previous check.
+        with self._permission_lock:
+            pending = self._permission_reads.get(account_id)
+            owner = pending is None
+            if owner:
+                pending = Future()
+                self._permission_reads[account_id] = pending
+        assert pending is not None
+        if not owner:
+            return pending.result()
+        try:
+            response = self._read_with_retry(
+                account_id, lambda client: client.get_api_key_information()
+            )
+            self._require_success(response, "Bybit API-key readiness query failed")
+            pending.set_result(response)
+            return response
+        except BaseException as exc:
+            pending.set_exception(exc)
+            raise
+        finally:
+            with self._permission_lock:
+                self._permission_reads.pop(account_id, None)
 
     def capability(self) -> GatewayAdapterCapability:
         capability = super().capability()
@@ -388,10 +422,7 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         )
         try:
             market = self._market_data(account_id).market(resolved_category, normalized)
-            api_response = self._read_with_retry(
-                account_id, lambda client: client.get_api_key_information()
-            )
-            self._require_success(api_response, "Bybit API-key readiness query failed")
+            api_response = self._api_key_readiness(account_id)
         except (GatewayConfigurationError, GatewayRequestRejectedError):
             raise
         except Exception as exc:
@@ -527,6 +558,9 @@ class BybitAcceptanceAdapter(BybitFillConfirmingAdapter):
         *,
         category: str | None = None,
     ) -> VenueFillSnapshot | None:
+        # Funding and other ledger executions are not position-changing fills.
+        if str(row.get("execType") or "Trade") != "Trade":
+            return None
         order_id = str(row.get("orderId") or "unknown")
         route = get_order_route(external_order_id=order_id, account_id=account)
         if route is None:

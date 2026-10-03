@@ -192,7 +192,6 @@ def read_iv_snapshot_history(tenor: str, days: int = 365) -> list[dict[str, Any]
 
 # 新增模块依赖（避免循环 import）
 def _now():
-    from datetime import UTC, datetime
     return datetime.now(UTC).isoformat()
 
 
@@ -266,9 +265,15 @@ def read_dataset_health(dataset: str) -> dict[str, Any]:
             "WHERE dataset=? ORDER BY observed_at DESC, fetched_at DESC LIMIT 1",
             (dataset,),
         ).fetchone()
+        run_scope = (
+            "run_id LIKE 'volatility-%'"
+            if dataset == "cumulative_volatility"
+            else "run_id NOT LIKE 'volatility-%'"
+        )
         run = db.execute(
             "SELECT status, error_code, message, started_at, finished_at "
-            "FROM research_a_share_refresh_runs ORDER BY started_at DESC LIMIT 1"
+            f"FROM research_a_share_refresh_runs WHERE {run_scope} "
+            "ORDER BY started_at DESC LIMIT 1"
         ).fetchone()
 
     observed_at = latest["observed_at"] if latest else None
@@ -406,7 +411,11 @@ def read_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
         except (InvalidOperation, ValueError):
             pass
         price = next(
-            (payload.get("price") for payload in flows.values() if isinstance(payload, dict) and payload.get("price")),
+            (
+                payload.get("price")
+                for payload in flows.values()
+                if isinstance(payload, dict) and payload.get("price")
+            ),
             prices.get(d),
         )
         days_out.append(
@@ -426,7 +435,8 @@ def read_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
     return {
         "observedAt": max(dates),
         "tickers": tickers,
-        "flowUnit": meta_payload.get("coinUnit") or (asset_key.upper() if has_coin_values else "US$m"),
+        "flowUnit": meta_payload.get("coinUnit")
+        or (asset_key.upper() if has_coin_values else "US$m"),
         "priceSource": meta_payload.get("priceSource"),
         "days": days_out,
     }

@@ -193,11 +193,17 @@ def test_auto_flatten_requires_terminal_evidence_and_is_idempotent(
             assert call_count == 2
             risk = client.get(f"/api/v1/trading/execution-batches/{batch['batchId']}/risk").json()
             assert risk["riskStatus"] == "escalated"
-            assert client.post(
-                f"/api/v1/trading/execution-batches/{batch['batchId']}/risk-actions",
-                json={"idempotencyKey": "unknown-retry", "action": "flatten_filled_legs",
-                      "actor": "risk-test"},
-            ).json()["status"] == "failed"
+            assert (
+                client.post(
+                    f"/api/v1/trading/execution-batches/{batch['batchId']}/risk-actions",
+                    json={
+                        "idempotencyKey": "unknown-retry",
+                        "action": "flatten_filled_legs",
+                        "actor": "risk-test",
+                    },
+                ).json()["status"]
+                == "failed"
+            )
             assert call_count == 2
             return
         assert batch["status"] == "failed"
@@ -206,8 +212,11 @@ def test_auto_flatten_requires_terminal_evidence_and_is_idempotent(
 
         another = client.post(
             f"/api/v1/trading/execution-batches/{batch['batchId']}/risk-actions",
-            json={"idempotencyKey": "already-flat-new-key", "action": "flatten_filled_legs",
-                  "actor": "risk-test"},
+            json={
+                "idempotencyKey": "already-flat-new-key",
+                "action": "flatten_filled_legs",
+                "actor": "risk-test",
+            },
         )
         assert another.status_code == 200
         assert another.json()["status"] == "completed"
@@ -339,6 +348,48 @@ def test_leg_deadline_uses_first_fill_timestamp(monkeypatch, tmp_path: Path) -> 
         assert allowed is False
         assert reason is not None
         assert "exceeded policy limit" in reason
+
+
+@pytest.mark.parametrize("action", ["cancel_open_legs", "substitute_hedge"])
+def test_risk_action_never_erases_remaining_filled_exposure(monkeypatch, tmp_path, action):
+    get_settings().database_path = str(tmp_path / "risk-action-proof.db")
+    sent = []
+
+    def runtime_post(*args, **kwargs):
+        sent.append(kwargs["json"])
+        return filled_runtime_response(kwargs["json"])
+
+    monkeypatch.setattr("app.runtime_transport.post", runtime_post)
+    with TestClient(app) as client:
+        set_policy(client, key="stop-after-first", max_residual="50")
+        batch = client.post(
+            "/api/v1/trading/execution-batches",
+            json=batch_payload("needs-reduction"),
+        ).json()
+        assert batch["status"] == "manual_intervention"
+        assert len(sent) == 1
+        payload = {"idempotencyKey": "partial-disposition", "action": action, "actor": "owner"}
+        if action == "substitute_hedge":
+            payload.update(
+                replacementAccountId=ACCOUNT_ID,
+                replacementInstrumentId=PERP_ID,
+                replacementSymbol="BTCUSDT-PERP",
+                replacementSide="sell",
+                replacementQuantity="0.5",
+            )
+        route = f"/api/v1/trading/execution-batches/{batch['batchId']}/risk-actions"
+        result = client.post(route, json=payload)
+        assert result.status_code == 200, result.text
+        assert result.json()["status"] == "action_required"
+        risk = client.get(f"/api/v1/trading/execution-batches/{batch['batchId']}/risk").json()
+        assert risk["riskStatus"] == "escalated"
+        assert risk["residualExposureNotional"] == (
+            "50.0" if action == "substitute_hedge" else "100"
+        )
+        assert risk["dataQualityState"] == "complete"
+        count = len(sent)
+        assert client.post(route, json=payload).json() == result.json()
+        assert len(sent) == count
 
 
 pytestmark = pytest.mark.usefixtures("generic_trading_instance")

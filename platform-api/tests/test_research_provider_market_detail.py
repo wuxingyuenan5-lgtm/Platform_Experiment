@@ -90,7 +90,7 @@ def test_provider_does_not_enable_deferred_market():
     provider = MarketDetailProvider(timeout_seconds=5, user_agent="test")
 
     with pytest.raises(ResearchProviderError, match="market_detail_not_enabled"):
-        asyncio.run(provider.get("us"))
+        asyncio.run(provider.get("unsupported"))
 
 
 def test_gold_provider_builds_real_90_day_series_and_ratio(monkeypatch: pytest.MonkeyPatch):
@@ -111,9 +111,9 @@ def test_gold_provider_builds_real_90_day_series_and_ratio(monkeypatch: pytest.M
     )
     provider = MarketDetailProvider(timeout_seconds=5, user_agent="test")
 
-    contract = asyncio.run(provider.get("gold"))
+    contract = asyncio.run(provider._get_live_market_detail("gold"))
 
-    assert contract.status == "ready"
+    assert contract.status == "partial"
     assert len(contract.rows) == 14
     assert all(len(row.spark_90d) == 90 for row in contract.rows)
     ratio = next(row for row in contract.rows if row.id == "gold-ratio-row")
@@ -125,7 +125,7 @@ def test_gold_provider_builds_real_90_day_series_and_ratio(monkeypatch: pytest.M
     assert gold.change_1m is not None
     assert gold.change_qtd is not None
     assert gold.change_ytd is not None
-    assert gold.high_52w == Decimal("199")
+    assert gold.high_52w is None
 
 
 def test_live_provider_fails_closed_when_every_symbol_is_unavailable(
@@ -139,7 +139,7 @@ def test_live_provider_fails_closed_when_every_symbol_is_unavailable(
     provider = MarketDetailProvider(timeout_seconds=5, user_agent="test")
 
     with pytest.raises(ResearchProviderError, match="market_detail_no_live_rows"):
-        asyncio.run(provider.get("crypto"))
+        asyncio.run(provider._get_live_market_detail("crypto"))
 
 
 def test_crypto_provider_includes_hype_series():

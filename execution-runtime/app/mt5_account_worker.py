@@ -269,7 +269,7 @@ class Mt5AccountWorkerSupervisor:
             self._clients[account_id] = client
         return client
 
-    def missing_requirements(self) -> list[str]:
+    def missing_requirements(self, selected_account_id: str | None = None) -> list[str]:
         missing: list[str] = []
         owners: dict[str, str] = {}
         for account_id in sorted(self.settings.mt5_accounts):
@@ -283,7 +283,10 @@ class Mt5AccountWorkerSupervisor:
             if resolved in owners:
                 missing.append(f"{account_id}:MT5_TERMINAL_SHARED_WITH:{owners[resolved]}")
             owners[resolved] = account_id
-        return missing
+        if selected_account_id is None:
+            return missing
+        prefix = f"{selected_account_id}:"
+        return [item for item in missing if item.startswith(prefix)]
 
     def close(self) -> None:
         for client in list(self._clients.values()):
@@ -309,9 +312,8 @@ def _run_account_worker(
                 "mt5_primary_account_id": account_id,
                 "mt5_credential_ref": original.mt5_credential_for_account(account_id),
                 "mt5_terminal_path": terminal_path,
-                # Every account uses a separately installed Terminal and its own
-                # normal-mode data directory. Portable copies are not a supported
-                # production identity boundary.
+                # Each account uses its configured Terminal and the data directory
+                # selected by its portable setting.
                 "mt5_terminal_portable": original.mt5_terminal_portable_for_account(account_id),
                 "mt5_check_timeout_seconds": max(
                     original.mt5_check_timeout_seconds,

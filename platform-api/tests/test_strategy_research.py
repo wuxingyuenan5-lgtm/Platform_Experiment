@@ -199,8 +199,9 @@ def test_borrow_spot_first_period_rounds_up_even_early_repayment():
 
 def test_quantity_matching_and_depth():
     result = matched_quantity(Decimal("1"), Decimal(".001"), Decimal(".1"), Decimal(".1"))
-    assert result["matched"] == "0.99"
-    assert result["residual"] == "0.009"
+    # The confirmed sizing rule selects the nearest legal perpetual quantity.
+    assert Decimal(result["matched"]) == Decimal("1.00")
+    assert Decimal(result["residual"]) == Decimal("-0.001")
     assert vwap([["10", "1"], ["12", "1"]], Decimal("2")) == 11
     assert vwap([["10", "1"]], Decimal("2")) is None
 

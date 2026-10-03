@@ -10,9 +10,14 @@ import json
 from collections import Counter
 from decimal import Decimal
 
-from app.database_connection import connection
+from app.database_connection import connection, read_only_connection
 from app.strategy_research_repository import assert_sqlite_safe, now, root_path
 from app.strategy_research_series import quantile, seconds_series, time_ms
+
+# The funding page currently exposes these paired instruments.  Keeping the
+# list in the projection worker (rather than in the Web client) makes the
+# persisted basis read model the single owner of the supported universe.
+FUNDING_BASIS_SYMBOLS = ("XAUT", "BTC", "ETH", "CRCL", "MSTR")
 
 
 def read_projection(
@@ -22,7 +27,7 @@ def read_projection(
     if entity is not None:
         clauses.append("entity=?")
         args.append(entity)
-    with connection() as db:
+    with read_only_connection() as db:
         where = " AND ".join(clauses)
         if interval_ms:
             rows = db.execute(
@@ -45,7 +50,7 @@ def read_projection(
 
 
 def price_coverage(symbol, start, end):
-    with connection() as db:
+    with read_only_connection() as db:
         r = db.execute(
             "SELECT COUNT(*),MIN(at_ms),MAX(at_ms) FROM research_strategy_projection "
             "WHERE kind='historical_candle' AND entity IN (?,?) AND at_ms BETWEEN ? AND ?",
@@ -59,7 +64,7 @@ def price_coverage(symbol, start, end):
 
 
 def projection_status():
-    with connection() as db:
+    with read_only_connection() as db:
         row = db.execute(
             "SELECT part_rowid,updated_at FROM research_strategy_projection_cursor WHERE id=1"
         ).fetchone()
@@ -74,6 +79,18 @@ def projection_status():
     }
 
 
+def funding_basis_status():
+    with read_only_connection() as db:
+        row = db.execute(
+            "SELECT last_at_ms,completed,updated_at FROM funding_basis_projection_cursor WHERE id=1"
+        ).fetchone()
+    return {
+        "lastAtMs": str(row[0]) if row else None,
+        "completed": bool(row[1]) if row else False,
+        "updatedAt": row[2] if row else None,
+    }
+
+
 def project_candle_next():
     """Project closed BTC/XAUT candles without waiting on spread replay.
 
@@ -85,7 +102,8 @@ def project_candle_next():
     with connection() as db:
         db.execute(
             "CREATE TABLE IF NOT EXISTS research_strategy_candle_cursor "
-            "(id INTEGER PRIMARY KEY CHECK(id=1), part_rowid INTEGER NOT NULL, updated_at TEXT NOT NULL)"
+            "(id INTEGER PRIMARY KEY CHECK(id=1), part_rowid INTEGER NOT NULL, "
+            "updated_at TEXT NOT NULL)"
         )
         checkpoint = db.execute(
             "SELECT part_rowid FROM research_strategy_candle_cursor WHERE id=1"
@@ -134,11 +152,15 @@ def project_candle_next():
             db.executemany(
                 "INSERT INTO research_strategy_projection VALUES(?,?,?,?) "
                 "ON CONFLICT(kind,entity,at_ms) DO UPDATE SET payload_json=excluded.payload_json",
-                [(kind, entity, stamp, payload) for (kind, entity, stamp), payload in values.items()],
+                [
+                    (kind, entity, stamp, payload)
+                    for (kind, entity, stamp), payload in values.items()
+                ],
             )
         db.execute(
             "INSERT INTO research_strategy_candle_cursor VALUES(1,?,?) "
-            "ON CONFLICT(id) DO UPDATE SET part_rowid=excluded.part_rowid,updated_at=excluded.updated_at",
+            "ON CONFLICT(id) DO UPDATE SET part_rowid=excluded.part_rowid,"
+            "updated_at=excluded.updated_at",
             (part["ordinal"], now()),
         )
     return True
@@ -150,7 +172,6 @@ def project_next():
             "SELECT * FROM research_strategy_projection_cursor WHERE id=1"
         ).fetchone()
         cursor = checkpoint["part_rowid"] if checkpoint else 0
-        state = json.loads(checkpoint["state_json"]) if checkpoint else {}
         part = db.execute(
             "SELECT rowid AS ordinal,* FROM research_strategy_parts "
             "WHERE rowid>? ORDER BY rowid LIMIT 1",
@@ -158,6 +179,7 @@ def project_next():
         ).fetchone()
     if part is None:
         return False
+    state = json.loads(checkpoint["state_json"]) if checkpoint else {}
     # Read each sealed shard once.  The old implementation scanned the same
     # Parquet file twice (derived rows, then raw market_scan rows), which made
     # projection throughput roughly equal to live publication and left the
@@ -170,6 +192,10 @@ def project_next():
     table = pq.read_table(
         path,
         columns=["layer", "kind", "event_json"],
+        # Raw order-book JSON is retained in the archive but is not an input
+        # to this projection. Filter in Arrow before converting/decoding it.
+        filters=[[("layer", "=", "derived")],
+                 [("layer", "=", "raw"), ("kind", "=", "market_scan")]],
     )
     rows = []
     market_scan_rows = []
@@ -192,6 +218,8 @@ def project_next():
                     }
                 )
     updates = {}
+    candle_payloads = {}
+    candle_stamps = {}
 
     def put(kind, entity, stamp, payload):
         updates[(kind, entity, int(stamp))] = json.dumps(payload, separators=(",", ":"))
@@ -202,12 +230,13 @@ def project_next():
         kind = r["kind"]
         if kind == "historical_candle":
             if int(r["intervalMs"]) == 60000 and not r.get("quality") and r["priceType"] == "trade":
-                put(
-                    kind,
-                    r["symbol"] + ":" + r["category"] + ":" + r["priceType"],
-                    r["closeTimeMs"],
-                    r,
-                )
+                entity = r["symbol"] + ":" + r["category"] + ":" + r["priceType"]
+                put(kind, entity, r["closeTimeMs"], r)
+                symbol_base = str(r["symbol"]).removesuffix("USDT")
+                if symbol_base in FUNDING_BASIS_SYMBOLS and r["category"] in {"spot", "linear"}:
+                    stamp = int(r["closeTimeMs"])
+                    candle_payloads[(entity, stamp)] = r
+                    candle_stamps.setdefault(symbol_base, set()).add(stamp)
         elif kind == "mt5_history_quote":
             put(kind, "cross-gold", int(r["sourceTimeMs"]) // 60000 * 60000, r)
         elif kind == "funding_settlement":
@@ -241,11 +270,71 @@ def project_next():
             len(events) - 1,
         )
         state[pair] = {"events": events[max(0, first - 1) :], "rewriteFrom": boundary}
+
+    # Derive candle-based funding basis in the serving projection itself.  The
+    # incoming shard may contain only one leg; merge it with already-persisted
+    # candles so a leg split across shards still produces exactly one point.
+    if candle_stamps:
+        entities = [
+            f"{base}USDT:{category}:trade"
+            for base in candle_stamps
+            for category in ("spot", "linear")
+        ]
+        lo = min(stamp for stamps in candle_stamps.values() for stamp in stamps)
+        hi = max(stamp for stamps in candle_stamps.values() for stamp in stamps)
+        placeholders = ",".join("?" for _ in entities)
+        with read_only_connection() as db:
+            existing = db.execute(
+                "SELECT entity,at_ms,payload_json FROM research_strategy_projection "
+                "WHERE kind='historical_candle' AND entity IN ("
+                + placeholders
+                + ") AND at_ms BETWEEN ? AND ?",
+                [*entities, lo, hi],
+            ).fetchall()
+        candles = {
+            (row["entity"], int(row["at_ms"])): json.loads(row["payload_json"])
+            for row in existing
+        }
+        candles.update(candle_payloads)
+        for symbol_base, stamps in candle_stamps.items():
+            linear_entity = f"{symbol_base}USDT:linear:trade"
+            spot_entity = f"{symbol_base}USDT:spot:trade"
+            for stamp in sorted(stamps):
+                linear = candles.get((linear_entity, stamp))
+                spot = candles.get((spot_entity, stamp))
+                if not linear or not spot:
+                    continue
+                try:
+                    linear_close = Decimal(str(linear["close"]))
+                    spot_close = Decimal(str(spot["close"]))
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if (
+                    not linear_close.is_finite()
+                    or not spot_close.is_finite()
+                    or linear_close <= 0
+                    or spot_close <= 0
+                ):
+                    continue
+                put(
+                    "funding_basis",
+                    symbol_base,
+                    stamp,
+                    {
+                        "timeMs": str(stamp),
+                        "validDurationMs": 60000,
+                        "quality": [],
+                        "ohlc": {
+                            "midSpread": {"close": str(linear_close - spot_close)}
+                        },
+                        "basisSource": "same_bucket_historical_closes",
+                        "linearClose": str(linear_close),
+                        "spotClose": str(spot_close),
+                    },
+                )
     values = [(k, e, t, p) for (k, e, t), p in updates.items()]
     # Bounded short transactions; cursor advances only after every upsert is durable.
-    # A sealed shard is already bounded.  Fewer commits materially improve
-    # catch-up throughput without making the transaction unbounded.
-    for offset in range(0, len(values), 5000):
+    for offset in range(0, len(values), 500):
         with connection() as db:
             assert_sqlite_safe(db)
             db.executemany(
@@ -259,6 +348,101 @@ def project_next():
             "ON CONFLICT(id) DO UPDATE SET part_rowid=excluded.part_rowid,"
             "state_json=excluded.state_json,updated_at=excluded.updated_at",
             (part["ordinal"], json.dumps(state), now()),
+        )
+    return True
+
+
+def project_funding_basis_next(batch_size: int = 5000):
+    """Backfill paired candle basis that predates the serving worker.
+
+    The normal shard projector handles newly arriving candles, including legs
+    split over adjacent shards.  This bounded join brings the already-built
+    historical candle projection into the same ``funding_basis`` read model
+    after an upgrade, without scanning the archive or doing arithmetic in an
+    HTTP request.
+    """
+    entities = [
+        f"{base}USDT:{category}:trade"
+        for base in FUNDING_BASIS_SYMBOLS
+        for category in ("spot", "linear")
+    ]
+    placeholders = ",".join("?" for _ in entities)
+    with connection() as db:
+        cursor = db.execute(
+            "SELECT last_at_ms,completed FROM funding_basis_projection_cursor WHERE id=1"
+        ).fetchone()
+        if cursor and cursor[1]:
+            return False
+        last_at_ms = int(cursor[0]) if cursor else 0
+        pairs = db.execute(
+            "SELECT l.at_ms,l.payload_json AS linear_json,s.payload_json AS spot_json "
+            "FROM research_strategy_projection l "
+            "JOIN research_strategy_projection s ON s.kind='historical_candle' "
+            "AND s.at_ms=l.at_ms AND s.entity=replace(l.entity,':linear:',':spot:') "
+            "WHERE l.kind='historical_candle' AND l.entity IN ("
+            + placeholders
+            + ") AND l.entity LIKE '%:linear:trade' AND l.at_ms>? "
+            "ORDER BY l.at_ms LIMIT ?",
+            [*entities, last_at_ms, batch_size],
+        ).fetchall()
+        if not pairs:
+            projection = db.execute(
+                "SELECT part_rowid FROM research_strategy_projection_cursor WHERE id=1"
+            ).fetchone()
+            published = db.execute(
+                "SELECT COALESCE(MAX(rowid),0) FROM research_strategy_parts"
+            ).fetchone()[0]
+            completed = bool(projection and projection[0] >= published)
+            db.execute(
+                "INSERT INTO funding_basis_projection_cursor(id,last_at_ms,completed,updated_at) "
+                "VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET completed=excluded.completed,"
+                "updated_at=excluded.updated_at",
+                (last_at_ms, int(completed), now()),
+            )
+            return False
+        values = []
+        max_at_ms = last_at_ms
+        for pair in pairs:
+            stamp = int(pair["at_ms"])
+            max_at_ms = max(max_at_ms, stamp)
+            try:
+                linear = json.loads(pair["linear_json"])
+                spot = json.loads(pair["spot_json"])
+                linear_close = Decimal(str(linear["close"]))
+                spot_close = Decimal(str(spot["close"]))
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if (
+                not linear_close.is_finite()
+                or not spot_close.is_finite()
+                or linear_close <= 0
+                or spot_close <= 0
+            ):
+                continue
+            symbol_base = str(linear["symbol"]).removesuffix("USDT")
+            payload = {
+                "timeMs": str(stamp),
+                "validDurationMs": 60000,
+                "quality": [],
+                "ohlc": {"midSpread": {"close": str(linear_close - spot_close)}},
+                "basisSource": "same_bucket_historical_closes",
+                "linearClose": str(linear_close),
+                "spotClose": str(spot_close),
+            }
+            values.append(
+                ("funding_basis", symbol_base, stamp, json.dumps(payload, separators=(",", ":")))
+            )
+        if values:
+            db.executemany(
+                "INSERT INTO research_strategy_projection VALUES(?,?,?,?) "
+                "ON CONFLICT(kind,entity,at_ms) DO UPDATE SET payload_json=excluded.payload_json",
+                values,
+            )
+        db.execute(
+            "INSERT INTO funding_basis_projection_cursor(id,last_at_ms,completed,updated_at) "
+            "VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET last_at_ms=excluded.last_at_ms,"
+            "updated_at=excluded.updated_at",
+            (max_at_ms, 0, now()),
         )
     return True
 

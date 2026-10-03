@@ -109,11 +109,12 @@
               <p>{{ widget.subtitle }}</p>
               <span>点击卡片右上角打开完整工具</span>
             </div>
-            <component
-              :is="localChartWidget"
+            <VisibleChart
               v-else-if="widget.kind === 'local-chart' && widget.localKey"
-              :widget="widget"
-            />
+              :height="widget.height"
+            >
+              <component :is="localChartWidget" :widget="widget" />
+            </VisibleChart>
             <component :is="tradingViewWidget" v-else :widget="widget" />
           </component>
         </article>
@@ -125,6 +126,7 @@
 <script setup lang="ts">
   import { computed, ref, type Component } from 'vue';
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
+  import VisibleChart from './VisibleChart';
   import type { ChartSection, LocalWidgetKey, WidgetConfig } from '../nativeData/dashboardClean';
 
   const props = defineProps<{

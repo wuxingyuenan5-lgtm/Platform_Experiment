@@ -1,5 +1,39 @@
 # Runbook
 
+## Platform data audit
+
+### Hedge Board local data producer
+
+The sibling `platform-data` checkout is a research-data producer for this
+Platform, not an unrelated product or a trading backend. Its Windows task
+`HedgeBoard-LocalData-Refresh` writes to `D:\自营数据库\hedge-board`, which
+Platform API reads through `app/research_local_data.py` for the macro, commodity
+and crypto providers. Do not disable this task merely because its code is in a
+separate directory.
+
+Repair its action using `platform-data/scripts/install_local_task.ps1` in
+PowerShell 7. The installer preserves existing triggers, principal and settings,
+pins the Python executable, and uses this repository's
+`scripts/launch-platform-child.py --wait` through `pythonw.exe`; PowerShell is
+created with `CREATE_NO_WINDOW`. The Platform checkout must remain available.
+New tasks run at 00:15, 06:15, 12:15 and 18:15 under interactive user logon;
+this does not guarantee collection while logged out or while the host is off.
+Inspect `logs/refresh-*.log` and `logs/scheduled-refresh.{out,err}.log` under the
+data root, together with the scheduled task result. A failed source command
+returns failure even if later commands update other artifacts or the DuckDB
+mirror; preserve quality failures rather than treating a fresh mirror as full
+success.
+
+### Persisted audit results
+
+`/risk/data-audit` is the internal `risk.read` view; `GET /api/v1/risk/data-audit` reads persisted results only. Platform API lifespan runs a serial audit every 300 seconds without browser activity. `GET /health/monitors` includes `dataAudit`; a report older than 900 seconds is not considered current. The header indicator reports read failures even if the API cannot answer.
+
+`app/data_audit.py` owns rules and the explicit table inventory. `data_audit_runs` retains 30 days of inspection evidence; `operational_alerts` category `data_audit` retains deduplicated incidents and recovery status. Only audit-owned results are pruned. New tables and history datasets without classified policies are warnings. Research fetch time, observed time, source status, field missingness, per-asset derived freshness, manifest file existence, account sync and management projections are distinct checks. Monthly/quarterly/weekly sources and on-demand strategy detail do not inherit a continuous-feed deadline. Runtime data is inspected through its owner read-only status endpoints, not through direct journal writes or venue actions.
+
+CN session coverage comes from the independent Sina calendar, fetched with an eight-second timeout and TLS verification, cached in `data_audit_calendar` for seven days. Failed refresh retries at the next scan; stale or insufficient coverage is explicit. No Vibe project file or service is a runtime dependency. Completeness is checked from each dataset's first stored date, not an invented pre-inception history. Other markets do not yet have independent session-calendar completeness guarantees.
+
+Every UTC day, physical SQLite and foreign-key checks each receive a two-second query budget. Timeout remains an unresolved coverage warning; it must not be relabeled healthy. Full offline validation and archive content hashing belong to the existing backup/restore verification, not repeated full scans on the trading database. Five-minute scans do not run upstream business refreshes, place orders, repair data, or change trading authorization. Standalone external delivery for whole-host outages is not configured by this feature; station-internal notifications require a running browser and reachable service. Use the existing watchdog and independent operational monitoring for process/host outages.
+
 ## Standard local startup
 
 From the repository root on Windows PowerShell:
@@ -51,6 +85,14 @@ Account current observations and historical/financial jobs report separate healt
 For the approved host clock repair, run `powershell.exe -NoProfile -File .\scripts\enable-windows-time.ps1` from an Administrator PowerShell at the repository root. It enables the existing Windows Time service, resynchronizes using its already configured source and prints the resulting status. It does not change MT5 server timezone, trading mode or order state. An access denial or nonzero resync result is an incomplete repair, not successful synchronization.
 
 ## Safe local verification
+
+For chart lifecycle regressions, run
+`node --test scripts/test-echarts-lifecycle.cjs` from `platform-web`. The shared
+ECharts hook keeps only the latest pending options while hidden, applies them
+when the container gains size or its KeepAlive page reactivates, and prevents
+late asynchronous results from recreating an unmounted chart. Hidden charts
+must not recursively retry on a timer. These isolated lifecycle tests do not
+replace actual browser navigation, resize and scrolling acceptance.
 
 The following focused checks run from the repository root, do not start long-running services or external connections and do not require credentials or Live Write. They use repository files, temporary paths and mocked or synthetic inputs; install each package's declared development dependencies first.
 
@@ -138,7 +180,7 @@ When an external result cannot be proven:
 
 ## Hedge Board research data
 
-The Hedge Board is read-only research functionality. A-share data is refreshed by the Platform API lifecycle worker and committed to the SQLite `research_a_share_*` snapshot/history tables. Scheduled production refreshes are eligible only on China-market weekdays after 15:05 Asia/Shanghai. A successful run is not repeated for the same local trade date; a partial/error run remains eligible at the configured cadence until a complete snapshot is available. An authorized manual refresh can be used for repair. The browser reads `/api/v1/research/a-share/*` only; it must not call Vibe Research, AKShare, Eastmoney or other upstream providers.
+The Hedge Board is read-only research functionality. A-share data is refreshed by the Platform API lifecycle worker and committed to the SQLite `research_a_share_*` snapshot/history tables. Scheduled production refreshes are eligible only on dates present in the cached China exchange trading calendar after 15:05 Asia/Shanghai; missing calendar coverage defers the run. A successful run is not repeated for the same local trade date; a partial/error run remains eligible at the configured cadence until a complete snapshot is available. An authorized manual refresh can be used for repair. The browser reads `/api/v1/research/a-share/*` only; it must not call Vibe Research, AKShare, Eastmoney or other upstream providers.
 
 To pause the worker for an isolated test, set `VG_RESEARCH_REFRESH_ENABLED=false`. To adjust cadence, set `VG_RESEARCH_REFRESH_INTERVAL_SECONDS` (minimum effective interval is 60 seconds). A refresh run is guarded by a process mutex and records `running`, `ready`, `partial` or `error` status in `research_a_share_refresh_runs`. Failed modules never erase an existing meaningful snapshot.
 
@@ -186,7 +228,7 @@ Runtime activation is `VG_RUNTIME_RESEARCH_CAPTURE_ENABLED=true`; Platform is `V
 
 Before an authorized owner cutover, confirm free disk, expected directories, current branch/dirty files, database path/migration, actual Bybit/MT5 owners, TLS/proxy policy and Windows/native clocks. Record `w32tm /query /status`; do not silently enable or repair OS time services. Verify native MT5 source timestamps separately from local UTC, preserving raw values and any explicitly verified conversion version. Until verified, cross-clock samples remain excluded.
 
-Monitor Runtime `/v1/market-data/status` and Platform `/api/v1/research/strategies/data-status` for source gaps, queue/drop count, spool/free space, last received/durable/published watermarks and capture errors. The daily capacity estimate is extrapolated only from the measured archive window; it is not a measured full-day rate. Calendar coverage, end-to-end latency and backup status must not be inferred from a listening port. A 60-second REST scan, replay backlog and a provisional quote are separately labeled.
+Monitor Runtime `/v1/market-data/status` and Platform `/api/v1/research/strategies/data-status` for source gaps, queue/drop count, spool/free space, last received/durable/published watermarks and capture errors. Data audit warns when spool usage reaches 80% of its configured budget and errors at the budget; raising the budget requires checking free disk and does not establish archival retention. The daily capacity estimate is extrapolated only from the measured archive window; it is not a measured full-day rate. Calendar coverage, end-to-end latency and backup status must not be inferred from a listening port. A 60-second REST scan, replay backlog and a provisional quote are separately labeled.
 
 `platform-api/scripts/benchmark_strategy_research.py` runs an isolated synthetic spool-to-Parquet/SQLite pressure and concurrent-read probe. Synthetic results are not real Bybit 20ms latency, MT5 coverage, live fill quality or 24-hour acceptance. Real validation still requires native-stream continuity, MT5 same-ms batches, reconnect/reboot gaps, backlog recovery, clock checks and a full day of CPU/RSS/disk/latency evidence. Capacity pause, corrupt-tail recovery, orphan replay, manifest checksum and backup restore each need explicit evidence. Never delete old spool/shards to make a failed capacity test pass; archival retention is an operator action within the file-deletion rules.
 
@@ -194,7 +236,9 @@ The trading API keeps the research worker and SQLite serving projection disabled
 
 For long-running operation, `platform-api/scripts/compact_observational_history.py --database-backup <verified-sqlite>` applies retention to market-spread and account-observation snapshots: full recent data, hourly for 14 days, and daily for 400 days. It requires a stopped service window, checks the database-only backup and SQLite integrity before changing data, preserves orders/fills/financial facts/research catalog rows, and runs `VACUUM`. A run that keeps row counts unchanged is expected when all current observations are inside the retention windows; it still establishes the policy for future growth.
 
-The cross-spread snapshot endpoint is a read path. Its persistence guard accepts at most one history write per configured `VG_CROSS_SPREAD_MARKET_SNAPSHOT_INTERVAL_SECONDS` for each strategy instance; the background market monitor owns the regular sample. Do not increase browser polling frequency as a way to collect history; high-frequency research belongs to the Runtime Parquet/archive path.
+The cross-spread snapshot endpoint and execution preflights do not write market history or acquire its sampling lock. Only the background market monitor requests persistence, at most once per configured `VG_CROSS_SPREAD_MARKET_SNAPSHOT_INTERVAL_SECONDS` for each strategy instance. Migration 37 supplies the covering created-time index for that sampling guard; do not substitute source observation time for ingestion time. A stale Runtime fallback remains readable but is not persisted as a new observation. Do not increase browser polling frequency as a way to collect history; high-frequency research belongs to the Runtime Parquet/archive path. `fetchLatencyMs` measures each Runtime leg's quote-plus-position read, not browser round-trip time or source quote age; an MT5 closed-session tick retains its original time and cannot authorize execution.
+
+MT5 worker window maintenance filters process names before reading and resolving executable paths, then hides only windows belonging to the exact configured Terminal path. Do not resolve every host executable on each IPC loop: that synchronous maintenance competes with quote/account reads and consumes CPU even while idle. Process exit/access-denied races are skipped; matching another Terminal by name alone is forbidden. SDK identity verification, periodic window hiding and trading permissions remain unchanged.
 
 Backup verification compares every sealed raw/derived shard and experiment-result artifact against the backed-up SQLite catalog before checking file checksums. A missing experiment entry in the manifest fails verification even when all listed files are intact. Native Bybit source health advances only for accepted raw callbacks; MT5 empty intervals are reported as `empty_range`, not as new tick coverage.
 

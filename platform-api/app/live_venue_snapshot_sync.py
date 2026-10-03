@@ -4,15 +4,13 @@ import asyncio
 import hashlib
 import json
 import logging
-from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
 from sqlite3 import Row
 from threading import Lock
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app import monitor_health
@@ -994,6 +992,10 @@ def _sync_venue_snapshots(
             synced.append(current)
             for key, value in result.items():
                 totals[key] += value
+    if synced:
+        from app.cross_spread_position_reconciliation import reconcile_external_cross_spread_closes
+
+        reconcile_external_cross_spread_closes()
     if synced and failed:
         overall_status = "partial"
     elif failed:
@@ -1120,14 +1122,7 @@ async def run_snapshot_sync_monitor() -> None:
         await asyncio.sleep(SNAPSHOT_SYNC_INTERVAL_SECONDS)
 
 
-@asynccontextmanager
-async def snapshot_sync_lifespan(_: FastAPI) -> AsyncIterator[None]:
-    # The application owns the monitor lifecycle. Keep this router lifespan as
-    # a compatibility no-op for isolated router tests and mounted applications.
-    yield
-
-
-router = APIRouter(prefix=get_settings().api_prefix, lifespan=snapshot_sync_lifespan)
+router = APIRouter(prefix=get_settings().api_prefix)
 
 
 @router.post(

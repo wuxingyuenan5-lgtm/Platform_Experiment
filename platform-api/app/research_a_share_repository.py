@@ -4,7 +4,7 @@ import json
 import sqlite3
 from contextlib import nullcontext
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.database import connection
@@ -267,7 +267,9 @@ def read_refresh_status() -> dict[str, Any] | None:
     with connection() as db:
         row = db.execute(
             "SELECT run_id,target_trade_date,started_at,finished_at,status,error_code,mes"
-            "sage FROM research_a_share_refresh_runs ORDER BY started_at DESC LIMIT 1"
+            "sage FROM research_a_share_refresh_runs "
+            "WHERE run_id LIKE 'a-share-%' OR target_trade_date IS NOT NULL "
+            "ORDER BY started_at DESC LIMIT 1"
         ).fetchone()
     if row is None:
         return None
@@ -471,14 +473,37 @@ def read_dashboard() -> AShareDashboardResponse | None:
         }
     with connection() as db:
         history_rows = db.execute(
-            """SELECT observed_at, payload_json FROM (
-                SELECT observed_at, payload_json
+            """SELECT observed_at, payload_json, source FROM (
+                SELECT observed_at, payload_json, source
                 FROM research_a_share_history
                 WHERE dataset='market'
                 ORDER BY observed_at DESC
                 LIMIT 2000
             ) ORDER BY observed_at"""
         ).fetchall()
+    market_history = []
+    previous_amount: Decimal | None = None
+    for row in history_rows:
+        payload = json.loads(row["payload_json"])
+        raw_amount = payload.get("totalAmountYuan")
+        try:
+            amount = Decimal(str(raw_amount)) if raw_amount is not None else None
+        except InvalidOperation:
+            amount = None
+        amount_change_pct = (
+            (amount / previous_amount - Decimal("1")) * Decimal("100")
+            if amount is not None and previous_amount is not None and previous_amount > 0
+            else None
+        )
+        market_history.append(
+            {
+                "observedAt": row["observed_at"],
+                "source": row["source"],
+                **payload,
+                "amountChangePct": amount_change_pct,
+            }
+        )
+        previous_amount = amount
     latest_run = read_refresh_status()
     if latest_run and latest_run["status"] == "error":
         for value in values.values():
@@ -490,10 +515,7 @@ def read_dashboard() -> AShareDashboardResponse | None:
         {
             "generatedAt": max(str(by_name[name]["fetched_at"]) for name in required),
             **values,
-            "marketHistory": [
-                {"observedAt": row["observed_at"], **json.loads(row["payload_json"])}
-                for row in history_rows
-            ],
+            "marketHistory": market_history,
         }
     )
 
@@ -663,6 +685,7 @@ def write_dataset(
     source: str,
     run_id: str,
     observed_at: str | None = None,
+    status: str = "ready",
     db: sqlite3.Connection | None = None,
 ) -> None:
     now = _now()
@@ -678,7 +701,7 @@ def write_dataset(
                 dataset,
                 observed_at,
                 now,
-                "ready",
+                status,
                 source,
                 json.dumps(_jsonable(payload), ensure_ascii=False),
                 run_id,
@@ -707,7 +730,9 @@ def read_dataset_metadata(dataset: str) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
-def read_hot_stock_history(*, days: int | None = 90, matrix_days: int | None = 10) -> dict[str, Any]:
+def read_hot_stock_history(
+    *, days: int | None = 90, matrix_days: int | None = 10
+) -> dict[str, Any]:
     """Read the Platform-owned >100bn mother table without reprocessing quotes."""
     with connection() as db:
         rows = db.execute(

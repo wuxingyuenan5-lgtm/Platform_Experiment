@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, time, timedelta
@@ -20,18 +21,19 @@ from fastapi import FastAPI
 from app.config import get_settings
 from app.research_a_share_repository import finish_refresh, start_refresh
 from app.research_cumulative_volatility import refresh_cumulative_volatility
+from app.research_macro_expectations_refresh import refresh_macro_expectations
+from app.research_market_detail_refresh import refresh_market_details
 from app.research_overseas_repository import (
     read_latest_fetched_at,
     write_iv_snapshot,
     write_overseas_points,
     write_overseas_series,
 )
-from app.research_macro_expectations_refresh import refresh_macro_expectations
 from app.research_provider_overseas import (
     fetch_btc_iv_snapshot,
+    fetch_crypto_daily_prices,
     fetch_deribit_iv,
     fetch_etf_flow,
-    fetch_crypto_daily_prices,
     fetch_fedwatch,
 )
 from app.research_write_lock import RESEARCH_DB_WRITE_LOCK
@@ -126,7 +128,11 @@ async def _collect_fedwatch(force: bool) -> tuple[str, str]:
     except BaseException as exc:
         async with RESEARCH_DB_WRITE_LOCK:
             await asyncio.to_thread(
-                finish_refresh, run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500]
+                finish_refresh,
+                run_id,
+                "error",
+                error_code=type(exc).__name__,
+                message=str(exc)[:500],
             )
         raise
 
@@ -181,7 +187,9 @@ async def _collect_etf_flow(force: bool, asset: str = "btc") -> tuple[str, str]:
                     if usd_flow is not None and price and price > 0
                     else None
                 )
-                points.append((day["date"], ticker, {"flow": usd_flow, "coinFlow": coin_flow, "price": price}))
+                points.append(
+                    (day["date"], ticker, {"flow": usd_flow, "coinFlow": coin_flow, "price": price})
+                )
         async with RESEARCH_DB_WRITE_LOCK:
             await asyncio.to_thread(
                 write_overseas_points, run_id, dataset, points, source=_SOURCE_ETF[asset_key]
@@ -191,7 +199,11 @@ async def _collect_etf_flow(force: bool, asset: str = "btc") -> tuple[str, str]:
     except BaseException as exc:
         async with RESEARCH_DB_WRITE_LOCK:
             await asyncio.to_thread(
-                finish_refresh, run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500]
+                finish_refresh,
+                run_id,
+                "error",
+                error_code=type(exc).__name__,
+                message=str(exc)[:500],
             )
         raise
 
@@ -204,7 +216,7 @@ async def _collect_deribit_iv(force: bool) -> tuple[str, str]:
     dataset_term = "crypto_iv_term"
     dataset_snap = "crypto_iv_snapshot"
     today = _today()
-    already_done = _already_refreshed_today(dataset_term) or _already_refreshed_today(dataset_snap)
+    already_done = _already_refreshed_today(dataset_term) and _already_refreshed_today(dataset_snap)
     if not force and already_done:
         return "up_to_date", ""
     run_id = uuid4().hex
@@ -235,7 +247,11 @@ async def _collect_deribit_iv(force: bool) -> tuple[str, str]:
     except BaseException as exc:
         async with RESEARCH_DB_WRITE_LOCK:
             await asyncio.to_thread(
-                finish_refresh, run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500]
+                finish_refresh,
+                run_id,
+                "error",
+                error_code=type(exc).__name__,
+                message=str(exc)[:500],
             )
         raise
 
@@ -291,11 +307,22 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     task = asyncio.create_task(
         _run_periodic(max(60.0, settings.research_refresh_interval_seconds))
     )
+    market_task = asyncio.create_task(_run_market_periodic())
     try:
         yield
     finally:
         task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+        market_task.cancel()
+        await asyncio.gather(task, market_task, return_exceptions=True)
+
+
+async def _run_market_periodic() -> None:
+    while True:
+        try:
+            await refresh_market_details()
+        except Exception:
+            logging.getLogger(__name__).exception("Market detail refresh failed")
+        await asyncio.sleep(300)
 
 
 async def _run_periodic(interval_seconds: float) -> None:

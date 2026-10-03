@@ -3,7 +3,7 @@ from __future__ import annotations
 import platform
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 from app.config import Settings
 from app.gateway_errors import (
@@ -37,6 +37,11 @@ from app.order_semantics import normalize_mt5_order_status
 from app.secret_resolver import inspect_credential_reference, resolve_secret_reference
 
 
+class TickFreshness(TypedDict):
+    time_msc: int
+    advanced_at: datetime | None
+
+
 class Mt5LiveAdapter:
     name = "mt5_live"
 
@@ -45,7 +50,7 @@ class Mt5LiveAdapter:
         self._provider = provider
         self._initialized = False
         self._connected = False
-        self._tick_freshness: dict[tuple[str, str, str, str], dict[str, object]] = {}
+        self._tick_freshness: dict[tuple[str, str, str, str], TickFreshness] = {}
         self._tick_identity: dict[str, tuple[str, str]] = {}
 
     def capability(self) -> GatewayAdapterCapability:

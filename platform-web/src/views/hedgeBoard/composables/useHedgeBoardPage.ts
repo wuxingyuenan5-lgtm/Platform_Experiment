@@ -85,8 +85,6 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
 
 const widgetTextOverrides: Record<string, { title?: string }> = {
   'etf-weekly-flows': { title: '全球各地区ETF每周流入' },
-  'spdr-daily-flow': { title: '金价 vs SPDR 每日流量' },
-  'spdr-holdings-vs-price': { title: 'SPDR 持仓量 vs 黄金价格' },
   'central-bank-holders': { title: '全球央行黄金储备' },
   'central-bank-buyers': { title: '各国央行黄金净购买量' },
 };

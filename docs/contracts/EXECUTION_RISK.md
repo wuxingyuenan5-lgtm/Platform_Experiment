@@ -47,6 +47,22 @@ catalog and binding validation
 
 Kill Switch and leg deadline are checked again before later legs.
 
+Funding evaluates the batch's frozen residual limit before each Spot release and
+checks the first-fill deadline when confirmed perpetual fills remain unreleased.
+The one authoritatively synchronized working perpetual order may contribute its
+confirmed fills to this incremental gate; this does not prove terminal execution
+or a flat position. Native Spot fees must be reconciled before a later release.
+On breach, an active perpetual attempt is canceled and checked, then the batch
+pauses. An opening batch with complete terminal evidence may apply its frozen
+`auto_flatten` policy; unknown evidence stays paused. A failed closing batch is
+never reversed by this policy.
+
+Funding and Cross account-capital pages expose existing risk policy and strategy
+Kill Switch APIs to users with `risk:manage`. Changes require explicit confirmation
+and retain the same request key after a lost response. Policy updates affect new
+batches; existing batch snapshots remain unchanged. No account-specific values are
+chosen automatically, and global/account Kill Switches continue to apply.
+
 ## Residual exposure
 
 Use exact command-owned orders from all batch legs, including partial fills,
@@ -111,6 +127,14 @@ Create an opposite TradeCommand only for a proven remaining position. A non-fill
 
 Only proof that every owned instrument is flat can finalize a flatten action. Finalization atomically resolves risk, closes the failed Funding instruction, cancels unsubmitted legs, releases claims/reservations, and records exact execution evidence plus the previous failure reasons. Replaying an already completed action may finish this local bookkeeping from existing evidence; it cannot resubmit trades. Original orders, fills and economic facts remain immutable. Funding enters manual intervention with a refreshed residual-risk calculation even when its first fill query failed.
 
+Cancel and substitute actions also require a failed or manually paused batch.
+Canceling unsubmitted legs does not erase earlier fills; a filled substitute does
+not prove a complete hedge. Both recheck owned execution evidence and keep
+`action_required` while nonzero or incomplete exposure remains. A Funding close
+cannot use generic flattening, which would reopen its completed perpetual leg;
+use the original close recovery described in the API contract. Unresolved Funding
+recovery children block competing risk disposition.
+
 ## Idempotency
 
 | Object | Identity |
@@ -128,3 +152,9 @@ Reusing a key with a different batch or payload returns 409. Risk actions are cl
 - Accepted or Result Unknown external orders are not claimed canceled without venue evidence.
 - Multi-currency residual comparison remains fail-closed without a risk-FX snapshot.
 - Live Write remains disabled by default. Existing explicit Owner authorization governs the current operating period; CEO/account authorization and independent Platform/Runtime safety gates remain required. Local validation never grants real-trading permission.
+
+## Funding executable-spread exits
+
+The per-opening plan compares spot Bid minus perpetual Ask in USDT per base coin: TP uses >=, SL uses <=. Both quotes must match the frozen account and pair, have complete quality, positive uncrossed books and aware source timestamps no more than 10 seconds old (future tolerance 2 seconds). Only normal active groups without pending/unknown closes are eligible. Platform Live Write off skips evaluation; readiness, Kill Switch, Runtime permissions and all existing Funding close checks still apply at dispatch.
+
+A revision-checked database claim freezes the quantity and unique `funding-exit:<open-id>` key. Recovery looks up the original instruction before any submission; an existing instruction is handled by the normal runner, including unknown-result reconciliation. Before initial publication or recovery of an unpublished claim, revalidate current quotes/threshold, original account/pair and unchanged remaining quantity. A changed group pauses; no new identity or automatic rearming is allowed. Concurrent manual closes are protected by the same transactional group-capacity and original-leg identity check. A terminal failed automatic close remains the same recorded close; any recovery uses existing explicit recovery controls.

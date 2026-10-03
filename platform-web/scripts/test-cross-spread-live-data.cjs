@@ -365,3 +365,39 @@ test('strategy order-information tabs place fills before historical orders', () 
     assert.ok(fillsIndex < historyIndex, `${marker} must place fills before historical orders`);
   }
 });
+
+test('slow or failed live positions never block historical order records', async () => {
+  const { ref } = require('vue');
+  let rejectPositions;
+  const pending = new Promise((_, reject) => {
+    rejectPositions = reject;
+  });
+  const load = require('./load-strategy-module.cjs')({
+    '@/api/platform/strategyQueries': { fetchStrategyQuery: (_key, query) => query() },
+    '@/api/platform/trading': {
+      getOrders: async () => [],
+      getFills: async () => [],
+      getExecutionBatches: async () => [],
+      getStrategyPnl: async () => ({
+        economicEvents: [{ externalEventId: 'cash', amount: '2', currency: 'USDT' }],
+      }),
+      getCrossSpreadSnapshot: () => pending,
+    },
+  });
+  const active = ref('settlements');
+  const records = load(
+    'src/views/strategy/management/composables/useCrossSpreadRecords.ts',
+  ).useCrossSpreadRecords(active);
+  const refresh = records.refresh();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(records.loading.value, false);
+  assert.equal(records.tables.value.settlements.rows[0].eventId, 'cash');
+  active.value = 'positions';
+  assert.equal(records.loading.value, true);
+  rejectPositions(new Error('quote timeout'));
+  await refresh;
+  assert.equal(records.error.value, 'quote timeout');
+  active.value = 'settlements';
+  assert.equal(records.error.value, '');
+  assert.equal(records.tables.value.settlements.rows.length, 1);
+});

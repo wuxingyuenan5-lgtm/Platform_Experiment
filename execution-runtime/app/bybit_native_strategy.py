@@ -125,7 +125,11 @@ def get_strategy(
     cursor: str | None = None
     seen_cursors: set[str] = set()
     for _ in range(max_pages):
-        params: dict[str, object] = {"strategyId": strategy_id, "pageSize": page_size, "strategyType": "chaseOrder"}
+        params: dict[str, object] = {
+            "strategyId": strategy_id,
+            "pageSize": page_size,
+            "strategyType": "chaseOrder",
+        }
         if cursor:
             params["cursor"] = cursor
         response = _request(client, method="GET", path="/v5/strategy/list", params=params)

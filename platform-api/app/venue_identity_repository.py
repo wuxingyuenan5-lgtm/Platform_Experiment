@@ -107,13 +107,22 @@ class OrderIdentities:
         return result
 
 
-def load_order_identities(db: sqlite3.Connection) -> OrderIdentities:
+def load_order_identities(
+    db: sqlite3.Connection, *, account_ids: list[str] | None = None
+) -> OrderIdentities:
+    # Native order identity is account-scoped. Retain every competing owner and
+    # instrument alias inside that scope, without loading unrelated accounts.
+    params = list(dict.fromkeys(account_ids)) if account_ids is not None else []
+    placeholders = ",".join("?" for _ in params) or "NULL"
+    account_filter = f" AND a.id IN ({placeholders})" if account_ids is not None else ""
+    order_filter = f" WHERE o.account_id IN ({placeholders})" if account_ids is not None else ""
     aliases: dict[tuple[str, str], str | None] = {}
     for row in db.execute(
         "SELECT a.id AS account_id,i.id,i.instrument_type,i.settle_currency,m.external_symbol "
         "FROM accounts a JOIN instrument_mappings m ON m.venue_id=a.venue_id "
         "JOIN instruments i ON i.id=m.instrument_id WHERE m.status='active' "
-        "AND i.instrument_type IN ('crypto_spot','crypto_perp')"
+        "AND i.instrument_type IN ('crypto_spot','crypto_perp')" + account_filter,
+        params,
     ):
         category = (
             "spot"
@@ -129,7 +138,8 @@ def load_order_identities(db: sqlite3.Connection) -> OrderIdentities:
         db.execute(
             "SELECT o.id,o.command_id,o.account_id,o.instrument_id,o.external_order_id,"
             "o.side,o.quantity,o.created_at,tc.strategy_instance_id "
-            "FROM orders o LEFT JOIN trade_commands tc ON tc.id=o.command_id"
+            "FROM orders o LEFT JOIN trade_commands tc ON tc.id=o.command_id" + order_filter,
+            params,
         ).fetchall(),
         aliases,
     )

@@ -4,8 +4,9 @@ import asyncio
 import json
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import Literal, overload
 
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 
 from app import monitor_health
 from app.database import connection
@@ -35,16 +36,44 @@ def request_projection(instance_id, account_id, kind):
         )
 
 
-def read_projection(instance_id, *, account_id=None, kind="pnl"):
-    request_projection(instance_id, account_id, kind)
+@overload
+def read_projection(
+    instance_id: str, *, account_id: str | None = None, kind: Literal["pnl"] = "pnl",
+    background_tasks: BackgroundTasks | None = None,
+) -> StrategyPnlResponse: ...
+
+
+@overload
+def read_projection(
+    instance_id: str, *, account_id: str | None = None, kind: Literal["summary", "detail"],
+    background_tasks: BackgroundTasks | None = None,
+) -> StrategyAccountSnapshotResponse: ...
+
+
+def read_projection(
+    instance_id: str, *, account_id: str | None = None,
+    kind: Literal["pnl", "summary", "detail"] = "pnl",
+    background_tasks: BackgroundTasks | None = None,
+) -> StrategyPnlResponse | StrategyAccountSnapshotResponse:
     with connection() as db:
         row = db.execute(
             "SELECT * FROM strategy_management_projection "
             "WHERE strategy_instance_id=? AND account_id=? AND kind=?",
             (instance_id, account_id or "", kind),
         ).fetchone()
-    if not row["payload_json"]:
+    if row is None:
+        request_projection(instance_id, account_id, kind)
         raise HTTPException(503, "后台正在准备策略数据，请稍后重试", headers={"Retry-After": "2"})
+    if not row["payload_json"]:
+        request_projection(instance_id, account_id, kind)
+        raise HTTPException(503, "后台正在准备策略数据，请稍后重试", headers={"Retry-After": "2"})
+    if (
+        kind == "detail"
+        and background_tasks is not None
+        and datetime.now(UTC) - datetime.fromisoformat(row["requested_at"]) > timedelta(seconds=30)
+    ):
+        # Persist demand after sending the response; ready reads need no writer lock.
+        background_tasks.add_task(request_projection, instance_id, account_id, kind)
     payload = json.loads(row["payload_json"])
     stale = (
         bool(row["error_code"])
@@ -127,17 +156,24 @@ def refresh_one(*, force=False):
     return True
 
 
+def refresh_and_check():
+    worked = refresh_one()
+    with connection() as db:
+        failed = db.execute(
+            "SELECT 1 FROM strategy_management_projection WHERE error_code IS NOT NULL LIMIT 1"
+        ).fetchone()
+    return worked, bool(failed)
+
+
 async def run_management_projection_monitor():
-    await asyncio.to_thread(prepare_keys)
+    prepared = False
     while True:
         monitor_health.begin("management_projection")
         try:
-            worked = await asyncio.to_thread(refresh_one)
-            with connection() as db:
-                failed = db.execute(
-                    "SELECT 1 FROM strategy_management_projection "
-                    "WHERE error_code IS NOT NULL LIMIT 1"
-                ).fetchone()
+            if not prepared:
+                await asyncio.to_thread(prepare_keys)
+                prepared = True
+            worked, failed = await asyncio.to_thread(refresh_and_check)
             monitor_health.finish("management_projection", "projection_failed" if failed else None)
         except Exception as exc:
             worked = False

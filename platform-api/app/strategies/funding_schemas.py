@@ -3,7 +3,41 @@
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class FundingExitPlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    expectedRevision: int = Field(ge=0)
+    enabled: bool
+    takeProfitSpread: Decimal | None = None
+    stopLossSpread: Decimal | None = None
+
+    @model_validator(mode="after")
+    def validate_thresholds(self):
+        if self.enabled and self.takeProfitSpread is None and self.stopLossSpread is None:
+            raise ValueError("启用自动平仓须设置至少一个可成交价差阈值")
+        if (
+            self.takeProfitSpread is not None
+            and self.stopLossSpread is not None
+            and self.stopLossSpread >= self.takeProfitSpread
+        ):
+            raise ValueError("止损价差须小于止盈价差")
+        return self
+
+
+class FundingExitPlanResponse(BaseModel):
+    openInstructionId: str
+    revision: int
+    enabled: bool
+    takeProfitSpread: Decimal | None
+    stopLossSpread: Decimal | None
+    triggeredAt: str | None
+    triggerReason: Literal["take_profit", "stop_loss"] | None
+    triggerSpread: Decimal | None
+    closeInstructionId: str | None
+    lastError: str | None
+    updatedAt: str
 
 
 class FundingSymbolOption(BaseModel):
@@ -70,11 +104,17 @@ class FundingWorkspaceResponse(BaseModel):
 
 
 class FundingPositionGroupResponse(BaseModel):
+    exitPlan: FundingExitPlanResponse | None = None
     roundingBalanced: bool = False
     model_config = ConfigDict(allow_inf_nan=False)
     isAbnormal: bool = False
     abnormalReason: str | None = None
-    abnormalAction: Literal["close_group", "flatten_open", "reconcile"] = "reconcile"
+    abnormalAction: Literal["close_group", "flatten_open", "finish_close", "reconcile"] = (
+        "reconcile"
+    )
+    recoveryCloseInstructionId: str | None = None
+    recoveryIdempotencyKey: str | None = None
+    recoverySpotQuantity: Decimal | None = None
     instructionId: str
     openInstructionId: str
     batchId: str

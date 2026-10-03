@@ -196,7 +196,6 @@ def execute_funding_instruction(
         assert active_attempt is not None
         synced = _synchronize_attempt_from_authority(active_attempt)
         total_cumulative_fill = _latest_perpetual_cumulative_fill(batch_id)
-        _record_incremental_risk(batch_id, total_cumulative_fill)
 
         if synced.status == "result_unknown":
             return _manual_intervention(
@@ -246,6 +245,15 @@ def execute_funding_instruction(
                 batch_id,
                 first.failure_reason or "Funding Spot release requires manual intervention",
             )
+
+        risk_reason = _incremental_risk_breach(batch_id, total_cumulative_fill, synced)
+        if risk_reason:
+            if synced.status in {"acknowledged", "accepted", "partially_filled"}:
+                _request_cancel(synced)
+                _mark_attempt_cancel_pending(synced.attempt_id)
+                synced = _synchronize_attempt_from_authority(synced)
+            _manual_intervention(instruction_id, batch_id, risk_reason)
+            return get_execution_batch(batch_id)
 
         release = _claim_spot_release(
             batch_id=batch_id,
@@ -368,6 +376,7 @@ def _claim_funding_batch(
             strategy_instance_id=strategy_instance_id,
             legs=[
                 SimpleNamespace(
+                    role=leg.role,
                     account_id=leg.account_id,
                     instrument_id=leg.instrument_id,
                     symbol=leg.external_symbol,
@@ -846,7 +855,21 @@ def _manual_intervention(instruction_id: str, batch_id: str, reason: str):
         failure_reason=reason,
     )
     # Native read failure must not leave an already filled leg labelled risk-clear.
-    risk_repository.recheck_batch_risk(batch_id, reason=reason)
+    risk = risk_repository.recheck_batch_risk(batch_id, reason=reason)
+    # Automatic reduction is authorized by this batch's frozen policy only.
+    # Unknown outcomes stay paused; failed closes keep their original direction.
+    if risk is not None and risk.failure_action == "auto_flatten":
+        with connection() as db:
+            action = db.execute(
+                "SELECT action FROM strategy_runs WHERE id=?", (instruction_id,)
+            ).fetchone()
+        if action is not None and action[0] == "open":
+            from app.execution_risk import handle_batch_failure
+
+            risk_repository.cancel_pending_legs(batch_id, reason)
+            risk = risk_repository.recheck_batch_risk(batch_id, reason=reason)
+            if risk is not None and risk.data_quality_state == "complete":
+                handle_batch_failure(batch_id, reason)
     return get_execution_batch(batch_id)
 
 
@@ -913,10 +936,53 @@ def _bounded_stop(instruction_id: str, batch_id: str, reason: str) -> ExecutionB
     return _failed_without_side_effects(instruction_id, batch_id, reason)
 
 
-def _record_incremental_risk(batch_id: str, cumulative_fill: Decimal) -> None:
+def _incremental_risk_breach(
+    batch_id: str, cumulative_fill: Decimal, attempt: FundingAttemptRow
+) -> str | None:
     if cumulative_fill <= 0:
-        return
+        return None
+    from app.execution_exposure import exposure_evidence
+    from app.execution_risk import check_leg_deadline, get_batch_risk
+    from app.execution_risk_policy import evaluate_residual_exposure
+    from app.venue_reconciliation_service import reconcile_order_with_venue
+
+    # Bring native Spot fees into confirmed inventory before evaluating the next
+    # release. Missing evidence stops dispatch instead of treating fees as zero.
+    for release in _release_rows(batch_id):
+        if release.status == "filled" and release.order_id:
+            if reconcile_order_with_venue(release.order_id).difference_ids:
+                return "Funding Spot fill evidence is not reconciled"
     record_filled_leg(batch_id)
+    risk = get_batch_risk(batch_id)
+    with connection() as db:
+        residual, currency, quality, _ = exposure_evidence(
+            db, batch_id, working_order_id=attempt.order_id
+        )
+    evaluated = evaluate_residual_exposure(residual, currency, quality, risk.max_residual_notional)
+    if evaluated.exceeded:
+        return evaluated.reason
+    # Apply the frozen inter-leg deadline only while there is an unreleased fill.
+    if _claimable_spot_delta(batch_id) > 0:
+        allowed, reason = check_leg_deadline(batch_id)
+        if not allowed:
+            return reason
+    return None
+
+
+def _claimable_spot_delta(batch_id: str) -> Decimal:
+    with connection() as db:
+        row = db.execute(
+            "SELECT execution_plan_json FROM strategy_runs WHERE execution_batch_id=?", (batch_id,)
+        ).fetchone()
+    plan = ExecutionPlan.model_validate_json(row[0])
+    legs = {leg.role: leg for leg in plan.legs}
+    perp, spot = legs[PERPETUAL_ROLE], legs[SPOT_ROLE]
+    target = _allowed_cumulative_spot(
+        perpetual_cumulative_fill=_latest_perpetual_cumulative_fill(batch_id),
+        perpetual_maximum_quantity=perp.maximum_quantity,
+        spot_leg=spot,
+    )
+    return max(Decimal(0), target - _filled_cumulative_spot(batch_id))
 
 
 def _strategy_trading_mode(strategy_instance_id: str) -> str:
@@ -973,12 +1039,39 @@ def get_funding_controlled_live_readiness(
             }
         )
         return checks
+    account_statuses = adapter.get("accountStatuses")
+    account_status = (
+        next(
+            (
+                item
+                for item in account_statuses
+                if isinstance(item, dict) and item.get("accountId") == account_id
+            ),
+            None,
+        )
+        if isinstance(account_statuses, list)
+        else None
+    )
+    if isinstance(account_statuses, list) and account_statuses and account_status is None:
+        checks.update(
+            {
+                "adapterConfigured": False,
+                "adapterOperational": False,
+                "runtimeCapabilities": [],
+                "hasRequiredRuntimeCapabilities": False,
+                "ready": False,
+                "blockedReason": "funding_account_readiness_missing",
+            }
+        )
+        return checks
+    readiness = account_status or adapter
     runtime_capabilities = {
         str(item) for item in adapter.get("capabilities", []) if isinstance(item, str)
     }
-    checks["adapterConfigured"] = bool(adapter.get("configured"))
-    checks["adapterOperational"] = bool(adapter.get("operational"))
-    checks["adapterWriteEnabled"] = bool(adapter.get("writeEnabled"))
+    checks["adapterConfigured"] = bool(readiness.get("configured"))
+    checks["adapterOperational"] = bool(readiness.get("operational"))
+    checks["adapterWriteEnabled"] = bool(readiness.get("writeEnabled"))
+    checks["adapterMissingRequirements"] = readiness.get("missingRequirements", [])
     checks["runtimeCapabilities"] = sorted(runtime_capabilities)
     checks["hasRequiredRuntimeCapabilities"] = FUNDING_RUNTIME_REQUIRED_CAPABILITIES.issubset(
         runtime_capabilities
@@ -1173,6 +1266,11 @@ def _authoritative_reconciliation_status(
     perpetual_leg: ExecutionPlanLeg,
     spot_leg: ExecutionPlanLeg,
 ) -> str:
+    from app.strategies.funding_close_recovery import (
+        confirmed_native_rejection,
+        unsubmitted_release_rejection,
+    )
+
     attempts = _attempts(batch_id)
     if not attempts or any(attempt.order_id is None for attempt in attempts):
         return "unavailable"
@@ -1180,12 +1278,21 @@ def _authoritative_reconciliation_status(
     try:
         for leg, order_ids in (
             (perpetual_leg, [attempt.order_id for attempt in attempts]),
-            (spot_leg, [row.order_id for row in _release_rows(batch_id)]),
+            (
+                spot_leg,
+                [
+                    row.order_id
+                    for row in _release_rows(batch_id)
+                    if not unsubmitted_release_rejection(batch_id, row)
+                ],
+            ),
         ):
             if not order_ids or any(order_id is None for order_id in order_ids):
                 return "unavailable"
             for order_id in order_ids:
                 assert order_id is not None
+                if confirmed_native_rejection(order_id):
+                    continue
                 order = _runtime_get(f"/venue/orders/by-platform/{order_id}")
                 fills = _runtime_get("/venue/fills", params={"platformOrderId": order_id})
                 if not isinstance(order, dict) or not isinstance(fills, list):
@@ -1549,7 +1656,12 @@ def _quote_move_requires_new_attempt(attempt: FundingAttemptRow, leg: ExecutionP
 
 
 def _has_release_side_effect_failure(batch_id: str) -> bool:
-    return any(row.status in {"failed", "result_unknown"} for row in _release_rows(batch_id))
+    failed = any(row.status in {"failed", "result_unknown"} for row in _release_rows(batch_id))
+    if failed:
+        from app.strategies.funding_close_recovery import has_completed_close_recovery
+
+        return not has_completed_close_recovery(batch_id)
+    return False
 
 
 def _has_any_external_side_effect(batch_id: str) -> bool:

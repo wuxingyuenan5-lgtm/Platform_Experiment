@@ -2,7 +2,12 @@
   <section class="market-terminal__detail">
     <div v-if="!readonly" class="market-terminal__panel-head market-terminal__panel-head--detail">
       <div class="market-terminal__detail-actions">
-        <button type="button" class="market-terminal__toolbar-btn" @click="toggleEditMode">
+        <button
+          type="button"
+          class="market-terminal__toolbar-btn"
+          :disabled="editingBlocked"
+          @click="toggleEditMode"
+        >
           {{ editMode ? '完成编辑' : '编辑标的' }}
         </button>
         <button
@@ -24,8 +29,9 @@
       </div>
     </div>
 
+    <p v-if="layoutMessage" role="status">{{ layoutMessage }}</p>
     <div v-if="editMode" class="market-terminal__editor-tip">
-      当前为本地编辑模式。你可以添加、删除、上下排序，刷新后仍会保留在当前浏览器。
+      标的列表按当前账号保存。可以添加、删除和排序；未接通的标的显示暂无数据。
     </div>
 
     <section v-if="editMode && addFormVisible" class="market-terminal__editor-card">
@@ -335,6 +341,9 @@
 </template>
 
 <script setup lang="ts">
+  import { getMarketLayout, saveMarketLayout, type MarketLayoutGroup } from '@/api/hedgeResearch';
+  import { useUserStore } from '@/store/modules/user';
+
   import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
   import type {
     RotationHeatmapRow,
@@ -386,7 +395,13 @@
 
   const emit = defineEmits<{ (event: 'index-chart', code: string, name: string): void }>();
 
-  const STORAGE_PREFIX = 'vg_hedge_market_detail_';
+  const userStore = useUserStore();
+  const savedLayout = ref<MarketLayoutGroup[] | null>(null);
+  const layoutVersion = ref(0);
+  const layoutLoading = ref(true);
+  const layoutSaving = ref(false);
+  const layoutMessage = ref('');
+  let layoutRequestId = 0;
   const signalColumnKeys = ['d10', 'd20', 'd50', 'd200', 'x2050'] as const;
   const rotationColumns = [
     { key: 'd1', label: '1D' },
@@ -421,11 +436,31 @@
 
   let tradingViewScriptPromise: Promise<void> | null = null;
 
-  const storageKey = computed(() => `${STORAGE_PREFIX}${props.marketId}`);
-  const hasSavedOverrides = computed(() => {
-    if (typeof window === 'undefined') return false;
-    return Boolean(window.localStorage.getItem(storageKey.value));
-  });
+  const hasSavedOverrides = computed(() => savedLayout.value !== null);
+  const editingBlocked = computed(() => layoutLoading.value || layoutSaving.value);
+
+  async function loadLayout() {
+    const requestId = ++layoutRequestId;
+    savedLayout.value = null;
+    layoutVersion.value = 0;
+    layoutLoading.value = !props.readonly;
+    layoutSaving.value = false;
+    editMode.value = false;
+    addFormVisible.value = false;
+    layoutMessage.value = '';
+    hydrateGroups();
+    if (props.readonly) return;
+    try {
+      const result = await getMarketLayout(props.marketId);
+      if (requestId !== layoutRequestId) return;
+      savedLayout.value = result.groups;
+      layoutVersion.value = result.rowVersion;
+      layoutLoading.value = false;
+      hydrateGroups();
+    } catch {
+      if (requestId === layoutRequestId) layoutMessage.value = '标的列表暂不可用，请刷新后重试';
+    }
+  }
 
   const displayGroups = computed<TerminalTableGroup[]>(() => editableGroups.value);
 
@@ -452,7 +487,9 @@
 
   function hydrateGroups() {
     const fallbackGroups = cloneGroups(props.groups);
-    const savedGroups = props.readonly ? null : readSavedGroups();
+    const savedGroups = props.readonly
+      ? null
+      : (savedLayout.value?.map(normalizeGroup).filter(Boolean) as TerminalTableGroup[] | null);
     editableGroups.value = savedGroups
       ? reconcileSavedGroups(fallbackGroups, savedGroups)
       : fallbackGroups;
@@ -474,23 +511,7 @@
     }));
   }
 
-  function readSavedGroups() {
-    if (typeof window === 'undefined') return null;
-    const raw = window.localStorage.getItem(storageKey.value);
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return null;
-      return parsed.map(normalizeGroup).filter(Boolean) as TerminalTableGroup[];
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Local storage owns only the user's table layout. A stored row must never
-   * become a stale cache for market data after the API has supplied live rows.
-   */
+  // Account storage owns only identities and ordering; prices always come from the API.
   function reconcileSavedGroups(
     liveGroups: TerminalTableGroup[],
     savedGroups: TerminalTableGroup[],
@@ -505,7 +526,7 @@
       ...group,
       rows: group.rows.map((savedRow) => {
         const liveRow = liveById.get(savedRow.id) || liveBySymbol.get(savedRow.symbol);
-        return liveRow ? { ...savedRow, ...liveRow } : savedRow;
+        return liveRow ? { ...savedRow, ...liveRow, id: savedRow.id } : savedRow;
       }),
     }));
   }
@@ -522,10 +543,7 @@
 
   function normalizeRow(groupLabel: string, row: any, index: number): TerminalTableRow | null {
     if (!row || typeof row.name !== 'string' || typeof row.symbol !== 'string') return null;
-    const spark =
-      Array.isArray(row.spark) && row.spark.length
-        ? row.spark.map(Number)
-        : buildPlaceholderSpark(row.symbol, index);
+    const spark: number[] = [];
     return {
       id:
         typeof row.id === 'string'
@@ -535,29 +553,71 @@
       symbol: row.symbol,
       tvSymbol: typeof row.tvSymbol === 'string' ? row.tvSymbol : '',
       spark,
-      price: typeof row.price === 'string' ? row.price : '0.00',
-      d1: typeof row.d1 === 'string' ? row.d1 : '+0.00%',
-      ytd: typeof row.ytd === 'string' ? row.ytd : '+0.00%',
-      qtd: typeof row.qtd === 'string' ? row.qtd : '+0.00%',
-      w1: typeof row.w1 === 'string' ? row.w1 : '+0.00%',
-      m1: typeof row.m1 === 'string' ? row.m1 : '+0.00%',
-      y1: typeof row.y1 === 'string' ? row.y1 : '+0.00%',
-      high: typeof row.high === 'string' ? row.high : '0.0%',
-      d10: typeof row.d10 === 'string' ? row.d10 : '▲',
-      d20: typeof row.d20 === 'string' ? row.d20 : '▲',
-      d50: typeof row.d50 === 'string' ? row.d50 : '▲',
-      d200: typeof row.d200 === 'string' ? row.d200 : '▲',
-      x2050: typeof row.x2050 === 'string' ? row.x2050 : '▲',
-      x50200: typeof row.x50200 === 'string' ? row.x50200 : '▲',
+      price: '—',
+      d1: '—',
+      ytd: '—',
+      qtd: '—',
+      w1: '—',
+      m1: '—',
+      y1: '—',
+      high: '—',
+      d10: '—',
+      d20: '—',
+      d50: '—',
+      d200: '—',
+      x2050: '—',
+      x50200: '—',
     };
   }
 
-  function persistGroups() {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(storageKey.value, JSON.stringify(editableGroups.value));
+  async function persistGroups(reset = false) {
+    if (editingBlocked.value) return;
+    const requestId = layoutRequestId;
+    const marketId = props.marketId;
+    layoutSaving.value = true;
+    layoutMessage.value = '正在保存…';
+    const groups = reset
+      ? null
+      : editableGroups.value.map((group) => ({
+          label: group.label,
+          rows: group.rows.map(({ id, name, symbol, tvSymbol }) => ({
+            id,
+            name,
+            symbol,
+            tvSymbol,
+          })),
+        }));
+    try {
+      const result = await saveMarketLayout(marketId, groups, layoutVersion.value);
+      if (requestId !== layoutRequestId) return;
+      savedLayout.value = result.groups;
+      layoutVersion.value = result.rowVersion;
+      layoutMessage.value = '已保存到当前账号';
+      hydrateGroups();
+    } catch (error) {
+      if (requestId !== layoutRequestId) return;
+      if ((error as { status?: number }).status === 409) {
+        await loadLayout();
+        layoutMessage.value = '列表已在其他页面更新，请重新检查后编辑';
+      } else {
+        hydrateGroups();
+        layoutMessage.value = '保存失败，本次修改未保存，请重试';
+      }
+    } finally {
+      if (requestId === layoutRequestId) layoutSaving.value = false;
+    }
   }
 
+  watch(
+    () => [props.marketId, props.readonly, userStore.getUserInfo.userId],
+    () => {
+      void loadLayout();
+    },
+    { immediate: true },
+  );
+
   function toggleEditMode() {
+    if (editingBlocked.value) return;
     editMode.value = !editMode.value;
     if (!editMode.value) {
       addFormVisible.value = false;
@@ -565,6 +625,7 @@
   }
 
   function openAddForm() {
+    if (editingBlocked.value) return;
     addFormVisible.value = true;
     addForm.value = {
       groupLabel: editableGroups.value[0]?.label || '',
@@ -579,6 +640,7 @@
   }
 
   function submitAddRow() {
+    if (editingBlocked.value) return;
     const groupLabel = addForm.value.groupLabel.trim();
     const name = addForm.value.name.trim();
     const symbol = addForm.value.symbol.trim();
@@ -592,21 +654,21 @@
       name,
       symbol,
       tvSymbol: addForm.value.tvSymbol.trim(),
-      spark: buildPlaceholderSpark(symbol, targetGroup.rows.length),
-      price: '0.00',
-      d1: '+0.00%',
-      ytd: '+0.00%',
-      qtd: '+0.00%',
-      w1: '+0.00%',
-      m1: '+0.00%',
-      y1: '+0.00%',
-      high: '0.0%',
-      d10: '▲',
-      d20: '▲',
-      d50: '▲',
-      d200: '▲',
-      x2050: '▲',
-      x50200: '▲',
+      spark: [],
+      price: '—',
+      d1: '—',
+      ytd: '—',
+      qtd: '—',
+      w1: '—',
+      m1: '—',
+      y1: '—',
+      high: '—',
+      d10: '—',
+      d20: '—',
+      d50: '—',
+      d200: '—',
+      x2050: '—',
+      x50200: '—',
     });
 
     persistGroups();
@@ -614,6 +676,7 @@
   }
 
   function removeRow(groupLabel: string, rowId: string) {
+    if (editingBlocked.value) return;
     const group = editableGroups.value.find((item) => item.label === groupLabel);
     if (!group) return;
     group.rows = group.rows.filter((row) => row.id !== rowId);
@@ -621,6 +684,7 @@
   }
 
   function moveRow(groupLabel: string, rowId: string, direction: 'up' | 'down') {
+    if (editingBlocked.value) return;
     const group = editableGroups.value.find((item) => item.label === groupLabel);
     if (!group) return;
     const currentIndex = group.rows.findIndex((row) => row.id === rowId);
@@ -633,13 +697,8 @@
   }
 
   function resetGroups() {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(storageKey.value);
-    }
-    editableGroups.value = cloneGroups(props.groups);
-    expandedGroups.value = Object.fromEntries(
-      editableGroups.value.map((group) => [group.label, true]),
-    );
+    if (editingBlocked.value) return;
+    void persistGroups(true);
     addFormVisible.value = false;
   }
 
@@ -793,12 +852,6 @@
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(' ');
-  }
-
-  function buildPlaceholderSpark(seed: string, offset: number) {
-    const base =
-      Array.from(seed).reduce((total, char) => total + char.charCodeAt(0), 0) + offset * 3;
-    return Array.from({ length: 24 }, (_, index) => 10 + ((base + index * 7) % 12));
   }
 
   function sparkStrokeClass(value: string) {
@@ -963,6 +1016,7 @@
   }
 
   onBeforeUnmount(() => {
+    ++layoutRequestId;
     if (chartContainerRef.value) {
       chartContainerRef.value.innerHTML = '';
     }

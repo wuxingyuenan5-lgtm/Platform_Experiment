@@ -1,36 +1,231 @@
 {
   "schema_version": 1,
   "scope": "platform-api/app production Python outside repository-named modules",
-  "policy": "Existing direct SQL owners are explicitly allowlisted; Phase 4-R1 may not add a new owner. Removal or migration out of an owner is allowed.",
+  "policy": "Direct SQL outside repository-named modules requires a bounded owner and persistence reason. This registry records existing colocated transactions and read models; it does not exempt modules from stricter domain boundaries or authorize new SQL surfaces.",
   "files": {
-    "platform-api/app/auth.py": {"owner": "Authentication policy", "reason": "Legacy authentication state queries remain colocated with the bounded auth policy."},
-    "platform-api/app/catalog.py": {"owner": "Catalog read model", "reason": "Legacy catalog read and bootstrap queries are not migrated in Phase 4-R1."},
-    "platform-api/app/credential_security.py": {"owner": "Credential security", "reason": "Bounded credential rotation and revocation state owner."},
-    "platform-api/app/database_bootstrap.py": {"owner": "Database bootstrap", "reason": "Canonical schema bootstrap owner; repository migration is outside R1."},
-    "platform-api/app/database_seeds.py": {"owner": "Database seeds", "reason": "Deterministic seed owner used only for maintained bootstrap flows."},
-    "platform-api/app/disaster_recovery.py": {"owner": "Disaster recovery", "reason": "Operational recovery evidence and restore coordination owner."},
-    "platform-api/app/eod_policy.py": {"owner": "EOD policy", "reason": "Small legacy policy lookup retained without expanding its SQL surface."},
-    "platform-api/app/execution_batches.py": {"owner": "Execution batches", "reason": "Existing atomic batch coordination owner."},
-    "platform-api/app/execution_exposure.py": {"owner": "Execution exposure", "reason": "Existing residual exposure projection owner."},
-    "platform-api/app/execution_risk.py": {"owner": "Execution risk", "reason": "Auditable risk state machine retained as an explicit legacy transactional owner."},
-    "platform-api/app/live_session_claims.py": {"owner": "Live session claims", "reason": "Two-person live-session claim state owner."},
-    "platform-api/app/live_trading_sessions.py": {"owner": "Live trading sessions", "reason": "Live-session lifecycle and fail-closed authorization owner."},
-    "platform-api/app/live_venue_accounting.py": {"owner": "Live venue accounting", "reason": "Venue-derived accounting projection owner."},
-    "platform-api/app/market_data.py": {"owner": "Market data", "reason": "Small maintained market snapshot persistence owner."},
-    "platform-api/app/ops.py": {"owner": "Operations", "reason": "Operational state queries retained within the bounded ops surface."},
-    "platform-api/app/order_execution_intents.py": {"owner": "Order execution intents", "reason": "Reduce-only and position-intent persistence owner."},
-    "platform-api/app/production_monitoring.py": {"owner": "Production monitoring", "reason": "Read-only production monitoring and evidence aggregation owner."},
-    "platform-api/app/production_operations_policy.py": {"owner": "Production operations policy", "reason": "Small legacy production-operation policy lookup owner."},
-    "platform-api/app/schema_migrations.py": {"owner": "Schema migrations", "reason": "Canonical migration owner; direct DDL is intentional."},
-    "platform-api/app/security.py": {"owner": "Security state", "reason": "Bounded security event and lockout persistence owner."},
-    "platform-api/app/strategy_runs.py": {"owner": "Strategy runs", "reason": "Strategy run lifecycle projection owner."},
-    "platform-api/app/trade_command_execution.py": {"owner": "Trade command execution", "reason": "Existing command execution state transition owner."},
-    "platform-api/app/trade_commands.py": {"owner": "Trade commands", "reason": "Trade command journal and idempotency owner."},
-    "platform-api/app/trading.py": {"owner": "Legacy order projection", "reason": "Existing order, fill, position and PnL projection owner; R1 adds recovery calls but no new SQL owner."},
-    "platform-api/app/user_admin_notes.py": {"owner": "User admin notes", "reason": "Bounded administrative-note persistence owner."},
-    "platform-api/app/user_demo_seed.py": {"owner": "User demo seeds", "reason": "Development/test-only deterministic user seed owner."},
-    "platform-api/app/user_password_reset.py": {"owner": "Password reset", "reason": "Bounded reset-token lifecycle owner."},
-    "platform-api/app/user_product_migrations.py": {"owner": "User product migrations", "reason": "Canonical user-product migration owner."},
-    "platform-api/app/v1_readiness.py": {"owner": "V1 readiness", "reason": "Readiness evidence queries retained without expanding the production interface."}
+    "platform-api/app/auth.py": {
+      "owner": "Authentication policy",
+      "reason": "Legacy authentication state queries remain colocated with the bounded auth policy."
+    },
+    "platform-api/app/catalog.py": {
+      "owner": "Catalog read model",
+      "reason": "Legacy catalog read and bootstrap queries are not migrated in Phase 4-R1."
+    },
+    "platform-api/app/credential_security.py": {
+      "owner": "Credential security",
+      "reason": "Bounded credential rotation and revocation state owner."
+    },
+    "platform-api/app/database_bootstrap.py": {
+      "owner": "Database bootstrap",
+      "reason": "Canonical schema bootstrap owner; repository migration is outside R1."
+    },
+    "platform-api/app/database_seeds.py": {
+      "owner": "Database seeds",
+      "reason": "Deterministic seed owner used only for maintained bootstrap flows."
+    },
+    "platform-api/app/disaster_recovery.py": {
+      "owner": "Disaster recovery",
+      "reason": "Operational recovery evidence and restore coordination owner."
+    },
+    "platform-api/app/eod_policy.py": {
+      "owner": "EOD policy",
+      "reason": "Small legacy policy lookup retained without expanding its SQL surface."
+    },
+    "platform-api/app/execution_batches.py": {
+      "owner": "Execution batches",
+      "reason": "Existing atomic batch coordination owner."
+    },
+    "platform-api/app/execution_exposure.py": {
+      "owner": "Execution exposure",
+      "reason": "Existing residual exposure projection owner."
+    },
+    "platform-api/app/execution_risk.py": {
+      "owner": "Execution risk",
+      "reason": "Auditable risk state machine retained as an explicit legacy transactional owner."
+    },
+    "platform-api/app/live_session_claims.py": {
+      "owner": "Live session claims",
+      "reason": "Two-person live-session claim state owner."
+    },
+    "platform-api/app/live_trading_sessions.py": {
+      "owner": "Live trading sessions",
+      "reason": "Live-session lifecycle and fail-closed authorization owner."
+    },
+    "platform-api/app/live_venue_accounting.py": {
+      "owner": "Live venue accounting",
+      "reason": "Venue-derived accounting projection owner."
+    },
+    "platform-api/app/market_data.py": {
+      "owner": "Market data",
+      "reason": "Small maintained market snapshot persistence owner."
+    },
+    "platform-api/app/ops.py": {
+      "owner": "Operations",
+      "reason": "Operational state queries retained within the bounded ops surface."
+    },
+    "platform-api/app/order_execution_intents.py": {
+      "owner": "Order execution intents",
+      "reason": "Reduce-only and position-intent persistence owner."
+    },
+    "platform-api/app/production_monitoring.py": {
+      "owner": "Production monitoring",
+      "reason": "Read-only production monitoring and evidence aggregation owner."
+    },
+    "platform-api/app/production_operations_policy.py": {
+      "owner": "Production operations policy",
+      "reason": "Small legacy production-operation policy lookup owner."
+    },
+    "platform-api/app/schema_migrations.py": {
+      "owner": "Schema migrations",
+      "reason": "Canonical migration owner; direct DDL is intentional."
+    },
+    "platform-api/app/security.py": {
+      "owner": "Security state",
+      "reason": "Bounded security event and lockout persistence owner."
+    },
+    "platform-api/app/strategy_runs.py": {
+      "owner": "Strategy runs",
+      "reason": "Strategy run lifecycle projection owner."
+    },
+    "platform-api/app/trade_command_execution.py": {
+      "owner": "Trade command execution",
+      "reason": "Existing command execution state transition owner."
+    },
+    "platform-api/app/trade_commands.py": {
+      "owner": "Trade commands",
+      "reason": "Trade command journal and idempotency owner."
+    },
+    "platform-api/app/trading.py": {
+      "owner": "Legacy order projection",
+      "reason": "Existing order, fill, position and PnL projection owner; R1 adds recovery calls but no new SQL owner."
+    },
+    "platform-api/app/user_admin_notes.py": {
+      "owner": "User admin notes",
+      "reason": "Bounded administrative-note persistence owner."
+    },
+    "platform-api/app/user_demo_seed.py": {
+      "owner": "User demo seeds",
+      "reason": "Development/test-only deterministic user seed owner."
+    },
+    "platform-api/app/user_password_reset.py": {
+      "owner": "Password reset",
+      "reason": "Bounded reset-token lifecycle owner."
+    },
+    "platform-api/app/user_product_migrations.py": {
+      "owner": "User product migrations",
+      "reason": "Canonical user-product migration owner."
+    },
+    "platform-api/app/v1_readiness.py": {
+      "owner": "V1 readiness",
+      "reason": "Readiness evidence queries retained without expanding the production interface."
+    },
+    "platform-api/app/account_history_sync.py": {
+      "owner": "Account history synchronization",
+      "reason": "Reads native history, missing-fill evidence and history job status; writes remain through snapshot and read-job owners."
+    },
+    "platform-api/app/account_performance.py": {
+      "owner": "Account capital performance",
+      "reason": "Owns capital movements, coverage and capital sync state used by account returns; does not allocate account returns to strategies."
+    },
+    "platform-api/app/account_read_jobs.py": {
+      "owner": "Account read jobs",
+      "reason": "Persists per-account read-job status and combines it with capital synchronization status."
+    },
+    "platform-api/app/controlled_strategy_write_guard.py": {
+      "owner": "Controlled strategy admission",
+      "reason": "Reads strategy definitions and active bindings to reject legacy execution bypasses; no persistence writes."
+    },
+    "platform-api/app/cross_session_valuation.py": {
+      "owner": "Cross session valuation",
+      "reason": "Reads historical spread, account-risk and session evidence for market-closure-aware valuation; no financial fact writes."
+    },
+    "platform-api/app/cross_spread.py": {
+      "owner": "Cross account selection",
+      "reason": "Reads the active bound venue account identity; lifecycle writes remain in the exit-plan repository."
+    },
+    "platform-api/app/cross_spread_close_recovery.py": {
+      "owner": "Cross close recovery",
+      "reason": "Existing bounded transaction rechecks original close leg, risk disposition and plan before moving their recovery states together."
+    },
+    "platform-api/app/cross_spread_position_reconciliation.py": {
+      "owner": "Cross external-close reconciliation",
+      "reason": "Reads proven native closes, pending intents and account sync; atomically closes only the matching exit plan and appends its audit."
+    },
+    "platform-api/app/cross_spread_synthetic_service.py": {
+      "owner": "Cross execution recovery lookup",
+      "reason": "Reads original batch-leg and command identity before reusing an existing close intent; no direct SQL writes."
+    },
+    "platform-api/app/data_audit.py": {
+      "owner": "Data health audit",
+      "reason": "Reads persisted producer and projection evidence and owns retained data_audit_runs reports; never alters source financial facts."
+    },
+    "platform-api/app/data_audit_calendar.py": {
+      "owner": "Data audit exchange calendar",
+      "reason": "Owns the persisted CN exchange-calendar cache and freshness metadata."
+    },
+    "platform-api/app/funding.py": {
+      "owner": "Funding binding and instrument selection",
+      "reason": "Reads bound account environment and native instrument mappings; execution remains through instruction and command owners."
+    },
+    "platform-api/app/funding_settlement_accounting.py": {
+      "owner": "Funding settlement read model",
+      "reason": "Reads original strategy runs, native settlement events and fills for evidence-based attribution; no fact mutation."
+    },
+    "platform-api/app/live_venue_snapshot_sync.py": {
+      "owner": "Live account snapshot persistence",
+      "reason": "Owns atomic current account frames, synchronization status and append-only native venue events; preserves source identities."
+    },
+    "platform-api/app/order_record_readmodel.py": {
+      "owner": "Order record presentation",
+      "reason": "Reads batch direction, risk-generated order membership and native MT5 fill metadata; no direct writes."
+    },
+    "platform-api/app/research_cumulative_volatility.py": {
+      "owner": "Cumulative volatility projection",
+      "reason": "Existing producer replaces only derived cumulative-volatility sampling rows in research_a_share_history; reads its serving coverage and series."
+    },
+    "platform-api/app/strategy_daily_valuation.py": {
+      "owner": "Strategy daily valuation",
+      "reason": "Reads historical spread, FX and account-risk observations for Beijing-day valuation; missing evidence stays unavailable."
+    },
+    "platform-api/app/strategy_financial_readmodel.py": {
+      "owner": "Strategy financial read model",
+      "reason": "Read-only aggregation of canonical fills, native events and strategy ownership; no formal accounting writes."
+    },
+    "platform-api/app/strategy_management_projection.py": {
+      "owner": "Management serving projection",
+      "reason": "Owns strategy_management_projection demand, attempts, published payload and error state; canonical inputs remain unchanged."
+    },
+    "platform-api/app/strategy_research_projection.py": {
+      "owner": "Strategy research serving projection",
+      "reason": "Owns derived research_strategy_projection rows and their incremental/backfill cursors; original archives remain authoritative."
+    },
+    "platform-api/app/strategies/capital_transfer.py": {
+      "owner": "Capital transfer intent persistence",
+      "reason": "Existing transaction claims transfer resources and reserves balance together with internal_capital_transfers; no new venue capability is granted."
+    },
+    "platform-api/app/strategies/funding_close_recovery.py": {
+      "owner": "Funding close recovery",
+      "reason": "Rechecks original close identity, native fills and remaining capacity before claiming one recovery release and audit in a bounded transaction."
+    },
+    "platform-api/app/strategies/funding_orchestration.py": {
+      "owner": "Funding execution state machine",
+      "reason": "Owns persisted perpetual attempts and spot releases and coordinates existing batch/leg/run states under original frozen intent."
+    },
+    "platform-api/app/strategies/funding_runner.py": {
+      "owner": "Funding runner queue",
+      "reason": "Reads only the existing persisted runnable instruction queue; execution is delegated to instruction_service."
+    },
+    "platform-api/app/strategies/funding_workspace.py": {
+      "owner": "Funding execution workspace read model",
+      "reason": "Reads symbol mappings, original instruction/attempt/release facts, balance and reservations for the workspace; no direct writes."
+    },
+    "platform-api/app/strategies/instruction_service.py": {
+      "owner": "Strategy instruction publication",
+      "reason": "Owns atomic frozen instruction, batch and leg publication and state transitions; rechecks idempotency and close capacity in the same transaction."
+    },
+    "platform-api/app/strategies/plan_service.py": {
+      "owner": "Strategy plan evidence lookup",
+      "reason": "Reads bindings, specifications, native fill evidence and reserved close capacity to build frozen plans; no direct writes."
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { useUserStore } from '@/store/modules/user';
-import { computed, ref, type Ref } from 'vue';
+import { computed, ref, watch, type Ref } from 'vue';
 import { getExecutionBatch } from '@/api/platform/trading';
 
 import {
@@ -139,6 +139,19 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   }
   const inputs = ref(captureInputs());
   const userStore = useUserStore();
+  const pendingDraftAbsent = ref(false);
+  let pendingDraftRecoveryRunning = false;
+
+  function draftKeys(draft: PersistedExecutionDraft): string[] {
+    return draft.kind === 'CLOSE_ALL'
+      ? draft.plans.filter((plan) => plan.submitted !== false).map((plan) => plan.idempotencyKey)
+      : [draft.idempotencyKey];
+  }
+
+  function sameDraft(left: PersistedExecutionDraft | null, right: PersistedExecutionDraft) {
+    return !!left && JSON.stringify(left) === JSON.stringify(right);
+  }
+
   function canStartIntent(): boolean {
     if (userStore.authentication?.user.role !== 'ceo') {
       setExecutionMessage('仅 CEO 可下达交易指令', 'is-warn');
@@ -146,12 +159,32 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     }
     if (submitLoading.value || confirmVisible.value) return false;
     if (readExecutionDraft()) {
-      setExecutionMessage('上一条指令回执尚未确认，请先恢复原指令', 'is-warn');
+      setExecutionMessage(
+        pendingDraftAbsent.value
+          ? '服务器未找到上一条指令；请先解除本地锁定，再重新核对持仓后操作。'
+          : '上一条指令回执尚未确认，请先恢复原指令',
+        'is-warn',
+      );
       return false;
     }
     inputs.value = captureInputs();
     limitEvidence.value = null;
     return true;
+  }
+
+  async function canStartCloseIntent(): Promise<boolean> {
+    const draft = readExecutionDraft();
+    if (
+      userStore.authentication?.user.role === 'ceo' &&
+      !submitLoading.value &&
+      !confirmVisible.value &&
+      pendingDraftAbsent.value &&
+      draft &&
+      draft.kind !== 'OPEN'
+    ) {
+      await clearUnreceivedPendingExecution();
+    }
+    return canStartIntent();
   }
 
   const submitLoading = ref(false);
@@ -322,8 +355,8 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     }
   }
 
-  function openConfirm(action: string) {
-    if (!canStartIntent()) return;
+  async function openConfirm(action: string) {
+    if (!(await canStartCloseIntent())) return;
     if (action.startsWith('CLOSE:')) {
       pendingAction.value = { kind: 'CLOSE', planId: action.slice('CLOSE:'.length) };
     } else if (action === 'CLOSE_ALL') {
@@ -334,8 +367,8 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     if (pendingAction.value) void prepareAction(pendingAction.value);
   }
 
-  function openPartialClose(planId: string, quantityOz: number) {
-    if (!canStartIntent()) return;
+  async function openPartialClose(planId: string, quantityOz: number) {
+    if (!(await canStartCloseIntent())) return;
     const order = inputs.value.closeOrders.find((candidate) => candidate.id === planId);
     if (!order || !Number.isFinite(quantityOz) || quantityOz <= 0 || quantityOz >= order.qtyOz) {
       setExecutionMessage('部分平仓数量必须大于 0 且小于该笔剩余数量', 'is-warn');
@@ -566,25 +599,28 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
   }
 
   async function resumePendingExecution() {
-    if (userStore.authentication?.user.role !== 'ceo') return;
+    if (userStore.authentication?.user.role !== 'ceo' || pendingDraftRecoveryRunning) return;
     if (submitLoading.value || confirmVisible.value) return;
     const draft = readExecutionDraft();
-    if (!draft) return;
+    if (!draft) {
+      pendingDraftAbsent.value = false;
+      return;
+    }
+    pendingDraftRecoveryRunning = true;
+    pendingDraftAbsent.value = false;
     submitLoading.value = true;
     setExecutionMessage('检测到未确认回执的价差指令，正在恢复状态…', 'is-warn');
     try {
-      const keys =
-        draft.kind === 'CLOSE_ALL'
-          ? draft.plans
-              .filter((plan) => plan.submitted !== false)
-              .map((plan) => plan.idempotencyKey)
-          : [draft.idempotencyKey];
+      const keys = draftKeys(draft);
       const statuses: string[] = [];
       let allTerminal = true;
       let allReceived = true;
+      let allAbsent = keys.length > 0;
       for (const key of keys) {
         const instruction = await getCrossSpreadInstruction(key);
         if (instruction === null) {
+          // Keep the draft until a second authoritative read confirms absence.
+          // This read-only recovery never resubmits an order.
           allReceived = false;
           // Absence during recovery can race an in-flight original request.
           // Keep its identity and never turn this read into a new submission.
@@ -592,6 +628,7 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
           statuses.push('原指令尚未查到，请稍后刷新核对');
           continue;
         }
+        allAbsent = false;
         if (instruction.executionBatchId === null) {
           allReceived = allReceived && ['failed', 'rejected'].includes(instruction.status);
           allTerminal = allTerminal && instruction.status === 'failed';
@@ -610,10 +647,24 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
         statuses.push(batch.status);
       }
       if (allReceived) clearExecutionDraft();
-      setExecutionMessage(
-        `已恢复指令状态：${statuses.join('；') || '没有已提交指令'}`,
-        allTerminal ? 'is-success' : 'is-warn',
-      );
+      if (allAbsent && sameDraft(readExecutionDraft(), draft)) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        if (sameDraft(readExecutionDraft(), draft)) {
+          const rechecked = await Promise.all(keys.map(getCrossSpreadInstruction));
+          if (rechecked.every((item) => item === null)) {
+            pendingDraftAbsent.value = true;
+            setExecutionMessage(
+              '服务器连续两次未找到这条指令。可核验后解除本地锁定；此操作不会下单。',
+              'is-warn',
+            );
+          }
+        }
+      } else {
+        setExecutionMessage(
+          `已恢复指令状态：${statuses.join('；') || '没有已提交指令'}`,
+          allTerminal ? 'is-success' : 'is-warn',
+        );
+      }
       await refreshExecutionViews();
     } catch (error: unknown) {
       setExecutionMessage(
@@ -622,10 +673,48 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
       );
     } finally {
       submitLoading.value = false;
+      pendingDraftRecoveryRunning = false;
     }
   }
 
-  void resumePendingExecution();
+  async function clearUnreceivedPendingExecution() {
+    if (!pendingDraftAbsent.value || submitLoading.value || confirmVisible.value) return;
+    const draft = readExecutionDraft();
+    if (!draft) {
+      pendingDraftAbsent.value = false;
+      return;
+    }
+    submitLoading.value = true;
+    try {
+      const instructions = await Promise.all(draftKeys(draft).map(getCrossSpreadInstruction));
+      if (!sameDraft(readExecutionDraft(), draft) || instructions.some((item) => item !== null)) {
+        pendingDraftAbsent.value = false;
+        setExecutionMessage('原指令状态已变化，已保留本地锁定并重新核对。', 'is-warn');
+        submitLoading.value = false;
+        await resumePendingExecution();
+        return;
+      }
+      clearExecutionDraft();
+      pendingDraftAbsent.value = false;
+      setExecutionMessage(
+        '已确认服务器没有收到原指令并解除本地锁定；未提交任何交易。请刷新持仓后再发起平仓。',
+        'is-success',
+      );
+      await refreshExecutionViews();
+    } catch (error) {
+      setExecutionMessage(requestErrorMessage(error, '核对失败，本地锁定仍保留。'), 'is-error');
+    } finally {
+      submitLoading.value = false;
+    }
+  }
+
+  watch(
+    () => userStore.authentication?.user.role,
+    (role) => {
+      if (role === 'ceo') void resumePendingExecution();
+    },
+    { immediate: true },
+  );
 
   return {
     cancelConfirmation,
@@ -633,12 +722,14 @@ export function useCrossSpreadExecution(options: UseCrossSpreadExecutionOptions)
     confirmOrder,
     confirmSummary,
     confirmVisible,
+    clearUnreceivedPendingExecution,
     executionLogs,
     executionMessage,
     executionMessageTone,
     limitEvidence,
     openConfirm,
     openPartialClose,
+    pendingDraftAbsent,
     prepareOpenDraft,
     resumePendingExecution,
     setExecutionMessage,

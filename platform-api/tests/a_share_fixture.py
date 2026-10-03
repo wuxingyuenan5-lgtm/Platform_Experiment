@@ -104,6 +104,36 @@ class AShareFixtureProvider:
             if not (self.mode == "partial" and code == "000858")
         ]
 
+    async def innovation_drug_snapshot(self) -> dict:
+        await self._check("innovation")
+        return {
+            "observed_at": datetime(2026, 9, 7, 7, 10, tzinfo=UTC),
+            "amount_yuan": Decimal("1000000000"),
+            "turnover_pct": Decimal("2.5"),
+            "return_pct": Decimal("0.5"),
+            "source": "fixture",
+        }
+
+    async def sector_crowding_snapshot(self) -> list[dict]:
+        await self._check("crowding")
+        sectors = [
+            ("通信设备", "801102", "100000000000", "3.52"),
+            ("计算机设备", "801101", "20000000000", "1.96"),
+            ("元件", "801083", "80000000000", "5.44"),
+            ("半导体", "801081", "150000000000", "3.20"),
+        ]
+        return [
+            {
+                "name": name,
+                "code": code,
+                "amount_yuan": Decimal(amount),
+                "turnover_pct": Decimal(turnover),
+                "observed_at": datetime(2026, 9, 7, 7, tzinfo=UTC),
+                "source": f"fixture-{code}",
+            }
+            for name, code, amount, turnover in sectors
+        ]
+
     async def stock_daily_histories(
         self, codes: list[str]
     ) -> dict[str, list[AShareIndexHistoryPoint]]:

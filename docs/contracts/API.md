@@ -28,7 +28,7 @@ FastAPI 的响应模型是 Funding、Cross 和策略管理接口的唯一类型�
 
 前端使用 openapi-fetch 的生成路径/类型，通过既有 Axios 发送请求。Cookie 会话、CSRF、每次调用的超时及 Axios 错误语义保留。Decimal 输入采用后端允许的精确字符串子集，响应金额和数量保持字符串；计数、时间间隔等普通数值不强行改成字符串。动态原生回执保留扩展字段，不假称所有 Venue 私有字段已有强类型定义。
 
-TanStack Vue Query 管理 Funding 上下文、原指令状态、持仓和策略管理读取。查询键包括会话代数、用户、账户/策略和实际参数；注销或身份/权限变化会取消旧查询并清空缓存，迟到响应不得写入新会话。无持久化查询缓存、读取自动重试或 mutation 自动重放；可见页轮询只发 GET。写入成功只使相关读取失效。
+TanStack Vue Query 管理 Funding 上下文、原指令状态、持仓和策略管理读取。查询键包括会话代数、用户、账户/策略和实际参数；注销或身份/权限变化会取消旧查询并清空缓存，迟到响应不得写入新会话。无持久化查询缓存、读取自动重试或 mutation 自动重放；可见页轮询只发 GET。写入成功只使相关读取失效。 Funding 执行页可见时每 3 秒更新上下文和持仓；切到分析页或隐藏页面时暂停这两项轮询。有效预览在后台刷新期间保留，输入变化、读取失败或超过 10 秒未成功更新即阻断操作；服务端派发前仍独立校验来源报价与风控。提交回执展示不等待持仓表刷新。
 
 交易动作仍由明确操作触发，Funding 在发送前保存原指令幂等身份及所属用户；超时、刷新和重新登录只能查询原身份。登录缓存清理只移除自己的缓存键，不得清空全部浏览器存储而误删待恢复指令。准备请求体前后及收到响应后检查会话是否变化，避免跨登录派发或接收旧交易动作。
 
@@ -182,6 +182,7 @@ POST /api/v1/trading/orders/{orderId}/venue-reconcile
 - 两者都不得重提原订单。
 - 两种恢复使用 `reconciliation:review`；CEO 可执行，浏览器 CSRF 及订单缺失接受的独立管理边界保持有效。
 - 网络结果不确定时保持 `result_unknown`。
+- Runtime HTTP 错误、截断/非 JSON 回执、无效事件和回执落库失败均不能证明未下单。已经分配订单时，TradeCommand 的异常状态以订单证据为准，不得把未知订单标成确定拒绝；重放只返回原身份。对已终结订单调用 Journal Reconcile 时同步其 TradeCommand 状态，不再访问 Runtime。迟到 ACK 不得把部分成交降级为已受理，成交自带的原生订单 ID 必须保存。
 - Deprecated `POST /api/v1/trading/orders` 不得用于 Live。
 
 ## 10. Kill Switch
@@ -376,6 +377,8 @@ Limit 响应同时附加 Platform 定价证据：
 
 ## 12. Runtime Command
 
+Runtime 对重复 `command_id` 在 Journal 事务内校验原有业务字段：账户、平台订单、标的、方向、数量、价格、执行方式、减仓和仓位目标等必须一致；冲突返回 409 且不调用 Gateway。等值 Decimal 和新请求的 `received_at` 不构成业务变化。适配器未分类异常或执行证据保存失败后保留原认领并标记 `result_unknown`，不能重新派单；错误响应不暴露适配器异常正文。
+
 ```http
 POST /commands/orders
 ```
@@ -395,17 +398,26 @@ execution_policy = default | fok | post_only_chase
 
 ### Funding 执行方式与恢复
 
-执行上下文接受可选 `quantity`（现货毛数量），返回 `openSizing`：毛数量、买入基础币费率、预计净到账、永续数量、取整余量及有效性。实盘按 0.001 费率计算 `floor(grossSpot × (1 − feeRate) / perpetualStep) × perpetualStep`；模拟无费成交使用零费率。开仓 POST 的 `quantity` 为现货毛数量，平仓仍为永续数量；页面提交冻结的 `expectedPerpetualQuantity`，与服务端当前计算不一致时创建前拒绝。两腿数量和费率冻结在计划中，幂等重放读取原计划，不重算历史计划。现货累计释放按冻结两腿数量比例计算，最终全成交可释放完整现货上限。
+`PATCH /api/v1/trading/funding/exit-plans/{open_instruction_id}` 保存该组一次性价差退出设置：`expectedRevision`、`enabled`、可空十进制 `takeProfitSpread` / `stopLossSpread`。首次 revision 为 0；并发版本或已触发冲突返回 409，阈值无效返回 422。需要 CEO 交易权限及浏览器 CSRF。`GET /funding/positions` 的 `exitPlan` 返回版本、阈值、触发证据、原平仓指令及暂停原因；无设置为 null。成交规则归资金费率产品合同及执行风险合同。此配置接口不派单、不打开 Live Write；后台触发仍受原交易准入约束。
+
+
+执行上下文和开、平仓 POST 的 `quantity` 均为永续目标数量。`openSizing` 返回永续数量、反推现货毛量、买入基础币费率、预计净到账、取整余量及有效性；按手续费和原生现货步长选择最接近目标的合法现货数量，实际微小余差如实保留。名义金额只用于建议数量，不替代提交的永续目标。页面提交冻结的 `expectedPerpetualQuantity` 时须与目标一致。两腿数量和费率冻结在计划中，幂等重放读取原计划，不重算历史计划。现货累计释放按冻结两腿数量比例向下量化，最终全成交可释放完整现货上限。
 
 Funding 持仓返回 `isAbnormal`、`abnormalReason`、`abnormalAction`、`remainingPerpetualQuantity`、`remainingSpotHolding` 和 `netDeltaQuantity`；实际持仓与扣除预约后的可交易数量分离。已完成但实际净现货少于永续，或正敞口达到一个永续步进的活动组标记异常；已结束组退出异常区。Cross 组合返回其归属腿数量、方向及 MT5 Ticket，管理页不得回退到全账户仓位分配。
 
 `POST /api/v1/trading/funding/instructions` 接受 `executionPolicy: market | fok | post_only_chase`，以及仅 FOK 必填的正有限十进制字符串 `perpetualLimitPrice`。省略执行方式仍保持既有 PostOnly Chase 合同，页面新指令默认市价；默认字段规范化不得改变既有幂等指纹。执行方式与价格属于不可变计划，同一幂等键更改它们返回冲突。
+
+提交完成账户/规格/数量及当前实盘准入校验，原子持久化冻结计划和批次后立即返回原指令状态，不等待场所下单或成交。`accepted` 只表示耐久受理；已有 Funding 后台执行器负责推进和重启恢复，GET 返回实际进度。同键 POST 仅核对原载荷并读取原指令，不额外驱动执行。实盘准入关闭时在发布前拒绝，不能留下等待以后开闸的休眠指令。
 
 开仓与指定组合的部分/全部平仓共用该请求及原执行主链。永续市价和 FOK 只尝试一次；FOK 使用原生全成全撤并要求精确全成交后才释放现货，非 FOK 延续按已证明成交增量释放现货的合同。平仓永续为 reduce-only，现货按净到账及步长量化。
 
 Funding 的报价、执行上下文及计划采用同一活动绑定，实盘 primary、模拟 local_test，校验账户环境和写权限。实盘计划冻结对应账户、symbol、Spot/Perpetual 类别的原生合约规格；缺失、类别不符、数量或价格不符合精度时创建失败。
 
 `GET /api/v1/trading/funding/instructions/{instructionId}` 及按 `idempotencyKey` 查询把持久化 `rejected` 映射为终态 `failed`。零敞口拒单仅进入历史，不占活动持仓。前端在超时或未知时只查询原指令；明确拒绝且查询确认无指令后才能解除旧草稿。原生终态零成交须检查所有本地订单、成交及现货释放证据后才能释放预约。
+
+`POST /api/v1/trading/funding/instructions/{instruction_id}/recover-close` 仅接受 CEO 会话及服务端提供的 `idempotencyKey`。原平仓永续已全成、现货存在确定未完成量且所有既有结果明确时，持仓返回 `abnormalAction=finish_close`、`recoveryCloseInstructionId`、`recoveryIdempotencyKey`、`recoverySpotQuantity`。确认后沿原账户、原批次，仅提交剩余现货卖单；须核对原生订单、成交、手续费、永续仓位、现货余额及当前交易准入。拒单历史保持不可变；未知、过期余额、归属或绑定冲突拒绝派发。
+
+恢复子单存在后，同键请求仅核对原单，不重复派发；最终核对中断保留异常入口及原键，`recoverySpotQuantity=0` 表示只核对已有恢复请求。证据完整且原冻结两腿数量全部完成后，原指令结束并释放资源。永续仍未完成的其他失败平仓保留人工核对，不能用反向开仓冒充平仓恢复。
 
 ## 13. Bybit 与 MT5
 

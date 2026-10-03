@@ -1,18 +1,43 @@
 import json
+from contextlib import asynccontextmanager
+from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
+from app.catalog import _funding_current_positions
 from app.config import get_settings
-from app.database import connection
+from app.database import connection, initialize_database
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def isolated_lifespan(monkeypatch):
+    # These tests verify the persisted account projection, with its worker driven
+    # explicitly after seeding. Do not launch unrelated production monitors.
+    @asynccontextmanager
+    async def lifespan(_):
+        initialize_database()
+        yield
+
+    monkeypatch.setattr(app.router, "lifespan_context", lifespan)
+
+
+def projected_get(client, path):
+    from app.strategy_management_projection import refresh_one
+
+    response = client.get(path)
+    assert response.status_code == 503
+    assert refresh_one(force=True)
+    return client.get(path)
 
 
 def test_unconfigured_bybit_strategy_account_is_explicitly_unavailable(tmp_path: Path) -> None:
     get_settings().database_path = str(tmp_path / "strategy-account-snapshot.db")
 
     with TestClient(app) as client:
-        response = client.get(
+        response = projected_get(client, 
             "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
@@ -42,7 +67,7 @@ def test_unbound_strategy_account_snapshot_returns_explicit_unbound_state(tmp_pa
     get_settings().database_path = str(tmp_path / "strategy-account-unbound.db")
 
     with TestClient(app) as client:
-        response = client.get(
+        response = projected_get(client, 
             "/api/v1/strategies/instances/strategy_short_term_w_instance_default/account-snapshot"
         )
 
@@ -125,11 +150,11 @@ def test_cross_strategy_account_snapshot_uses_current_venue_positions(
                     json.dumps(payload),
                 ),
             )
-        response = client.get(
+        response = projected_get(client, 
             "/api/v1/strategies/instances/strategy_cross_venue_spread_instance_default/"
             "account-snapshot?accountId=bybit-live-main"
         )
-        summary_response = client.get(
+        summary_response = projected_get(client, 
             "/api/v1/strategies/instances/strategy_cross_venue_spread_instance_default/"
             "account-snapshot?accountId=bybit-live-main&includeDetails=false"
         )
@@ -144,6 +169,115 @@ def test_cross_strategy_account_snapshot_uses_current_venue_positions(
     assert summary["orders"] == []
     assert summary["fills"] == []
     assert summary["finance"] is None
+
+
+def test_funding_current_positions_follow_active_order_groups_not_fill_history(
+    tmp_path: Path, monkeypatch
+) -> None:
+    get_settings().database_path = str(tmp_path / "funding-current-position.db")
+    initialize_database()
+    with connection() as db:
+        db.executemany(
+            """
+            INSERT INTO instruments (
+                id,instrument_code,name,instrument_type,base_currency,quote_currency,
+                settle_currency,quantity_unit,data_quality_state,created_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            [
+                (
+                    "funding-spot",
+                    "BTCUSDT-FUNDING-TEST-SPOT",
+                    "BTC spot",
+                    "crypto_spot",
+                    "BTC",
+                    "USDT",
+                    "USDT",
+                    "BTC",
+                    "complete",
+                    "2026-09-25T00:00:00+00:00",
+                ),
+                (
+                    "funding-perp",
+                    "BTCUSDT-FUNDING-TEST-PERP",
+                    "BTC perpetual",
+                    "crypto_perp",
+                    "BTC",
+                    "USDT",
+                    "USDT",
+                    "BTC",
+                    "complete",
+                    "2026-09-25T00:00:00+00:00",
+                ),
+            ],
+        )
+
+    group = {
+        "openInstructionId": "open-1",
+        "spotSide": "buy",
+        "perpetualSide": "sell",
+        "remainingSpotHolding": "0.0099",
+        "remainingPerpetualQuantity": "0.01",
+        "asOf": "2026-09-25T00:00:00+00:00",
+    }
+    plan = {
+        "executionPlan": {
+            "legs": [
+                {
+                    "role": "spot_leg",
+                    "accountId": "bybit-live-main",
+                    "instrumentId": "funding-spot",
+                    "externalSymbol": "BTCUSDT",
+                    "side": "buy",
+                    "contractMultiplier": "1",
+                },
+                {
+                    "role": "perpetual_leg",
+                    "accountId": "bybit-live-main",
+                    "instrumentId": "funding-perp",
+                    "externalSymbol": "BTCUSDT",
+                    "side": "sell",
+                    "contractMultiplier": "1",
+                },
+            ]
+        }
+    }
+    monkeypatch.setattr(
+        "app.strategies.funding_workspace.list_funding_position_groups",
+        lambda *, scope: [group] if scope == "active" else [],
+    )
+    monkeypatch.setattr("app.strategies.instruction_service.get_instruction", lambda _id: plan)
+
+    marks = [
+        {"instrumentId": "funding-spot", "currentPrice": "100"},
+        {"instrumentId": "funding-perp", "currentPrice": "100"},
+        # A lifetime-fill residual must not become a current position.
+        {
+            "instrumentId": "unrelated-fill-dust",
+            "netQuantity": "0.000000759",
+            "positionValue": "0.0000759",
+        },
+    ]
+    positions, exposure = _funding_current_positions("bybit-live-main", marks)
+    assert [(row.instrument_id, row.net_quantity) for row in positions] == [
+        ("funding-spot", Decimal("0.0099")),
+        ("funding-perp", Decimal("-0.01")),
+    ]
+    assert [row.instrument_type for row in positions] == ["crypto_spot", "crypto_perp"]
+    assert Decimal(str(exposure["positionValue"])) == Decimal("1.99")
+    assert Decimal(str(exposure["positionValueNet"])) == Decimal("0.01")
+
+    monkeypatch.setattr(
+        "app.strategies.funding_workspace.list_funding_position_groups",
+        lambda *, scope: [],
+    )
+    closed, closed_exposure = _funding_current_positions("bybit-live-main", marks)
+    assert closed == []
+    assert closed_exposure == {
+        "positionValue": None,
+        "positionValueNet": None,
+        "positionValueCurrency": None,
+    }
 
 
 def test_strategy_account_snapshot_aggregates_assets_in_account_currency(
@@ -181,7 +315,7 @@ def test_strategy_account_snapshot_aggregates_assets_in_account_currency(
                     "2026-08-21T00:00:00+00:00",
                 ),
             )
-        response = client.get(
+        response = projected_get(client, 
             "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
@@ -190,9 +324,17 @@ def test_strategy_account_snapshot_aggregates_assets_in_account_currency(
     assert body["balance"]["currency"] == "USD"
     assert body["balance"]["equity"] == "100"
     assert body["equityHistory"] == [
-        {"asOf": "2026-08-21T00:00:00Z", "equity": "100", "currency": "USD", "assetScope": "coin", "totalAssets": None,
-         "equityDrawdown": None, "totalAssetsDrawdown": None,
-         "equityDrawdownQuality": "baseline", "totalAssetsDrawdownQuality": "baseline"}
+        {
+            "asOf": "2026-08-21T00:00:00Z",
+            "equity": "100",
+            "currency": "USD",
+            "assetScope": "coin",
+            "totalAssets": None,
+            "equityDrawdown": None,
+            "totalAssetsDrawdown": None,
+            "equityDrawdownQuality": "baseline",
+            "totalAssetsDrawdownQuality": "baseline",
+        }
     ]
 
 
@@ -231,7 +373,7 @@ def test_strategy_account_snapshot_reports_single_asset_in_account_currency(
                     "2026-08-21T00:00:00+00:00",
                 ),
             )
-        response = client.get(
+        response = projected_get(client, 
             "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
@@ -302,7 +444,7 @@ def test_strategy_account_snapshot_uses_account_risk_for_live_account_funds(
                     "2026-08-22T00:00:01+00:00",
                 ),
             )
-        response = client.get(
+        response = projected_get(client, 
             "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 
@@ -369,7 +511,7 @@ def test_strategy_account_snapshot_does_not_promote_legacy_account_pnl_to_strate
                     "2026-08-21T00:00:00+00:00",
                 ),
             )
-        response = client.get(
+        response = projected_get(client, 
             "/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/account-snapshot"
         )
 

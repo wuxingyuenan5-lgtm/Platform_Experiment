@@ -109,19 +109,21 @@ class BybitMarketData:
             return list(normalized)
 
     def ticker(self, category: str, symbol: str) -> tuple[dict, dict, dict, dict]:
+        market = self.market(category, symbol)
+        # Network latency must not hold the parser/catalog lock: independent
+        # spot/perpetual quotes already share the account transport rate budget.
+        response = self._read("get_tickers", category=category, symbol=symbol)
+        if response.get("result", {}).get("category") != category:
+            raise GatewayConfigurationError("Bybit ticker response category mismatch")
+        rows = response.get("result", {}).get("list", [])
+        row = next((row for row in rows if row.get("symbol") == symbol), None)
+        if row is None:
+            raise GatewayConfigurationError("Bybit ticker query returned no matching symbol")
         with self._lock:
-            market = self.market(category, symbol)
-            response = self._read("get_tickers", category=category, symbol=symbol)
-            if response.get("result", {}).get("category") != category:
-                raise GatewayConfigurationError("Bybit ticker response category mismatch")
-            rows = response.get("result", {}).get("list", [])
-            row = next((row for row in rows if row.get("symbol") == symbol), None)
-            if row is None:
-                raise GatewayConfigurationError("Bybit ticker query returned no matching symbol")
             exchange = self._ccxt()
             ticker = exchange.parse_ticker(row, market)
             funding = exchange.parse_funding_rate(row, market) if category != "spot" else {}
-            return market, ticker, funding, response
+        return market, ticker, funding, response
 
     def close(self) -> None:
         with self._lock:

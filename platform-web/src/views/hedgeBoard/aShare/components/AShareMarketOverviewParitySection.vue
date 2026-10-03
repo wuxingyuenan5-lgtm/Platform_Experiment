@@ -18,9 +18,14 @@
           ></div
         >
         <div v-if="latestHistory || turnoverData" class="overview-meta-grid">
-          <div
-            ><span>全A成交额</span
-            ><strong>{{ formatHundredMillion(latestHistory?.total_amount_100m) }}</strong></div
+          <button
+            type="button"
+            class="meta-action"
+            :disabled="!marketAmountRows.length"
+            title="点击查看全A成交额历史统计"
+            @click="marketAmountHistoryOpen = true"
+            ><span>全A成交额 · 点击查看历史</span
+            ><strong>{{ formatHundredMillion(latestHistory?.total_amount_100m) }}</strong></button
           >
           <button
             type="button"
@@ -282,6 +287,52 @@
       </article>
     </Modal>
     <Modal
+      v-model:open="marketAmountHistoryOpen"
+      title="全A成交额 · 历史统计"
+      :footer="null"
+      width="min(960px, calc(100vw - 32px))"
+      :get-container="false"
+    >
+      <article class="panel">
+        <div class="market-amount-summary">
+          <strong>{{ marketAmountRows.length }} 个交易日</strong>
+          <span>
+            {{ marketAmountRows.at(-1)?.observedAt || '—' }} 至
+            {{ marketAmountRows[0]?.observedAt || '—' }} · 单位：亿元 · 最新日期在最上方
+          </span>
+        </div>
+        <div v-if="marketAmountRows.length" class="table-shell market-amount-table">
+          <table>
+            <thead>
+              <tr>
+                <th class="is-left">交易日</th>
+                <th class="is-right">全A成交额（亿元）</th>
+                <th class="is-right">较前一归档日</th>
+                <th class="is-left">数据来源</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in marketAmountRows" :key="row.observedAt">
+                <td class="is-left">{{ row.observedAt }}</td>
+                <td class="is-right">{{
+                  formatHundredMillion(
+                    row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
+                  )
+                }}</td>
+                <td class="is-right" :class="tone(row.amountChangePct)">
+                  {{ formatPct(row.amountChangePct) }}
+                </td>
+                <td class="is-left source-cell" :title="row.source || '来源未记录'">
+                  {{ row.source || '来源未记录' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="empty">暂无全A成交额历史数据</div>
+      </article>
+    </Modal>
+    <Modal
       v-model:open="ladderOpen"
       title="连板股清单"
       :footer="null"
@@ -379,6 +430,7 @@
   const topN = ref<10 | 20>(10);
   const ladderOpen = ref(false);
   const hotMatrixOpen = ref(false);
+  const marketAmountHistoryOpen = ref(false);
   const selectedHotDate = ref('');
   const hotHistoryRange = ref<10 | 30 | 'all'>(10);
   const visibleHotDates = computed(() => {
@@ -402,6 +454,11 @@
       total_amount_100m: row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
       market_breadth: row.marketBreadthPct == null ? null : Number(row.marketBreadthPct) / 100,
     })),
+  );
+  const marketAmountRows = computed(() =>
+    [...(props.dashboard?.marketHistory || [])].sort((a, b) =>
+      b.observedAt.localeCompare(a.observedAt),
+    ),
   );
   const latestHistory = computed(() => allHistoryRows.value.at(-1) || null);
   const hotStockCount = computed(() => turnoverData.value?.highTurnoverCount ?? null);
@@ -1003,8 +1060,8 @@
 
   .ladder-list {
     display: grid;
-    flex: 1;
     grid-template-columns: repeat(4, minmax(110px, 1fr));
+    flex: 1;
     gap: 12px;
   }
 
@@ -1116,6 +1173,7 @@
     color: var(--strategy-text-1);
     font-size: 14px;
   }
+
   .hot-history-head span,
   .hot-history-head b {
     color: var(--strategy-text-4);
@@ -1125,10 +1183,10 @@
 
   .hot-history-dates {
     display: grid;
-    grid-auto-flow: column;
     grid-auto-columns: minmax(80px, 1fr);
-    overflow-x: auto;
+    grid-auto-flow: column;
     padding-bottom: 6px;
+    overflow-x: auto;
     gap: 6px;
   }
 
@@ -1147,27 +1205,32 @@
     color: var(--strategy-text-1);
     font-size: 15px;
   }
+
   .hot-history-dates button.active {
     border-color: var(--strategy-accent-strong);
     background: var(--strategy-accent-soft);
   }
+
   .hot-history-matrix table {
-    min-width: 100%;
     width: max-content;
+    min-width: 100%;
   }
+
   .hot-history-matrix th,
   .hot-history-matrix td {
     min-width: 68px;
   }
+
   .hot-history-matrix .is-left {
     position: sticky;
     left: 0;
-    background: var(--strategy-surface-2);
     min-width: 130px;
+    background: var(--strategy-surface-2);
   }
+
   .hot-history-matrix {
-    overflow: auto;
     max-height: 260px;
+    overflow: auto;
   }
 
   .hot-history-day {
@@ -1176,11 +1239,13 @@
     align-items: center;
     gap: 6px;
   }
+
   .hot-history-day > strong {
     margin-right: 4px;
     color: var(--strategy-text-2);
     font-size: 12px;
   }
+
   .hot-history-day button {
     padding: 4px 7px;
     border: 1px solid var(--strategy-border);
@@ -1190,6 +1255,7 @@
     font-size: 11px;
     cursor: pointer;
   }
+
   .hot-history-day button span {
     margin-left: 4px;
     color: var(--strategy-text-4);
@@ -1199,6 +1265,40 @@
     overflow-x: auto;
     border: 1px solid var(--strategy-border);
     border-radius: 10px;
+  }
+
+  .market-amount-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 14px;
+    margin-bottom: 12px;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+  }
+
+  .market-amount-summary strong {
+    color: var(--strategy-text-1);
+    font-size: 14px;
+  }
+
+  .market-amount-table {
+    max-height: min(65vh, 680px);
+    overflow: auto;
+  }
+
+  .market-amount-table thead th {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    background: var(--strategy-surface-2);
+  }
+
+  .market-amount-table .source-cell {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   table {

@@ -67,16 +67,24 @@ def _localize_title(title: str, category: str) -> str:
         "US x Iran ceasefire continues through September 25?": "美国与伊朗停火持续至9月25日吗？",
         "US x Iran ceasefire continues through September 30?": "美国与伊朗停火持续至9月30日吗？",
         "US x Iran ceasefire continues through October 31?": "美国与伊朗停火持续至10月31日吗？",
-        "Israel x Iran ceasefire continues through September 30?": "以色列与伊朗停火持续至9月30日吗？",
-        "Israel x Iran ceasefire continues through November 30?": "以色列与伊朗停火持续至11月30日吗？",
+        "Israel x Iran ceasefire continues through September 30?": (
+            "以色列与伊朗停火持续至9月30日吗？"
+        ),
+        "Israel x Iran ceasefire continues through November 30?": (
+            "以色列与伊朗停火持续至11月30日吗？"
+        ),
         "Will the U.S. invade Iran before 2027?": "美国将在2027年前入侵伊朗吗？",
-        "NATO x Russia military clash by October 31, 2026?": "北约与俄罗斯将在2026年10月31日前发生军事冲突吗？",
+        "NATO x Russia military clash by October 31, 2026?": (
+            "北约与俄罗斯将在2026年10月31日前发生军事冲突吗？"
+        ),
         "Will China invade Taiwan by end of 2026?": "中国将在2026年底前入侵台湾吗？",
     }
     if title in known:
         return known[title]
 
-    match = re.fullmatch(r"Will (.+) (gain|win) the most seats in the next Russian parliamentary election\?", title)
+    match = re.fullmatch(
+        r"Will (.+) (gain|win) the most seats in the next Russian parliamentary election\?", title
+    )
     if match:
         party = _PARTY_NAMES_ZH.get(match.group(1), match.group(1))
         return f"{party}将在下一次俄罗斯议会选举中赢得最多席位吗？"
@@ -144,7 +152,9 @@ def _event_from_market(row: dict[str, Any], now: datetime) -> dict[str, Any] | N
     prices = _json_list(row.get("outcomePrices"))
     if len(outcomes) != len(prices) or len(outcomes) < 2:
         return None
-    yes_index = next((i for i, value in enumerate(outcomes) if str(value).strip().lower() in {"yes", "是"}), None)
+    yes_index = next(
+        (i for i, value in enumerate(outcomes) if str(value).strip().lower() in {"yes", "是"}), None
+    )
     if yes_index is None:
         return None
     probability = _number(prices[yes_index])
@@ -251,7 +261,9 @@ def _fetch_historical_points(client: httpx.Client, row: dict[str, Any]) -> list[
     return points[-_HISTORY_MAX_POINTS:]
 
 
-def fetch_macro_expectations(*, timeout_seconds: float = 15.0, limit: int = 200) -> list[dict[str, Any]]:
+def fetch_macro_expectations(
+    *, timeout_seconds: float = 15.0, limit: int = 200
+) -> list[dict[str, Any]]:
     historical_points_by_market: dict[str, list[dict[str, Any]]] = {}
     try:
         # Use the deployment-provided proxy/trust settings; the application
@@ -259,7 +271,13 @@ def fetch_macro_expectations(*, timeout_seconds: float = 15.0, limit: int = 200)
         with httpx.Client(timeout=timeout_seconds, trust_env=True, follow_redirects=True) as client:
             response = client.get(
                 _URL,
-                params={"active": "true", "closed": "false", "limit": min(limit, 200), "order": "volume24hr", "ascending": "false"},
+                params={
+                    "active": "true",
+                    "closed": "false",
+                    "limit": min(limit, 200),
+                    "order": "volume24hr",
+                    "ascending": "false",
+                },
                 headers={"User-Agent": "Platform-API macro-expectations"},
             )
             response.raise_for_status()
@@ -299,7 +317,9 @@ def fetch_macro_expectations(*, timeout_seconds: float = 15.0, limit: int = 200)
                 market_id = str(row.get("id") or row.get("conditionId") or row.get("slug") or title)
                 historical_points_by_market[market_id] = _fetch_historical_points(client, row)
     except Exception as exc:
-        raise ResearchProviderError(f"macro_expectation_upstream_unavailable:{type(exc).__name__}") from exc
+        raise ResearchProviderError(
+            f"macro_expectation_upstream_unavailable:{type(exc).__name__}"
+        ) from exc
     now = datetime.now(UTC)
     parsed_events: list[dict[str, Any]] = []
     for row in payload:
@@ -309,7 +329,9 @@ def fetch_macro_expectations(*, timeout_seconds: float = 15.0, limit: int = 200)
         if event is None:
             continue
         if event["category"] == "monetary_policy":
-            market_id = str(row.get("id") or row.get("conditionId") or row.get("slug") or event["label"])
+            market_id = str(
+                row.get("id") or row.get("conditionId") or row.get("slug") or event["label"]
+            )
             event["_historicalPoints"] = historical_points_by_market.get(market_id, [])
         parsed_events.append(event)
     # The same market can appear in the ranked feed and the curated event
@@ -321,12 +343,14 @@ def fetch_macro_expectations(*, timeout_seconds: float = 15.0, limit: int = 200)
 
 
 def refresh_macro_expectations(*, force: bool = False) -> str:
-    """Refresh and atomically publish the feed; return ``ready``/``up_to_date``/``stale``/``error``."""
+    """Atomically publish the feed: ready, up_to_date, stale or error."""
     target = hedge_board_data_root() / "public" / "v1" / "macro" / "expectations.json"
     if not force and target.exists():
         try:
             previous = json.loads(target.read_text(encoding="utf-8"))
-            updated = datetime.fromisoformat(str(previous.get("updatedAt", "")).replace("Z", "+00:00"))
+            updated = datetime.fromisoformat(
+                str(previous.get("updatedAt", "")).replace("Z", "+00:00")
+            )
             if datetime.now(UTC) - updated < timedelta(minutes=5):
                 return "up_to_date"
         except (OSError, ValueError, json.JSONDecodeError):
@@ -349,7 +373,11 @@ def refresh_macro_expectations(*, force: bool = False) -> str:
     old_events: dict[str, dict[str, Any]] = {}
     try:
         previous = json.loads(target.read_text(encoding="utf-8"))
-        old_events = {str(item.get("id")): item for item in previous.get("events", []) if isinstance(item, dict)}
+        old_events = {
+            str(item.get("id")): item
+            for item in previous.get("events", [])
+            if isinstance(item, dict)
+        }
     except (OSError, ValueError, json.JSONDecodeError):
         pass
     for event in events:

@@ -128,14 +128,16 @@ def test_routes_own_only_the_exact_venue_http_contract() -> None:
         "read_reconciliation_differences",
         "resolve_reconciliation_difference",
     } <= functions
-    assert source.count("@router.post(") == 3
+    assert source.count("@router.post(") == 4
     assert source.count("@router.get(") == 2
+    assert '"/trading/orders/{order_id}/resolve-missing-external"' in source
+    assert "facade.resolve_owner_accepted_missing_external_order(order_id)" in source
     assert '"/trading/orders/{order_id}/venue-reconcile"' in source
     assert '"/ops/venue-reconciliation/runs"' in source
     assert '"/ops/venue-reconciliation/runs/{run_id}"' in source
     assert '"/ops/venue-reconciliation/runs/{run_id}/differences"' in source
     assert '"/ops/venue-reconciliation/differences/{difference_id}/resolve"' in source
-    assert source.count('tags=["venue-reconciliation"]') == 5
+    assert source.count('tags=["venue-reconciliation"]') == 6
     assert "response_model=OrderVenueReconciliationResponse" in source
     assert source.count("response_model=VenueReconciliationRunResponse") == 2
     assert "response_model=list[ReconciliationDifferenceResponse]" in source

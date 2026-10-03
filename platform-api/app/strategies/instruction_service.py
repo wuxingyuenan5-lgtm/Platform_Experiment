@@ -270,26 +270,28 @@ def create_instruction(
             "strategy_instance_id": strategy_instance_id,
         }
     )
+    # Native Funding specifications can require network reads. Do not hold the
+    # global SQLite writer reservation while building a candidate plan.
+    with connection() as db:
+        existing = db.execute(
+            "SELECT * FROM strategy_runs WHERE idempotency_key = ?", (request.idempotency_key,)
+        ).fetchone()
+    if existing is not None:
+        return _replay_instruction(existing, request_fingerprint)
+    plan = build_plan(strategy_instance_id, request.action, normalized_parameters)
     with connection() as db:
         db.execute("BEGIN IMMEDIATE")
+        # Another request may have published the same identity during planning.
         existing = db.execute(
             "SELECT * FROM strategy_runs WHERE idempotency_key = ?", (request.idempotency_key,)
         ).fetchone()
         if existing is not None:
-            if existing["request_fingerprint"] == request_fingerprint:
-                return _response(existing)
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "Idempotency key is already used by a different strategy instruction payload"
-                ),
-            )
+            return _replay_instruction(existing, request_fingerprint)
         if (
             strategy_key == "funding_arbitrage"
             and request.action is StrategyInstructionAction.CLOSE
         ):
-            validate_funding_close_capacity(db, strategy_instance_id, normalized_parameters)
-        plan = build_plan(strategy_instance_id, request.action, normalized_parameters)
+            validate_funding_close_capacity(db, strategy_instance_id, normalized_parameters, plan)
         instruction_id, batch_id, timestamp = str(uuid4()), str(uuid4()), _utc_now()
         first_leg = plan.legs[0]
         db.execute(
@@ -363,6 +365,15 @@ def create_instruction(
                 ),
             )
         row = db.execute("SELECT * FROM strategy_runs WHERE id = ?", (instruction_id,)).fetchone()
+    return _response(row)
+
+
+def _replay_instruction(row, request_fingerprint: str) -> dict[str, object]:
+    if row["request_fingerprint"] != request_fingerprint:
+        raise HTTPException(
+            status_code=409,
+            detail="Idempotency key is already used by a different strategy instruction payload",
+        )
     return _response(row)
 
 

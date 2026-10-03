@@ -8,6 +8,7 @@ const useFilePolling = process.env.VITE_USE_FILE_POLLING === 'true';
 export default defineApplicationConfig({
   overrides: {
     build: {
+      manifest: true,
       rollupOptions: {
         maxParallelFileOps: 1,
       },

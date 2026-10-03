@@ -17,7 +17,7 @@ async def run_market_snapshot_monitor() -> None:
     while True:
         await asyncio.sleep(settings.cross_spread_market_snapshot_interval_seconds)
         try:
-            await asyncio.to_thread(get_cross_spread_snapshot)
+            await asyncio.to_thread(get_cross_spread_snapshot, record_history=True)
         except Exception:
             # A temporary Runtime or venue read failure must not stop future sampling.
             continue

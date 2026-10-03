@@ -18,6 +18,90 @@ def memory_database() -> sqlite3.Connection:
     return db
 
 
+def test_audit_subject_index_migration_preserves_evidence_and_uses_index():
+    db = memory_database()
+    bootstrap_database(db)
+    apply_migrations(db, tuple(m for m in PLATFORM_MIGRATIONS if m.version < 40))
+    db.execute(
+        "INSERT INTO audit_events(id,event_type,subject_type,subject_id,details_json,created_at) "
+        "VALUES ('proof','execution_batch_flattened','batch','batch-1','{}','2026-10-02')"
+    )
+    before = [tuple(row) for row in db.execute("SELECT * FROM audit_events")]
+    apply_migrations(db)
+    apply_migrations(db)
+    assert [tuple(row) for row in db.execute("SELECT * FROM audit_events")] == before
+    plan = db.execute(
+        "EXPLAIN QUERY PLAN SELECT 1 FROM audit_events "
+        "WHERE subject_id=? AND event_type='execution_batch_flattened' LIMIT 1", ("batch-1",)
+    ).fetchone()
+    assert "idx_audit_events_subject_type" in plan[3]
+
+
+def test_account_lookup_indexes_preserve_timestamp_and_missing_currency_results():
+    db = memory_database()
+    bootstrap_database(db)
+    apply_migrations(db, tuple(m for m in PLATFORM_MIGRATIONS if m.version < 41))
+    db.execute("INSERT INTO venues VALUES ('v','test','test','test','active','2026-10-02')")
+    db.execute(
+        "INSERT INTO accounts (id,venue_id,account_code,name,account_type,environment,"
+        "base_currency,status,data_quality_state,created_at) "
+        "VALUES ('a','v','a','a','test','simulation','USD','active','complete','2026-10-02')"
+    )
+    for at, scope in (("2026-10-02T09:00:00+08:00", "older"),
+                      ("2026-10-02T02:00:00Z", "newer")):
+        db.execute(
+            "INSERT INTO account_risk_snapshots "
+            "(account_id,as_of,currency,equity,data_quality_state,created_at,asset_scope) "
+            "VALUES ('a',?,'USD','100','complete',?,?)", (at, at, scope),
+        )
+        db.execute("INSERT INTO account_capital_coverage VALUES ('a','scope',?,?,?)",
+                   (at, at, at))
+    queries = (
+        ("SELECT asset_scope FROM account_risk_snapshots WHERE account_id='a' "
+         "ORDER BY julianday(as_of) DESC LIMIT 1", "idx_account_risk_observed_time"),
+        ("SELECT end_at FROM account_capital_coverage WHERE account_id='a' "
+         "AND asset_scope='scope' ORDER BY julianday(end_at) DESC LIMIT 1",
+         "idx_account_capital_coverage_end"),
+        ("SELECT id FROM balance_snapshots WHERE account_id='a' "
+         "AND upper(currency)='MISSING' ORDER BY as_of DESC,id LIMIT 1",
+         "idx_balance_current_currency"),
+    )
+    before = [[tuple(row) for row in db.execute(sql)] for sql, _ in queries]
+    assert before == [[("newer",)], [("2026-10-02T02:00:00Z",)], []]
+    apply_migrations(db)
+    apply_migrations(db)
+    for (sql, index), expected in zip(queries, before, strict=True):
+        assert [tuple(row) for row in db.execute(sql)] == expected
+        assert index in str([tuple(row) for row in db.execute("EXPLAIN QUERY PLAN " + sql)])
+
+
+@pytest.mark.parametrize("legacy_tables", [False, True])
+def test_data_audit_migration_owns_fresh_and_existing_tables(legacy_tables):
+    db = memory_database()
+    bootstrap_database(db)
+    apply_migrations(db, tuple(m for m in PLATFORM_MIGRATIONS if m.version < 36))
+    previous = [tuple(row) for row in db.execute("SELECT * FROM schema_migrations")]
+    migration = next(m for m in PLATFORM_MIGRATIONS if m.version == 36)
+    if legacy_tables:
+        for statement in migration.statements:
+            db.execute(statement)
+        db.execute("INSERT INTO data_audit_runs VALUES (1,'2026-09-26','{}')")
+        db.execute("INSERT INTO data_audit_calendar VALUES ('CN','2026-09-26','[]','sina')")
+    apply_migrations(db)
+    apply_migrations(db)
+    assert [
+        tuple(row) for row in db.execute("SELECT * FROM schema_migrations WHERE version<36")
+    ] == previous
+    assert db.execute("SELECT COUNT(*) FROM data_audit_runs").fetchone()[0] == int(legacy_tables)
+    assert db.execute("SELECT COUNT(*) FROM data_audit_calendar").fetchone()[0] == int(
+        legacy_tables
+    )
+    assert (
+        db.execute("SELECT checksum FROM schema_migrations WHERE version=36").fetchone()[0]
+        == migration.checksum
+    )
+
+
 def test_schema_migrations_are_idempotent_and_recorded() -> None:
     db = memory_database()
     migrations = (
@@ -39,6 +123,20 @@ def test_schema_migrations_are_idempotent_and_recorded() -> None:
     assert rows[0]["name"] == "create-example"
     assert rows[0]["checksum"] == migrations[0].checksum
     assert db.execute("SELECT name FROM sqlite_master WHERE name = 'example'").fetchone()
+
+
+def test_cross_market_sampler_uses_covering_index_without_history_sort():
+    db = memory_database()
+    bootstrap_database(db)
+    apply_migrations(db)
+    plan = db.execute(
+        "EXPLAIN QUERY PLAN SELECT created_at FROM market_spread_snapshots "
+        "WHERE strategy_key=? AND strategy_instance_id=? ORDER BY created_at DESC LIMIT 1",
+        ("cross_venue_spread", "strategy_cross_venue_spread_instance_default"),
+    ).fetchall()
+    detail = " ".join(row["detail"] for row in plan)
+    assert "COVERING INDEX idx_market_spread_instance_created" in detail
+    assert "TEMP B-TREE" not in detail
 
 
 def test_fill_provenance_upgrade_preserves_legacy_facts_and_repeated_startup():
@@ -89,6 +187,40 @@ def test_applied_migration_cannot_be_rewritten() -> None:
     )
     with pytest.raises(RuntimeError, match="changed after it was applied"):
         apply_migrations(db, changed)
+
+
+def test_management_history_indexes_preserve_exact_values_and_cover_reads():
+    from app.database_seeds import seed_reference_data
+
+    db = memory_database()
+    bootstrap_database(db)
+    apply_migrations(db, tuple(m for m in PLATFORM_MIGRATIONS if m.version < 35))
+    seed_reference_data(db)
+    values = (
+        "bybit-live-main", "2026-09-26T01:02:03.123456+08:00", "BTC",
+        "0.123456789012345678", "complete", "2026-09-26T01:02:04.654321+08:00",
+        "1.234567890123456789", "coin",
+    )
+    db.execute(
+        "INSERT INTO account_risk_snapshots "
+        "(account_id,as_of,currency,equity,data_quality_state,created_at,total_assets,asset_scope) "
+        "VALUES (?,?,?,?,?,?,?,?)", values,
+    )
+    before = tuple(db.execute("SELECT * FROM account_risk_snapshots").fetchone())
+    apply_migrations(db, PLATFORM_MIGRATIONS)
+    assert tuple(db.execute("SELECT * FROM account_risk_snapshots").fetchone()) == before
+    plan = db.execute(
+        "EXPLAIN QUERY PLAN SELECT as_of,currency,equity,asset_scope,total_assets "
+        "FROM account_risk_snapshots WHERE account_id=? AND equity IS NOT NULL "
+        "AND as_of>=? ORDER BY as_of,created_at", ("bybit-live-main", "2026-01-01"),
+    ).fetchall()
+    assert any("COVERING INDEX idx_account_risk_history_cover" in row[3] for row in plan)
+    plan = db.execute(
+        "EXPLAIN QUERY PLAN SELECT payload_json FROM market_spread_snapshots "
+        "WHERE strategy_key=? AND strategy_instance_id=? AND observed_at>=? "
+        "ORDER BY observed_at DESC LIMIT 1", ("cross_venue_spread", "instance", "2026-01-01"),
+    ).fetchall()
+    assert any("idx_market_spread_instance_time" in row[3] for row in plan)
 
 
 def test_migrations_must_be_unique_and_ordered() -> None:
@@ -197,11 +329,18 @@ def test_application_startup_applies_platform_migration_baseline(tmp_path: Path)
 
 def test_chase_terminal_table_is_an_append_only_upgrade_from_live_migration_26():
     migration26 = next(m for m in PLATFORM_MIGRATIONS if m.version == 26)
-    assert migration26.checksum == "68e2f141e69d6f6b349254c24ae0e2fb41d2efe3c08d94d0ce220f8696174040"
+    assert (
+        migration26.checksum == "68e2f141e69d6f6b349254c24ae0e2fb41d2efe3c08d94d0ce220f8696174040"
+    )
     db = memory_database()
     bootstrap_database(db)
     apply_migrations(db, tuple(m for m in PLATFORM_MIGRATIONS if m.version <= 26))
-    assert db.execute("SELECT name FROM sqlite_master WHERE name='runtime_order_terminals'").fetchone() is None
+    assert (
+        db.execute("SELECT name FROM sqlite_master WHERE name='runtime_order_terminals'").fetchone()
+        is None
+    )
     apply_migrations(db)
     apply_migrations(db)
-    assert db.execute("SELECT name FROM sqlite_master WHERE name='runtime_order_terminals'").fetchone()
+    assert db.execute(
+        "SELECT name FROM sqlite_master WHERE name='runtime_order_terminals'"
+    ).fetchone()

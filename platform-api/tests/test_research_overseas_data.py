@@ -33,6 +33,8 @@ def overseas_db(tmp_path, monkeypatch: pytest.MonkeyPatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "database_path", str(tmp_path / "overseas.db"))
     monkeypatch.setattr(settings, "research_refresh_enabled", False)
+    # Each asyncio.run owns a new loop; production's shared write lock is loop-bound.
+    monkeypatch.setattr(refresh, "RESEARCH_DB_WRITE_LOCK", asyncio.Lock())
     initialize_database()
     return tmp_path
 
@@ -144,11 +146,15 @@ def test_etf_fetch_falls_back_to_farside_reader_when_direct_page_is_blocked(
         def raise_for_status(self) -> None:
             if self.status_code >= 400:
                 raise provider.httpx.HTTPStatusError(
-                    "blocked", request=provider.httpx.Request("GET", "https://example.invalid"), response=provider.httpx.Response(self.status_code)
+                    "blocked",
+                    request=provider.httpx.Request("GET", "https://example.invalid"),
+                    response=provider.httpx.Response(self.status_code),
                 )
 
     calls: list[str] = []
-    markdown = "| 18 Sep 2026 | 108.4 | 310.7 | 9.7 | 1.9 | 0 | 0 | 0 | 2.3 | 0 | 0 | 0 | 0 | 433.0 |"
+    markdown = (
+        "| 18 Sep 2026 | 108.4 | 310.7 | 9.7 | 1.9 | 0 | 0 | 0 | 2.3 | 0 | 0 | 0 | 0 | 433.0 |"
+    )
 
     def fake_get(url: str, **_kwargs):
         calls.append(url)

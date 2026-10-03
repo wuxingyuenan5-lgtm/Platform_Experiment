@@ -125,12 +125,12 @@ const detailColumns: TerminalTableColumn[] = [
   { key: 'w1', label: '1周', align: 'center' },
   { key: 'm1', label: '1月', align: 'center' },
   { key: 'y1', label: '1年', align: 'center' },
-  { key: 'high', label: '52周高', align: 'center' },
-  { key: 'd10', label: '1H', align: 'center' },
-  { key: 'd20', label: '4H', align: 'center' },
-  { key: 'd50', label: '日线', align: 'center' },
-  { key: 'd200', label: '3日线', align: 'center' },
-  { key: 'x2050', label: '周线', align: 'center' },
+  { key: 'high', label: '距52周高', align: 'center' },
+  { key: 'd10', label: '10日均线', align: 'center' },
+  { key: 'd20', label: '20日均线', align: 'center' },
+  { key: 'd50', label: '50日均线', align: 'center' },
+  { key: 'd200', label: '200日均线', align: 'center' },
+  { key: 'x2050', label: '20/50均线', align: 'center' },
 ];
 
 const macroDetailGroups: TerminalTableGroup[] = [
@@ -654,44 +654,32 @@ function overview(
 function buildCatalogDetailGroups(marketId: CatalogMarketId): TerminalTableGroup[] {
   return marketDetailCatalog[marketId].map((group) => ({
     label: group.label,
-    rows: group.rows.map((item, index) => buildCatalogRow(group, item, index)),
+    rows: group.rows.map((item) => buildCatalogRow(item)),
   }));
 }
 
-function buildCatalogRow(
-  group: CatalogGroup,
-  item: CatalogGroup['rows'][number],
-  index: number,
-): TerminalTableRow {
-  const spark = buildPlaceholderSpark(item.symbol, index);
-  return row(
-    item.id,
-    item.name,
-    item.symbol,
-    '0.00',
-    '+0.00%',
-    '+0.00%',
-    '+0.00%',
-    '+0.00%',
-    '+0.00%',
-    '+0.00%',
-    '0.0%',
-    spark,
-    {
-      d10: '▲',
-      d20: '▲',
-      d50: '▲',
-      d200: '▲',
-      x2050: '▲',
-      x50200: '▲',
-    },
-    { tvSymbol: item.tvSymbol },
-  );
-}
-
-function buildPlaceholderSpark(seed: string, offset: number) {
-  const base = Array.from(seed).reduce((total, char) => total + char.charCodeAt(0), 0) + offset * 7;
-  return Array.from({ length: 24 }, (_, index) => 10 + ((base + index * 5) % 11));
+function buildCatalogRow(item: CatalogGroup['rows'][number]): TerminalTableRow {
+  return {
+    id: item.id,
+    name: item.name,
+    symbol: item.symbol,
+    tvSymbol: item.tvSymbol,
+    price: '—',
+    d1: '—',
+    ytd: '—',
+    qtd: '—',
+    w1: '—',
+    m1: '—',
+    y1: '—',
+    high: '—',
+    spark: [],
+    d10: '—',
+    d20: '—',
+    d50: '—',
+    d200: '—',
+    x2050: '—',
+    x50200: '—',
+  };
 }
 
 const usOverviewCards: OverviewCard[] = [

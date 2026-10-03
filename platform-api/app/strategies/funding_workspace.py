@@ -22,7 +22,6 @@ from app.strategies.funding_orchestration import get_funding_controlled_live_rea
 from app.strategies.instruction_service import (
     CreateStrategyInstructionRequest,
     create_instruction,
-    execute_instruction,
     get_instruction,
     get_instruction_by_idempotency,
     list_instructions,
@@ -59,37 +58,38 @@ def list_funding_pairs(search: str | None = None) -> list[dict[str, str]]:
     return local_pairs
 
 
-def _list_local_funding_pairs(
-    venue_id: str, search: str | None = None
-) -> list[dict[str, str]]:
+def _list_local_funding_pairs(venue_id: str, search: str | None = None) -> list[dict[str, str]]:
     with connection() as db:
         rows = db.execute(
             """
+            WITH spots AS MATERIALIZED (
+                SELECT spot.id AS instrument_id, spot_map.external_symbol AS symbol,
+                       upper(spot_map.external_symbol) AS normalized_symbol
+                FROM instrument_mappings AS spot_map
+                JOIN instruments AS spot ON spot.id = spot_map.instrument_id
+                JOIN contract_specifications AS spec ON spec.instrument_id = spot.id
+                WHERE spot_map.venue_id = ? AND spot_map.status = 'active'
+                  AND spot.instrument_type = 'crypto_spot'
+                  AND spec.data_quality_state = 'complete'
+            )
             SELECT
                 perp.id AS perpetual_instrument_id,
                 perp_map.external_symbol AS perpetual_symbol,
                 perp.base_currency AS base_currency,
                 perp.quote_currency AS quote_currency,
-                spot.id AS spot_instrument_id,
-                spot_map.external_symbol AS spot_symbol
+                spots.instrument_id AS spot_instrument_id,
+                spots.symbol AS spot_symbol
             FROM instrument_mappings AS perp_map
             JOIN instruments AS perp ON perp.id = perp_map.instrument_id
             JOIN contract_specifications AS perp_spec ON perp_spec.instrument_id = perp.id
-            JOIN instrument_mappings AS spot_map
-              ON spot_map.venue_id = perp_map.venue_id
-             AND upper(spot_map.external_symbol) = upper(perp.base_currency || perp.quote_currency)
-             AND spot_map.status = 'active'
-            JOIN instruments AS spot ON spot.id = spot_map.instrument_id
-            JOIN contract_specifications AS spot_spec ON spot_spec.instrument_id = spot.id
+            JOIN spots ON spots.normalized_symbol = upper(perp.base_currency || perp.quote_currency)
             WHERE perp_map.venue_id = ?
               AND perp_map.status = 'active'
               AND perp.instrument_type = 'crypto_perp'
-              AND spot.instrument_type = 'crypto_spot'
               AND perp_spec.data_quality_state = 'complete'
-              AND spot_spec.data_quality_state = 'complete'
             ORDER BY perp.base_currency, perp_map.external_symbol
             """,
-            (venue_id,),
+            (venue_id, venue_id),
         ).fetchall()
     pairs: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
@@ -281,7 +281,26 @@ def list_funding_position_groups(*, scope: str = "active") -> list[dict[str, Any
     if scope not in {"active", "history", "all"}:
         raise HTTPException(status_code=422, detail="Unsupported Funding position scope")
     instructions = list_instructions(STRATEGY_INSTANCE_ID)
+    from app.strategies import funding_exit_repository
+
+    exit_plans = {
+        row["open_instruction_id"]: funding_exit_repository.response(row).model_dump(mode="json")
+        for row in funding_exit_repository.list_plans()
+    }
     close_summary = _close_summary_by_open_instruction(instructions)
+    from app.strategies.funding_close_recovery import (
+        close_recovery_details,
+        pending_recovery_reconciliation,
+    )
+
+    recoveries = {}
+    for item in instructions:
+        if item["action"] == "close" and item["status"] in {"failed", "manual_intervention"}:
+            recovery = pending_recovery_reconciliation(
+                str(item["instructionId"])
+            ) or close_recovery_details(str(item["instructionId"]))
+            if recovery:
+                recoveries.setdefault(recovery["target"], []).append(recovery)
     groups: list[dict[str, Any]] = []
     for instruction in instructions:
         if instruction["action"] != StrategyInstructionAction.OPEN.value:
@@ -294,11 +313,28 @@ def list_funding_position_groups(*, scope: str = "active") -> list[dict[str, Any
             batch_id=str(batch_id),
             close_summary=close_summary.get(str(instruction["instructionId"])),
         )
+        candidates = recoveries.get(str(instruction["instructionId"]), [])
+        if len(candidates) == 1:
+            recovery = candidates[0]
+            group.update(
+                abnormalAction="finish_close",
+                abnormalReason="原平仓永续腿已全部成交，现货腿尚未完成；确认后只卖出原指令剩余现货",
+                recoveryCloseInstructionId=recovery["instruction"]["id"],
+                recoveryIdempotencyKey=recovery["key"],
+                recoverySpotQuantity=recovery["remaining"],
+                isAbnormal=True,
+                lifecycleState="active",
+            )
+            if recovery.get("reconcileOnly"):
+                group["abnormalReason"] = (
+                    "原补平请求已发出，结果或最终核对尚未完成；只核对原请求，不重复下单"
+                )
         lifecycle_state = str(group["lifecycleState"])
         if scope == "active" and lifecycle_state != "active":
             continue
         if scope == "history" and lifecycle_state == "active":
             continue
+        group["exitPlan"] = exit_plans.get(str(instruction["instructionId"]))
         groups.append(group)
     return groups
 
@@ -327,8 +363,7 @@ def submit_funding_instruction(
         if (
             existing["action"] != action
             or not isinstance(parameters, dict)
-            or Decimal(str(parameters.get("perpetualQuantity")))
-            != quantity
+            or Decimal(str(parameters.get("perpetualQuantity"))) != quantity
             or (
                 expected_perpetual_quantity is not None
                 and Decimal(str(parameters.get("perpetualQuantity"))) != expected_perpetual_quantity
@@ -348,7 +383,7 @@ def submit_funding_instruction(
                 status_code=409,
                 detail="Funding idempotency key conflicts with original instruction",
             )
-        return _execute_funding_instruction(existing)
+        return get_funding_instruction_workspace(str(existing["instructionId"]))
     # `quantity` is the user-facing perpetual target for both open and close.
     # The spot gross amount is derived from the live fee and quantity step.
     spot_quantity = quantity
@@ -414,6 +449,16 @@ def submit_funding_instruction(
             ).to_integral_value(rounding=ROUND_FLOOR) * step
             if spot_quantity <= 0:
                 raise HTTPException(status_code=409, detail="本次平仓对应的现货数量小于交易步长")
+    # Admission must fail before publication when writes are disabled; never
+    # leave a dormant accepted intent that could fire after a later enable.
+    with connection() as db:
+        binding = funding_account_binding(db, STRATEGY_INSTANCE_ID)
+    if binding["trading_mode"] != "simulation":
+        readiness = get_funding_controlled_live_readiness(
+            strategy_instance_id=STRATEGY_INSTANCE_ID, account_id=str(binding["account_id"])
+        )
+        if not readiness["ready"]:
+            raise HTTPException(423, readiness.get("blockedMessage") or "Funding trading is paused")
     instruction = create_instruction(
         STRATEGY_INSTANCE_ID,
         CreateStrategyInstructionRequest(
@@ -437,17 +482,9 @@ def submit_funding_instruction(
         ),
         requested_by=requested_by,
     )
-    return _execute_funding_instruction(instruction)
-
-
-def _execute_funding_instruction(instruction: dict[str, Any]) -> dict[str, Any]:
-    batch = execute_instruction(str(instruction["instructionId"]))
-    refreshed = get_instruction(str(instruction["instructionId"]))
-    return {
-        "instruction": refreshed,
-        "executionBatch": batch.model_dump(by_alias=True),
-        "workspaceState": _workspace_state_from_instruction(refreshed),
-    }
+    # Publication is durable before returning. The existing runner owns all
+    # subsequent ticks, including restart recovery; a replay is read-only.
+    return get_funding_instruction_workspace(str(instruction["instructionId"]))
 
 
 def get_funding_instruction_workspace(instruction_id: str) -> dict[str, Any]:
@@ -1096,9 +1133,7 @@ def _suggest_quantity(
     return raw if raw >= minimum else None
 
 
-def _persist_funding_market_catalog(
-    venue_id: str, payload: list[object]
-) -> list[dict[str, str]]:
+def _persist_funding_market_catalog(venue_id: str, payload: list[object]) -> list[dict[str, str]]:
     """Persist venue-discovered hedgeable pairs for the execution plan resolver."""
     from datetime import UTC, datetime
 

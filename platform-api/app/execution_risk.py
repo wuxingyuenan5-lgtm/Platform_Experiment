@@ -340,15 +340,19 @@ def perform_risk_action(
             reason = "Open external orders require Venue cancellation support"
             set_batch_risk_state(batch_id, "escalated", reason=reason)
             return "action_required", [], reason
-        set_batch_risk_state(
-            batch_id,
-            "resolved",
-            residual=Decimal("0"),
-            reason=request.reason,
-        )
-        return "completed", [], None
+        return _verify_risk_disposition(batch_id, [], "Unsubmitted legs canceled")
 
     if request.action == "substitute_hedge":
+        _reconcile_live_batch_orders(batch_id)
+        _, _, quality = calculate_residual_exposure(batch_id)
+        if quality != "complete":
+            raise repository.ExecutionRiskRepositoryError(
+                "Replacement hedge requires complete terminal execution evidence"
+            )
+        if repository.cancel_pending_legs(batch_id, "Original unsubmitted legs superseded by hedge"):
+            raise repository.ExecutionRiskRepositoryError(
+                "Original external orders must be terminal before replacement"
+            )
         replacement_account_id = request.replacement_account_id
         replacement_instrument_id = request.replacement_instrument_id
         replacement_symbol = request.replacement_symbol
@@ -380,26 +384,14 @@ def perform_risk_action(
             reason = f"Replacement hedge completed with status {command.status}"
             set_batch_risk_state(batch_id, "escalated", reason=reason)
             return "action_required", order_ids, reason
-        repository.mark_batch_hedged(batch_id)
-        set_batch_risk_state(
-            batch_id,
-            "resolved",
-            residual=Decimal("0"),
-            currency="UNKNOWN",
-            quality="complete",
-            reason="Replacement hedge filled",
-        )
-        return "completed", order_ids, None
+        _reconcile_live_batch_orders(batch_id)
+        result = _verify_risk_disposition(batch_id, order_ids, "Replacement hedge filled")
+        if result[0] == "completed":
+            repository.mark_batch_hedged(batch_id)
+        return result
 
     _reconcile_live_batch_orders(batch_id)
-    with repository.connection() as db:
-        batch_key = db.execute(
-            "SELECT strategy_key FROM execution_batches WHERE id=?", (batch_id,)
-        ).fetchone()
-        allow_funding_dust = batch_key is not None and batch_key["strategy_key"] == "funding_arbitrage"
-        positions, _ = repository.flattening_positions(
-            db, batch_id, allow_dust=allow_funding_dust
-        )
+    positions = repository.get_flattening_positions(batch_id)
     legs = [leg for leg in positions if leg["quantity"] > 0]
     if not legs:
         return "completed", [], None
@@ -438,6 +430,24 @@ def perform_risk_action(
         return "action_required", order_ids, failure_reason
 
     return "completed", order_ids, None
+
+
+def _verify_risk_disposition(
+    batch_id: str, order_ids: list[str], reason: str
+) -> tuple[str, list[str], str | None]:
+    """An action receipt cannot prove that existing exposure disappeared."""
+    result = repository.recheck_batch_risk(batch_id, reason=reason)
+    if (
+        result is not None
+        and result.data_quality_state == "complete"
+        and result.residual_exposure_notional == 0
+        and result.risk_status in {"clear", "resolved"}
+    ):
+        return "completed", order_ids, None
+    failure = f"{reason}; remaining exposure or execution evidence still requires review"
+    repository.mark_batch_manual_intervention(batch_id, failure)
+    set_batch_risk_state(batch_id, "escalated", reason=failure)
+    return "action_required", order_ids, failure
 
 
 def _reconcile_live_batch_orders(batch_id: str) -> None:

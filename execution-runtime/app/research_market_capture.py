@@ -6,9 +6,11 @@ import json
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from time import monotonic
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.cross_spread_schedule import resolve_mt5_session_state
 from app.market_spool import MarketSpool
 
 
@@ -21,6 +23,7 @@ class ResearchCapture:
         self.error = None
         self.source_health = {}
         self.bybit_clock = None
+        self._bybit_last_received: dict[str, float] = {}
 
     def start(self):
         if not self.settings.research_capture_enabled:
@@ -76,7 +79,9 @@ class ResearchCapture:
                 "reason": payload.get("reason") if kind == "quality" else None,
             }
         if accepted and kind == "bybit_message":
-            self.source_health[":".join(stream.split(":")[:2])] = {
+            category = ":".join(stream.split(":")[:2])
+            self._bybit_last_received[category] = monotonic()
+            self.source_health[category] = {
                 "status": "receiving",
                 "lastReceivedAt": datetime.now(UTC).isoformat(),
             }
@@ -86,6 +91,7 @@ class ResearchCapture:
         assert self.spool
         account = self.settings.research_bybit_account_id
         while not self.stop_event.is_set() and not self.spool.error:
+            delay = 60
             try:
                 from app.research_clock import sample_clock
 
@@ -107,19 +113,39 @@ class ResearchCapture:
                         **self.bybit_clock,
                     }
             except Exception as exc:
-                self._quality("bybit:clock", "public", type(exc).__name__)
-            self.stop_event.wait(60)
+                from app.research_clock import conservative_utc_now
+
+                if conservative_utc_now(self.bybit_clock) is None:
+                    reason = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
+                    self._quality("bybit:clock", "public", reason)
+                    delay = 5
+            self.stop_event.wait(delay)
 
     def _bybit(self):
         assert self.spool
         # Exactly three distinct subscriptions. XAUT linear is shared by consumers.
         owner = self.gateway.bybit._connections
         delay = 2
+        last_start = monotonic()
         while not self.stop_event.is_set() and not self.spool.error:
             try:
-                owner.start_research_streams(self._capture_bybit)
-                self.source_health["bybit"] = {"status": "subscriptions_started"}
-                return
+                now = monotonic()
+                stale = [
+                    category
+                    for category in ("bybit:linear", "bybit:spot")
+                    if now - max(last_start, self._bybit_last_received.get(category, 0)) > 120
+                ]
+                if stale:
+                    for category in stale:
+                        self._quality(category, "public", "research_stream_stale")
+                restarted = owner.start_research_streams(
+                    self._capture_bybit, force_reconnect=bool(stale)
+                )
+                if restarted:
+                    last_start = monotonic()
+                    self.source_health["bybit"] = {"status": "subscriptions_started"}
+                delay = 2
+                self.stop_event.wait(15)
             except Exception as exc:
                 self._quality("bybit", "public", type(exc).__name__)
                 self.stop_event.wait(delay)
@@ -165,9 +191,17 @@ class ResearchCapture:
                     account_id=account, symbol="XAUUSD", start=start, end=end
                 )
                 received = datetime.now(UTC).isoformat()
+                session = resolve_mt5_session_state(
+                    schedule=self.settings.cross_spread_mt5_trading_schedule,
+                    timezone=self.settings.cross_spread_mt5_schedule_timezone,
+                    guard_minutes=self.settings.cross_spread_auto_exit_guard_minutes,
+                    overrides=self.settings.cross_spread_mt5_session_overrides,
+                    now=reference,
+                )
                 self.source_health["mt5"] = {
                     "status": "received" if batch.get("ticks") else "empty_range",
                     "lastReadAt": received,
+                    "marketStatus": session.status,
                     "nativeSymbol": batch.get("symbol"),
                     "instrumentId": batch.get("instrumentId"),
                     "lastRangeTickCount": len(batch.get("ticks", [])),
@@ -176,6 +210,7 @@ class ResearchCapture:
                     ),
                     "clock": "unverified",
                 }
+                self.source_health["mt5:XAUUSD"] = dict(self.source_health["mt5"])
                 mode = "backfill" if (reference - start).total_seconds() > 2 else "realtime"
                 batch.update(
                     {
@@ -219,7 +254,15 @@ class ResearchCapture:
                     if str(exc) == "Research yielded to account operations"
                     else type(exc).__name__
                 )
-                self._quality("mt5:XAUUSD", scope, reason)
+                if reason == "research_yielded_to_account_operations":
+                    self.source_health["mt5:XAUUSD"] = {
+                        "status": "deferred",
+                        "reason": reason,
+                        "at": datetime.now(UTC).isoformat(),
+                        "lastReadAt": self.source_health.get("mt5", {}).get("lastReadAt"),
+                    }
+                else:
+                    self._quality("mt5:XAUUSD", scope, reason)
                 self.stop_event.wait(2)
             self.stop_event.wait(self.settings.research_mt5_poll_seconds)
 

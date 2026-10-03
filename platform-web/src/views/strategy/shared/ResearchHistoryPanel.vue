@@ -3,6 +3,13 @@
     <header
       ><h3>{{ pairId === 'cross-gold' ? '历史价格' : '标的价格与资费走势' }}</h3
       ><div class="controls"
+        ><a
+          v-if="pairId === 'funding-btc'"
+          class="external-link"
+          href="https://www.coinglass.com/zh/FundingRate"
+          target="_blank"
+          rel="noopener noreferrer"
+          >coinglass资费</a
         ><label v-if="pairId === 'funding-btc'"
           >标的<select v-model="selectedSymbol">
             <option v-for="item in symbolOptions" :key="item" :value="item">{{ item }}</option>
@@ -58,7 +65,8 @@
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
+  import { computed, onUnmounted, ref, watch, type Ref } from 'vue';
+  import { useKeepAliveActive } from '@/hooks/web/useKeepAliveActive';
   import { researchHistory, type ResearchResponse } from '@/api/platform/strategyResearch';
   import { useECharts } from '@/hooks/web/useECharts';
 
@@ -92,6 +100,7 @@
   const data = ref<ResearchResponse>();
   const chartRef = ref<HTMLDivElement>();
   const chart = useECharts(chartRef as Ref<HTMLDivElement>);
+  const pageActive = useKeepAliveActive();
   let timer: ReturnType<typeof setTimeout> | undefined,
     stopped = false;
   watch(
@@ -112,7 +121,7 @@
   watch(selectedSymbol, (value) => emit('update:symbol', value));
   watch(selectedResolution, (value) => emit('update:resolution', value));
   async function load() {
-    if (loading.value) return;
+    if (loading.value || !pageActive.value) return;
     loading.value = true;
     error.value = '';
     const pair = props.pairId;
@@ -204,9 +213,19 @@
   }
   async function refresh() {
     if (follow.value && !document.hidden) await load();
-    if (!stopped) timer = setTimeout(refresh, 60000);
+    if (!stopped && pageActive.value) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(refresh, 60000);
+    }
   }
-  onMounted(() => void refresh());
+  watch(pageActive, (active) => {
+    if (active) {
+      void refresh();
+    } else if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  });
   onUnmounted(() => {
     stopped = true;
     if (timer) clearTimeout(timer);
@@ -269,6 +288,25 @@
 
   button.active {
     background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+  }
+
+  .external-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 8px 12px;
+    border: 1px solid var(--strategy-border);
+    border-radius: var(--strategy-radius-control);
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: inherit;
+    text-decoration: none;
+  }
+
+  .external-link:hover,
+  .external-link:focus-visible {
+    border-color: var(--strategy-accent-soft);
     color: var(--strategy-accent-strong);
   }
 

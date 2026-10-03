@@ -51,7 +51,9 @@ def test_native_fee_cash_and_snapshot_are_exact_and_not_repeated(tmp_path, fee) 
     assert current.positions == first.positions
     assert current.orders == current.fills == current.economic_events == []
     assert current.economic_events_quality == "not_requested"
-    history = gateway.get_account("account_crypto_test", include_history=True, history_start=datetime(2026, 1, 1, tzinfo=UTC))
+    history = gateway.get_account(
+        "account_crypto_test", include_history=True, history_start=datetime(2026, 1, 1, tzinfo=UTC)
+    )
     assert len(history.fills) == 1
 
 

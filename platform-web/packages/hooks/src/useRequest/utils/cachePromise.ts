@@ -7,11 +7,10 @@ export const getCachePromise = (cacheKey: CachedKey) => {
 };
 
 export const setCachePromise = (cacheKey: CachedKey, promise: Promise<any>) => {
-  // Should cache the same promise, cannot be promise.finally
-  // Because the promise.finally will change the reference of the promise
+  // Keep the original promise in the cache so concurrent callers share its identity.
   cachePromise.set(cacheKey, promise);
 
-  // no use promise.finally for compatibility
+  // Attach cleanup handlers without replacing the cached promise with a derived one.
   promise
     .then((res) => {
       cachePromise.delete(cacheKey);

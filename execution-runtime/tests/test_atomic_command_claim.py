@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -62,4 +63,38 @@ def test_duplicate_http_command_reuses_events_without_second_gateway_call(
     assert first.status_code == 200
     assert second.status_code == 200
     assert second.json() == first.json()
+    assert gateway.calls == 1
+
+
+@pytest.mark.parametrize("changes", [
+    {"quantity": "0.02"}, {"account_id": "other-account"},
+    {"platform_order_id": "other-order"}, {"reduce_only": True},
+    {"symbol": "ETHUSDT"}, {"side": "sell"},
+])
+def test_command_identity_rejects_changed_execution_payload(tmp_path, changes):
+    get_settings().journal_path = str(tmp_path / "claim-conflict.db")
+
+    class CountingGateway:
+        name = "counting"
+        calls = 0
+
+        def place_order(self, command):
+            self.calls += 1
+            return [ExecutionEvent(
+                command_id=command.command_id, platform_order_id=command.platform_order_id,
+                event_type="order_acknowledged", external_order_id="original-order",
+            )]
+
+    gateway = CountingGateway()
+    payload = build_command().model_dump(mode="json")
+    payload.pop("received_at")
+    with TestClient(create_app(gateway)) as client:
+        first = client.post("/commands/orders", json=payload)
+        assert first.status_code == 200
+        conflict = client.post("/commands/orders", json={**payload, **changes})
+        assert conflict.status_code == 409
+        # A freshly generated receive time and equivalent Decimal are a valid replay.
+        replay = client.post("/commands/orders", json={**payload, "quantity": "0.010"})
+        assert replay.status_code == 200
+        assert replay.json() == first.json()
     assert gateway.calls == 1

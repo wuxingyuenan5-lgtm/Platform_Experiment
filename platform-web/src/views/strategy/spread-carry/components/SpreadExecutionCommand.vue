@@ -416,7 +416,7 @@
           class="submit-btn submit-btn--red submit-btn--full"
           :disabled="submitLoading || !closeOrders.length"
           @click="$emit('openConfirm', 'CLOSE_ALL')"
-          >全部平仓</button
+          >平掉上表全部仓位</button
         >
 
         <div v-if="executionMessage || limitEvidence" class="execution-feedback">

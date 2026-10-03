@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 from app.models import ExecutionEvent, SubmitOrderCommand
+from app.runtime_contracts import RuntimeSubmitOrderCommandV1
 
 SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
@@ -76,6 +77,10 @@ class JournalEventValidationError(JournalEventError):
 
 class JournalEventConflictError(JournalEventError):
     pass
+
+
+class JournalCommandConflictError(RuntimeError):
+    """A persisted command identity cannot be reused for different execution terms."""
 
 
 class RuntimeCommandRecord(BaseModel):
@@ -208,7 +213,7 @@ def has_unresolved_command_for_account(
     return False
 
 
-def claim_command(command: SubmitOrderCommand) -> bool:
+def claim_command(command: SubmitOrderCommand | RuntimeSubmitOrderCommandV1) -> bool:
     """Atomically claim a command before any external gateway side effect."""
 
     now = command.received_at.isoformat()
@@ -231,7 +236,22 @@ def claim_command(command: SubmitOrderCommand) -> bool:
                 now,
             ),
         )
-        return cursor.rowcount == 1
+        if cursor.rowcount == 1:
+            return True
+        stored = db.execute(
+            "SELECT payload_json FROM runtime_commands WHERE command_id=?",
+            (command.command_id,),
+        ).fetchone()
+        # Compare typed business fields so Decimal spellings and per-request
+        # receive timestamps do not cause false conflicts. Legacy payloads are
+        # parsed through the same defaults as current command records.
+        original = SubmitOrderCommand.model_validate_json(stored["payload_json"])
+        candidate = SubmitOrderCommand.model_validate(command.model_dump())
+        if original.model_dump(exclude={"received_at"}) != candidate.model_dump(
+            exclude={"received_at"}
+        ):
+            raise JournalCommandConflictError("Command identity has conflicting execution payload")
+        return False
 
 
 def save_command_started(command: SubmitOrderCommand) -> None:
@@ -320,7 +340,7 @@ def resolve_command_absent(
 
 
 def _validated_unique_events(
-    command: SubmitOrderCommand,
+    command: SubmitOrderCommand | RuntimeSubmitOrderCommandV1,
     events: list[ExecutionEvent],
 ) -> list[ExecutionEvent]:
     if not events:
@@ -349,7 +369,9 @@ def _validated_unique_events(
     return list(unique.values())
 
 
-def save_command_events(command: SubmitOrderCommand, events: list[ExecutionEvent]) -> None:
+def save_command_events(
+    command: SubmitOrderCommand | RuntimeSubmitOrderCommandV1, events: list[ExecutionEvent],
+) -> None:
     unique_events = _validated_unique_events(command, events)
     now = utc_now().isoformat()
     desired_status = (

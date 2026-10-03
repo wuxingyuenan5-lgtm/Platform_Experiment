@@ -444,6 +444,13 @@ def test_strategy_account_snapshot_returns_ready_sync_status_and_account_risk(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    from unittest.mock import AsyncMock
+
+    from app.strategy_management_projection import refresh_one
+
+    monkeypatch.setattr(
+        "app.strategy_management_projection.run_management_projection_monitor", AsyncMock()
+    )
     bootstrap(tmp_path)
     with TestClient(app) as client:
         activate_legacy_monitor_fixture()
@@ -452,6 +459,11 @@ def test_strategy_account_snapshot_returns_ready_sync_status_and_account_risk(
             lambda path, params=None: StubResponse(base_snapshot("account_mt5_short_term_a")),
         )
         sync_venue_snapshots("account_mt5_short_term_a")
+        response = client.get(
+            "/api/v1/strategies/instances/strategy_short_term_l_instance_default/account-snapshot"
+        )
+        assert response.status_code == 503
+        assert refresh_one()
         response = client.get(
             "/api/v1/strategies/instances/strategy_short_term_l_instance_default/account-snapshot"
         )

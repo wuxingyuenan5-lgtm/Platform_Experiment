@@ -4,9 +4,10 @@ import asyncio
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 import httpx
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationError, field_validator
 
 from app.research_data_schemas import ResearchApiModel
 from app.research_local_data import read_local_json
@@ -41,6 +42,7 @@ class MarketDetailRow(ResearchApiModel):
     distance_52w_high: Decimal | None = None
     spark_30d: list[Decimal] = Field(default_factory=list)
     spark_90d: list[Decimal] = Field(default_factory=list)
+    signals: dict[str, str | None] = Field(default_factory=dict)
 
 
 class MarketDetailResponse(ResearchApiModel):
@@ -68,22 +70,27 @@ class MarketDetailProvider:
         self._last_known_good: dict[str, MarketDetailResponse] = {}
 
     async def get(self, market_id: str) -> MarketDetailResponse:
-        if market_id in {"gold", "crypto"}:
+        if market_id in MARKET_SYMBOLS:
+            from app.research_a_share_repository import read_dataset
+
+            document = await asyncio.to_thread(read_dataset, f"market_detail_{market_id}")
+            if document is None:
+                return MarketDetailResponse(market_id=market_id, status="no_data")
             try:
-                contract = await self._get_live_market_detail(market_id)
-                self._last_known_good[market_id] = contract.model_copy(deep=True)
-                return contract
-            except Exception as exc:
-                cached = self._last_known_good.get(market_id)
-                if cached is not None:
-                    stale = cached.model_copy(deep=True)
-                    stale.status = "stale"
-                    return stale
-                if isinstance(exc, ResearchProviderError):
-                    raise
-                raise ResearchProviderError(
-                    f"market_detail_unavailable:{type(exc).__name__}"
-                ) from exc
+                contract = MarketDetailResponse.model_validate(document)
+            except ValidationError as exc:
+                raise ResearchProviderError("market_detail_invalid_snapshot") from exc
+            if contract.market_id != market_id:
+                raise ResearchProviderError("market_detail_schema_mismatch")
+            if contract.rows and (
+                contract.retrieved_at is None
+                or datetime.now(UTC) - contract.retrieved_at > timedelta(hours=1)
+            ):
+                contract.status = "stale" if contract.rows else "no_data"
+                for row in contract.rows:
+                    if row.status not in {"no_data", "error"}:
+                        row.status = "stale"
+            return contract
         if market_id != "macro":
             raise ResearchProviderError("market_detail_not_enabled")
         try:
@@ -107,42 +114,66 @@ class MarketDetailProvider:
             raise ResearchProviderError(f"market_detail_unavailable:{type(exc).__name__}") from exc
 
     async def _get_live_market_detail(self, market_id: str) -> MarketDetailResponse:
-        yahoo_symbols = GOLD_YAHOO_SYMBOLS if market_id == "gold" else CRYPTO_YAHOO_SYMBOLS
+        yahoo_symbols = MARKET_SYMBOLS[market_id]
+        semaphore = asyncio.Semaphore(6)
         async with httpx.AsyncClient(timeout=self._timeout_seconds, trust_env=True) as client:
+
+            async def fetch(row_id: str, symbol: str):
+                async with semaphore:
+                    return await self._fetch_yahoo_history(client, row_id, symbol)
+
             results = await asyncio.gather(
-                *(
-                    self._fetch_yahoo_history(client, row_id, symbol)
-                    for row_id, symbol in yahoo_symbols.items()
-                ),
+                *(fetch(row_id, symbol) for row_id, symbol in yahoo_symbols.items()),
                 return_exceptions=True,
             )
         series: dict[str, list[tuple[str, Decimal]]] = {}
+        timezones: dict[str, str] = {}
         for result in results:
             if isinstance(result, BaseException):
                 continue
-            row_id, points = result
+            row_id, points, source_timezone = result
+            timezones[row_id] = source_timezone
             if points:
                 series[row_id] = points
-        derived = GOLD_DERIVED if market_id == "gold" else CRYPTO_DERIVED
+        derived = GOLD_DERIVED if market_id == "gold" else {}
         for row_id, (numerator, denominator) in derived.items():
             ratio = _ratio_series(series.get(numerator, []), series.get(denominator, []))
             if ratio:
                 series[row_id] = ratio
+                timezones[row_id] = timezones.get(numerator, "UTC")
         rows = [_market_row(row_id, points) for row_id, points in series.items() if points]
         if not rows:
             raise ResearchProviderError("market_detail_no_live_rows")
+        for row in rows:
+            row.timezone = timezones.get(row.id, "UTC")
+            row.symbol = yahoo_symbols.get(row.id, row.id).replace("%5E", "^")
+            if row.symbol.startswith("^"):
+                row.unit = "index"
+            if row.id in GOLD_DERIVED:
+                row.unit = "ratio"
+            if row.id in FUTURES_LABELS:
+                row.name = FUTURES_LABELS[row.id]
+                row.quality_flags.append("continuous_futures_not_spot")
+            if row.observation_date and date.fromisoformat(row.observation_date) < datetime.now(
+                UTC
+            ).date() - timedelta(days=7):
+                row.status = "stale"
+                row.quality_flags.append("old_source_observation")
         now = datetime.now(UTC)
         return MarketDetailResponse(
             market_id=market_id,
-            status="partial" if len(rows) < len(yahoo_symbols) + len(derived) else "ready",
-            as_of=now.date().isoformat(),
+            status="partial"
+            if len(rows) < len(yahoo_symbols) + len(derived)
+            or any(row.status != "ready" for row in rows)
+            else "ready",
+            as_of=max(row.observation_date or "" for row in rows),
             retrieved_at=now,
             rows=rows,
         )
 
     async def _fetch_yahoo_history(
         self, client: httpx.AsyncClient, row_id: str, symbol: str
-    ) -> tuple[str, list[tuple[str, Decimal]]]:
+    ) -> tuple[str, list[tuple[str, Decimal]], str]:
         response = await client.get(
             f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
             params={"range": "2y", "interval": "1d", "events": "history"},
@@ -152,14 +183,16 @@ class MarketDetailProvider:
         result = ((response.json().get("chart") or {}).get("result") or [None])[0] or {}
         timestamps = result.get("timestamp") or []
         closes = (((result.get("indicators") or {}).get("quote") or [{}])[0]).get("close") or []
-        points = []
+        timezone = ZoneInfo((result.get("meta") or {}).get("exchangeTimezoneName") or "UTC")
+        points: dict[str, Decimal] = {}
         for timestamp, close in zip(timestamps, closes, strict=False):
             if close is None:
                 continue
-            points.append(
-                (datetime.fromtimestamp(timestamp, tz=UTC).date().isoformat(), Decimal(str(close)))
-            )
-        return row_id, points
+            value = Decimal(str(close))
+            if not value.is_finite():
+                continue
+            points[datetime.fromtimestamp(timestamp, tz=timezone).date().isoformat()] = value
+        return row_id, sorted(points.items()), timezone.key
 
 
 GOLD_YAHOO_SYMBOLS = {
@@ -182,6 +215,17 @@ GOLD_DERIVED = {
     "gold-ratio-row": ("gold-xau-row", "gold-slv-row"),
 }
 
+FUTURES_LABELS = {
+    "gold-xau-row": "黄金期货（连续合约）",
+    "gold-slv-row": "白银期货（连续合约）",
+    "gold-copper-row": "铜期货（连续合约）",
+    "gold-plat-row": "铂金期货（连续合约）",
+    "gold-pall-row": "钯金期货（连续合约）",
+    "gold-wti-row": "WTI 期货（连续合约）",
+    "gold-brent-row": "布伦特期货（连续合约）",
+    "gold-gas-row": "天然气期货（连续合约）",
+}
+
 CRYPTO_YAHOO_SYMBOLS = {
     "crypto-btc-row": "BTC-USD",
     "crypto-ibit-row": "IBIT",
@@ -200,6 +244,30 @@ CRYPTO_YAHOO_SYMBOLS = {
 }
 
 CRYPTO_DERIVED: dict[str, tuple[str, str]] = {}
+
+
+US_YAHOO_SYMBOLS = {
+    f"us-{symbol.lower()}": symbol
+    for symbol in (
+        "SPY DIA IWM MDY MAGS COST JNK MOAT VNQ XLB XLC XLE XLF XLI XLK XLP XLRE XLU XLV "
+        "XLY SOXX ITA SCHD IBB ARKK BOTZ CLOU AAPL NVDA TSLA AMZN GOOGL META MSFT PLTR "
+        "SNDK AMD BAC MU TSM QQQ GDX"
+    ).split()
+}
+US_YAHOO_SYMBOLS.update({"us-ndx": "^NDX", "us-dji": "^DJI", "us-vix": "^VIX", "us-move": "^MOVE"})
+GLOBAL_YAHOO_SYMBOLS = {
+    f"global-{symbol.lower()}": symbol
+    for symbol in (
+        "EWA EWC EWQ EWG EWH EWI EWJ EWN EWS EWP EWL EWU ARGT EWZ ECH MCHI INDA EIDO "
+        "EWM EWW EPHE EPOL RSX EZA EWY EWT THD TUR VNM EFA EEM IEMG VEA VWO VIGI AIA"
+    ).split()
+}
+MARKET_SYMBOLS = {
+    "gold": GOLD_YAHOO_SYMBOLS,
+    "crypto": CRYPTO_YAHOO_SYMBOLS,
+    "us": US_YAHOO_SYMBOLS,
+    "global": GLOBAL_YAHOO_SYMBOLS,
+}
 
 
 def _ratio_series(
@@ -222,8 +290,27 @@ def _market_row(row_id: str, points: list[tuple[str, Decimal]]) -> MarketDetailR
         for point_date, value in parsed_points
         if point_date >= latest_day - timedelta(days=366)
     ]
-    high = max(trailing_year) if trailing_year else latest
+    high = max(trailing_year) if parsed_points[0][0] <= latest_day - timedelta(days=365) else None
     quarter_month = ((latest_day.month - 1) // 3) * 3 + 1
+    averages = {
+        days: sum((value for _, value in points[-days:]), Decimal(0)) / days
+        if len(points) >= days
+        else None
+        for days in (10, 20, 50, 200)
+    }
+
+    def direction(left: Decimal | None, right: Decimal | None) -> str | None:
+        if left is None or right is None:
+            return None
+        return "▲" if left > right else "▼" if left < right else "—"
+
+    signals = {f"d{days}": direction(latest, average) for days, average in averages.items()}
+    signals.update(
+        {
+            "x2050": direction(averages[20], averages[50]),
+            "x50200": direction(averages[50], averages[200]),
+        }
+    )
     return MarketDetailRow(
         id=row_id,
         name=row_id,
@@ -237,7 +324,8 @@ def _market_row(row_id: str, points: list[tuple[str, Decimal]]) -> MarketDetailR
         as_of=latest_date,
         source="Yahoo Finance",
         source_url="https://finance.yahoo.com/",
-        methodology_version="market-detail-live-v1",
+        methodology_version="market-detail-close-v2",
+        quality_flags=["daily_close_price_return_excludes_distributions"],
         close=latest,
         change_1d=_change_from_previous(parsed_points),
         change_1w=_change_from_cutoff(parsed_points, latest_day - timedelta(days=7)),
@@ -251,6 +339,7 @@ def _market_row(row_id: str, points: list[tuple[str, Decimal]]) -> MarketDetailR
         distance_52w_high=(latest / high - 1) * Decimal("100") if high else None,
         spark_30d=[value for _, value in points[-30:]],
         spark_90d=[value for _, value in points[-90:]],
+        signals=signals,
     )
 
 
@@ -277,6 +366,4 @@ def _change_from_period_start(
     baseline = next(
         (value for point_date, value in reversed(points) if point_date < period_start), None
     )
-    if baseline is None:
-        baseline = next((value for point_date, value in points if point_date >= period_start), None)
     return _percent_change(points[-1][1], baseline)

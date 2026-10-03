@@ -6,7 +6,6 @@ from uuid import uuid4
 
 import httpx
 from fastapi import HTTPException
-from pydantic import ValidationError
 
 from app import runtime_transport
 from app.catalog import get_instrument
@@ -138,9 +137,9 @@ def submit_order_through_runtime(
             reduce_only=reduce_only,
             position_id=position_id,
             cross_spread_guard=(
-                cross_spread_guard.model_dump(mode="json")
-                if isinstance(cross_spread_guard, CrossSpreadGuardV1)
-                else cross_spread_guard
+                CrossSpreadGuardV1.model_validate(cross_spread_guard)
+                if cross_spread_guard is not None
+                else None
             ),
         ).model_dump(mode="json")
     else:
@@ -180,11 +179,13 @@ def submit_order_through_runtime(
     except httpx.HTTPError:
         mark_order_result_unknown(order_id)
         return get_order_response(order_id)
-    except (ValidationError, TypeError):
-        if mode != "v1":
-            raise
+    except (ValueError, TypeError):
+        # A malformed/partial HTTP body is not evidence that dispatch failed.
         mark_order_result_unknown(order_id)
         return get_order_response(order_id)
+    except Exception:
+        mark_order_result_unknown(order_id)
+        raise
 
     try:
         apply_execution_events(
@@ -193,7 +194,8 @@ def submit_order_through_runtime(
             events,
             expected_command_id=resolved_command_id,
         )
-    except HTTPException:
+    except Exception:
+        # This includes projection transaction failures after the venue acted.
         mark_order_result_unknown(order_id)
         raise
     return get_order_response(order_id)

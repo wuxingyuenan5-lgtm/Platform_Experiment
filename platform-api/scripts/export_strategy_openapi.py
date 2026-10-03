@@ -19,6 +19,7 @@ def strategy_openapi() -> dict:
         "/api/v1/instruments",
         "/api/v1/live-trading/",
         "/api/v1/security/",
+        "/api/v1/risk/kill-switches/",
         "/api/v1/system/runtime-readiness",
         "/api/v1/ops/reconciliation-summary",
     )

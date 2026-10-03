@@ -40,6 +40,27 @@ def research_db(tmp_path, monkeypatch):
     return provider
 
 
+def test_cumulative_volatility_run_does_not_replace_a_share_refresh_status(research_db):
+    repository.start_refresh("legacy-a-share", "2026-09-23")
+    repository.finish_refresh("legacy-a-share", "ready")
+    repository.start_refresh("volatility-latest", None)
+    repository.finish_refresh("volatility-latest", "ready")
+    with connection() as db:
+        db.execute(
+            "UPDATE research_a_share_refresh_runs SET started_at=? WHERE run_id=?",
+            ("2026-09-23T15:00:00+00:00", "legacy-a-share"),
+        )
+        db.execute(
+            "UPDATE research_a_share_refresh_runs SET started_at=? WHERE run_id=?",
+            ("2026-09-23T16:00:00+00:00", "volatility-latest"),
+        )
+
+    status = repository.read_refresh_status()
+
+    assert status is not None
+    assert status["runId"] == "legacy-a-share"
+
+
 def test_weak_legacy_research_schema_is_rebuilt_without_losing_records():
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
@@ -73,7 +94,9 @@ def test_weak_legacy_research_schema_is_rebuilt_without_losing_records():
         (now, now),
     )
     db.commit()
-    migrations = tuple(item for item in PLATFORM_MIGRATIONS if item.version >= 20)
+    # This fixture contains only the legacy research tables. Exercise their
+    # rebuild, not later migrations that require the complete trading schema.
+    migrations = tuple(item for item in PLATFORM_MIGRATIONS if 20 <= item.version <= 21)
     apply_migrations(db, migrations)
     apply_migrations(db, migrations)
     assert json.loads(
@@ -129,6 +152,25 @@ def test_production_collects_once_preserves_missing_values_and_correct_periods(r
     assert pool["leaders"]["today"]["up"] != pool["leaders"]["20d"]["up"]
     assert repository.read_hot_stock_history()["counts"] == [2]
     assert repository.read_dashboard().market_history[-1].market_breadth_pct is not None
+    crowding = repository.read_dashboard().crowding
+    assert crowding.meta.status == "ready"
+    assert crowding.data["latest"]["targets"]["通信设备"]["amount100m"] == 1000
+    assert crowding.data["latest"]["targets"]["通信设备"]["turnoverPct"] == 3.52
+    assert crowding.data["innovationHistory"][-1]["turnoverPct"] == 2.5
+
+
+def test_missing_sector_quote_does_not_publish_zero_or_claim_ready(research_db, monkeypatch):
+    assert asyncio.run(refresh.refresh_a_share_research(force=True)) == "ready"
+    previous = repository.read_dashboard().crowding.data["latest"]
+
+    async def fail_sector_quotes():
+        raise RuntimeError("sector feed unavailable")
+
+    monkeypatch.setattr(research_db, "sector_crowding_snapshot", fail_sector_quotes)
+    assert asyncio.run(refresh.refresh_a_share_research(force=True)) == "partial"
+    current = repository.read_dashboard().crowding
+    assert current.meta.status == "partial"
+    assert current.data["latest"] == previous
 
 
 def test_failed_modules_keep_stale_data_and_do_not_freeze_healthy_stocks(research_db):
@@ -214,6 +256,31 @@ def test_daily_import_metadata_has_timezone_and_unmatched_turnover_is_included(r
     assert dashboard.market_history[-1].total_amount_yuan == sum(
         row.turnover_yuan for row in asyncio.run(research_db.a_share_spot())
     )
+
+
+def test_full_market_turnover_history_includes_backend_day_change_and_source(research_db):
+    asyncio.run(refresh.refresh_a_share_research(force=True))
+    repository.start_refresh("market-turnover-history-test", None)
+    repository.finish_refresh("market-turnover-history-test", "ready")
+    with connection() as db:
+        db.execute("DELETE FROM research_a_share_history WHERE dataset='market'")
+    repository.write_history_points(
+        "market-turnover-history-test",
+        "market",
+        [
+            ("2030-01-02", "market", {"totalAmountYuan": "10000000000"}),
+            ("2030-01-03", "market", {"totalAmountYuan": "11000000000"}),
+        ],
+        source="测试全市场行情源",
+    )
+
+    rows = repository.read_dashboard().market_history
+
+    assert rows[-2].observed_at.isoformat() == "2030-01-02"
+    assert rows[-2].source == "测试全市场行情源"
+    assert rows[-2].amount_change_pct is None
+    assert rows[-1].observed_at.isoformat() == "2030-01-03"
+    assert rows[-1].amount_change_pct == 10
 
 
 def test_revision_replaces_daily_qualifiers_and_persists_a_zero_day(research_db, monkeypatch):
@@ -364,6 +431,98 @@ def test_live_lkg_marks_stale_without_rewriting_fetch_time(research_db, monkeypa
     assert stale.status == "stale" and stale.is_stale
     assert stale.fetched_at == good.fetched_at
     assert stale.rows == good.rows
+
+
+def test_live_turnover_uses_hot_stock_history_as_authoritative_daily_count(
+    research_db, monkeypatch
+):
+    from app.research_cache import LastKnownGoodResearchCache
+    from app.research_data_schemas import AShareMarketTurnoverResponse
+
+    class LaggingSnapshotProvider(AShareFixtureProvider):
+        async def a_share_market_turnover(self):
+            return []
+
+    repository.start_refresh("lagging-stocks-test", "2026-09-29")
+    repository.start_refresh("hot-stock-authoritative-test", "2026-09-29")
+    repository.write_dataset(
+        "stocks",
+        [
+            {
+                "securityCode": "300308",
+                "securityName": "中际旭创",
+                "turnoverYuan": "13099145541.12",
+                "returnPct": "10.38",
+                "industry": "通信设备",
+            },
+            {
+                "securityCode": "300502",
+                "securityName": "新易盛",
+                "turnoverYuan": "10061899943.16",
+                "returnPct": "8.08",
+                "industry": "通信设备",
+            },
+        ],
+        source="lagging-stocks",
+        run_id="lagging-stocks-test",
+        observed_at="2026-09-29",
+    )
+    repository.write_history_points(
+        "hot-stock-authoritative-test",
+        "hot_stock",
+        [
+            (
+                "2026-09-29",
+                "300308",
+                {
+                    "securityCode": "300308",
+                    "securityName": "中际旭创",
+                    "turnoverYuan": "13099145541.12",
+                    "returnPct": "10.38",
+                    "industry": "通信设备",
+                },
+            ),
+            (
+                "2026-09-29",
+                "600487",
+                {
+                    "securityCode": "600487",
+                    "securityName": "亨通光电",
+                    "turnoverYuan": "11344313714.0",
+                    "returnPct": "9.28",
+                    "industry": "通信设备",
+                },
+            ),
+            (
+                "2026-09-29",
+                "300502",
+                {
+                    "securityCode": "300502",
+                    "securityName": "新易盛",
+                    "turnoverYuan": "10061899943.16",
+                    "returnPct": "8.08",
+                    "industry": "通信设备",
+                },
+            ),
+        ],
+        source="hot-stock-history",
+    )
+    cache = LastKnownGoodResearchCache[AShareMarketTurnoverResponse](
+        ttl=timedelta(minutes=5), is_meaningful=lambda value: True
+    )
+    monkeypatch.setattr(service, "_LIVE_TURNOVER_CACHE", cache)
+    monkeypatch.setattr(service, "_LIVE_TURNOVER_LOCK", asyncio.Lock())
+    monkeypatch.setattr(service, "_PROVIDER", LaggingSnapshotProvider())
+
+    result = asyncio.run(service.get_live_a_share_market_turnover())
+
+    assert result.daily_observed_at == "2026-09-29"
+    assert result.high_turnover_count == 3
+    assert {row.security_code for row in result.high_turnover_rows} == {
+        "300308",
+        "600487",
+        "300502",
+    }
 
 
 def test_hot_history_all_dates_keeps_ninety_day_totals(research_db):

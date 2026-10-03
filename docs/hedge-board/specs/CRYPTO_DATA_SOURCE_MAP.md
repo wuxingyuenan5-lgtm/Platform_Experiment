@@ -18,7 +18,7 @@
 | 主题 | 原始来源 | 交付原因 |
 |---|---|---|
 | BTC / ETH ETF 流量、企业财库周度流入 | SoSoValue | 原站维护证券流量与财库分类。 |
-| 稳定币、链上估值与资金流 | DefiLlama、Checkonchain、Glassnode、CryptoQuant、Arkham | 许可、定义或完整历史不适合本地复制时保留研究入口。 |
+| 尚未接通的链上估值、地址与资金流 | Checkonchain、Glassnode、CryptoQuant、Arkham、BGeometrics | 稳定币与 URPD 已本地采集；地址分布尝试的公开 BGeometrics 余额/币数接口返回空正文，未虚构数据。 |
 | 多 Venue 衍生品、清算、期权与波动率 | CoinGlass、Deribit、Greeks.live、Bybit、OKX | 不将单一来源误标为聚合数据。 |
 | 公开研究布局 | TradingView 及明确原始网页 | 仅新标签页跳转，不依赖用户登录态或私有模板。 |
 
@@ -29,3 +29,17 @@
 - 理财信息属于加密研究的观察材料，不代表收益承诺、申购入口或交易授权。
 - ETF、IV 和 DVOL 数据按各自来源的市场日历与时间戳展示；刷新失败保留上次有效数据并标记状态，不以零值替代缺失。
 - BTC / ETH ETF 日流量卡位于“加密资金面”，默认展示后端生成的日流量与价格双轴图，资金流使用左轴、Bybit 策略归档参考收盘价使用右轴；每日流量柱使用独立视觉比例，价格覆盖不足时保持不可用，不渲染零散断线；图表下方复用策略模块的日期标签、概览线、双滑块和范围按钮，可切换近 90 日、近 1 年或全部历史；卡片不重复展示抓取日期、单位和覆盖天数摘要，视图切换仅保留图标按钮；点击表格图标切换到最新日期倒序表格；BTC 的 30 日均线与各 ETF 细节继续作为卡片参考链接，ETH 保留 SoSoValue 参考入口。Greeks.live BTC Data Lab（含 BTC ATM IV 期限结构本地交互）位于“期权分析”，其参考网页链接保留。
+
+## 本地公开数据补充
+
+- 稳定币：DefiLlama `stablecoincharts/all`，汇总 `totalCirculatingUSD`，保留每日原值。
+- 恐惧贪婪：Alternative.me 官方 API，0–100，页面紧邻数据注明来源。
+- Deribit：BTC option book summary 的 Call/Put OI 与 Put/Call 比率；单一交易所快照，历史从接入日积累，ATM IV 原链路保留。
+- BitcoinTreasuries：可公开读取的上市公司持仓样本及 Strategy；采集日不冒充统一披露日，不能由样本余额变化推成财库周净流入。
+- Strategic ETH Reserve：只纳入 ACTIVE 实体，排除未审/停用记录；保留原始更新时间与 PUBLIC_REPORT / SELF_REPORTED / WALLET_TRACKING 标识。旧披露仍可 stale，抓取成功不代表所有实体当日披露。
+- BGeometrics URPD：UTXO 最后移动价格分桶及 BTC 数量；这是链上价格分布，非已证实的投资者成本。
+- STRC：Yahoo 交易所日线价格，不冒充实时 ATM 发行额或收益率；最新交易日可能未收盘。
+- Coinbase/Binance 日线溢价：闭合 UTC 日线精确日期相交，并用 Coinbase USDT/USD 调整计价币，公式和输入版本由生产端保留。
+- 保证金借贷：Bybit USDT 公开 VIP 0 小时费率；非用户账户实际成本。Binance 资金费率单独接入原有历史组，不冒充全市场聚合。
+
+财库周净流入、全市场合约 OI/清算热力、CoinGlass CDRI、GEX、STRC ATM 实际发行及完整地址分布尚未形成可靠的本地数据链；这些缺口与文章、作者、Seasonal Chart 等明确外部研究工具分开对待。

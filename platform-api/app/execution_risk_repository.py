@@ -574,12 +574,31 @@ def claim_risk_action(batch_id: str, request: RiskActionRequest) -> tuple[RiskAc
         ).fetchone()
         if active is not None:
             raise ExecutionRiskRepositoryError("Another risk action is still processing")
-        if request.action == "flatten_filled_legs":
+        if request.action in {"flatten_filled_legs", "cancel_open_legs", "substitute_hedge"}:
             batch = db.execute(
-                "SELECT status FROM execution_batches WHERE id=?", (batch_id,)
+                "SELECT status,strategy_key,direction FROM execution_batches WHERE id=?",
+                (batch_id,),
             ).fetchone()
             if batch is None or batch["status"] not in {"failed", "manual_intervention"}:
-                raise ExecutionRiskRepositoryError("Pause the failed batch before flattening")
+                raise ExecutionRiskRepositoryError("Pause the failed batch before risk disposition")
+            if (
+                batch["strategy_key"] == "funding_arbitrage"
+                and db.execute(
+                    "SELECT 1 FROM funding_spot_release_commands WHERE batch_id=? "
+                    "AND child_id LIKE 'funding-close-recovery:%' "
+                    "AND status NOT IN ('filled','failed','rejected','canceled') LIMIT 1",
+                    (batch_id,),
+                ).fetchone()
+            ):
+                raise ExecutionRiskRepositoryError("Funding close recovery is still unresolved")
+            if (
+                request.action == "flatten_filled_legs"
+                and batch["strategy_key"] == "funding_arbitrage"
+                and batch["direction"] == "close"
+            ):
+                raise ExecutionRiskRepositoryError(
+                    "Finish the original Funding close; reversing its filled legs would reopen exposure"
+                )
         db.execute(
             """
             INSERT INTO execution_risk_actions (
@@ -730,7 +749,9 @@ def mark_batch_failed_flattened(batch_id: str) -> None:
         batch_key = db.execute(
             "SELECT strategy_key FROM execution_batches WHERE id=?", (batch_id,)
         ).fetchone()
-        allow_funding_dust = batch_key is not None and batch_key["strategy_key"] == "funding_arbitrage"
+        allow_funding_dust = (
+            batch_key is not None and batch_key["strategy_key"] == "funding_arbitrage"
+        )
         positions, proof = flattening_positions(db, batch_id, allow_dust=allow_funding_dust)
         if any(item["quantity"] != 0 for item in positions):
             raise ExecutionRiskRepositoryError(
@@ -828,6 +849,19 @@ def live_order_ids_for_batch(batch_id: str) -> list[str]:
             )
             if row[0] in owned
         ]
+
+
+def get_flattening_positions(batch_id: str) -> list[dict[str, Any]]:
+    with connection() as db:
+        batch = db.execute(
+            "SELECT strategy_key FROM execution_batches WHERE id=?", (batch_id,)
+        ).fetchone()
+        positions, _ = flattening_positions(
+            db,
+            batch_id,
+            allow_dust=batch is not None and batch["strategy_key"] == "funding_arbitrage",
+        )
+    return positions
 
 
 def flattening_positions(

@@ -46,9 +46,9 @@ def create_venue_query_router(*, gateway: VenueGateway) -> APIRouter:
 
     @router.get("/venue/capital-flows", tags=["venue-query"])
     def capital_flows(
-        account_id: str = Query(alias="accountId"),
-        start_time: datetime = Query(alias="startTime"),
-        end_time: datetime = Query(alias="endTime"),
+        account_id: Annotated[str, Query(alias="accountId")],
+        start_time: Annotated[datetime, Query(alias="startTime")],
+        end_time: Annotated[datetime, Query(alias="endTime")],
     ) -> dict:
         start, end = history_window(start_time, end_time)
         reader = getattr(gateway, "get_capital_flows", None)

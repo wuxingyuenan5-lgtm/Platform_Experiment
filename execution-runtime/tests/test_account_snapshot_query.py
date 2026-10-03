@@ -9,6 +9,7 @@ import pytest
 from app.bybit_live_adapter import BybitLiveAdapter
 from app.bybit_mt5_gateway import BybitMt5Gateway
 from app.config import Settings
+from app.gateway_errors import GatewayConfigurationError, GatewayResultUnknownError
 from app.mt5_read_coordinator import COORDINATOR, with_mt5_read_session
 from app.strict_live_acceptance_adapters import StrictMt5AcceptanceAdapter
 
@@ -100,6 +101,7 @@ class FakeMt5SnapshotProvider:
         return SimpleNamespace(
             login=int(self.current_login),
             server=self.current_server,
+            company="Broker Company",
             currency="USD",
             balance=1000.0,
             equity=1001.0,
@@ -116,7 +118,7 @@ class FakeMt5SnapshotProvider:
         )
 
     def terminal_info(self):
-        return SimpleNamespace(trade_allowed=True)
+        return SimpleNamespace(trade_allowed=True, connected=True)
 
     def positions_get(self):
         return (
@@ -703,3 +705,34 @@ def test_mt5_account_snapshot_reports_real_zero_when_positions_and_orders_are_em
     assert snapshot.orders == []
     assert snapshot.fills == []
     assert snapshot.data_quality_state == "complete"
+    assert snapshot.identity["company"] == "Broker Company"
+
+
+def test_mt5_disconnected_terminal_cannot_prove_account_health(monkeypatch) -> None:
+    COORDINATOR.clear_restore_failure()
+    configure_mt5_refs(monkeypatch)
+
+    class DisconnectedProvider(FakeMt5SnapshotProvider):
+        def terminal_info(self):
+            return SimpleNamespace(trade_allowed=True, connected=False)
+
+    provider = DisconnectedProvider()
+    gateway = BybitMt5Gateway(
+        Settings(
+            mt5_account_ids="mt5-live-main,account_mt5_short_term_a",
+            mt5_account_credential_refs=(
+                "mt5-live-main=secret://environment/mt5-main,"
+                "account_mt5_short_term_a=secret://environment/mt5-short-a"
+            ),
+            mt5_primary_account_id="mt5-live-main",
+        ),
+        bybit=None,
+        mt5=None,
+    )
+    gateway.mt5 = StrictMt5AcceptanceAdapter(gateway.settings, provider)
+    gateway._injected_mt5 = gateway.mt5
+
+    with pytest.raises(GatewayResultUnknownError, match="not connected"):
+        gateway.get_account_risk("account_mt5_short_term_a")
+    with pytest.raises(GatewayConfigurationError, match="not connected"):
+        gateway.get_account_snapshot("account_mt5_short_term_a", include_history=False)

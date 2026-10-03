@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.strategy_research_ingest import LATEST, STATUS
 from app.strategy_research_policy import scenario
 from app.strategy_research_projection import (
+    funding_basis_status,
     history_chart,
     price_coverage,
     projection_status,
@@ -19,6 +20,7 @@ from app.strategy_research_projection import (
 )
 from app.strategy_research_repository import (
     cancel_experiment,
+    capture_metadata,
     capture_status,
     enqueue_experiment,
     get_draft,
@@ -136,7 +138,7 @@ def access(pair, principal):
 
 
 def envelope(data, warnings=None, method="observed-spread.v1"):
-    state = capture_status()
+    state = capture_metadata()
     through = state["publishedThrough"]
     stale = through is None or datetime.now(UTC).timestamp() * 1000 - time_ms(through) > 120000
     return ResearchEnvelope(
@@ -170,11 +172,17 @@ def funding_candle_basis_rows(symbol_base: str, lo: int, hi: int, interval_ms: i
     """Pair same-bucket Bybit closes without filling either missing leg."""
     symbol = symbol_base + "USDT"
     legs: dict[int, dict[str, Decimal]] = {}
-    for category in ("linear", "spot"):
+    # Check the usually-sparser spot leg first.  If it is absent, the pair
+    # cannot produce a basis and we avoid touching the much larger perpetual
+    # candle projection at all.
+    for category in ("spot", "linear"):
         entity = f"{symbol}:{category}:trade"
-        for row in read_projection(
+        category_rows = read_projection(
             "historical_candle", entity, lo, hi, interval_ms=interval_ms, limit=10001
-        ):
+        )
+        if category == "spot" and not category_rows:
+            return []
+        for row in category_rows:
             if row.get("quality"):
                 continue
             try:
@@ -217,8 +225,13 @@ def funding_basis_series_rows(
             "spread_all", "funding-btc", lo, hi, interval_ms=interval_ms, limit=10001
         )
         return (valid if view == "valid" else all_rows), all_rows, "observed_paired_quotes"
-    rows = funding_candle_basis_rows(symbol_base, lo, hi, interval_ms)
-    return rows, rows, "same_bucket_historical_closes"
+    # Candle-derived basis is prepared by the background serving projector.
+    # HTTP reads only this persisted read model; it never joins price legs or
+    # performs Decimal arithmetic on demand.
+    rows = read_projection(
+        "funding_basis", symbol_base, lo, hi, interval_ms=interval_ms, limit=10001
+    )
+    return rows, rows, "persisted_candle_basis"
 
 
 @router.get("/catalog", response_model=ResearchResponse)
@@ -572,6 +585,7 @@ def series(
                 "seriesBySymbol": series_by_symbol,
                 "distributionBySymbol": distributions,
                 "view": view,
+                "projection": {**projection_status(), "fundingBasis": funding_basis_status()},
                 "basisSource": "backend_series_projection",
                 "emptyReason": None
                 if any(series_by_symbol.values())
@@ -581,10 +595,10 @@ def series(
         )
     symbol_base = normalize_research_symbol(symbol, pair=pair)
     if pair == "funding-btc" and symbol_base != "BTC":
-        data = funding_candle_basis_rows(symbol_base, lo, hi, interval_ms or 900_000)
-        all_rows = data
+        data, all_rows, basis_source = funding_basis_series_rows(
+            symbol_base, lo, hi, interval_ms or 900_000, view
+        )
         stats = second_statistics(data, all_rows)
-        basis_source = "same_bucket_historical_closes"
     elif resolution in ("1s", "15m", "1h", "8h", "1d"):
         valid = read_projection("spread_valid", pair, lo, hi, interval_ms=interval_ms, limit=10001)
         all_rows = read_projection("spread_all", pair, lo, hi, interval_ms=interval_ms, limit=10001)
@@ -606,7 +620,7 @@ def series(
             "view": view,
             "rows": data,
             "distribution": stats,
-            "projection": projection_status(),
+            "projection": {**projection_status(), "fundingBasis": funding_basis_status()},
             "basisSource": (
                 basis_source
                 if pair == "funding-btc" and symbol_base != "BTC"

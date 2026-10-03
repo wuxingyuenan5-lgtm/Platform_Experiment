@@ -452,8 +452,17 @@ async def get_live_a_share_market_turnover() -> AShareMarketTurnoverResponse:
             daily_meta = await asyncio.to_thread(read_dataset_metadata, "stocks")
             high_count: int | None = None
             high_rows = []
+            latest_history_date = history["dates"][-1] if history["dates"] else None
+            latest_history_rows = [
+                item
+                for item in history["rows"]
+                if latest_history_date and item.get("observedAt") == latest_history_date
+            ]
+            if latest_history_rows:
+                high_rows = latest_history_rows
+                high_count = len(latest_history_rows)
             if isinstance(persisted, list):
-                high_rows = [
+                snapshot_high_rows = [
                     item
                     for item in persisted
                     if isinstance(item, dict)
@@ -462,12 +471,15 @@ async def get_live_a_share_market_turnover() -> AShareMarketTurnoverResponse:
                     and Decimal(str(item.get("turnoverYuan", item.get("turnover_yuan", 0)) or 0))
                     > DEFAULT_THRESHOLD_YUAN
                 ]
-                high_count = len(high_rows)
+                if not latest_history_rows:
+                    high_rows = snapshot_high_rows
+                    high_count = len(snapshot_high_rows)
             result = AShareMarketTurnoverResponse(
                 fetched_at=_now(),
                 source="东方财富A股实时行情",
                 high_turnover_count=high_count,
-                daily_observed_at=daily_meta.get("observed_at") if daily_meta else None,
+                daily_observed_at=latest_history_date
+                or (daily_meta.get("observed_at") if daily_meta else None),
                 high_turnover_rows=[
                     AShareMarketTurnoverRow.model_validate(
                         {

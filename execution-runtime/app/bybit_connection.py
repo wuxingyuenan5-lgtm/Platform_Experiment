@@ -221,31 +221,40 @@ class BybitConnections:
             offset = _clock_offset_ms
         return int(original()) + offset
 
-    def start_research_streams(self, capture) -> None:
+    def start_research_streams(self, capture, *, force_reconnect: bool = False) -> bool:
         from pybit.unified_trading import WebSocket
 
         class RawPublicSocket(WebSocket):
+            research_category: str
             # pybit's normal callback rewrites delta into a synthetic snapshot.
             # This dedicated PUBLIC socket forwards the native message before that merge.
-            def _process_normal_message(ws, message):
+            def _process_normal_message(self, message):
                 topic = message["topic"]
-                capture("bybit_message", f"bybit:{ws.research_category}:{topic}", "public",
+                capture("bybit_message", f"bybit:{self.research_category}:{topic}", "public",
                         message, source_ms=message.get("cts", message.get("ts")),
                         source_layer="native_websocket")
 
-            def _on_open(ws):
-                capture("quality", f"bybit:{ws.research_category}", "public",
+            def _on_open(self):
+                capture("quality", f"bybit:{self.research_category}", "public",
                         {"reason": "connected_wait_snapshot"}, quality=["book_unsynced"])
                 super()._on_open()
 
-            def _on_close(ws):
-                capture("quality", f"bybit:{ws.research_category}", "public",
+            def _on_close(self):
+                capture("quality", f"bybit:{self.research_category}", "public",
                         {"reason": "disconnected"}, quality=["source_gap"])
                 super()._on_close()
 
         with self._research_lock:
-            if self._research_sockets:
-                return
+            if self._research_sockets and not force_reconnect:
+                try:
+                    if all(socket.is_connected() for socket in self._research_sockets):
+                        return False
+                except Exception:
+                    pass
+            for socket in self._research_sockets:
+                socket.handle_error = False
+                socket.exit()
+            self._research_sockets.clear()
             for category, symbols in (("linear", ["XAUTUSDT", "BTCUSDT"]), ("spot", ["BTCUSDT"])):
                 # _on_open may run during construction, so category belongs to a per-socket class.
                 Socket = type(
@@ -262,14 +271,18 @@ class BybitConnections:
                     if ws is not None:
                         ws.exit()
                     for existing in self._research_sockets:
+                        existing.handle_error = False
                         existing.exit()
                     self._research_sockets.clear()
                     raise
+            return True
 
     def close(self) -> None:
-        for socket in self._research_sockets:
-            socket.exit()
-        self._research_sockets.clear()
+        with self._research_lock:
+            for socket in self._research_sockets:
+                socket.handle_error = False
+                socket.exit()
+            self._research_sockets.clear()
         with self._lock:
             for client in self._clients.values():
                 client.client.close()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -22,6 +23,7 @@ from app.user_schemas import (
     UserSelfResponse,
     UserSessionListResponse,
 )
+from app.user_security import hash_secret_token
 from app.user_service import (
     UserServiceError,
     change_self_password,
@@ -257,13 +259,27 @@ def reset_password(
     tags=["user-auth"],
 )
 def current_authentication(
+    request: Request,
     response: Response,
     principal: Annotated[Principal, Depends(require_permission("profile.read_self"))],
 ) -> AuthenticationResponse:
+    # A warm navigation already holds the current CSRF secret. Validate it
+    # against the freshly authenticated session instead of taking a write lock
+    # just to replace it. A cold/stale browser still receives a new token.
+    supplied_csrf = request.headers.get("x-csrf-token")
+    session = getattr(request.state, "browser_session", None)
+    verified_csrf = (
+        supplied_csrf
+        if supplied_csrf
+        and session is not None
+        and hmac.compare_digest(hash_secret_token(supplied_csrf), session.csrf_token_hash)
+        else None
+    )
     try:
         result = get_current_authentication(
             user_id=principal.user_id,
             session_id=_require_session_id(principal),
+            verified_csrf_token=verified_csrf,
         )
     except UserServiceError as exc:
         _raise_service_error(exc)

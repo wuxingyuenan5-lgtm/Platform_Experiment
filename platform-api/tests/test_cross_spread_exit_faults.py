@@ -26,6 +26,8 @@ def saved_exit(tmp_path, monkeypatch):
     configure_platform(tmp_path)
     monkeypatch.setattr(get_settings(), "research_refresh_enabled", False)
     monkeypatch.setattr(service, "assert_cross_spread_native_trading_rules", lambda: None)
+    monkeypatch.setattr(service, "assert_close_positions", lambda *_: None)
+    monkeypatch.setattr(service, "_bybit_close_reduces_live_position", lambda *_: True)
     monkeypatch.setattr(service, "assert_cross_spread_market_executable", lambda *, is_close: None)
     with TestClient(app):
         insert_batch_with_fills("fault-open")
@@ -268,3 +270,30 @@ def test_mt5_boundary_guard_pauses_automatic_exit_without_blocking_manual_intent
     )
     assert claims == []
     assert get_exit_plan(saved_exit.plan_id).status == "active"
+
+
+def test_pre_dispatch_close_rejection_releases_claim_without_manual_intervention(
+    saved_exit, monkeypatch
+):
+    monkeypatch.setattr(service, "assert_cross_spread_live_execution_enabled", lambda: None)
+
+    def reject_before_instruction(*args, **kwargs):
+        raise HTTPException(422, "Authoritative crypto perp instrument mapping is ambiguous")
+
+    monkeypatch.setattr(service, "submit_cross_spread_market_command", reject_before_instruction)
+
+    with pytest.raises(HTTPException, match="instrument mapping"):
+        service.close_cross_spread_market(
+            saved_exit.plan_id,
+            execution_mode="market",
+            idempotency_key="pre-dispatch-map-rejection",
+        )
+
+    current = get_exit_plan(saved_exit.plan_id)
+    assert current.status == "active"
+    assert current.close_batch_id is None
+    with connection() as db:
+        assert db.execute(
+            "SELECT COUNT(*) FROM strategy_runs WHERE idempotency_key=?",
+            ("pre-dispatch-map-rejection",),
+        ).fetchone()[0] == 0

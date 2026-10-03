@@ -35,6 +35,10 @@ function setup({
     submissions = [],
     reads = [];
   let state = 'executing';
+  let contextBarrier, positionsBarrier;
+  const executionVisible = vue.ref(true);
+  let contextReads = 0,
+    positionsReads = 0;
   let contextError = false;
   const user = vue.reactive({ authentication: { user: { userId: 'ceo-one', role: 'ceo' } } });
   const context = {
@@ -45,12 +49,12 @@ function setup({
     symbolOptions: [],
     spotQuote: { mid: '80000' },
     perpetualQuote: { mid: '79990' },
-    suggestedQuantity: '0.00128',
+    suggestedQuantity: '0.001',
     openSizing: {
-      spotQuantity: '0.00128',
-      expectedSpotNetQuantity: '0.00127872',
+      spotQuantity: '0.001001',
+      expectedSpotNetQuantity: '0.000999999',
       perpetualQuantity: '0.001',
-      roundingResidualQuantity: '0.00027872',
+      roundingResidualQuantity: '-0.000000001',
       spotBaseFeeRate: '0.001',
       valid: true,
       reason: null,
@@ -79,23 +83,32 @@ function setup({
       ...vue,
       onMounted: (fn) => mounted.push(fn),
       onBeforeUnmount: (fn) => unmounted.push(fn),
+      onUnmounted: (fn) => unmounted.push(fn),
+      onActivated() {},
+      onDeactivated() {},
     },
     '@vueuse/core': { useDocumentVisibility: () => visibility, refDebounced: (value) => value },
     'ant-design-vue': { Modal: { confirm: (options) => options.onOk() } },
     '@/store/modules/user': { useUserStore: () => user },
     '@/api/platform/fundingWorkspace': {
       getFundingExecutionContext: async () => {
+        contextReads += 1;
+        if (contextBarrier) await contextBarrier;
         if (contextError) throw new Error('quote timeout');
         return context;
       },
-      getFundingPositionGroups: async () => [
-        {
-          ...group,
-          status: state,
-          cumulativePerpetualFill: state === 'manual_intervention' ? '0.001' : '0',
-          residualQuantity: state === 'manual_intervention' ? '0.001' : '0',
-        },
-      ],
+      getFundingPositionGroups: async () => {
+        positionsReads += 1;
+        if (positionsBarrier) await positionsBarrier;
+        return [
+          {
+            ...group,
+            status: state,
+            cumulativePerpetualFill: state === 'manual_intervention' ? '0.001' : '0',
+            residualQuantity: state === 'manual_intervention' ? '0.001' : '0',
+          },
+        ];
+      },
       submitFundingInstruction: async (input) => {
         submissions.push(input);
         if (failSubmit)
@@ -128,7 +141,7 @@ function setup({
     'src/views/strategy/funding-carry/composables/useFundingWorkspace.ts',
   );
   const scope = vue.effectScope();
-  const workspace = scope.run(useFundingWorkspace);
+  const workspace = scope.run(() => useFundingWorkspace(executionVisible));
   mounted.forEach((fn) => fn());
   const fixture = {
     workspace,
@@ -139,6 +152,28 @@ function setup({
     submissions,
     reads,
     context,
+    executionVisible,
+    readCounts: () => ({ context: contextReads, positions: positionsReads }),
+    blockContext: () => {
+      let release;
+      contextBarrier = new Promise((resolve) => {
+        release = resolve;
+      });
+      return () => {
+        contextBarrier = null;
+        release();
+      };
+    },
+    blockPositions: () => {
+      let release;
+      positionsBarrier = new Promise((resolve) => {
+        release = resolve;
+      });
+      return () => {
+        positionsBarrier = null;
+        release();
+      };
+    },
     setState: (next) => {
       state = next;
     },
@@ -313,13 +348,14 @@ test('partial close shortcuts round down to the venue step and retain the select
   assert.equal(fixture.workspace.canClose.value, false);
 });
 
-test('open freezes gross spot and fee-adjusted perpetual quantities separately', async () => {
+test('open retains the authoritative perpetual target and distinct fee-adjusted spot sizing', async () => {
   const fixture = setup();
   await settle();
-  assert.equal(fixture.workspace.quantityInput.value, '0.00128');
+  assert.equal(fixture.workspace.quantityInput.value, '0.001');
+  assert.equal(fixture.context.openSizing.spotQuantity, '0.001001');
   assert.equal(fixture.workspace.canSubmit.value, true);
   await fixture.workspace.submit('open');
-  assert.equal(fixture.submissions[0].quantity, '0.00128');
+  assert.equal(fixture.submissions[0].quantity, '0.001');
   assert.equal(fixture.submissions[0].expectedPerpetualQuantity, '0.001');
   assert.equal(fixture.recovery.readFundingDraft().expectedPerpetualQuantity, '0.001');
 });
@@ -327,10 +363,63 @@ test('open freezes gross spot and fee-adjusted perpetual quantities separately',
 test('editing quantity invalidates the old sizing until the matching preview returns', async () => {
   const fixture = setup();
   await settle();
-  fixture.workspace.quantityInput.value = '0.001';
+  fixture.workspace.quantityInput.value = '0.002';
   assert.equal(fixture.workspace.canSubmit.value, false);
   await settle();
   assert.equal(fixture.workspace.canSubmit.value, false);
   await fixture.workspace.submit('open');
   assert.equal(fixture.submissions.length, 0);
+});
+
+test('background refresh retains a still-fresh preview without blocking input', async () => {
+  const fixture = setup();
+  await settle();
+  assert.equal(fixture.workspace.canSubmit.value, true);
+  const release = fixture.blockContext();
+  const pending = fixture.workspace.refreshContext();
+  await settle();
+  assert.equal(fixture.workspace.loading.value, true);
+  assert.equal(fixture.workspace.canSubmit.value, true);
+  fixture.workspace.notionalInput.value = '200';
+  assert.equal(fixture.workspace.canSubmit.value, false);
+  release();
+  await pending;
+});
+
+test('accepted submission feedback does not wait for the positions table', async () => {
+  const fixture = setup();
+  await settle();
+  fixture.setState('accepted');
+  const release = fixture.blockPositions();
+  let timeout;
+  try {
+    const result = await Promise.race([
+      fixture.workspace.submit('open'),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error('table blocks receipt')), 500);
+      }),
+    ]);
+    assert.equal(result.workspaceState.executionState, 'accepted');
+    assert.equal(fixture.workspace.submitting.value, false);
+    assert.equal(fixture.workspace.pendingDraft.value.state, 'accepted');
+    assert.equal(fixture.submissions.length, 1);
+  } finally {
+    clearTimeout(timeout);
+    release();
+  }
+  await settle();
+});
+
+test('analysis section pauses execution market and position polling', async () => {
+  const fixture = setup();
+  await settle();
+  fixture.executionVisible.value = false;
+  await settle();
+  const before = fixture.readCounts();
+  await new Promise((resolve) => setTimeout(resolve, 3_100));
+  assert.deepEqual(fixture.readCounts(), before);
+  fixture.executionVisible.value = true;
+  await settle();
+  assert.ok(fixture.readCounts().context > before.context);
+  assert.ok(fixture.readCounts().positions > before.positions);
 });

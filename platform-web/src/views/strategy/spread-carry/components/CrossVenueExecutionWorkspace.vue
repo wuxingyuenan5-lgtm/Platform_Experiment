@@ -50,6 +50,8 @@
         :execution-logs="executionLogs"
         :execution-message="executionMessage"
         :execution-message-tone="executionMessageTone"
+        :pending-draft-absent="pendingDraftAbsent"
+        @clear-unreceived="clearUnreceivedPendingExecution"
       />
       <SpreadExecutionCommand
         v-model:execution-stage="executionStage"
@@ -152,6 +154,7 @@
     confirmOrder,
     confirmSummary,
     confirmVisible,
+    clearUnreceivedPendingExecution,
     executionLogs,
     executionMessage,
     executionMessageTone,
@@ -172,6 +175,7 @@
     overviewRows,
     refreshAbnormalPositions,
     overviewPnl,
+    pendingDraftAbsent,
     prepareOpenDraft,
     qtyError,
     qtyInput,

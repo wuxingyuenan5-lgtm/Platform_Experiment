@@ -117,7 +117,6 @@
               ><span>建议数量</span><strong>{{ context?.suggestedQuantity ?? '--' }}</strong></div
             >
           </div>
-          <p class="execution-hint">先确认标的与数量，再提交开仓。可用资金已扣除执行中的预约。</p>
         </section>
         <div class="stage-tabs">
           <button type="button" :class="{ active: stage === 'open' }" @click="stage = 'open'"
@@ -167,7 +166,6 @@
               }}。</small
             >
           </label>
-          <p class="execution-hint">{{ executionPolicyHint }}</p>
         </div>
 
         <template v-if="stage === 'open'">
@@ -195,9 +193,6 @@
                     {{ item.baseAsset }} · {{ item.perpetualSymbol }}
                   </option>
                 </select>
-                <small
-                  >仅显示 Bybit 同时具备现货和永续的可配平标的；未出现的标的没有可用双腿。</small
-                >
               </label>
               <label class="field">
                 <span>名义本金</span>
@@ -241,15 +236,6 @@
                   ><span>反算永续名义金额</span><strong>{{ estimatedNotional }} USDT</strong></div
                 >
               </div>
-              <p class="execution-hint"
-                >目标以永续数量为准；现货自动补足手续费和最小步长。现货买入扣币
-                {{ spotFeePercent }}；预计净到账
-                {{ context?.openSizing?.expectedSpotNetQuantity ?? '--' }}；最小单位配平余量
-                {{ context?.openSizing?.roundingResidualQuantity ?? '--' }}。</p
-              >
-              <p class="execution-hint"
-                >现货卖出手续费和永续手续费计入 USDT 成本，不重复扣减币数量。</p
-              >
               <p v-if="context?.openSizing?.reason" class="error-text">{{
                 context.openSizing.reason
               }}</p>
@@ -380,7 +366,10 @@
       </section>
     </div>
 
-    <section v-if="abnormalGroups.length" class="panel positions-panel funding-abnormal">
+    <section
+      v-if="abnormalGroups.length || pendingRecovery || abnormalMessage"
+      class="panel positions-panel funding-abnormal"
+    >
       <div class="panel-title"
         ><h3>资费异常订单</h3><span>{{ abnormalGroups.length }} 项待处理</span></div
       >
@@ -407,6 +396,21 @@
           @click="pendingAbnormal = item.batchId"
           >平掉异常开仓剩余仓位</button
         >
+        <button
+          v-else-if="item.abnormalAction === 'finish_close'"
+          type="button"
+          :disabled="abnormalSubmitting || submitting || !canTrade || !!pendingRecovery"
+          @click="
+            pendingRecovery = {
+              instructionId: item.recoveryCloseInstructionId,
+              key: item.recoveryIdempotencyKey,
+              quantity: item.recoverySpotQuantity,
+            }
+          "
+          >{{
+            Number(item.recoverySpotQuantity) > 0 ? '补平原指令剩余现货' : '核对原补平结果'
+          }}</button
+        >
         <p v-else>执行结果尚未确定，请先核对原指令及两腿成交。</p>
         <div v-if="pendingAbnormal === item.batchId">
           <p>确认市价平掉此资费异常开仓的已确认剩余仓位？现货按扣费后剩余数量执行。</p>
@@ -421,6 +425,21 @@
           >
         </div>
       </article>
+      <div v-if="pendingRecovery" role="group" aria-label="确认补平现货">
+        <p v-if="Number(pendingRecovery.quantity) > 0"
+          >原平仓永续腿已完成。确认在同一账户市价卖出剩余 {{ pendingRecovery.quantity }} 现货？</p
+        >
+        <p v-else>核对原补平请求及成交，不重复下单。</p>
+        <button type="button" :disabled="abnormalSubmitting" @click="pendingRecovery = null"
+          >取消</button
+        >
+        <button
+          type="button"
+          :disabled="abnormalSubmitting || !canTrade"
+          @click="confirmCloseRecovery"
+          >确认补平现货</button
+        >
+      </div>
       <p v-if="abnormalMessage" role="status">{{ abnormalMessage }}</p>
     </section>
 
@@ -453,7 +472,8 @@
           <thead
             ><tr
               ><th>组合</th><th>现货腿</th><th>永续腿</th><th>累计现货成交</th><th>累计永续成交</th
-              ><th>剩余可平</th><th>净敞口</th><th>状态</th><th>更新时间</th></tr
+              ><th>剩余可平</th><th>净敞口</th><th>状态</th><th>更新时间</th
+              ><th>价差止盈止损</th></tr
             ></thead
           >
           <tbody>
@@ -467,9 +487,16 @@
               ><td>{{ item.residualQuantity ?? '--' }}</td
               ><td>{{ stateLabel(item.status) }}</td
               ><td>{{ formatTime(item.asOf) }}</td>
+              <td
+                ><FundingExitSettings
+                  :open-instruction-id="item.openInstructionId || item.instructionId"
+                  :plan="item.exitPlan"
+                  :can-trade="canTrade && !item.isAbnormal"
+                  @saved="$emit('refresh')"
+              /></td>
             </tr>
             <tr v-if="!activeGroups.length"
-              ><td colspan="9" class="empty-cell">暂无真实 Funding 持仓</td></tr
+              ><td colspan="10" class="empty-cell">暂无真实 Funding 持仓</td></tr
             >
           </tbody>
         </table>
@@ -479,11 +506,12 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
+  import { computed, ref, watch } from 'vue';
   import Decimal from 'decimal.js';
   import { useUserStore } from '@/store/modules/user';
   import FundingBasisPanel from './FundingBasisPanel.vue';
-  import { closeFundingAbnormalOpen } from '@/api/platform/fundingWorkspace';
+  import FundingExitSettings from './FundingExitSettings.vue';
+  import { closeFundingAbnormalOpen, recoverFundingClose } from '@/api/platform/fundingWorkspace';
   import type { FundingExecutionPolicy } from '../composables/fundingExecutionRecovery';
 
   const props = defineProps<{
@@ -529,22 +557,11 @@
   const executionPolicyLabel = computed(
     () => executionMethods.find((method) => method.value === props.executionPolicy)?.label ?? '--',
   );
-  const executionPolicyHint = computed(() => {
-    if (props.executionPolicy === 'market')
-      return '永续按当前市场成交，现货随实际成交量执行；成交价格可能变化。';
-    if (props.executionPolicy === 'fok')
-      return '永续须在限价内立即全部成交，否则取消；未成交时不下现货单。';
-    return '永续只挂单并按盘口逐次追价，现货随已确认成交量执行。';
-  });
   const pendingFeedback = computed(() =>
     ['manual_intervention', 'result_unknown'].includes(props.workspaceState)
       ? '保留原指令，等待核对'
       : '正在恢复同一指令',
   );
-  const spotFeePercent = computed(() => {
-    const rate = props.context?.openSizing?.spotBaseFeeRate;
-    return rate == null ? '--' : `${new Decimal(rate).times(100).toString()}%`;
-  });
   const estimatedNotional = computed(() => {
     try {
       const amount = new Decimal(String(props.context?.openSizing?.estimatedNotional ?? ''));
@@ -585,6 +602,35 @@
   const pendingAbnormal = ref<string | null>(null);
   const abnormalSubmitting = ref(false);
   const abnormalMessage = ref('');
+  const pendingRecovery = ref<{ instructionId: string; key: string; quantity: string } | null>(
+    null,
+  );
+  watch(
+    () => user.authentication?.user.userId,
+    () => {
+      pendingRecovery.value = null;
+      pendingAbnormal.value = null;
+      abnormalMessage.value = '';
+    },
+  );
+  async function confirmCloseRecovery() {
+    const pending = pendingRecovery.value;
+    if (!pending || abnormalSubmitting.value || !canTrade.value) return;
+    abnormalSubmitting.value = true;
+    try {
+      const result = await recoverFundingClose(pending.instructionId, pending.key);
+      abnormalMessage.value =
+        result.instruction.status === 'completed'
+          ? '原平仓已完成，永续腿未重复下单。'
+          : '原平仓仍待核对，请查看原指令与成交。';
+      if (result.instruction.status === 'completed') pendingRecovery.value = null;
+    } catch {
+      abnormalMessage.value = '补平结果尚未确认；再次确认沿用原请求，仅核对已有成交。';
+    } finally {
+      abnormalSubmitting.value = false;
+      emit('refresh');
+    }
+  }
   function selectAbnormalClose(instructionId: string) {
     stage.value = 'close';
     emit('select-close-instruction', instructionId);

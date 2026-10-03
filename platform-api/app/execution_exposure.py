@@ -53,7 +53,7 @@ def calculate_residual_exposure(batch_id: str) -> tuple[Decimal, str, str]:
 
 
 def exposure_evidence(
-    db: Connection, batch_id: str
+    db: Connection, batch_id: str, *, working_order_id: str | None = None
 ) -> tuple[Decimal, str, str, list[dict[str, Any]]]:
     """Net actual quantities before prices; never equate spread PnL with exposure.
 
@@ -112,7 +112,14 @@ def exposure_evidence(
             if order["status"] not in {"filled", "canceled", "rejected"} or order[
                 "command_status"
             ] in {"processing", "result_unknown", "accepted", "acknowledged"}:
-                trustworthy = False
+                # Funding may assess confirmed fills while its one authoritative
+                # perpetual attempt is working. This is never terminal/flat proof.
+                if not (
+                    order_id == working_order_id
+                    and order["status"] in {"accepted", "acknowledged", "partially_filled"}
+                    and order["command_status"] not in {"processing", "result_unknown"}
+                ):
+                    trustworthy = False
             if quantity == 0 and order["status"] == "filled":
                 trustworthy = False
             complete = complete and trustworthy

@@ -8,12 +8,14 @@ This projection does not write accounting facts or manufacture historical FX.
 from __future__ import annotations
 
 import json
+from bisect import bisect_left
 from collections import defaultdict
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
 from app.database import connection
+from app.pnl_reporting import REPORTING_ZONE
 from app.position_math import calculate_position_update
 from app.schemas import (
     CrossSpreadAbnormalOrderResponse,
@@ -30,7 +32,10 @@ from app.venue_identity_repository import (
     load_order_execution_links,
     load_order_identities,
 )
-from app.venue_reconciliation_repository import effective_venue_event
+from app.venue_reconciliation_repository import (
+    effective_venue_event,
+    load_venue_timestamp_corrections,
+)
 
 ZERO = Decimal("0")
 FIELDS = ("realizedPnl", "tradingPnl", "fees", "fundingPnl", "swapPnl")
@@ -725,6 +730,7 @@ def get_strategy_financials(
             "ORDER BY occurred_at,external_id",
             accounts,
         ).fetchall()
+        corrections = load_venue_timestamp_corrections(db, accounts)
         events = [
             {
                 **dict(event),
@@ -734,6 +740,7 @@ def get_strategy_financials(
                         event["account_id"],
                         event["event_type"],
                         json.loads(event["payload_json"]),
+                        corrections=corrections,
                     )
                 ),
             }
@@ -803,16 +810,24 @@ def get_strategy_financials(
             )
         )
 
+    for rates in valuation_rates.values():
+        rates.sort(key=lambda row: row[0])
+    valuation_times = {key: [row[0] for row in rates] for key, rates in valuation_rates.items()}
+
     def nearest_rate(account: str, currency: str, occurred_at: str | None) -> Decimal | None:
-        rows = valuation_rates.get((account, currency.upper()), [])
-        if not rows:
+        key = (account, currency.upper())
+        rows = valuation_rates.get(key, [])
+        if not rows or not occurred_at:
             return None
-        target = (
-            datetime.fromisoformat(str(occurred_at).replace("Z", "+00:00"))
-            if occurred_at
-            else rows[-1][0]
-        )
-        return min(rows, key=lambda row: abs((row[0] - target).total_seconds()))[1]
+        target = datetime.fromisoformat(occurred_at.replace("Z", "+00:00"))
+        index = bisect_left(valuation_times[key], target)
+        candidates = rows[max(0, index - 1):index + 1]
+        observed_at, rate = min(candidates, key=lambda row: abs((row[0] - target).total_seconds()))
+        # Account valuation observations are not historical daily FX fixings.
+        # Permit collection lag, but never value old events with a distant snapshot.
+        if abs((observed_at - target).total_seconds()) > 300 or rate <= ZERO:
+            return None
+        return rate
 
     def to_base(
         account: str, currency: str, amount: Decimal, occurred_at: str | None
@@ -873,7 +888,7 @@ def get_strategy_financials(
             return
         day = (
             datetime.fromisoformat(str(occurred_at).replace("Z", "+00:00"))
-            .astimezone(UTC)
+            .astimezone(REPORTING_ZONE)
             .date()
             .isoformat()
         )
@@ -1027,7 +1042,7 @@ def get_strategy_financials(
                 issues.add("opening_cost_basis_unavailable")
             incomplete_days[
                 datetime.fromisoformat(row["occurred_at"].replace("Z", "+00:00"))
-                .astimezone(UTC)
+                .astimezone(REPORTING_ZONE)
                 .date()
                 .isoformat()
             ] = "opening_cost_basis_unavailable"
@@ -1053,7 +1068,7 @@ def get_strategy_financials(
         if not native:
             incomplete_days[
                 datetime.fromisoformat(row["occurred_at"].replace("Z", "+00:00"))
-                .astimezone(UTC)
+                .astimezone(REPORTING_ZONE)
                 .date()
                 .isoformat()
             ] = "fill_details_pending"
@@ -1129,7 +1144,7 @@ def get_strategy_financials(
                 if fill.get("occurredAt"):
                     day = (
                         datetime.fromisoformat(fill["occurredAt"].replace("Z", "+00:00"))
-                        .astimezone(UTC)
+                        .astimezone(REPORTING_ZONE)
                         .date()
                         .isoformat()
                     )
@@ -1396,7 +1411,7 @@ def get_strategy_financials(
     for event in unattributed:
         day = (
             datetime.fromisoformat(event["occurredAt"].replace("Z", "+00:00"))
-            .astimezone(UTC)
+            .astimezone(REPORTING_ZONE)
             .date()
             .isoformat()
         )
@@ -1509,12 +1524,13 @@ def _native_fills_for_orders(db, order_ids: set[str]) -> list[dict[str, Any]] | 
             list(order_ids),
         )
     }
-    identities = load_order_identities(db)
+    accounts = sorted({row["account_id"] for row in orders.values()})
+    identities = load_order_identities(db, account_ids=accounts)
     if any(identities.canonical.get(order_id) != order_id for order_id in order_ids):
         return None
-    accounts = sorted({row["account_id"] for row in orders.values()})
     placeholders = ",".join("?" for _ in accounts) or "NULL"
     result = []
+    corrections = load_venue_timestamp_corrections(db, accounts)
     for event in db.execute(
         "SELECT account_id,payload_json FROM venue_account_events "
         f"WHERE event_type='trade_fill' AND account_id IN ({placeholders})",
@@ -1522,7 +1538,8 @@ def _native_fills_for_orders(db, order_ids: set[str]) -> list[dict[str, Any]] | 
     ):
         try:
             payload = effective_venue_event(
-                db, event["account_id"], "trade_fill", json.loads(event["payload_json"])
+                db, event["account_id"], "trade_fill", json.loads(event["payload_json"]),
+                corrections=corrections,
             )
             order_id = identities.resolve(event["account_id"], payload)
         except VenueIdentityConflict:

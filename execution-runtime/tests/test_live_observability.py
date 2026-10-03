@@ -120,7 +120,7 @@ class FakeMt5ObservabilityProvider:
         )
 
     def terminal_info(self):
-        return SimpleNamespace(trade_allowed=True)
+        return SimpleNamespace(trade_allowed=True, connected=True)
 
     def last_error(self):
         return (0, "ok")

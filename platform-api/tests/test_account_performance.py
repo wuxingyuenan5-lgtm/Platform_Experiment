@@ -13,11 +13,9 @@ from app.schemas import StrategyEquityHistoryPointResponse as Point
 def db():
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
-    # Later migrations add columns to this unrelated table; provide the minimal
-    # predecessor needed when testing the capital-performance migrations alone.
-    db.execute("CREATE TABLE cross_spread_exit_plans (id TEXT PRIMARY KEY)")
+    # This unit fixture needs only capital history and valuation provenance.
     for migration in PLATFORM_MIGRATIONS:
-        if migration.version >= 24:
+        if migration.version in (24, 25):
             for sql in migration.statements:
                 db.execute(sql)
     yield db
@@ -53,6 +51,16 @@ def test_missing_closing_day_is_not_booked_as_single_day_profit(db):
     assert daily_pnl(db, "a", rows, "mt5_trading", "equity")[1] == (
         None, None, "missing_daily_baseline"
     )
+
+
+def test_daily_gap_uses_beijing_midnight(db):
+    window(db)
+    db.execute("UPDATE account_capital_coverage SET end_at='2026-09-04T00:00:00Z'")
+    rows = points([100, 110])
+    # Consecutive UTC dates, but September 2 has no Beijing closing observation.
+    rows[0].as_of = START + timedelta(hours=15, minutes=59)
+    rows[1].as_of = START + timedelta(days=1, hours=16)
+    assert daily_pnl(db, "a", rows, "mt5_trading", "equity")[1][2] == "missing_daily_baseline"
 
 
 def window(db, movements=()):

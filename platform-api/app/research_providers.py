@@ -70,6 +70,12 @@ class FreeResearchProvider:
     async def a_share_spot(self) -> list[AShareTurnoverStock]:
         return await self._a_share.a_share_spot()
 
+    async def innovation_drug_snapshot(self) -> dict[str, Any]:
+        return await self._a_share.innovation_drug_snapshot()
+
+    async def sector_crowding_snapshot(self) -> list[dict[str, Any]]:
+        return await self._a_share.sector_crowding_snapshot()
+
     async def tracked_stock_spot(self, codes: list[str]) -> list[AShareTurnoverStock]:
         return await self._a_share.tracked_stock_spot(codes)
 

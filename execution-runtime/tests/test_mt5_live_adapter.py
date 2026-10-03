@@ -396,7 +396,7 @@ def test_mt5_live_adapter_sets_terminal_timeouts(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         fake_mt5, "account_info", lambda: account_info() if fake_mt5.login_calls else None
     )
-    monkeypatch.setattr("app.mt5_connection._ensure_background_terminal", lambda *a, **kw: None)
+    monkeypatch.setattr("app.mt5_connection.maintain_background_terminal", lambda *a, **kw: None)
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
     monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
 
@@ -413,7 +413,7 @@ def test_mt5_restart_reuses_authenticated_terminal_and_rejects_identity_drift(
 ) -> None:
     configure_mt5_secret(monkeypatch)
     fake_mt5 = FakeRuntimeMt5()
-    monkeypatch.setattr("app.mt5_connection._ensure_background_terminal", lambda *a, **kw: None)
+    monkeypatch.setattr("app.mt5_connection.maintain_background_terminal", lambda *a, **kw: None)
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
     monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
 
@@ -436,7 +436,7 @@ def test_mt5_live_adapter_passes_terminal_path_positionally(tmp_path, monkeypatc
     get_settings().journal_path = str(tmp_path / "mt5-path.db")
     initialize_journal()
     fake_mt5 = FakeRuntimeMt5()
-    monkeypatch.setattr("app.mt5_connection._ensure_background_terminal", lambda *a, **kw: None)
+    monkeypatch.setattr("app.mt5_connection.maintain_background_terminal", lambda *a, **kw: None)
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
     monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
     settings = runtime_settings(write_enabled=False)
@@ -461,7 +461,7 @@ def test_mt5_live_adapter_rejects_wrong_runtime_server(tmp_path, monkeypatch) ->
         return SimpleNamespace(**{**vars(info), "server": "Wrong-Broker"})
 
     monkeypatch.setattr(fake_mt5, "account_info", wrong_server_info)
-    monkeypatch.setattr("app.mt5_connection._ensure_background_terminal", lambda *a, **kw: None)
+    monkeypatch.setattr("app.mt5_connection.maintain_background_terminal", lambda *a, **kw: None)
     monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
     monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
 

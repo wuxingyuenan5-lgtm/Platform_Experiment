@@ -63,7 +63,7 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue';
   import type { PnlCalendarCursor } from '../composables/strategyPnlCalendar';
-  import { buildPnlCalendar, shiftMonth } from '../composables/strategyPnlCalendar';
+  import { buildPnlCalendar, shiftMonth, todayBeijing } from '../composables/strategyPnlCalendar';
   import type { StrategyPnlDayPoint } from '@/data/sample/strategy';
 
   const props = defineProps<{
@@ -77,9 +77,9 @@
   const touched = ref(false);
   const cursor = ref<PnlCalendarCursor>(anchor(props.points));
 
-  function currentUtc(): PnlCalendarCursor {
-    const now = new Date();
-    return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+  function currentBeijing(): PnlCalendarCursor {
+    const [year, month] = todayBeijing().split('-').map(Number);
+    return { year, month };
   }
 
   /** 默认落在最近有数据的那一个月；没有数据时落在当月。 */
@@ -89,7 +89,7 @@
       if (point.date > latest) latest = point.date;
     }
     const [year, month] = latest.split('-').map(Number);
-    if (!Number.isFinite(year) || !Number.isFinite(month)) return currentUtc();
+    if (!Number.isFinite(year) || !Number.isFinite(month)) return currentBeijing();
     return { year, month };
   }
 
@@ -110,7 +110,7 @@
   );
 
   const canForward = computed(() => {
-    const now = currentUtc();
+    const now = currentBeijing();
     return isMonthly.value
       ? cursor.value.year < now.year
       : cursor.value.year * 12 + cursor.value.month < now.year * 12 + now.month;

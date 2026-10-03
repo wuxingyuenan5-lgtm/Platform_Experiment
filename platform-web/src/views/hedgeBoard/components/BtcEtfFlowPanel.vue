@@ -7,6 +7,22 @@
     <div v-else-if="days.length === 0" class="etf-flow-panel__state">暂无 ETF 资金流数据</div>
     <div v-else class="etf-flow-panel__body">
       <div class="etf-flow-panel__header">
+        <div
+          v-if="mode === 'chart' && days.length > 1"
+          class="etf-flow-panel__range-buttons"
+          role="group"
+          :aria-label="`${assetLabel} ETF 历史范围`"
+        >
+          <button type="button" :class="{ active: preset === 90 }" @click="setPreset(90)"
+            >近90日</button
+          >
+          <button type="button" :class="{ active: preset === 365 }" @click="setPreset(365)"
+            >近1年</button
+          >
+          <button type="button" :class="{ active: preset === null }" @click="setPreset(null)"
+            >全部</button
+          >
+        </div>
         <div class="etf-flow-panel__mode" role="group" aria-label="ETF 视图切换">
           <button
             type="button"
@@ -148,21 +164,6 @@
               :aria-label="`${assetLabel} ETF 结束日期`"
               @input="onEndInput"
             />
-          </div>
-          <div
-            class="etf-flow-panel__range-buttons"
-            role="group"
-            :aria-label="`${assetLabel} ETF 历史范围`"
-          >
-            <button type="button" :class="{ active: preset === 90 }" @click="setPreset(90)"
-              >近90日</button
-            >
-            <button type="button" :class="{ active: preset === 365 }" @click="setPreset(365)"
-              >近1年</button
-            >
-            <button type="button" :class="{ active: preset === null }" @click="setPreset(null)"
-              >全部</button
-            >
           </div>
         </div>
       </div>

@@ -57,6 +57,7 @@ Risk policy must remain deterministic and independently testable. Risk persisten
 | Operational fill projections | `app/trading.py` |
 | Immutable financial facts | `app/financial_fact_repository.py` |
 | Formal projection calculations | `app/financial_projection_service.py` |
+| Funding automatic exit | `app/strategies/funding_exit_service.py` evaluates; `funding_exit_repository.py` owns revision/claim/link persistence; existing Funding instruction/runner owns all orders |
 | Venue reconciliation | dedicated policy/repository/client/service/routes modules |
 | EOD reconciliation | dedicated policy/repository/service/routes modules |
 | Live session approval | `app/live_trading_sessions.py` |

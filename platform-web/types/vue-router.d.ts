@@ -17,6 +17,8 @@ declare module 'vue-router' {
     roles?: RoleEnum[];
     // Whether not to cache
     ignoreKeepAlive?: boolean;
+    // The page observes its query itself; query changes must not remount it.
+    reuseOnQueryChange?: boolean;
     // Is it fixed on tab
     affix?: boolean;
     // icon on tab

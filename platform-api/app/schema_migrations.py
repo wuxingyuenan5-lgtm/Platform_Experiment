@@ -805,7 +805,8 @@ PLATFORM_MIGRATIONS += (
             asset_scope TEXT NOT NULL, occurred_at TEXT NOT NULL, currency TEXT NOT NULL,
             amount TEXT, event_type TEXT NOT NULL, payload_json TEXT NOT NULL,
             PRIMARY KEY(account_id, asset_scope, external_event_id))""",
-        "CREATE INDEX ix_capital_movement_time ON account_capital_movements(account_id, asset_scope, occurred_at)",
+        "CREATE INDEX ix_capital_movement_time ON "
+        "account_capital_movements(account_id, asset_scope, occurred_at)",
         """CREATE TABLE account_capital_coverage (
             account_id TEXT NOT NULL REFERENCES accounts(id), asset_scope TEXT NOT NULL,
             start_at TEXT NOT NULL, end_at TEXT NOT NULL, updated_at TEXT NOT NULL,
@@ -823,21 +824,25 @@ PLATFORM_MIGRATIONS += (
 
 PLATFORM_MIGRATIONS += (
     Migration(version=25, name="capital-valuation-provenance", statements=(
-        "ALTER TABLE account_valuation_rates ADD COLUMN source TEXT NOT NULL DEFAULT 'bybit_wallet'",
+        "ALTER TABLE account_valuation_rates "
+        "ADD COLUMN source TEXT NOT NULL DEFAULT 'bybit_wallet'",
     )),
 )
 
 PLATFORM_MIGRATIONS += (
     Migration(version=26, name="cross-spread-adverse-spread-guards", statements=(
-        "ALTER TABLE cross_spread_exit_plans ADD COLUMN take_profit_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
-        "ALTER TABLE cross_spread_exit_plans ADD COLUMN stop_loss_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
+        "ALTER TABLE cross_spread_exit_plans "
+        "ADD COLUMN take_profit_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
+        "ALTER TABLE cross_spread_exit_plans "
+        "ADD COLUMN stop_loss_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
     )),
 )
 
 
 PLATFORM_MIGRATIONS += (
     Migration(version=27, name="cross-spread-terminal-fill-evidence", statements=(
-        "CREATE TABLE runtime_order_terminals (order_id TEXT PRIMARY KEY REFERENCES orders(id), event_id TEXT NOT NULL UNIQUE, filled_quantity TEXT NOT NULL, occurred_at TEXT NOT NULL)",
+        "CREATE TABLE runtime_order_terminals (order_id TEXT PRIMARY KEY REFERENCES orders(id), "
+        "event_id TEXT NOT NULL UNIQUE, filled_quantity TEXT NOT NULL, occurred_at TEXT NOT NULL)",
     )),
 )
 
@@ -851,7 +856,8 @@ PLATFORM_MIGRATIONS += (
             updated_at TEXT NOT NULL, triggered_at TEXT, execution_batch_id TEXT,
             failure_reason TEXT
         )""",
-        "CREATE INDEX idx_cross_spread_open_triggers_status ON cross_spread_open_triggers(status, created_at)",
+        "CREATE INDEX idx_cross_spread_open_triggers_status "
+        "ON cross_spread_open_triggers(status, created_at)",
     )),
 )
 
@@ -941,6 +947,80 @@ PLATFORM_MIGRATIONS += (
           FOREIGN KEY(batch_id) REFERENCES execution_batches(id))""",
         """CREATE INDEX IF NOT EXISTS idx_execution_risk_actions_batch
           ON execution_risk_actions(batch_id, created_at)""",
+    )),
+    Migration(version=34, name="funding-basis-serving-projection", statements=(
+        """CREATE TABLE funding_basis_projection_cursor (
+          id INTEGER PRIMARY KEY CHECK(id=1), last_at_ms INTEGER NOT NULL DEFAULT 0,
+          completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1)),
+          updated_at TEXT NOT NULL)""",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=35, name="management-history-read-indexes", statements=(
+        "CREATE INDEX idx_account_risk_history_cover\n"
+        "        ON account_risk_snapshots(account_id,as_of,created_at,"
+        "currency,equity,asset_scope,total_assets)\n"
+        "        WHERE equity IS NOT NULL",
+        """CREATE INDEX idx_market_spread_instance_time
+        ON market_spread_snapshots(strategy_key,strategy_instance_id,observed_at)""",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=36, name="data-audit-persistence", statements=(
+        """CREATE TABLE IF NOT EXISTS data_audit_runs (
+          id INTEGER PRIMARY KEY, checked_at TEXT NOT NULL, report_json TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS data_audit_calendar (
+          market TEXT PRIMARY KEY, fetched_at TEXT NOT NULL,
+          days_json TEXT NOT NULL, source TEXT NOT NULL)""",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(version=37, name="cross-market-sampling-read-index", statements=(
+        """CREATE INDEX idx_market_spread_instance_created
+        ON market_spread_snapshots(strategy_key,strategy_instance_id,created_at DESC)""",
+    )),
+    Migration(version=38, name="user-research-market-layouts", statements=(
+        """CREATE TABLE user_research_market_layouts (
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            market_id TEXT NOT NULL,
+            groups_json TEXT NOT NULL,
+            row_version INTEGER NOT NULL CHECK(row_version >= 1),
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(user_id, market_id)
+        )""",
+    )),
+    Migration(version=39, name="funding-executable-spread-exit-plans", statements=(
+        """CREATE TABLE funding_exit_plans (
+            open_instruction_id TEXT PRIMARY KEY REFERENCES strategy_runs(id),
+            account_id TEXT NOT NULL REFERENCES accounts(id),
+            revision INTEGER NOT NULL CHECK(revision>0),
+            enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+            take_profit_spread TEXT,
+            stop_loss_spread TEXT,
+            configured_by TEXT NOT NULL,
+            close_key TEXT UNIQUE,
+            trigger_json TEXT,
+            close_instruction_id TEXT REFERENCES strategy_runs(id),
+            last_error TEXT,
+            updated_at TEXT NOT NULL
+        )""",
+    )),
+    Migration(version=40, name="execution-audit-subject-lookup", statements=(
+        "CREATE INDEX idx_audit_events_subject_type ON audit_events(subject_id,event_type)",
+    )),
+    Migration(version=41, name="account-current-observation-lookups", statements=(
+        "CREATE INDEX idx_balance_current_currency "
+        "ON balance_snapshots(account_id,upper(currency),as_of DESC,id)",
+        "CREATE INDEX idx_account_risk_observed_time "
+        "ON account_risk_snapshots(account_id,julianday(as_of) DESC,asset_scope)",
+        "CREATE INDEX idx_account_capital_coverage_end "
+        "ON account_capital_coverage(account_id,asset_scope,julianday(end_at) DESC)",
     )),
 )
 

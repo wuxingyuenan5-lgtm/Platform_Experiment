@@ -49,6 +49,17 @@ class MacroDashboardResponse(ResearchApiModel):
     as_of: str
     groups: dict[str, list[MacroDashboardSeries]]
 
+    def stale_copy(self) -> MacroDashboardResponse:
+        result = self.model_copy(deep=True)
+        result.status = "stale"
+        for series in (item for group in result.groups.values() for item in group):
+            if series.status not in {"error", "no_data"}:
+                series.status = "stale"
+                series.is_stale = True
+                if "local_artifact_unavailable" not in series.quality_flags:
+                    series.quality_flags.append("local_artifact_unavailable")
+        return result
+
 
 class MacroDashboardProvider:
     def __init__(self, *, timeout_seconds: float, user_agent: str) -> None:
@@ -68,7 +79,7 @@ class MacroDashboardProvider:
             return contract
         except Exception as exc:
             if self._last_known_good is not None:
-                return self._last_known_good.model_copy(deep=True)
+                return self._last_known_good.stale_copy()
             if isinstance(exc, ResearchProviderError):
                 raise
             raise ResearchProviderError(

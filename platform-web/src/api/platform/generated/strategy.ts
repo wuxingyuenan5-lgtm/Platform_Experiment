@@ -477,6 +477,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/risk/kill-switches/{scope_type}/{scope_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Kill Switch */
+    get: operations['read_kill_switch_api_v1_risk_kill_switches__scope_type___scope_id__get'];
+    /** Change Kill Switch */
+    put: operations['change_kill_switch_api_v1_risk_kill_switches__scope_type___scope_id__put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/security/credential-references': {
     parameters: {
       query?: never;
@@ -866,6 +884,23 @@ export interface paths {
     put?: never;
     /** Create Strategy Instruction */
     post: operations['create_strategy_instruction_api_v1_strategies__strategy_instance_id__instructions_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/strategies/{strategy_instance_id}/instructions/by-idempotency/{idempotency_key}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Strategy Instruction By Idempotency */
+    get: operations['strategy_instruction_by_idempotency_api_v1_strategies__strategy_instance_id__instructions_by_idempotency__idempotency_key__get'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1317,6 +1352,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/trading/funding/exit-plans/{open_instruction_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Configure Funding Exit Plan */
+    patch: operations['configure_funding_exit_plan_api_v1_trading_funding_exit_plans__open_instruction_id__patch'];
+    trace?: never;
+  };
   '/api/v1/trading/funding/instructions': {
     parameters: {
       query?: never;
@@ -1346,6 +1398,23 @@ export interface paths {
     get: operations['funding_instruction_workspace_api_v1_trading_funding_instructions__instruction_id__get'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/trading/funding/instructions/{instruction_id}/recover-close': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Funding Close Recovery */
+    post: operations['funding_close_recovery_api_v1_trading_funding_instructions__instruction_id__recover_close_post'];
     delete?: never;
     options?: never;
     head?: never;
@@ -3257,6 +3326,11 @@ export interface components {
       /** Reason */
       reason?: string | null;
     };
+    /** FundingCloseRecoveryRequest */
+    FundingCloseRecoveryRequest: {
+      /** Idempotencykey */
+      idempotencyKey: string;
+    };
     /** FundingEvent */
     FundingEvent: {
       /**
@@ -3363,6 +3437,42 @@ export interface components {
       /** Venue */
       venue: string;
     };
+    /** FundingExitPlanRequest */
+    FundingExitPlanRequest: {
+      /** Enabled */
+      enabled: boolean;
+      /** Expectedrevision */
+      expectedRevision: number;
+      /** Stoplossspread */
+      stopLossSpread?: string | null;
+      /** Takeprofitspread */
+      takeProfitSpread?: string | null;
+    };
+    /** FundingExitPlanResponse */
+    FundingExitPlanResponse: {
+      /** Closeinstructionid */
+      closeInstructionId: string | null;
+      /** Enabled */
+      enabled: boolean;
+      /** Lasterror */
+      lastError: string | null;
+      /** Openinstructionid */
+      openInstructionId: string;
+      /** Revision */
+      revision: number;
+      /** Stoplossspread */
+      stopLossSpread: string | null;
+      /** Takeprofitspread */
+      takeProfitSpread: string | null;
+      /** Triggerreason */
+      triggerReason: ('take_profit' | 'stop_loss') | null;
+      /** Triggerspread */
+      triggerSpread: string | null;
+      /** Triggeredat */
+      triggeredAt: string | null;
+      /** Updatedat */
+      updatedAt: string;
+    };
     /** FundingInstructionRequest */
     FundingInstructionRequest: {
       /**
@@ -3448,7 +3558,7 @@ export interface components {
        * @default reconcile
        * @enum {string}
        */
-      abnormalAction: 'close_group' | 'flatten_open' | 'reconcile';
+      abnormalAction: 'close_group' | 'flatten_open' | 'finish_close' | 'reconcile';
       /** Abnormalreason */
       abnormalReason?: string | null;
       /** Alreadyclosedquantity */
@@ -3463,6 +3573,7 @@ export interface components {
       cumulativePerpetualFill: string;
       /** Cumulativespotfill */
       cumulativeSpotFill: string;
+      exitPlan?: components['schemas']['FundingExitPlanResponse'] | null;
       /** Fees */
       fees: string | null;
       /** Fundingfees */
@@ -3497,6 +3608,12 @@ export interface components {
       perpetualSymbol: string;
       /** Pnl */
       pnl: string | null;
+      /** Recoverycloseinstructionid */
+      recoveryCloseInstructionId?: string | null;
+      /** Recoveryidempotencykey */
+      recoveryIdempotencyKey?: string | null;
+      /** Recoveryspotquantity */
+      recoverySpotQuantity?: string | null;
       /** Remainingclosablequantity */
       remainingClosableQuantity: string;
       /** Remainingperpetualquantity */
@@ -3705,6 +3822,40 @@ export interface components {
        * Format: date-time
        */
       updatedAt: string;
+    };
+    /** KillSwitchResponse */
+    KillSwitchResponse: {
+      /** Actor */
+      actor: string;
+      /** Enabled */
+      enabled: boolean;
+      /** Reason */
+      reason?: string | null;
+      /** Scopeid */
+      scopeId: string;
+      /**
+       * Scopetype
+       * @enum {string}
+       */
+      scopeType: 'global' | 'strategy' | 'account';
+      /**
+       * Updatedat
+       * Format: date-time
+       */
+      updatedAt: string;
+      /** Version */
+      version: number;
+    };
+    /** KillSwitchUpdateRequest */
+    KillSwitchUpdateRequest: {
+      /** Actor */
+      actor: string;
+      /** Enabled */
+      enabled: boolean;
+      /** Idempotencykey */
+      idempotencyKey: string;
+      /** Reason */
+      reason?: string | null;
     };
     /** LiveTradingSessionApprovalRequest */
     LiveTradingSessionApprovalRequest: {
@@ -5970,6 +6121,74 @@ export interface operations {
       };
     };
   };
+  read_kill_switch_api_v1_risk_kill_switches__scope_type___scope_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        scope_type: string;
+        scope_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KillSwitchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  change_kill_switch_api_v1_risk_kill_switches__scope_type___scope_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        scope_type: string;
+        scope_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['KillSwitchUpdateRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KillSwitchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   credential_references_api_v1_security_credential_references_get: {
     parameters: {
       query?: never;
@@ -6730,6 +6949,40 @@ export interface operations {
         'application/json': components['schemas']['CreateStrategyInstructionRequest'];
       };
     };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  strategy_instruction_by_idempotency_api_v1_strategies__strategy_instance_id__instructions_by_idempotency__idempotency_key__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        strategy_instance_id: string;
+        idempotency_key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description Successful Response */
       200: {
@@ -7606,6 +7859,41 @@ export interface operations {
       };
     };
   };
+  configure_funding_exit_plan_api_v1_trading_funding_exit_plans__open_instruction_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        open_instruction_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FundingExitPlanRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FundingExitPlanResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   funding_instruction_by_idempotency_api_v1_trading_funding_instructions_get: {
     parameters: {
       query: {
@@ -7680,6 +7968,41 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FundingWorkspaceResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  funding_close_recovery_api_v1_trading_funding_instructions__instruction_id__recover_close_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        instruction_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FundingCloseRecoveryRequest'];
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {

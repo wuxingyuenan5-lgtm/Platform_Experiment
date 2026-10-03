@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, watch } from 'vue';
+  import { computed, ref, watch } from 'vue';
   import ResearchDraftImport from '../shared/ResearchDraftImport.vue';
   import type { components } from '@/api/platform/generated/strategy';
   import StrategyResearchWorkspace from '../shared/StrategyResearchWorkspace.vue';
@@ -89,7 +89,7 @@
     selectSymbol,
     selectCloseInstruction,
     selectCloseFraction,
-  } = useFundingWorkspace();
+  } = useFundingWorkspace(computed(() => localSection.value === 'execution'));
 
   function applyResearchDraft(draft: components['schemas']['DraftRequest']) {
     if (submitting.value || pendingDraft.value || draft.direction !== 'sell_spread') return;
@@ -106,7 +106,6 @@
     () => props.activeSection,
     (value) => {
       localSection.value = value;
-      if (value === 'execution') refreshAll();
     },
     { immediate: true },
   );

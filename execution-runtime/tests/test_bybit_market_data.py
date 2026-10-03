@@ -175,3 +175,34 @@ def test_market_catalog_is_cached_for_the_ttl():
         assert len(calls) == 1
     finally:
         reader.close()
+
+
+def test_independent_ticker_network_reads_do_not_hold_parser_lock():
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    barrier = Barrier(2, timeout=2)
+
+    def read(method, **params):
+        category = params["category"]
+        if method == "get_tickers":
+            barrier.wait()
+            return {"time": 1788832800123, "result": {"category": category, "list": [
+                {"symbol": "XAUTUSDT", "bid1Price": "3500.1", "ask1Price": "3500.2"}
+            ]}}
+        rows = [] if params.get("status") == "PreLaunch" else [market_row(category)]
+        return {"result": {"category": category, "list": rows, "nextPageCursor": ""}}
+
+    reader = BybitMarketData(read)
+    try:
+        reader.market("spot", "XAUTUSDT")
+        reader.market("linear", "XAUTUSDT")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            jobs = [pool.submit(reader.ticker, category, "XAUTUSDT")
+                    for category in ("spot", "linear")]
+            results = [job.result() for job in jobs]
+        assert [result[0]["spot"] for result in results] == [True, False]
+        assert all(result[1]["bid"] == "3500.1" for result in results)
+        assert all(result[3]["time"] == 1788832800123 for result in results)
+    finally:
+        reader.close()

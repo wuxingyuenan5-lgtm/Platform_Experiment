@@ -247,7 +247,6 @@ def validate_candidate_documentation(
 ) -> list[str]:
     errors: list[str] = []
     stable_version = candidate_version(root)
-    candidate = next_patch_version(stable_version)
     if not stable_version:
         errors.append("VERSION is missing or empty for candidate documentation validation")
 
@@ -268,7 +267,7 @@ def validate_candidate_documentation(
     for alternatives in CURRENT_STATE_SCOPE_REQUIREMENTS:
         if not any(alternative.casefold() in current_folded for alternative in alternatives):
             errors.append(
-                f"docs/BASELINE.md must describe Platform {candidate} candidate scope: "
+                "docs/BASELINE.md must describe current candidate scope: "
                 + " or ".join(alternatives)
             )
 
@@ -317,11 +316,14 @@ def validate_entrypoints(root: Path) -> list[str]:
 def validate_current_authority(root: Path) -> list[str]:
     current = (root / "docs/BASELINE.md").read_text(encoding="utf-8")
     stable_version = candidate_version(root)
-    candidate = next_patch_version(stable_version)
     errors: list[str] = []
+    candidate = re.search(r"Current candidate target: Platform `([^`]+)`\.", current)
+    if candidate is None or candidate.group(1) not in {
+        stable_version, next_patch_version(stable_version)
+    }:
+        errors.append("BASELINE.md candidate target must be the stable VERSION or next patch")
     required = (
         f"Stable baseline: Platform `{stable_version}`",
-        f"Current candidate target: Platform `{candidate}`",
         "Platform Live Write and Runtime Live Write remain disabled by default",
         "Candidate validation does not mean the candidate is released, deployed or production-ready",
         "remain unverified",

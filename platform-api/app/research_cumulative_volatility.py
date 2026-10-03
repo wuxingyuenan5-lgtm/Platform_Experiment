@@ -15,9 +15,9 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import uuid4
 
-from app.database import connection
 from app import runtime_transport
 from app.config import get_settings
+from app.database import connection
 from app.research_a_share_repository import finish_refresh, start_refresh, write_history_points
 from app.research_provider_errors import ResearchProviderError
 
@@ -35,7 +35,9 @@ _STALE_AFTER = timedelta(minutes=45)
 _DERIVED_WINDOW_TOLERANCE = timedelta(days=2)
 
 
-def _shared_bybit_bars(asset: str, start: datetime, end: datetime) -> list[tuple[datetime, Decimal]]:
+def _shared_bybit_bars(
+    asset: str, start: datetime, end: datetime
+) -> list[tuple[datetime, Decimal]]:
     """Read strategy-owned closed trade candles; raw prices are not duplicated."""
     from app.strategy_research_projection import read_projection
 
@@ -76,9 +78,9 @@ def _shared_bybit_bars(asset: str, start: datetime, end: datetime) -> list[tuple
                 "symbol": symbol,
                 "category": "linear",
                 "priceType": "trade",
-                "startMs": int(repair_start.timestamp() * 1000),
-                "endMs": int(end.timestamp() * 1000),
-                "limit": 5000,
+                "startMs": str(int(repair_start.timestamp() * 1000)),
+                "endMs": str(int(end.timestamp() * 1000)),
+                "limit": "5000",
             },
             timeout=20,
         )
@@ -203,7 +205,9 @@ def calculate_cumulative_volatility(
             previous_close[key] = close
             previous_cumulative[session] = cumulative
             baseline = price_baselines.get(session_date)
-            price_change = ((close / baseline) - Decimal("1")) * Decimal("100") if baseline else None
+            price_change = (
+                ((close / baseline) - Decimal("1")) * Decimal("100") if baseline else None
+            )
             points.append(
                 {
                     "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
@@ -213,7 +217,9 @@ def calculate_cumulative_volatility(
                     "value": format(cumulative, "f"),
                     "price": format(close, "f"),
                     "priceBaseline": format(baseline, "f") if baseline else None,
-                    "priceChangePct": format(price_change, "f") if price_change is not None else None,
+                    "priceChangePct": format(price_change, "f")
+                    if price_change is not None
+                    else None,
                 }
             )
     points.sort(key=lambda point: (point["timestamp"], point["interval"], point["session"]))
@@ -331,19 +337,79 @@ def _rebase_points_to_window(points: list[dict[str, Any]]) -> None:
             continue
 
 
+def _sample_window(timestamp: str, interval: str) -> tuple[datetime, datetime]:
+    observed = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(UTC)
+    session, session_date = _session_for(observed)
+    start = _session_start(session, session_date)
+    duration = timedelta(minutes=_INTERVALS[interval])
+    lower = start + ((observed - start) // duration) * duration
+    return lower, lower + duration
+
+
+def _latest_samples(points: list[dict[str, Any]], interval: str) -> list[dict[str, Any]]:
+    # Older producers appended every provisional close in an unfinished bucket.
+    # A sampling level represents one final/latest observation per bucket.
+    samples: dict[tuple[str, datetime], dict[str, Any]] = {}
+    for point in sorted(points, key=lambda item: item["timestamp"]):
+        lower, _ = _sample_window(point["timestamp"], interval)
+        samples[(point["session"], lower)] = point
+    return sorted(samples.values(), key=lambda point: (point["timestamp"], point["session"]))
+
+
+def _publish_samples(
+    run_id: str, points: list[tuple[str, str, dict[str, Any]]], rebuilt: set[str]
+) -> None:
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        for asset in rebuilt:
+            db.execute(
+                "DELETE FROM research_a_share_history WHERE dataset=? AND entity_code LIKE ?",
+                (DATASET, f"{asset}:%"),
+            )
+        for timestamp, entity, payload in points:
+            if payload["asset"] in rebuilt:
+                continue
+            lower, upper = _sample_window(timestamp, payload["interval"])
+            db.execute(
+                """DELETE FROM research_a_share_history
+                   WHERE dataset=? AND entity_code=? AND observed_at>=? AND observed_at<?
+                     AND observed_at<>?""",
+                (DATASET, entity, lower.isoformat().replace("+00:00", "Z"),
+                 upper.isoformat().replace("+00:00", "Z"), timestamp),
+            )
+        write_history_points(run_id, DATASET, points, source=SOURCE, db=db)
+
+
 def read_cumulative_volatility(
-    asset: str = "btc", days: int = _MAX_RANGE_DAYS, interval: str = "15m"
+    asset: str = "btc", days: int = _MAX_RANGE_DAYS, interval: str = "15m",
+    *, start: datetime | None = None, end: datetime | None = None,
 ) -> dict[str, Any]:
     if asset not in _ASSETS or interval not in _INTERVALS:
         raise ValueError("asset must be btc|gold and interval must be 15m|1h|4h")
-    cutoff = datetime.now(UTC) - timedelta(days=max(1, min(days, _MAX_RANGE_DAYS)))
+    now = datetime.now(UTC)
+    if any(value is not None and value.utcoffset() is None for value in (start, end)):
+        raise ValueError("start and end must include a timezone")
+    if start is not None and end is not None and start > end:
+        raise ValueError("start must not be after end")
+    cutoff = now - timedelta(days=max(1, min(days, _MAX_RANGE_DAYS)))
+    cutoff = max(cutoff, start.astimezone(UTC)) if start else cutoff
+    upper = min(now, end.astimezone(UTC)) if end else now
+    entities = tuple(f"{asset}:{session}:{interval}" for session in _SESSION_LABELS)
     with connection() as db:
+        coverage = db.execute(
+            """SELECT MIN(observed_at) AS first_at, MAX(observed_at) AS last_at
+               FROM research_a_share_history
+               WHERE dataset=? AND entity_code IN (?, ?, ?)""",
+            (DATASET, *entities),
+        ).fetchone()
         rows = db.execute(
             """SELECT observed_at, entity_code, payload_json, source
                FROM research_a_share_history
-               WHERE dataset=? AND entity_code LIKE ? AND observed_at>=?
+               WHERE dataset=? AND entity_code IN (?, ?, ?)
+                 AND observed_at>=? AND observed_at<=?
                ORDER BY observed_at ASC""",
-            (DATASET, f"{asset}:%", cutoff.isoformat().replace("+00:00", "Z")),
+            (DATASET, *entities, cutoff.isoformat().replace("+00:00", "Z"),
+             upper.isoformat().replace("+00:00", "Z")),
         ).fetchall()
     points: list[dict[str, Any]] = []
     source = SOURCE
@@ -369,11 +435,11 @@ def read_cumulative_volatility(
                 "priceChangePct": payload.get("priceChangePct"),
             }
         )
-    points.sort(key=lambda point: (point["timestamp"], point["session"]))
+    points = _latest_samples(points, interval)
     # Stored values are absolute within retained history; the chart contract
     # is relative to the requested window, just like the reference notebook.
     _rebase_points_to_window(points)
-    as_of = points[-1]["timestamp"] if points else None
+    as_of = coverage["last_at"]
     is_stale = bool(
         as_of
         and datetime.fromisoformat(as_of.replace("Z", "+00:00"))
@@ -387,8 +453,8 @@ def read_cumulative_volatility(
         "timezone": "UTC",
         "source": source,
         "asOf": as_of,
-        "availableFrom": points[0]["timestamp"] if points else None,
-        "availableTo": points[-1]["timestamp"] if points else None,
+        "availableFrom": coverage["first_at"],
+        "availableTo": coverage["last_at"],
         "isStale": is_stale,
         "message": ("当前范围暂无已落库观测。" if not points else None),
         "points": points,
@@ -423,6 +489,8 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
             start = full_start
         else:
             start = max(full_start, latest - timedelta(days=2))
+        if latest and not needs_backfill:
+            start = _session_start(*_session_for(start))
         write_cutoff = None if needs_backfill or not latest else latest - timedelta(hours=2)
         seeds = _seed_cumulative(asset, start) if latest and not needs_backfill else None
         try:
@@ -443,6 +511,7 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
         if rebuild_requested and not rebuild_ready and latest:
             needs_backfill = False
             start = max(full_start, latest - timedelta(days=2))
+            start = _session_start(*_session_for(start))
             write_cutoff = latest - timedelta(hours=2)
             seeds = _seed_cumulative(asset, start)
             try:
@@ -468,19 +537,8 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
             )
         except (TypeError, ValueError, InvalidOperation) as exc:
             failures.append(f"{asset}:{type(exc).__name__}")
-    if successful_backfills:
-        # The first price-overlay rollout replaces the derived rows for each
-        # successfully recalculated asset. This removes obsolete pre-overlay
-        # sampling points (which cannot be safely upserted by timestamp alone)
-        # without touching the strategy-owned raw archive or a failed asset.
-        with connection() as db:
-            for asset in successful_backfills:
-                db.execute(
-                    "DELETE FROM research_a_share_history WHERE dataset=? AND entity_code LIKE ?",
-                    (DATASET, f"{asset}:%"),
-                )
     if points:
-        write_history_points(run_id, DATASET, points, source=SOURCE)
+        _publish_samples(run_id, points, successful_backfills)
     if failures and not points:
         message = f"Shared Bybit strategy candles unavailable for: {', '.join(failures)}"
         finish_refresh(run_id, "error", error_code="ResearchProviderError", message=message)

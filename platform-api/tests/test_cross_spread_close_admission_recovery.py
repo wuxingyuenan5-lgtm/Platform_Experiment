@@ -22,6 +22,8 @@ from app.database import connection, initialize_database
 def plan(monkeypatch):
     initialize_database()
     monkeypatch.setattr(get_settings(), "live_trading_enabled", True)
+    monkeypatch.setattr(service, "assert_cross_spread_market_executable", lambda **_: None)
+    monkeypatch.setattr(service, "assert_cross_spread_native_trading_rules", lambda: None)
     now = datetime.now(UTC).isoformat()
     with connection() as db:
         db.execute(

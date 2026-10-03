@@ -904,6 +904,7 @@ export function accountCapitalProfile(
       periodOptions: [{ key: 'all', label: '已记录' }],
       defaultMetric: 'equity',
       defaultPeriod: 'all',
+      timestamps: history.map((point) => point.asOf),
       xLabels: history.map((point) => formatTime(point.asOf)),
       netValueData: history.map((point) => Number(point.value)),
       drawdownData: history.map((point) => {

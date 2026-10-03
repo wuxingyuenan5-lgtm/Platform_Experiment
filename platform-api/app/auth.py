@@ -199,6 +199,8 @@ def assurance_for_request(method: str, path: str, settings: Settings) -> Authent
     )
     if path in HUMAN_SESSION_PATHS or is_human_prefix:
         return AuthenticationAssurance.HUMAN_SESSION
+    if normalized_method == "POST" and path.endswith("/trading/cross-spread/preflight"):
+        return AuthenticationAssurance.PLATFORM_READ
     if normalized_method in SAFE_METHODS:
         return AuthenticationAssurance.PLATFORM_READ
     if settings.environment.lower() == "live" or settings.live_trading_enabled:
@@ -273,7 +275,8 @@ def enforce_assurance(
             "Human browser session authentication is required",
         )
     if assurance == AuthenticationAssurance.LIVE_WRITE and principal.auth_method not in {
-        "api_key", "session"
+        "api_key",
+        "session",
     }:
         raise AuthenticationError(
             403,
@@ -300,7 +303,9 @@ def permission_for_request(method: str, path: str) -> str:
         return "research.read"
     if normalized_method == "POST" and (
         path in {"/api/v1/research/strategies/experiments", "/api/v1/research/strategies/drafts"}
-        or (path.startswith("/api/v1/research/strategies/experiments/") and path.endswith("/cancel"))
+        or (
+            path.startswith("/api/v1/research/strategies/experiments/") and path.endswith("/cancel")
+        )
     ):
         return "research.write"
     if normalized_method == "POST" and path == "/api/v1/research/a-share/stock-pool/focus":
@@ -349,6 +354,9 @@ def permission_for_request(method: str, path: str) -> str:
     if path.endswith("/trading/cross-spread/preflight"):
         return "platform:read"
 
+    if path.startswith("/api/v1/trading/funding/instructions/") and path.endswith("/recover-close"):
+        return "trading.write"
+
     if path.endswith("/trading/commands") or path.endswith("/trading/execution-batches"):
         return "trade:submit"
     if path.endswith("/trading/orders") and normalized_method == "POST":
@@ -369,6 +377,8 @@ def permission_for_request(method: str, path: str) -> str:
     if path.endswith("/trading/cross-spread/lifecycle/open"):
         return "trading.write"
     if normalized_method == "PATCH" and "/trading/cross-spread/exit-plans/" in path:
+        return "trading.write"
+    if normalized_method == "PATCH" and "/trading/funding/exit-plans/" in path:
         return "trading.write"
     if "/trading/cross-spread/exit-plans/" in path and path.endswith("/close"):
         return "trading.write"
@@ -450,6 +460,10 @@ async def requires_ceo_trade_authority(request: Request) -> bool:
     if request.method.upper() not in {"POST", "PATCH"}:
         return False
     if request.url.path.startswith(
+        "/api/v1/trading/funding/instructions/"
+    ) and request.url.path.endswith("/recover-close"):
+        return True
+    if request.url.path.startswith(
         "/api/v1/trading/execution-batches/"
     ) and request.url.path.endswith("/risk-actions"):
         batch_id = request.url.path.split("/")[-2]
@@ -460,6 +474,10 @@ async def requires_ceo_trade_authority(request: Request) -> bool:
         )
     if request.method.upper() == "PATCH" and request.url.path.startswith(
         "/api/v1/trading/cross-spread/exit-plans/"
+    ):
+        return True
+    if request.method.upper() == "PATCH" and request.url.path.startswith(
+        "/api/v1/trading/funding/exit-plans/"
     ):
         return True
     if request.url.path in CEO_TRADE_WRITE_PATHS:

@@ -9,7 +9,12 @@ from test_strategy_research import T, event
 from app.config import get_settings
 from app.database import initialize_database
 from app.database_connection import connection
-from app.strategy_research_projection import price_coverage, project_next, read_projection
+from app.strategy_research_projection import (
+    price_coverage,
+    project_funding_basis_next,
+    project_next,
+    read_projection,
+)
 from app.strategy_research_repository import publish, read_rows
 from app.strategy_research_series import seconds_series
 
@@ -71,6 +76,32 @@ def test_indexed_sampling_preserves_decimal_and_empty_intervals(archive):
     assert [r["closeTimeMs"] for r in points] == [str(3 * 60000), str(29 * 60000)]
     assert all(r["close"] == "123.456789012345678901" for r in points)
     assert read_projection("historical_candle", "BTCUSDT:linear:trade", 4 * 60000, 15 * 60000) == []
+
+
+def test_funding_basis_is_persisted_from_paired_candles(archive):
+    stamp = 1789776000000
+    rows = [
+        (
+            "historical_candle",
+            "ETHUSDT:linear:trade",
+            stamp,
+            json.dumps({"symbol": "ETHUSDT", "category": "linear", "close": "2501.234567890123"}),
+        ),
+        (
+            "historical_candle",
+            "ETHUSDT:spot:trade",
+            stamp,
+            json.dumps({"symbol": "ETHUSDT", "category": "spot", "close": "2500.000000000001"}),
+        ),
+    ]
+    with connection() as db:
+        db.executemany("INSERT INTO research_strategy_projection VALUES(?,?,?,?)", rows)
+
+    assert project_funding_basis_next() is True
+    basis = read_projection("funding_basis", "ETH")
+    assert basis[0]["ohlc"]["midSpread"]["close"] == "1.234567890122"
+    assert basis[0]["basisSource"] == "same_bucket_historical_closes"
+    assert project_funding_basis_next() is False
 
 
 def test_window_get_never_reads_archive_or_triggers_projection(archive, monkeypatch):
@@ -148,3 +179,37 @@ def test_spread_chart_preserves_exact_prices_and_breaks_gaps():
         {"value": [2000, None]},
         {"value": [4000, value], "exactPrice": value},
     ]
+
+
+def test_large_shard_projects_every_row_without_decoding_unused_raw_payloads(archive, monkeypatch):
+    raw = event(1)
+    raw.update(
+        kind="price_history", stream="bybit:linear:BTCUSDT:trade", ingestionMode="backfill",
+        payload={
+            "intervalMs": "60000", "symbol": "BTCUSDT", "category": "linear",
+            "priceType": "trade",
+            "response": {"result": {"list": [
+                [str(1_000_000 + i * 60000), "1", "2", "1", "1.123456789012"]
+                for i in range(701)
+            ]}},
+        },
+    )
+    publish({"schemaVersion": "market-events.v1", "after": None,
+             "nextCursor": "1", "events": [raw]})
+    original_loads = json.loads
+    decoded_raw = []
+
+    def observe(value, *args, **kwargs):
+        result = original_loads(value, *args, **kwargs)
+        if isinstance(result, dict) and result.get("kind") == "price_history":
+            decoded_raw.append(result)
+        return result
+
+    with monkeypatch.context() as patch:
+        patch.setattr(json, "loads", observe)
+        assert project_next()
+    rows = read_projection("historical_candle", "BTCUSDT:linear:trade")
+    assert len(rows) == 701
+    assert {row["close"] for row in rows} == {"1.123456789012"}
+    assert not decoded_raw
+    assert project_next() is False

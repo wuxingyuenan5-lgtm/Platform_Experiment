@@ -1,6 +1,6 @@
 {
   "name": "vg-platform-web",
-  "version": "0.11.3",
+  "version": "0.11.4",
   "private": true,
   "description": "Platform research, trading, risk, identity, portfolio and reconciliation web application",
   "homepage": "https://github.com/wuxingyuenan5-lgtm/Platform_Experiment",
@@ -34,6 +34,7 @@
     "reinstall": "rimraf pnpm-lock.yaml && rimraf package.lock.json && rimraf node_modules && npm run bootstrap",
     "serve": "npm run dev",
     "sync:trading-tools": "node scripts/sync-trading-tools-from-md.cjs",
+    "test:charts": "node --test scripts/test-echarts-lifecycle.cjs scripts/test-capital-chart-refresh.cjs scripts/test-navigation-lifecycle.cjs",
     "test:codebase-boundaries": "node scripts/check-codebase-boundaries.cjs",
     "test:cross-spread-funding-transfer": "node scripts/test-cross-spread-funding-transfer.cjs",
     "test:cross-spread-layout": "node scripts/verify-cross-spread-layout.cjs",

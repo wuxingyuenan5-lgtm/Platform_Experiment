@@ -26,6 +26,7 @@ def create_system_router(settings: Settings, platform_version: str) -> APIRouter
         # Async route remains responsive when blocking venue calls occupy workers.
         return {
             "watchdog": monitor_health.watchdog_snapshot(),
+            "dataAudit": monitor_health.snapshot("data_audit", enabled=True, deadline=900),
             "accountSync": monitor_health.snapshot("account_sync", enabled=True, deadline=180),
             "accountHistory": monitor_health.snapshot(
                 "account_history", enabled=True, deadline=600
@@ -33,6 +34,8 @@ def create_system_router(settings: Settings, platform_version: str) -> APIRouter
             "managementProjection": monitor_health.snapshot(
                 "management_projection", enabled=True, deadline=120
             ),
+            "fundingRunner": monitor_health.snapshot("funding_runner", enabled=True, deadline=60),
+            "fundingExit": monitor_health.snapshot("funding_exit", enabled=True, deadline=60),
             "crossExit": monitor_health.snapshot(
                 "cross_exit",
                 enabled=settings.cross_spread_exit_monitor_enabled,

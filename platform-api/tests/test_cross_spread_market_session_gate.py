@@ -42,7 +42,11 @@ def snapshot(*, mt5_open: bool, mt5_close: bool) -> CrossSpreadSnapshotResponse:
 def test_normal_cross_execution_is_blocked_when_mt5_session_is_closed(
     monkeypatch, is_close: bool, allowed: bool
 ) -> None:
-    monkeypatch.setattr(cross_spread, "get_cross_spread_snapshot", lambda: snapshot(mt5_open=allowed, mt5_close=allowed))
+    monkeypatch.setattr(
+        cross_spread,
+        "get_cross_spread_snapshot",
+        lambda: snapshot(mt5_open=allowed, mt5_close=allowed),
+    )
     with pytest.raises(HTTPException) as exc_info:
         cross_spread.assert_cross_spread_market_executable(is_close=is_close)
     assert exc_info.value.status_code == 423

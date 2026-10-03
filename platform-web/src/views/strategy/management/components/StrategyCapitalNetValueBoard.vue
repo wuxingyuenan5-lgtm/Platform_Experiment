@@ -16,6 +16,19 @@
             item.label
           }}</option>
         </select>
+        <div class="precision-controls" role="group" aria-label="曲线精度">
+          <button
+            v-for="item in precisionOptions"
+            :key="item.key"
+            type="button"
+            class="mode-button"
+            :class="{ 'is-active': precisionKey === item.key }"
+            :aria-pressed="precisionKey === item.key"
+            @click="precisionKey = item.key"
+          >
+            {{ item.label }}
+          </button>
+        </div>
         <template
           v-if="
             curve.modeOptions?.length &&
@@ -60,12 +73,44 @@
   const metricKey = ref(props.curve.defaultMetric);
   const periodKey = ref(props.curve.defaultPeriod);
   const modeKey = ref(props.curve.defaultMode || props.curve.modeOptions?.[0]?.key || '');
+  const precisionOptions = [
+    { key: '5min', label: '5min', duration: 300_000 },
+    { key: '1h', label: '1h', duration: 3_600_000 },
+    { key: '4h', label: '4h', duration: 14_400_000 },
+    { key: 'day', label: '日', duration: 86_400_000 },
+    { key: 'week', label: '周', duration: 604_800_000 },
+  ] as const;
+  const precisionKey = ref<(typeof precisionOptions)[number]['key']>('1h');
   const activeSeries = computed(
     () =>
       props.curve.metricSeries?.[`${metricKey.value}:${modeKey.value}`] ||
       props.curve.metricSeries?.[metricKey.value] ||
       props.curve,
   );
+  const sampledSeries = computed(() => {
+    const series = activeSeries.value;
+    if (!series.timestamps?.length || series.timestamps.length !== series.xLabels.length)
+      return series;
+    const duration = precisionOptions.find((item) => item.key === precisionKey.value)!.duration;
+    const localOffset = 8 * 3_600_000;
+    const weekOffset = precisionKey.value === 'week' ? 3 * 86_400_000 : 0;
+    const buckets = new Map<number, number>();
+    series.timestamps.forEach((timestamp, index) => {
+      const time = Date.parse(timestamp);
+      if (Number.isFinite(time) && Number.isFinite(series.netValueData[index])) {
+        buckets.set(Math.floor((time + localOffset + weekOffset) / duration), index);
+      }
+    });
+    const indices = [...buckets.entries()]
+      .sort(([left], [right]) => left - right)
+      .map(([, index]) => index);
+    return {
+      ...series,
+      xLabels: indices.map((index) => series.xLabels[index]),
+      netValueData: indices.map((index) => series.netValueData[index]),
+      drawdownData: indices.map((index) => series.drawdownData[index] ?? null),
+    };
+  });
 
   const activeMetricLabel = computed(
     () => props.curve.metricOptions.find((item) => item.key === metricKey.value)?.label || '净值',
@@ -78,81 +123,99 @@
   });
 
   const chartRef = ref<HTMLDivElement | null>(null);
-  const { setOptions, resize } = useECharts(chartRef as Ref<HTMLDivElement>);
+  const { setOptions, resize, getInstance } = useECharts(chartRef as Ref<HTMLDivElement>);
+  let renderedSelection = '';
 
   async function renderChart() {
-    await setOptions({
-      tooltip: { trigger: 'axis' },
-      legend: {
-        top: 4,
-        itemWidth: 12,
-        itemHeight: 12,
-        data: [activeMetricLabel.value, '调整后回撤（估算）'],
-        textStyle: { color: '#6b7c93', fontSize: 12 },
-      },
-      grid: { left: 26, right: 36, top: 52, bottom: 72, containLabel: true },
-      xAxis: {
-        type: 'category',
-        boundaryGap: false,
-        data: activeSeries.value.xLabels,
-        axisTick: { show: false },
-        axisLine: { lineStyle: { color: '#dbe5f1' } },
-        axisLabel: { color: '#90a0b5', hideOverlap: true },
-      },
-      yAxis: [
-        {
-          type: 'value',
-          min: (value: { min: number }) => Math.max(0, Number((value.min - 0.04).toFixed(2))),
-          max: (value: { max: number }) => Number((value.max + 0.04).toFixed(2)),
-          axisLabel: { color: '#90a0b5' },
-          splitLine: { lineStyle: { color: 'rgba(148, 163, 184, .16)', type: 'dashed' } },
+    const selection = JSON.stringify([
+      metricKey.value,
+      periodKey.value,
+      modeKey.value,
+      precisionKey.value,
+    ]);
+    const resetInteraction = selection !== renderedSelection;
+    renderedSelection = selection;
+    const zoom = !resetInteraction
+      ? (getInstance()?.getOption().dataZoom as { start?: number; end?: number }[] | undefined)?.[0]
+      : undefined;
+    const zoomRange = {
+      start: zoom?.start ?? Math.max(0, activeZoomEnd.value - 40),
+      end: zoom?.end ?? activeZoomEnd.value,
+    };
+    await setOptions(
+      {
+        tooltip: { trigger: 'axis' },
+        legend: {
+          top: 4,
+          itemWidth: 12,
+          itemHeight: 12,
+          data: [activeMetricLabel.value, '调整后回撤（估算）'],
+          textStyle: { color: '#6b7c93', fontSize: 12 },
         },
-        {
-          type: 'value',
-          position: 'right',
-          axisLabel: { color: '#90a0b5', formatter: '{value}%' },
-          splitLine: { show: false },
+        grid: { left: 26, right: 36, top: 52, bottom: 72, containLabel: true },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: sampledSeries.value.xLabels,
+          axisTick: { show: false },
+          axisLine: { lineStyle: { color: '#dbe5f1' } },
+          axisLabel: { color: '#90a0b5', hideOverlap: true },
         },
-      ],
-      dataZoom: [
-        { type: 'inside', start: Math.max(0, activeZoomEnd.value - 40), end: activeZoomEnd.value },
-        {
-          type: 'slider',
-          height: 20,
-          bottom: 14,
-          backgroundColor: 'rgba(227, 236, 248, .55)',
-          fillerColor: 'rgba(159, 186, 245, .28)',
-          brushSelect: false,
-          start: Math.max(0, activeZoomEnd.value - 40),
-          end: activeZoomEnd.value,
-        },
-      ],
-      series: [
-        {
-          name: activeMetricLabel.value,
-          type: 'line',
-          smooth: true,
-          symbol: 'none',
-          lineStyle: { width: 2.5, color: activeModeColor.value },
-          areaStyle: {
-            color:
-              modeKey.value === 'fixed' ? 'rgba(138, 99, 210, .08)' : 'rgba(74, 124, 255, .08)',
+        yAxis: [
+          {
+            type: 'value',
+            min: (value: { min: number }) => Math.max(0, Number((value.min - 0.04).toFixed(2))),
+            max: (value: { max: number }) => Number((value.max + 0.04).toFixed(2)),
+            axisLabel: { color: '#90a0b5' },
+            splitLine: { lineStyle: { color: 'rgba(148, 163, 184, .16)', type: 'dashed' } },
           },
-          data: activeSeries.value.netValueData,
-        },
-        {
-          name: '调整后回撤（估算）',
-          type: 'line',
-          yAxisIndex: 1,
-          smooth: false,
-          connectNulls: false,
-          symbol: 'none',
-          lineStyle: { width: 1.8, color: '#db6d6d' },
-          areaStyle: { color: 'rgba(219, 109, 109, .14)' },
-          data: activeSeries.value.drawdownData.map((value) => value ?? '-'),
-        },
-      ],
-    });
+          {
+            type: 'value',
+            position: 'right',
+            axisLabel: { color: '#90a0b5', formatter: '{value}%' },
+            splitLine: { show: false },
+          },
+        ],
+        dataZoom: [
+          { type: 'inside', ...zoomRange },
+          {
+            type: 'slider',
+            height: 20,
+            bottom: 14,
+            backgroundColor: 'rgba(227, 236, 248, .55)',
+            fillerColor: 'rgba(159, 186, 245, .28)',
+            brushSelect: false,
+            ...zoomRange,
+          },
+        ],
+        series: [
+          {
+            name: activeMetricLabel.value,
+            type: 'line',
+            smooth: true,
+            symbol: 'none',
+            lineStyle: { width: 2.5, color: activeModeColor.value },
+            areaStyle: {
+              color:
+                modeKey.value === 'fixed' ? 'rgba(138, 99, 210, .08)' : 'rgba(74, 124, 255, .08)',
+            },
+            data: sampledSeries.value.netValueData,
+          },
+          {
+            name: '调整后回撤（估算）',
+            type: 'line',
+            yAxisIndex: 1,
+            smooth: false,
+            connectNulls: false,
+            symbol: 'none',
+            lineStyle: { width: 1.8, color: '#db6d6d' },
+            areaStyle: { color: 'rgba(219, 109, 109, .14)' },
+            data: sampledSeries.value.drawdownData.map((value) => value ?? '-'),
+          },
+        ],
+      },
+      resetInteraction,
+    );
 
     await nextTick();
     resize();
@@ -167,7 +230,7 @@
     },
     { deep: true },
   );
-  watch([metricKey, periodKey, modeKey], renderChart);
+  watch([metricKey, periodKey, modeKey, precisionKey], renderChart);
   onMounted(renderChart);
 </script>
 
@@ -218,6 +281,16 @@
 
   .mode-button {
     cursor: pointer;
+  }
+
+  .precision-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .precision-controls .mode-button {
+    padding: 0 9px;
   }
 
   .mode-button.is-active {

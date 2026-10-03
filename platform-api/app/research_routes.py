@@ -400,10 +400,18 @@ async def cumulative_volatility(
     asset: str = Query("btc", pattern="^(btc|gold)$"),
     days: int = Query(365, ge=1, le=365),
     interval: str = Query("15m", pattern="^(15m|1h|4h)$"),
+    start: datetime | None = Query(None),
+    end: datetime | None = Query(None),
 ) -> dict[str, object]:
     """读取共享 Bybit 行情经后端计算的 UTC 盘口累计波动与价格叠加。"""
     response.headers["Cache-Control"] = "no-store"
-    return {"data": await asyncio.to_thread(read_cumulative_volatility, asset, days, interval)}
+    try:
+        data = await asyncio.to_thread(
+            read_cumulative_volatility, asset, days, interval, start=start, end=end
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"data": data}
 
 
 @router.get("/crypto/iv-term", tags=["research"])

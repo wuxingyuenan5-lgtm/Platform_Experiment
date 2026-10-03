@@ -18,11 +18,8 @@ def save_cross_spread_market_snapshot(
     strategy_key: str,
     strategy_instance_id: str,
 ) -> None:
-    # Browser polling and execution preflights also read this snapshot. They
-    # must not turn a read into an unbounded high-frequency history writer.
-    # The dedicated monitor still samples at the configured interval; this
-    # guard keeps the same behavior for the first read and any later read after
-    # the interval has elapsed.
+    # Sampling is background-owned. Retain the interval guard for overlapping
+    # sampler invocations, using the created-time covering index.
     created_at = datetime.now(UTC)
     interval = max(1.0, get_settings().cross_spread_market_snapshot_interval_seconds)
     with _SNAPSHOT_SAVE_LOCK, connection() as db:

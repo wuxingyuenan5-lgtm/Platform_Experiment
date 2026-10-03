@@ -99,6 +99,7 @@ export interface StrategyCapitalCurveConfig {
     string,
     {
       title: string;
+      timestamps?: string[];
       xLabels: string[];
       netValueData: number[];
       drawdownData: (number | null)[];
@@ -114,6 +115,7 @@ export interface StrategyCapitalCurveConfig {
   defaultMetric: string;
   defaultPeriod: string;
   defaultMode?: string;
+  timestamps?: string[];
   xLabels: string[];
   netValueData: number[];
   drawdownData: (number | null)[];

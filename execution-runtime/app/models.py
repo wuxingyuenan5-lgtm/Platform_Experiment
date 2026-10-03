@@ -360,6 +360,17 @@ class VenueEconomicEventSnapshot(BaseModel):
     payload: dict[str, object] = Field(default_factory=dict)
 
 
+class GatewayAccountCapability(BaseModel):
+    account_id: str = Field(alias="accountId")
+    configured: bool
+    operational: bool
+    write_enabled: bool = Field(alias="writeEnabled")
+    missing_requirements: list[str] = Field(
+        default_factory=list,
+        alias="missingRequirements",
+    )
+
+
 class GatewayAdapterCapability(BaseModel):
     adapter: str
     environment: str
@@ -367,6 +378,10 @@ class GatewayAdapterCapability(BaseModel):
     operational: bool
     write_enabled: bool = Field(alias="writeEnabled")
     account_ids: list[str] = Field(default_factory=list, alias="accountIds")
+    account_statuses: list[GatewayAccountCapability] = Field(
+        default_factory=list,
+        alias="accountStatuses",
+    )
     capabilities: list[str] = Field(default_factory=list)
     missing_requirements: list[str] = Field(
         default_factory=list,

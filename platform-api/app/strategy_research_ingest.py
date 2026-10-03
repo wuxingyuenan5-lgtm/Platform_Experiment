@@ -8,21 +8,24 @@ import logging
 import multiprocessing
 import time
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from app import runtime_transport
 from app.config import get_settings
+from app.research_write_lock import RESEARCH_DB_WRITE_LOCK
 from app.strategy_research_lease import ResearchLease
 from app.strategy_research_repository import (
     checkpoint,
     finish_experiment,
+    invalidate_capture_status_cache,
     next_experiment,
     publish,
     recover_experiments,
     root_path,
 )
 from app.strategy_research_series import Deriver, stable_hash
-from app.research_write_lock import RESEARCH_DB_WRITE_LOCK
 
 WORKER_STOP = None
 
@@ -48,10 +51,10 @@ def fetch_batch(after, limit=1000):
     return response.json()
 
 
-async def consume():
+async def consume(pool):
     STATUS.update(status="waiting", error=None)
     pending = None
-    deriver = Deriver(json.loads(checkpoint()["state_json"]))
+    deriver = await asyncio.to_thread(lambda: Deriver(json.loads(checkpoint()["state_json"])))
     started = time.monotonic()
     while True:
         try:
@@ -66,7 +69,9 @@ async def consume():
                 runtime=batch.get("capture", {}),
                 error=None,
             )
-            for event in batch["events"]:
+            for index, event in enumerate(batch["events"]):
+                if index % 32 == 0:
+                    await asyncio.sleep(0)
                 for derived in deriver.consume(event):
                     if derived["kind"] == "spread":
                         LATEST[derived["pairId"]] = derived
@@ -78,12 +83,14 @@ async def consume():
                 else:
                     pending, started = batch, time.monotonic()
             if pending and (len(pending["events"]) >= 5000 or time.monotonic() - started >= 60):
-                async with RESEARCH_DB_WRITE_LOCK:
-                    await asyncio.to_thread(publish, pending)
+                await run_serving_job(pool, publish, pending)
+                invalidate_capture_status_cache()
                 pending = None
             await asyncio.sleep(0.25)
         except asyncio.CancelledError:
             # Unpublished work replays from the last committed cursor on restart.
+            raise
+        except BrokenProcessPool:
             raise
         except Exception as exc:
             STATUS.update(status="failed", error=type(exc).__name__ + ":" + str(exc))
@@ -92,7 +99,9 @@ async def consume():
             )
             pending = None
             LATEST.clear()
-            deriver = Deriver(json.loads(checkpoint()["state_json"]))
+            deriver = await asyncio.to_thread(
+                lambda: Deriver(json.loads(checkpoint()["state_json"]))
+            )
             await asyncio.sleep(2)
 
 
@@ -156,20 +165,80 @@ async def experiments():
             stop.set()
 
 
-async def projections():
-    from app.strategy_research_projection import project_candle_next, project_next
+def initialize_serving_worker(database_path, archive_path):
+    get_settings().database_path = database_path
+    get_settings().strategy_research_path = archive_path
 
+
+def project_serving_once():
+    from app.strategy_research_projection import (
+        project_candle_next,
+        project_funding_basis_next,
+        project_next,
+    )
+
+    return project_candle_next(), project_next(), project_funding_basis_next(500)
+
+
+async def run_serving_job(pool, operation, *args):
+    # Keep the existing writer lock until the child has actually finished,
+    # including cancellation during API shutdown. No concurrent replacement job.
+    async with RESEARCH_DB_WRITE_LOCK:
+        future = asyncio.get_running_loop().run_in_executor(pool, operation, *args)
+        try:
+            return await asyncio.shield(future)
+        except asyncio.CancelledError:
+            try:
+                await future
+            finally:
+                raise
+
+
+async def projections(pool):
     while True:
         try:
-            async with RESEARCH_DB_WRITE_LOCK:
-                candle_progressed = await asyncio.to_thread(project_candle_next)
-                progressed = await asyncio.to_thread(project_next)
-            await asyncio.sleep(0.02 if candle_progressed or progressed else 1)
-        except asyncio.CancelledError:
+            candle_progressed, progressed, basis_progressed = await run_serving_job(
+                pool, project_serving_once
+            )
+            await asyncio.sleep(
+                0.2 if basis_progressed and not (candle_progressed or progressed)
+                else (0.02 if candle_progressed or progressed else 1)
+            )
+        except (asyncio.CancelledError, BrokenProcessPool):
             raise
         except Exception:
             logging.getLogger(__name__).exception("Research serving projection paused")
             await asyncio.sleep(5)
+
+
+async def serving():
+    # CPU-heavy JSON/Parquet work must not contend with the API's Python lock.
+    # This is one API-owned worker, sharing the existing durable cursor and lease.
+    while True:
+        pool = ProcessPoolExecutor(
+            max_workers=1, mp_context=multiprocessing.get_context("spawn"),
+            initializer=initialize_serving_worker,
+            initargs=(
+                str(Path(get_settings().database_path).resolve()), str(root_path().resolve())
+            ),
+        )
+        tasks = [asyncio.create_task(consume(pool))]
+        if get_settings().strategy_research_projection_enabled:
+            tasks.append(asyncio.create_task(projections(pool)))
+        try:
+            await asyncio.gather(*tasks)
+        except BrokenProcessPool:
+            LATEST.clear()
+            STATUS.update(
+                status="failed", error="Research worker exited; recovering durable cursor"
+            )
+            logging.getLogger(__name__).exception("Research worker exited; restarting")
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.to_thread(pool.shutdown, wait=True, cancel_futures=True)
+        await asyncio.sleep(2)
 
 
 @asynccontextmanager
@@ -180,11 +249,9 @@ async def lifespan(_):
     if settings.strategy_research_enabled and settings.strategy_research_worker_enabled:
         lease = ResearchLease(root_path())
         tasks = [
-            asyncio.create_task(consume()),
+            asyncio.create_task(serving()),
             asyncio.create_task(experiments()),
         ]
-        if settings.strategy_research_projection_enabled:
-            tasks.append(asyncio.create_task(projections()))
     try:
         yield
     finally:

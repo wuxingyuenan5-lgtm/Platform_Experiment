@@ -43,6 +43,7 @@ def reconcile_order(order_id: str) -> OrderResponse:
 
     row = get_order_row(order_id)
     if row["status"] != "result_unknown":
+        synchronize_trade_command_status(row["command_id"], order_id)
         return order_response_from_row(row)
 
     try:
@@ -149,7 +150,9 @@ def apply_execution_events(
                 db.execute(
                     """
                     UPDATE orders
-                    SET status = ?, external_order_id = ?, updated_at = ?
+                    SET status = CASE WHEN status='partially_filled' THEN status ELSE ? END,
+                        external_order_id = COALESCE(?, external_order_id),
+                        updated_at = CASE WHEN status='partially_filled' THEN updated_at ELSE ? END
                     WHERE id = ? AND status NOT IN ('filled', 'canceled', 'rejected')
                     """,
                     ("acknowledged", external_order_id, occurred_at, order_id),
@@ -199,7 +202,8 @@ def apply_execution_events(
                         (order_id, str(event["event_id"]), decimal_text(cumulative), occurred_at),
                     )
                 db.execute(
-                    "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
+                    "UPDATE orders SET status = ?, updated_at = ?, "
+                    "external_order_id = COALESCE(?, external_order_id) WHERE id = ?",
                     (
                         "filled"
                         if cumulative == request.quantity
@@ -209,6 +213,7 @@ def apply_execution_events(
                             else "partially_filled"
                         ),
                         occurred_at,
+                        external_order_id,
                         order_id,
                     ),
                 )

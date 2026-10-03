@@ -197,7 +197,7 @@
               {
                 type: 'max',
                 name: 'Max',
-                symbolSize: 0, // 👈 关键兼容性补丁！
+                symbolSize: 0,
                 label: {
                   color: '#C1272D',
                   formatter: 'max:{c}',
@@ -210,7 +210,7 @@
                   color: '#22B573',
                   formatter: 'min:{c}',
                 },
-                symbolSize: 0, // 👈 关键兼容性补丁！
+                symbolSize: 0,
               },
             ],
           },

@@ -93,6 +93,8 @@ jobs:
         run: node scripts/generate-strategy-api.mjs --from-schema --check
       - name: Test strategy query and recovery behavior
         run: pnpm test:strategy-queries
+      - name: Chart lifecycle and refresh regression
+        run: pnpm test:charts
       - name: Test browser access policy
         run: pnpm test:user-system
       - name: Test transformed browser route capabilities

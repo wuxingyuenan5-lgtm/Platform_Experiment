@@ -45,6 +45,37 @@ def login(client: TestClient, username: str, password: str):
 
 
 @pytest.mark.integration
+def test_warm_session_verification_avoids_writer_lock_and_still_rejects_revocation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(monkeypatch, tmp_path, "warm-session.db")
+    create_initial_ceo(username="owner", password="correct horse battery staple")
+    with TestClient(app, base_url=ORIGIN) as client:
+        signed_in = login(client, "owner", "correct horse battery staple")
+        assert signed_in.status_code == 200
+        csrf = signed_in.json()["csrfToken"]
+        # A background writer's RESERVED lock permits reads but prevents CSRF
+        # rotation. Warm navigation must complete without waiting for that writer.
+        with sqlite3.connect(database_path) as writer:
+            writer.execute("BEGIN IMMEDIATE")
+            warm = client.get("/api/v1/auth/me", headers={"X-CSRF-Token": csrf})
+            assert warm.status_code == 200
+            assert warm.json()["csrfToken"] == csrf
+            writer.rollback()
+
+        stale = client.get("/api/v1/auth/me", headers={"X-CSRF-Token": "wrong-token"})
+        assert stale.status_code == 200
+        assert stale.json()["csrfToken"] not in {csrf, "wrong-token"}
+        csrf = stale.json()["csrfToken"]
+        with sqlite3.connect(database_path) as db:
+            db.execute("UPDATE user_sessions SET revoked_at = created_at")
+            db.commit()
+        revoked = client.get("/api/v1/auth/me", headers={"X-CSRF-Token": csrf})
+        assert revoked.status_code == 401
+
+
+@pytest.mark.integration
 def test_public_registration_is_pending_and_cannot_request_privileged_role(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

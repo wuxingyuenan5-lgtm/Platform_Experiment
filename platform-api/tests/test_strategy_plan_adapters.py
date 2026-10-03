@@ -145,8 +145,12 @@ def test_funding_plan_freezes_price_ticks_for_phase_2_postonly_open() -> None:
     assert plan.legs[1].price_tick == Decimal("0.01")
 
 
-def test_live_funding_and_cross_spread_can_bind_the_same_logical_bybit_account(tmp_path) -> None:
-    get_settings().database_path = str(tmp_path / "shared-bybit-binding.db")
+def test_live_funding_and_cross_spread_can_bind_the_same_logical_bybit_account(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        get_settings(), "database_path", str(tmp_path / "shared-bybit-binding.db")
+    )
     initialize_database()
     with connection() as db:
         db.execute(
@@ -182,3 +186,57 @@ def test_live_funding_and_cross_spread_can_bind_the_same_logical_bybit_account(t
     assert funding_plan.legs[0].account_id == "bybit-live-main"
     assert cross_binding is not None
     assert cross_binding["account_id"] == "bybit-live-main"
+
+
+def test_cross_spread_plan_uses_latest_complete_bybit_contract_specification(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        get_settings(), "database_path", str(tmp_path / "latest-cross-contract-spec.db")
+    )
+    initialize_database()
+    effective_from = datetime.now(UTC).isoformat()
+    with connection() as db:
+        db.execute(
+            "UPDATE strategy_instances SET trading_mode='live' "
+            "WHERE id='strategy_cross_venue_spread_instance_default'"
+        )
+        db.execute(
+            "UPDATE contract_specifications SET effective_from=? "
+            "WHERE instrument_id='instrument_xau_usdt_perp'",
+            (datetime(2020, 1, 1, tzinfo=UTC).isoformat(),),
+        )
+        db.execute(
+            """
+            INSERT INTO contract_specifications (
+                id, instrument_id, version, price_tick, min_order_quantity,
+                quantity_step, contract_multiplier, effective_from, data_quality_state
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "contract_instrument_xau_usdt_perp_v2_test",
+                "instrument_xau_usdt_perp",
+                "venue-live-test",
+                "0.10",
+                "0.001",
+                "0.001",
+                "1",
+                effective_from,
+                "complete",
+            ),
+        )
+
+    plan = build_plan(
+        "strategy_cross_venue_spread_instance_default",
+        StrategyInstructionAction.CLOSE,
+        {
+            "action": "CLOSE_LONG",
+            "quantityOz": "1",
+            "bybitReduceOnly": True,
+            "mt5ReduceOnly": True,
+            "mt5PositionId": "test-ticket",
+        },
+    )
+
+    assert plan.legs[0].price_tick == Decimal("0.10")
+    assert plan.legs[0].external_symbol == "XAUTUSDT"

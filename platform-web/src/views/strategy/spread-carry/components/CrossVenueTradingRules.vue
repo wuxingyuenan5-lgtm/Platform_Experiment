@@ -40,6 +40,14 @@
           暂无执行反馈
         </p>
       </div>
+      <button
+        v-if="pendingDraftAbsent"
+        class="status-mini-log__recover"
+        type="button"
+        @click="$emit('clear-unreceived')"
+      >
+        核验未送达指令并解除锁定
+      </button>
     </div>
   </section>
 </template>
@@ -65,6 +73,11 @@
     executionLogs: readonly ExecutionLogRow[];
     executionMessage: string;
     executionMessageTone: 'is-success' | 'is-error' | 'is-warn';
+    pendingDraftAbsent: boolean;
+  }>();
+
+  defineEmits<{
+    (event: 'clear-unreceived'): void;
   }>();
 
   const feedbackToneClass = computed(() => {
@@ -79,8 +92,8 @@
     padding: 16px 18px 18px;
     border: 1px solid #e7ebf0;
     border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-    box-shadow: 0 10px 22px rgba(94, 109, 133, 0.04);
+    background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
+    box-shadow: 0 10px 22px rgb(94 109 133 / 4%);
   }
 
   .cross-card--status {
@@ -89,18 +102,18 @@
 
   .card-head {
     display: flex;
-    justify-content: space-between;
     align-items: flex-start;
+    justify-content: space-between;
     margin-bottom: 12px;
   }
 
   .card-head h3 {
     margin: 0;
+    color: #162845;
     font-family: var(--strategy-font-heading);
     font-size: 21px;
     font-weight: 800;
     letter-spacing: -0.012em;
-    color: #162845;
   }
 
   .rule-list {
@@ -165,11 +178,11 @@
   }
 
   .status-mini-log__dot {
+    flex: none;
     width: 8px;
     height: 8px;
     margin-top: 5px;
     border-radius: 999px;
-    flex: none;
   }
 
   .status-mini-log__dot.is-success {
@@ -190,5 +203,16 @@
 
   .status-mini-log__empty {
     color: #98a2b3;
+  }
+
+  .status-mini-log__recover {
+    padding: 7px 11px;
+    border: 1px solid #d9a441;
+    border-radius: 6px;
+    background: #fffaf0;
+    color: #8a5a00;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
   }
 </style>

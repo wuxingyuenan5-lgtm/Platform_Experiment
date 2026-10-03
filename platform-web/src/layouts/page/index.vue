@@ -2,6 +2,7 @@
   <RouterView>
     <template #default="{ Component, route }">
       <transition
+        :css="getEnableTransition && !route.path.startsWith('/hedge-board/')"
         :name="
           getTransitionName({
             route,
@@ -11,13 +12,15 @@
             def: getBasicTransition,
           })
         "
-        mode="out-in"
+        :mode="
+          getEnableTransition && !route.path.startsWith('/hedge-board/') ? 'out-in' : undefined
+        "
         appear
       >
         <keep-alive v-if="openCache" :include="getCaches">
-          <component :is="Component" :key="route.fullPath" class="min-h-190" />
+          <component :is="Component" :key="getPageKey(route)" class="min-h-190" />
         </keep-alive>
-        <component v-else :is="Component" :key="route.fullPath" class="min-h-190" />
+        <component v-else :is="Component" :key="getPageKey(route)" class="min-h-190" />
       </transition>
     </template>
   </RouterView>
@@ -33,7 +36,7 @@
 
   import { useTransitionSetting } from '@/hooks/setting/useTransitionSetting';
   import { useMultipleTabSetting } from '@/hooks/setting/useMultipleTabSetting';
-  import { getTransitionName } from './transition';
+  import { getPageKey, getTransitionName } from './transition';
 
   import { useMultipleTabStore } from '@/store/modules/multipleTab';
 

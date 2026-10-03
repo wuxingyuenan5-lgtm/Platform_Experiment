@@ -64,7 +64,7 @@
         <span>活动说明</span>
       </div>
 
-      <div v-if="!filteredCampaigns.length" class="wealth-empty">暂无匹配活动</div>
+      <div v-if="!filteredCampaigns.length" class="wealth-empty">暂无已核实的活动数据</div>
       <div v-else class="wealth-list">
         <article v-for="item in filteredCampaigns" :key="item.id" class="wealth-row">
           <div>
@@ -98,7 +98,9 @@
 
 <script setup lang="ts">
   import { computed, reactive, ref } from 'vue';
-  import { wealthCampaigns, type WealthFrequency, type WealthLock } from '@/data/sample/news';
+  import type { WealthCampaign, WealthFrequency, WealthLock } from '@/data/sample/news';
+
+  const wealthCampaigns: WealthCampaign[] = [];
 
   type SortOrder = 'desc' | 'asc';
 

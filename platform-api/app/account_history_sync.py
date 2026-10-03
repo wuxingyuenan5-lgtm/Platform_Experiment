@@ -53,20 +53,22 @@ def _merge_history(previous: dict, incoming: dict, *, incremental: bool) -> dict
     window_seconds = previous.get("historyWindowSeconds", 7 * 86400)
     if not incremental and start and end:
         window_seconds = (_stamp(end) - _stamp(start)).total_seconds()
+    floor = None
+    if contiguous and end is not None:
+        floor = max(
+            _stamp(previous["historyStart"]), _stamp(end) - timedelta(seconds=window_seconds)
+        )
     for key, identity in (("fills", "externalFillId"), ("economicEvents", "externalEventId")):
-        if contiguous:
+        if floor is not None:
             rows = {(row.get("source"), row[identity]): row for row in previous.get(key, [])}
             rows.update({(row.get("source"), row[identity]): row for row in incoming.get(key, [])})
-            floor = max(
-                _stamp(previous["historyStart"]), _stamp(end) - timedelta(seconds=window_seconds)
-            )
             result[key] = [row for row in rows.values() if _stamp(row["occurredAt"]) >= floor]
         else:
             result[key] = incoming.get(key, [])
     # Bybit refreshes the full order-status window, including older orders that
     # closed recently. Never infer a cancellation from absence in a time slice.
     result["orders"] = incoming["orders"]
-    result["historyStart"] = floor.isoformat() if contiguous else start
+    result["historyStart"] = floor.isoformat() if floor is not None else start
     result["historyEnd"] = end
     result["economicEventsQuality"] = incoming.get("economicEventsQuality", "unavailable")
     result["historyAuditAt"] = (
@@ -249,16 +251,20 @@ def sync_due_histories() -> None:
         _lock.release()
 
 
+def sync_and_check():
+    sync_due_histories()
+    with connection() as db:
+        return bool(db.execute(
+            "SELECT 1 FROM account_read_jobs j JOIN accounts a ON a.id=j.account_id "
+            "WHERE j.job='history' AND j.status='failed' AND a.status='active' LIMIT 1"
+        ).fetchone())
+
+
 async def run_history_sync_monitor() -> None:
     while True:
         monitor_health.begin("account_history")
         try:
-            await asyncio.to_thread(sync_due_histories)
-            with connection() as db:
-                failed = db.execute(
-                    "SELECT 1 FROM account_read_jobs j JOIN accounts a ON a.id=j.account_id "
-                    "WHERE j.job='history' AND j.status='failed' AND a.status='active' LIMIT 1"
-                ).fetchone()
+            failed = await asyncio.to_thread(sync_and_check)
             monitor_health.finish("account_history", "history_sync_failed" if failed else None)
         except Exception as exc:
             monitor_health.finish("account_history", type(exc).__name__)

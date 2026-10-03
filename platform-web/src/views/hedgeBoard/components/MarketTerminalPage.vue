@@ -1,12 +1,27 @@
 ﻿<template>
   <div class="market-terminal">
+    <p v-if="['us', 'global'].includes(config.id)" role="status">
+      {{
+        marketLoading
+          ? '正在读取数据…'
+          : marketError
+          ? '数据暂不可用'
+          : marketSnapshot?.status === 'stale'
+          ? '当前显示最近保留的数据'
+          : marketSnapshot?.status === 'partial'
+          ? '部分数据暂不可用'
+          : !marketSnapshot?.rows.length
+          ? '暂无数据'
+          : `数据日期：${marketSnapshot.asOf ?? '—'}`
+      }}
+    </p>
     <HedgeBoardSubnav
-      v-if="config.id === 'us'"
+      v-if="displayConfig.id === 'us'"
       :sections="[
         { id: 'us-market-overview', title: '大盘表现' },
         { id: detailSectionId, title: '美股市场明细' },
-        ...(config.rotationButtonLabel
-          ? [{ id: 'us-market-rotation', title: config.rotationButtonLabel }]
+        ...(displayConfig.rotationButtonLabel
+          ? [{ id: 'us-market-rotation', title: displayConfig.rotationButtonLabel }]
           : []),
       ]"
       module-label="美股"
@@ -15,16 +30,18 @@
       @jump="jumpToMarketSection"
     />
     <section
-      :id="`${config.id}-market-overview`"
+      :id="`${displayConfig.id}-market-overview`"
       v-if="displayOverviewCards.length"
       class="market-terminal__overview-strip"
-      :class="{ 'is-single': !(config.breadthCards?.length || config.volatilityCards?.length) }"
+      :class="{
+        'is-single': !(displayConfig.breadthCards?.length || displayConfig.volatilityCards?.length),
+      }"
     >
       <article class="market-terminal__overview-panel">
         <div class="market-terminal__panel-head">
           <h3>大盘表现</h3>
-          <div v-if="config.overviewChip" class="market-terminal__mini-chip">{{
-            config.overviewChip
+          <div v-if="displayConfig.overviewChip" class="market-terminal__mini-chip">{{
+            displayConfig.overviewChip
           }}</div>
         </div>
 
@@ -88,7 +105,7 @@
       </article>
 
       <div
-        v-if="config.breadthCards?.length || config.volatilityCards?.length"
+        v-if="displayConfig.breadthCards?.length || displayConfig.volatilityCards?.length"
         class="market-terminal__overview-side"
       >
         <article class="market-terminal__side-panel">
@@ -96,11 +113,11 @@
             <h3>大盘广度</h3>
             <span class="market-terminal__info-dot">i</span>
           </div>
-          <p class="market-terminal__side-subtitle">{{ config.breadthSubtitle }}</p>
+          <p class="market-terminal__side-subtitle">{{ displayConfig.breadthSubtitle }}</p>
 
-          <div v-if="config.breadthCards?.length" class="market-terminal__breadth-grid">
+          <div v-if="displayConfig.breadthCards?.length" class="market-terminal__breadth-grid">
             <article
-              v-for="item in config.breadthCards"
+              v-for="item in displayConfig.breadthCards"
               :key="item.id"
               class="market-terminal__breadth-card"
             >
@@ -119,7 +136,7 @@
           </div>
         </article>
 
-        <article v-if="config.volatilityCards?.length" class="market-terminal__side-panel">
+        <article v-if="displayConfig.volatilityCards?.length" class="market-terminal__side-panel">
           <div class="market-terminal__panel-head">
             <h3>波动与相关性</h3>
             <span class="market-terminal__info-dot">i</span>
@@ -127,7 +144,7 @@
 
           <div class="market-terminal__vol-grid">
             <article
-              v-for="item in config.volatilityCards"
+              v-for="item in displayConfig.volatilityCards"
               :key="item.id"
               class="market-terminal__vol-card"
             >
@@ -164,26 +181,26 @@
         v-if="marketDetailExpanded"
         id="market-terminal-detail-content"
         title="市场明细"
-        :market-id="config.id"
-        :columns="config.detailColumns"
-        :groups="config.detailGroups"
+        :market-id="displayConfig.id"
+        :columns="displayConfig.detailColumns"
+        :groups="displayConfig.detailGroups"
         :readonly="readonlyDetails"
         @index-chart="(code, name) => emit('index-chart', code, name)"
       />
     </section>
 
     <section
-      :id="`${config.id}-market-rotation`"
-      v-if="config.rotationButtonLabel"
+      :id="`${displayConfig.id}-market-rotation`"
+      v-if="displayConfig.rotationButtonLabel"
       class="market-terminal__rotation"
     >
       <button type="button" class="market-terminal__rotation-button" @click="toggleRotation">
         <span>{{ rotationExpanded ? '▼' : '▶' }}</span>
-        {{ config.rotationButtonLabel }}
+        {{ displayConfig.rotationButtonLabel }}
       </button>
 
       <div
-        v-if="rotationExpanded && config.rotationHeatmap?.length"
+        v-if="rotationExpanded && displayConfig.rotationHeatmap?.length"
         class="market-terminal__rotation-heatmap"
       >
         <table class="market-terminal__rotation-table">
@@ -230,11 +247,11 @@
       </div>
 
       <div
-        v-else-if="rotationExpanded && config.rotationSections?.length"
+        v-else-if="rotationExpanded && displayConfig.rotationSections?.length"
         class="market-terminal__rotation-grid"
       >
         <article
-          v-for="section in config.rotationSections"
+          v-for="section in displayConfig.rotationSections"
           :key="section.id"
           class="market-terminal__rotation-panel"
         >
@@ -253,11 +270,11 @@
       </div>
 
       <div
-        v-else-if="rotationExpanded && config.rotationList?.length"
+        v-else-if="rotationExpanded && displayConfig.rotationList?.length"
         class="market-terminal__rotation-list"
       >
         <span
-          v-for="item in config.rotationList"
+          v-for="item in displayConfig.rotationList"
           :key="item.id"
           class="market-terminal__rotation-chip"
         >
@@ -309,16 +326,15 @@
 
 <script setup lang="ts">
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
-  function jumpToMarketSection(id: string) {
-    document
-      .getElementById(id)
-      ?.scrollIntoView({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-        block: 'start',
-      });
-  }
-  import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
-  import type { AShareDashboardResponse, AShareIndexSnapshot } from '@/api/hedgeResearch';
+  import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+  import {
+    getMarketDetail,
+    type MarketDetailResponse,
+    AShareDashboardResponse,
+    AShareIndexSnapshot,
+  } from '@/api/hedgeResearch';
+  import { mergeTerminalMarket } from '../nativeData/marketDetailAdapter';
+
   import TerminalDetailPanel from './TerminalDetailPanel.vue';
   import type {
     MarketTerminalPageConfig,
@@ -327,6 +343,13 @@
     TerminalMarketId,
     TerminalTone,
   } from '../nativeData/marketTerminal';
+
+  function jumpToMarketSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }
 
   interface MarketTab {
     id: TerminalMarketId;
@@ -355,6 +378,50 @@
     dashboard?: AShareDashboardResponse | null;
     readonlyDetails?: boolean;
   }>();
+
+  const marketSnapshot = ref<MarketDetailResponse | null>(null);
+  const marketLoading = ref(false);
+  const marketError = ref(false);
+  let marketRequestId = 0;
+  let marketTimer: ReturnType<typeof setInterval> | undefined;
+  const displayConfig = computed(() =>
+    ['us', 'global'].includes(props.config.id)
+      ? mergeTerminalMarket(props.config, marketSnapshot.value?.rows ?? [])
+      : props.config,
+  );
+  async function loadMarket() {
+    const market = props.config.id;
+    if (market !== 'us' && market !== 'global') return;
+    const requestId = ++marketRequestId;
+    marketLoading.value = true;
+    try {
+      const result = await getMarketDetail(market);
+      if (requestId === marketRequestId) {
+        marketSnapshot.value = result;
+        marketError.value = false;
+      }
+    } catch {
+      if (requestId === marketRequestId) marketError.value = true;
+    } finally {
+      if (requestId === marketRequestId) marketLoading.value = false;
+    }
+  }
+  watch(
+    () => props.config.id,
+    () => {
+      ++marketRequestId;
+      marketSnapshot.value = null;
+      clearInterval(marketTimer);
+      void loadMarket();
+      if (['us', 'global'].includes(props.config.id))
+        marketTimer = setInterval(loadMarket, 300_000);
+    },
+    { immediate: true },
+  );
+  onBeforeUnmount(() => {
+    ++marketRequestId;
+    clearInterval(marketTimer);
+  });
 
   const emit = defineEmits<{ (event: 'index-chart', code: string, name: string): void }>();
   const rotationExpanded = ref(true);
@@ -400,7 +467,7 @@
     };
   };
   const displayOverviewCards = computed(() => {
-    if (props.config.id !== 'aShare') return props.config.overviewCards || [];
+    if (props.config.id !== 'aShare') return displayConfig.value.overviewCards || [];
     const labels: Record<string, string> = {
       '000300': '沪深300',
       '000852': '中证1000',
@@ -416,7 +483,7 @@
     );
   });
   const displayMoverCards = computed(() => {
-    if (props.config.id !== 'aShare') return props.config.moverCards || [];
+    if (props.config.id !== 'aShare') return displayConfig.value.moverCards || [];
     const labels: Record<string, string> = {
       '931071': 'AI',
       '931238': '金股',
@@ -452,7 +519,7 @@
     { key: 'y1', label: '过去1年' },
   ] as const;
   const sortedRotationRows = computed(() => {
-    const rows = [...(props.config.rotationHeatmap ?? [])];
+    const rows = [...(displayConfig.value.rotationHeatmap ?? [])];
     const state = rotationSortState.value;
     if (!state) return rows;
     return rows.sort((left, right) =>
@@ -1543,13 +1610,13 @@
   .is-badge-accent {
     display: inline-flex;
     flex-shrink: 0;
-    white-space: nowrap;
     align-items: center;
     padding: 4px 8px;
     border: 1px solid rgb(201 213 226 / 72%);
     background: rgb(243 247 250 / 94%);
     font-size: 11px;
     font-weight: 700;
+    white-space: nowrap;
   }
 
   .is-badge-negative {

@@ -203,15 +203,17 @@ function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
             letterSpacing: '0.04em',
           },
         },
-        'External Link · permission_required',
+        '暂无可用数据',
       ),
       h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
       h('span', item.description),
       h(
         'small',
-        key === 'spdr-daily-flow'
-          ? '请使用卡片右上角“MacroMicro 参考”查看；后续接入正式采集后在此显示完整图表。'
-          : '请使用卡片右上角“参考网页”查看；后续接入正式采集后在此显示完整图表。',
+        key === 'etf-weekly-flows' ||
+          key === 'central-bank-buyers' ||
+          key === 'central-bank-holders'
+          ? '当前无法取得 WGC 的可下载数据。可访问参考网页；SPDR 单只基金持仓不能替代全球 ETF 或央行统计。'
+          : '当前尚未取得可核验的数据，可访问参考网页查看原始指标。',
       ),
     ],
   );
@@ -235,14 +237,14 @@ function renderExternalCryptoResearch(key: ExternalCryptoResearchKey) {
       },
     },
     [
-      h('span', 'External Link · permission_required'),
+      h('span', '暂无可用数据'),
       h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
       h('span', item.description),
       h(
         'small',
         key === 'btc-treasury-flow'
-          ? '请使用卡片右上角“SoSoValue 参考”查看；后续接入正式采集后在此显示完整图表。'
-          : '请使用卡片右上角“参考网页”查看；后续接入正式采集后在此显示完整图表。',
+          ? '已接入企业持仓截面，但尚无可核验的每周买卖流量；持仓差额不能直接当作资金流。可访问 SoSoValue 参考。'
+          : '当前尚未取得可核验的数据，可访问参考网页查看原始指标。',
       ),
     ],
   );
@@ -259,19 +261,27 @@ export default defineComponent({
         const key = props.widget.localKey as LocalWidgetKey;
         switch (key) {
           case 'macro-fed-balance-structure':
+            return h(MacroSeriesChart, { groupId: 'fedBalance', unitLabel: 'USD million' });
           case 'macro-polymarket-fed':
             return h(PolymarketFedPanel);
           case 'macro-inflation-nowcast':
+            return h(MacroSeriesChart, { groupId: 'inflationNowcast', years: 1, unitLabel: '%' });
           case 'macro-inflation-expectations':
+            return h(MacroSeriesChart, {
+              groupId: 'inflationExpectations',
+              years: 10,
+              unitLabel: '%',
+            });
           case 'macro-gdp-now':
+            return h(MacroSeriesChart, { groupId: 'gdpNow', unitLabel: '% SAAR' });
           case 'macro-lending-standards':
-            return renderExternalMacroResearch(key);
+            return h(MacroSeriesChart, { groupId: 'lendingStandards', years: 10, unitLabel: '%' });
           case 'macro-fedwatch':
             return h(FedWatchPanel);
           case 'spdr-daily-flow':
-            return renderExternalGoldResearch(key);
+            return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'spdrFlow' });
           case 'spdr-holdings-vs-price':
-            return renderExternalGoldResearch(key);
+            return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'spdrHoldings' });
           case 'etf-weekly-flows':
             return renderExternalGoldResearch(key);
           case 'central-bank-holders':
@@ -290,13 +300,96 @@ export default defineComponent({
             return renderExternalGoldResearch(key);
           case 'gold-vs-nominal':
           case 'gold-vs-breakeven':
-          case 'gold-vs-real':
           case 'gold-vs-gvz':
             return renderExternalGoldResearch(key);
+          case 'gold-vs-real':
+            return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'goldRealYield' });
+          case 'macro-treasury-issuance':
+            return h(MacroSeriesChart, { groupId: 'treasuryIssuance', unitLabel: 'USD' });
+          case 'macro-net-liquidity':
+            return h(MacroSeriesChart, { groupId: 'netLiquidity', unitLabel: 'USD million' });
+          case 'macro-nfci':
+            return h(MacroSeriesChart, { groupId: 'financialConditions', unitLabel: 'index' });
+          case 'macro-vix':
+            return h(MacroSeriesChart, { groupId: 'vix', unitLabel: 'index' });
+          case 'gold-gvz':
+            return h(MacroSeriesChart, { groupId: 'goldVolatility', unitLabel: 'index' });
+          case 'crypto-strc':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'strcPrice',
+              unitLabel: 'USD/share',
+            });
+          case 'crypto-deribit-metrics':
+            return h(MacroSeriesChart, { dataDomain: 'crypto', groupId: 'deribitOptions' });
+          case 'crypto-eth-reserves':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'ethReserves',
+              presentation: 'distribution',
+            });
+          case 'gold-borrow-fee':
+            return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'gldBorrow' });
+          case 'crypto-coinbase-premium':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'coinbasePremium',
+              unitLabel: '%',
+            });
+          case 'crypto-margin-rate':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'publicMarginRate',
+              unitLabel: '% / hour',
+            });
+          case 'crypto-urpd':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'urpd',
+              presentation: 'distribution',
+            });
+          case 'crypto-treasuries':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'treasuries',
+              presentation: 'distribution',
+            });
+          case 'crypto-strategy-holdings':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'strategyHoldings',
+              unitLabel: 'BTC',
+            });
+          case 'gold-comex-inventory':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'comexGoldInventory',
+              unitLabel: 'troy oz',
+            });
+          case 'crypto-stablecoins':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'stablecoins',
+              unitLabel: 'USD',
+            });
+          case 'crypto-fear-greed':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'fearGreed',
+              unitLabel: '0–100',
+            });
+          case 'crypto-funding':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'binanceFunding',
+              unitLabel: '%',
+            });
           case 'gold-market-detail-table':
             return h(GoldMarketDetailPanel);
           case 'macro-market-detail-table':
             return h(MacroMarketDetailPanel);
+          case 'macro-treasury-yields':
+            return h(MacroSeriesChart, { groupId: 'treasuryYields', unitLabel: '%' });
           case 'macro-global-m2':
             return h(MacroSeriesChart, {
               groupId: 'globalM2Level',

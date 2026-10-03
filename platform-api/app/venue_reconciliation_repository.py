@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from sqlite3 import Row
+from typing import Any
 from uuid import uuid4
 
 from app.database import connection
@@ -66,26 +67,47 @@ def now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def effective_venue_event(db, account_id: str, event_type: str, payload: dict) -> dict:
+def load_venue_timestamp_corrections(
+    db, account_ids: list[str]
+) -> dict[tuple[str, str, str], list[dict[str, Any]]]:
+    """Read accepted evidence once per read operation; never cache across requests."""
+    if not account_ids or not db.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='reconciliation_differences'"
+    ).fetchone():
+        return {}
+    placeholders = ",".join("?" for _ in account_ids)
+    corrections: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in db.execute(
+        "SELECT r.account_id,r.source,d.external_reference,d.local_value_json,"
+        "d.external_value_json FROM reconciliation_differences d "
+        "JOIN venue_reconciliation_runs r ON r.id=d.run_id "
+        f"WHERE r.account_id IN ({placeholders}) AND d.entity_type='venue_event' "
+        "AND d.difference_type='timestamp_mismatch' AND d.status='accepted' "
+        "AND d.resolution_actor IS NOT NULL AND d.resolved_at IS NOT NULL",
+        account_ids,
+    ):
+        key = (row["account_id"], row["source"], row["external_reference"])
+        corrections.setdefault(key, []).append(dict(row))
+    return corrections
+
+
+def effective_venue_event(
+    db, account_id: str, event_type: str, payload: dict, *,
+    corrections: dict[tuple[str, str, str], list[dict[str, Any]]] | None = None,
+) -> dict:
     """Apply an explicitly accepted timestamp correction, retaining the raw receipt.
 
     Acceptance must match the complete old receipt and can change only its time.
     It cannot approve changed amounts, ownership, or a later third timestamp.
     """
-    if not db.execute(
-        "SELECT 1 FROM sqlite_master WHERE name='reconciliation_differences'"
-    ).fetchone():
-        return payload
     external_id = payload.get("externalFillId" if event_type == "trade_fill" else "externalEventId")
-    rows = db.execute(
-        "SELECT d.local_value_json,d.external_value_json FROM reconciliation_differences d "
-        "JOIN venue_reconciliation_runs r ON r.id=d.run_id "
-        "WHERE r.account_id=? AND r.source=? AND d.entity_type='venue_event' "
-        "AND d.difference_type='timestamp_mismatch' AND d.external_reference=? "
-        "AND d.status='accepted' AND d.resolution_actor IS NOT NULL "
-        "AND d.resolved_at IS NOT NULL",
-        (account_id, payload.get("source"), f"{event_type}:{external_id}"),
-    ).fetchall()
+    if corrections is None:
+        corrections = load_venue_timestamp_corrections(db, [account_id])
+    source = payload.get("source")
+    rows = (
+        corrections.get((account_id, source, f"{event_type}:{external_id}"), [])
+        if isinstance(source, str) else []
+    )
     result = payload
     for row in rows:
         original = json.loads(row["local_value_json"])
@@ -155,6 +177,11 @@ def update_order_from_external(
             WHERE id = ? AND (status != 'filled' OR ? = 0)
             """,
             (status, external_order_id, updated_at, order_id, int(full_projection)),
+        )
+        db.execute(
+            "UPDATE trade_commands SET status=(SELECT status FROM orders WHERE id=?), "
+            "updated_at=? WHERE id=(SELECT command_id FROM orders WHERE id=?)",
+            (order_id, now_iso(), order_id),
         )
         if status != "filled":
             return
@@ -556,3 +583,93 @@ def difference_from_row(row: Row) -> ReconciliationDifferenceResponse:
         resolvedAt=row["resolved_at"],
         createdAt=row["created_at"],
     )
+
+
+def persist_validated_native_fills(order_id, account_id, source, external_order_id, fills):
+    from app.live_venue_snapshot_sync import _persist_venue_event
+    from app.venue_identity_repository import load_order_identities
+
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        identities = load_order_identities(db)
+        confirmed = sum(
+            (
+                Decimal(row[0])
+                for row in db.execute(
+                    "SELECT quantity FROM fills WHERE order_id=? AND origin='runtime_confirmation'",
+                    (order_id,),
+                )
+            ),
+            Decimal(0),
+        )
+        for fill in fills:
+            if (
+                fill["externalOrderId"] != external_order_id
+                or fill["source"] != source
+                or identities.resolve(account_id, fill) != order_id
+            ):
+                raise ValueError("Venue execution identity conflicts with local order")
+            _persist_venue_event(db, account_id, "trade_fill", fill)
+    return confirmed
+
+
+def resolve_accepted_absent_order(order_id: str) -> None:
+    """Recheck the local proof and close an absent intent in one writer transaction."""
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        order = db.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
+        if order is None or order["status"] != "result_unknown":
+            raise ValueError("Order is not result-unknown")
+        if (
+            order["external_order_id"]
+            or db.execute("SELECT 1 FROM fills WHERE order_id=? LIMIT 1", (order_id,)).fetchone()
+        ):
+            raise ValueError("Order has external execution evidence and cannot be closed as absent")
+        proof = db.execute(
+            "SELECT 1 FROM reconciliation_differences WHERE entity_type='order' "
+            "AND difference_type='missing_external' AND local_reference=? "
+            "AND status='accepted' LIMIT 1",
+            (order_id,),
+        ).fetchone()
+        if proof is None:
+            raise ValueError("Accepted missing-external reconciliation evidence is required")
+        leg = db.execute(
+            "SELECT batch_id FROM execution_batch_legs WHERE order_id=?", (order_id,)
+        ).fetchone()
+        batch_id = str(leg["batch_id"]) if leg else None
+        if batch_id is not None:
+            unsafe = db.execute(
+                "SELECT 1 FROM execution_batch_legs l LEFT JOIN orders o ON o.id=l.order_id "
+                "WHERE l.batch_id=? AND (l.status IN ('filled','partially_filled','acknowledged') "
+                "OR EXISTS(SELECT 1 FROM fills f WHERE f.order_id=l.order_id) "
+                "OR (l.order_id!=? AND o.status NOT IN ('rejected','canceled'))) LIMIT 1",
+                (batch_id, order_id),
+            ).fetchone()
+            if unsafe:
+                raise ValueError(
+                    "Batch contains external execution evidence and cannot be closed as absent"
+                )
+        now = now_iso()
+        reason = "Owner-accepted reconciliation confirmed no external venue order"
+        db.execute("UPDATE orders SET status='rejected',updated_at=? WHERE id=?", (now, order_id))
+        db.execute(
+            "UPDATE trade_commands SET status='rejected',updated_at=? WHERE id=?",
+            (now, order["command_id"]),
+        )
+        if batch_id is not None:
+            db.execute(
+                "UPDATE execution_batch_legs SET status='rejected',failure_reason=?,updated_at=? "
+                "WHERE order_id=?",
+                (reason, now, order_id),
+            )
+            db.execute(
+                "UPDATE execution_batches SET status='failed',requires_manual_intervention=0,"
+                "failure_reason=?,updated_at=? WHERE id=?",
+                (reason, now, batch_id),
+            )
+        db.execute(
+            "INSERT INTO audit_events(id,event_type,subject_type,subject_id,"
+            "details_json,created_at) "
+            "VALUES (?,'result_unknown_absent_order_resolved','order',?,?,?)",
+            (str(uuid4()), order_id, json.dumps({"batchId": batch_id}), now),
+        )

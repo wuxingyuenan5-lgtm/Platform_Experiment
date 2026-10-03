@@ -261,3 +261,62 @@ def test_position_identity_uses_account_and_persisted_market_without_a_static_sy
             instrument_type=kind,
             category=category,
         ).startswith("monitor:bybit:monitor:")
+
+
+def test_concurrent_specs_share_only_inflight_permission_read(routed, monkeypatch):
+    from concurrent.futures import Future, ThreadPoolExecutor
+    from threading import Event
+
+    _, adapter, clients = routed
+    client = clients["funding"]
+    for category in ("spot", "linear"):
+        adapter._market_data("funding").market(category, "BTCUSDT")
+    entered, joined, release = Event(), Event(), Event()
+    original = client.get_api_key_information
+    calls = []
+
+    class ObservedFuture(Future):
+        def result(self, timeout=None):
+            joined.set()
+            return super().result(timeout)
+
+    def blocked_read():
+        calls.append(1)
+        entered.set()
+        assert release.wait(3)
+        return original()
+
+    monkeypatch.setattr("app.bybit_acceptance_adapter.Future", ObservedFuture)
+    monkeypatch.setattr(client, "get_api_key_information", blocked_read)
+
+    def spec(category):
+        return adapter.get_instrument_specification(
+            account_id="funding", symbol="BTCUSDT", category=category,
+            instrument_type="crypto_spot" if category == "spot" else "crypto_perp",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(spec, "spot")
+        assert entered.wait(3)
+        second = pool.submit(spec, "linear")
+        assert joined.wait(3)
+        release.set()
+        assert first.result().access_checks["orderPermission"] is True
+        assert second.result().access_checks["orderPermission"] is True
+    assert len(calls) == 1
+    client.spot_permission = False
+    assert spec("spot").access_checks["orderPermission"] is False
+    assert len(calls) == 2
+    assert adapter._permission_reads == {}
+
+
+def test_permission_read_failure_does_not_survive_next_check(routed, monkeypatch):
+    _, adapter, clients = routed
+    client = clients["funding"]
+    original = client.get_api_key_information
+    monkeypatch.setattr(client, "get_api_key_information", lambda: {"retCode": 10003})
+    with pytest.raises(GatewayRequestRejectedError):
+        adapter._api_key_readiness("funding")
+    assert adapter._permission_reads == {}
+    monkeypatch.setattr(client, "get_api_key_information", original)
+    assert adapter._api_key_readiness("funding")["retCode"] == 0

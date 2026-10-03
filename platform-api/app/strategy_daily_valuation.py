@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.database import connection
+from app.pnl_reporting import day_start, reporting_date
 
 ZERO = Decimal(0)
 
@@ -26,14 +27,14 @@ def daily_marks(
         return {}, {}
     history = sorted(history, key=lambda item: item[0])
     specifications = {(o["account_id"], o["instrument_id"]): o for o in orders}
-    first = history[0][0].date()
-    today = datetime.now(UTC).date()
+    first = reporting_date(history[0][0])
+    today = reporting_date(datetime.now(UTC))
     day = max(first, today - timedelta(days=400))
     cursor, held = 0, {}
     values, reasons = {}, {}
     with connection() as db:
         while day <= today:
-            end = datetime.combine(day + timedelta(days=1), datetime.min.time(), UTC)
+            end = day_start(day + timedelta(days=1))
             key = day.isoformat()
             session = (reporting_sessions or {}).get("observations", {}).get(key)
             if reporting_sessions is not None:
@@ -56,7 +57,7 @@ def daily_marks(
                     "WHERE strategy_key='cross_venue_spread' AND strategy_instance_id=? "
                     "AND observed_at>=? AND observed_at<? AND status='available' "
                     "ORDER BY observed_at DESC LIMIT 1",
-                    (strategy_id, day.isoformat(), end.date().isoformat()),
+                    (strategy_id, day_start(day).isoformat(), end.isoformat()),
                 ).fetchone()
                 if row and (end - instant(row["observed_at"])).total_seconds() <= 300:
                     spread = json.loads(row["payload_json"])

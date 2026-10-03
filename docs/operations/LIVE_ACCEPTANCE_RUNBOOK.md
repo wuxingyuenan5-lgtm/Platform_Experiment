@@ -294,6 +294,11 @@ following in read-only mode:
   subsequent calls. Account/profile-change auto-disable protections remain enabled;
   the platform must not force the Algorithmic Trading switch back on after a
   deliberate operator shutdown.
+  Before accepting a dedicated portable Terminal, confirm its own data directory
+  contains the broker's trade-server settings and verify a connected read-only
+  snapshot against the intended Login, Server and Company. The terminal executable
+  brand does not select the broker; a new portable data directory can otherwise
+  remain on MetaQuotes-Demo even when the Runtime supplies a live Server name.
 - Restoring existing Cross TP/SL requires both live gates and the local
   `VG_CROSS_SPREAD_EXIT_MONITOR_ENABLED=true` setting. Verify the monitor startup
   log, fresh executable quotes and the unchanged authorized plan thresholds;

@@ -14,8 +14,10 @@ with the FakeGateway and live_write_enabled=False.
 
 from __future__ import annotations
 
+import json
 import os
 import socket
+import sqlite3
 import subprocess
 import sys
 import time
@@ -50,7 +52,7 @@ def _free_port() -> int:
 
 
 @pytest.fixture
-def runtime_process(tmp_path):
+def runtime_process(tmp_path, monkeypatch):
     port = _free_port()
     journal_dir = tmp_path / "runtime-journal"
     journal_dir.mkdir()
@@ -61,6 +63,42 @@ def runtime_process(tmp_path):
     log_file = journal_dir / "runtime.log"
     base_url = f"http://127.0.0.1:{port}"
     process = None
+
+    # FakeGateway exposes net positions. Model MT5 hedging tickets from its
+    # actual persisted fills and submitted position_id, without bypassing the
+    # production preflight or inventing fills from the expected plan.
+    from app import cross_spread_live_read_client as live_client
+
+    original_positions = live_client.list_positions
+
+    def ticket_positions(account_id):
+        if account_id != MT5_ACCOUNT_ID:
+            return original_positions(account_id)
+        with sqlite3.connect(journal_dir / "runtime_journal.db") as db:
+            db.row_factory = sqlite3.Row
+            rows = db.execute(
+                "SELECT f.*,c.payload_json FROM fake_venue_fills f "
+                "JOIN runtime_commands c ON c.command_id=f.command_id "
+                "WHERE f.account_id=? ORDER BY f.occurred_at",
+                (account_id,),
+            ).fetchall()
+        tickets = {}
+        for row in rows:
+            command = json.loads(row["payload_json"])
+            ticket = command.get("position_id") or row["external_order_id"]
+            quantity = Decimal(row["quantity"]) * (1 if row["side"] == "buy" else -1)
+            previous = tickets.get(ticket)
+            tickets[ticket] = live_client.LivePosition(
+                source="fake",
+                external_position_id=ticket,
+                account_id=account_id,
+                instrument_id=row["instrument_id"],
+                symbol=row["symbol"],
+                net_quantity=quantity + (previous.net_quantity if previous else Decimal(0)),
+            )
+        return [p for p in tickets.values() if p.net_quantity != 0]
+
+    monkeypatch.setattr(live_client, "list_positions", ticket_positions)
 
     def stop():
         nonlocal process
@@ -97,9 +135,7 @@ def runtime_process(tmp_path):
         deadline = time.monotonic() + 45
         while time.monotonic() < deadline:
             if process.poll() is not None:
-                raise RuntimeError(
-                    f"runtime exited early rc={process.returncode}; log={log_file}"
-                )
+                raise RuntimeError(f"runtime exited early rc={process.returncode}; log={log_file}")
             try:
                 with httpx.Client(timeout=1.0, trust_env=False) as client:
                     response = client.get(f"{base_url}/status")
@@ -243,9 +279,9 @@ def test_cross_spread_gold_local_closed_loop(
         assert bybit_after and all(
             Decimal(position["netQuantity"]) == 0 for position in bybit_after
         ), bybit_after
-        assert mt5_after and all(
-            Decimal(position["netQuantity"]) == 0 for position in mt5_after
-        ), mt5_after
+        assert mt5_after and all(Decimal(position["netQuantity"]) == 0 for position in mt5_after), (
+            mt5_after
+        )
 
 
 def test_cross_spread_local_closed_loop_allows_independent_completed_groups(
@@ -432,7 +468,9 @@ def test_runtime_and_api_restart_after_first_leg_never_repeat_orders(
 
     monkeypatch.setattr(runtime_transport, "post", interrupted_post)
     payload = {
-        "direction": "LONG_SPREAD", "quantityOz": "1", "executionMode": "market",
+        "direction": "LONG_SPREAD",
+        "quantityOz": "1",
+        "executionMode": "market",
         "idempotencyKey": "interrupted-cross-open",
     }
     with TestClient(app) as client:
@@ -505,19 +543,27 @@ def test_runtime_and_api_restart_after_first_leg_never_repeat_orders(
 
 
 @pytest.mark.parametrize("terminal_partial", [False, True])
-def test_native_chase_guard_survives_real_platform_transport(runtime_url, tmp_path, authorize_funding_ceo, monkeypatch, terminal_partial):
+def test_native_chase_guard_survives_real_platform_transport(
+    runtime_url, tmp_path, authorize_funding_ceo, monkeypatch, terminal_partial
+):
     from app import runtime_transport
+
     _seed_cross_spread_environment(tmp_path, "chase-transport.db")
     settings = get_settings()
     settings.runtime_base_url = runtime_url
     settings.live_trading_enabled = True
     original = runtime_transport.post
     commands = []
+
     def capture(url, **kwargs):
         if url.endswith("/commands/orders"):
             commands.append(kwargs["json"])
         result = original(url, **kwargs)
-        if terminal_partial and url.endswith("/commands/orders") and kwargs["json"]["account_id"] != MT5_ACCOUNT_ID:
+        if (
+            terminal_partial
+            and url.endswith("/commands/orders")
+            and kwargs["json"]["account_id"] != MT5_ACCOUNT_ID
+        ):
             events = result.json()
             for event in events:
                 if event["event_type"] == "order_filled":
@@ -525,15 +571,25 @@ def test_native_chase_guard_survives_real_platform_transport(runtime_url, tmp_pa
                     event["terminal"] = True
             return httpx.Response(200, json=events, request=result.request)
         return result
+
     monkeypatch.setattr(runtime_transport, "post", capture)
     with TestClient(app) as client:
         _seed_cross_spread_environment(tmp_path, "chase-transport.db")
         authorize_funding_ceo(client)
-        response = client.post(LIFECYCLE_OPEN_ENDPOINT, json={
-            "direction": "LONG_SPREAD", "quantityOz": "2" if terminal_partial else "1", "executionMode": "limit",
-            "limitStrategy": "post_only_chase", "limitSpread": "10", "maxAdverseSpread": "5",
-            "takeProfitMaxAdverseSpread": "3", "stopLossMaxAdverseSpread": "4",
-            "idempotencyKey": "chase-transport"})
+        response = client.post(
+            LIFECYCLE_OPEN_ENDPOINT,
+            json={
+                "direction": "LONG_SPREAD",
+                "quantityOz": "2" if terminal_partial else "1",
+                "executionMode": "limit",
+                "limitStrategy": "post_only_chase",
+                "limitSpread": "10",
+                "maxAdverseSpread": "5",
+                "takeProfitMaxAdverseSpread": "3",
+                "stopLossMaxAdverseSpread": "4",
+                "idempotencyKey": "chase-transport",
+            },
+        )
         assert response.status_code == 200, response.text
         assert response.json()["executionBatch"]["status"] == "hedged", response.text
         assert len(commands) == 2

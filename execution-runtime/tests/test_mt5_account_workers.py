@@ -237,7 +237,9 @@ def test_worker_start_failure_backoff_prevents_terminal_restart_storm(monkeypatc
             return None
 
     monkeypatch.setattr("app.mt5_account_worker.multiprocessing.Process", Process)
-    monkeypatch.setattr("app.mt5_account_worker.multiprocessing.Pipe", lambda: (Connection(), Connection()))
+    monkeypatch.setattr(
+        "app.mt5_account_worker.multiprocessing.Pipe", lambda: (Connection(), Connection())
+    )
     client = Mt5AccountWorkerClient(
         settings=Settings(), account_id="mt5-live-main", terminal_path="C:/MT5/terminal64.exe"
     )

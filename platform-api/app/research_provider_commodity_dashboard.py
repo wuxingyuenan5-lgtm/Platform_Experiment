@@ -23,7 +23,7 @@ class CommodityDashboardProvider:
             return contract
         except Exception as exc:
             if self._last_known_good is not None:
-                return self._last_known_good.model_copy(deep=True)
+                return self._last_known_good.stale_copy()
             if isinstance(exc, ResearchProviderError):
                 raise
             raise ResearchProviderError(

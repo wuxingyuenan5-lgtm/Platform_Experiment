@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
+from concurrent.futures import Future
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from threading import Lock
 from time import monotonic
 from typing import Any, Literal, cast
 
@@ -12,6 +15,7 @@ from app.live_route_store import get_order_route
 from app.models import (
     CancelOrderResponse,
     ExecutionEvent,
+    GatewayAccountCapability,
     GatewayCapabilitiesResponse,
     InternalCapitalTransferReadinessResponse,
     InternalCapitalTransferStepCommand,
@@ -36,12 +40,14 @@ from app.strict_live_acceptance_adapters import (
     StrictMt5AcceptanceAdapter,
 )
 
+LOG = logging.getLogger(__name__)
+
 
 class BybitMt5Gateway:
     """Account-routed live gateway with independent Bybit and MT5 adapters."""
 
     name = "bybit_mt5"
-    _QUOTE_CACHE_SECONDS = 5.0
+    _QUOTE_CACHE_SECONDS = 1.0
     _MARGIN_CACHE_SECONDS = 15.0
 
     def __init__(
@@ -61,6 +67,9 @@ class BybitMt5Gateway:
         # lazily from the explicit account id on the first account-scoped call.
         self.mt5: Any = mt5 or StrictMt5AcceptanceAdapter(self.settings)
         self._execution_read_cache: dict[tuple[object, ...], tuple[float, Any]] = {}
+        self._execution_read_lock = Lock()
+        self._execution_reads: dict[tuple[object, ...], Future[Any]] = {}
+        self._execution_read_generation: dict[str, int] = {}
         if hasattr(self.bybit, "market_quote_reader"):
             self.bybit.market_quote_reader = lambda **kwargs: self._adapter_for_account(
                 kwargs["account_id"]
@@ -69,18 +78,24 @@ class BybitMt5Gateway:
     def warm_live_execution(self) -> None:
         """Pay connection and identity startup costs before the first order.
 
-        This performs authenticated reads only. A failure keeps Runtime startup
-        fail-closed instead of moving Terminal login or client initialization
-        into the first live command's latency budget.
+        This performs authenticated reads only. Startup remains available when
+        one configured account cannot warm; that account's own reads and writes
+        still fail closed at their normal account-scoped checks.
         """
         for account_id in sorted(self.settings.allowed_live_accounts):
-            if account_id in self.settings.bybit_accounts:
-                self.bybit.get_account_risk(account_id)
-            elif account_id in self.settings.mt5_accounts:
-                # Worker startup already proves an authoritative account
-                # snapshot. The capability call merely triggers that startup;
-                # avoid immediately fetching the full account history twice.
-                self._mt5_adapter(account_id).capability()
+            try:
+                if account_id in self.settings.bybit_accounts:
+                    self.bybit.get_account_risk(account_id)
+                elif account_id in self.settings.mt5_accounts:
+                    # Worker startup proves account identity without loading
+                    # full history a second time.
+                    self._mt5_adapter(account_id).capability()
+            except Exception as exc:
+                LOG.warning(
+                    "Live account warm-up failed for %s (%s); other accounts remain available",
+                    account_id,
+                    type(exc).__name__,
+                )
 
     def place_order(self, command: SubmitOrderCommand) -> list[ExecutionEvent]:
         return self.submit_order(command)
@@ -109,9 +124,13 @@ class BybitMt5Gateway:
         finally:
             # Even an uncertain update invalidates old margin estimates. Reads
             # must re-query the venue; the setting is never automatically replayed.
-            for key in list(self._execution_read_cache):
-                if len(key) > 1 and key[1] == account_id:
-                    self._execution_read_cache.pop(key, None)
+            with self._execution_read_lock:
+                self._execution_read_generation[account_id] = (
+                    self._execution_read_generation.get(account_id, 0) + 1
+                )
+                for key in list(self._execution_read_cache):
+                    if len(key) > 1 and key[1] == account_id:
+                        self._execution_read_cache.pop(key, None)
 
     def get_positions(self, account_id: str | None = None) -> list[VenuePositionSnapshot]:
         return self.list_positions(account_id)
@@ -578,13 +597,36 @@ class BybitMt5Gateway:
         )
 
     def _cached_execution_read(self, key, ttl_seconds: float, loader):
-        cached = self._execution_read_cache.get(key)
-        now = monotonic()
-        if cached is not None and now - cached[0] <= ttl_seconds:
-            return cached[1]
-        value = loader()
-        self._execution_read_cache[key] = (now, value)
-        return value
+        # Merge simultaneous reads of exactly the same account/market/inputs.
+        # Independent keys and writes never wait behind this bookkeeping lock.
+        with self._execution_read_lock:
+            now = monotonic()
+            cached = self._execution_read_cache.get(key)
+            if cached is not None and now - cached[0] <= ttl_seconds:
+                return cached[1]
+            generation = self._execution_read_generation.get(key[1], 0)
+            flight_key = (*key, generation)
+            pending = self._execution_reads.get(flight_key)
+            owner = pending is None
+            if owner:
+                pending = Future()
+                self._execution_reads[flight_key] = pending
+        assert pending is not None
+        if not owner:
+            return pending.result()
+        try:
+            value = loader()
+            with self._execution_read_lock:
+                if self._execution_read_generation.get(key[1], 0) == generation:
+                    self._execution_read_cache[key] = (now, value)
+            pending.set_result(value)
+            return value
+        except BaseException as exc:
+            pending.set_exception(exc)
+            raise
+        finally:
+            with self._execution_read_lock:
+                self._execution_reads.pop(flight_key, None)
 
     def list_economic_events(
         self,
@@ -631,15 +673,55 @@ class BybitMt5Gateway:
     def capabilities(self) -> GatewayCapabilitiesResponse:
         mt5_capability = self.mt5.capability()
         if self._mt5_supervisor is not None:
-            missing = sorted(
-                set(mt5_capability.missing_requirements)
-                | set(self._mt5_supervisor.missing_requirements())
-            )
+            account_ids = sorted(self.settings.mt5_accounts)
+            account_missing: dict[str, set[str]] = {account_id: set() for account_id in account_ids}
+            shared_missing: set[str] = set()
+            for requirement in mt5_capability.missing_requirements:
+                account_id = next(
+                    (item for item in account_ids if requirement.startswith(f"{item}:")),
+                    None,
+                )
+                if account_id is None:
+                    shared_missing.add(requirement)
+                else:
+                    account_missing[account_id].add(requirement)
+            for account_id in account_ids:
+                account_missing[account_id].update(
+                    self._mt5_supervisor.missing_requirements(account_id)
+                )
+
+            environment_only = {"WINDOWS_RUNTIME", "METATRADER5_DEPENDENCY"}
+            shared_configured = not (shared_missing - environment_only)
+            shared_operational = not shared_missing
+            account_statuses = [
+                GatewayAccountCapability(
+                    accountId=account_id,
+                    configured=shared_configured and not account_missing[account_id],
+                    operational=shared_operational and not account_missing[account_id],
+                    writeEnabled=(
+                        shared_operational
+                        and not account_missing[account_id]
+                        and self.settings.live_write_enabled
+                        and account_id in self.settings.allowed_live_accounts
+                    ),
+                    missingRequirements=sorted(account_missing[account_id]),
+                )
+                for account_id in account_ids
+            ]
+            missing = sorted(shared_missing | set().union(*account_missing.values()))
             mt5_capability = mt5_capability.model_copy(
                 update={
-                    "configured": mt5_capability.configured and not missing,
-                    "operational": mt5_capability.operational and not missing,
-                    "write_enabled": mt5_capability.write_enabled and not missing,
+                    # Adapter-wide readiness describes shared MT5 support. A
+                    # broken account path is retained in accountStatuses and
+                    # must not disable healthy accounts using this adapter.
+                    "configured": shared_configured and any(
+                        item.configured for item in account_statuses
+                    ),
+                    "operational": shared_operational and any(
+                        item.operational for item in account_statuses
+                    ),
+                    "write_enabled": any(item.write_enabled for item in account_statuses),
+                    "account_statuses": account_statuses,
                     "missing_requirements": missing,
                 }
             )
@@ -697,6 +779,8 @@ class BybitMt5Gateway:
             terminal = mt5.terminal_info()
             if info is None or terminal is None:
                 raise GatewayConfigurationError(f"MT5 account snapshot failed: {mt5.last_error()}")
+            if not bool(getattr(terminal, "connected", False)):
+                raise GatewayConfigurationError("MT5 account snapshot terminal is not connected")
             currency = self.mt5._account_currency(mt5)
             as_of = datetime.now(UTC)
             balances = [
@@ -843,6 +927,7 @@ class BybitMt5Gateway:
                     "accountId": account_id,
                     "login": str(getattr(info, "login", "") or ""),
                     "server": str(getattr(info, "server", "") or ""),
+                    "company": str(getattr(info, "company", "") or "") or None,
                 },
                 balances=balances,
                 positions=positions,

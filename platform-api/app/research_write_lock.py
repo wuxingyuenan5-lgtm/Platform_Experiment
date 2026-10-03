@@ -8,5 +8,4 @@ from __future__ import annotations
 
 import asyncio
 
-
 RESEARCH_DB_WRITE_LOCK = asyncio.Lock()

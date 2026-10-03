@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -17,6 +18,28 @@ SPEC.loader.exec_module(DOCUMENTATION_CONSISTENCY)
 
 def test_current_repository_documentation_is_consistent() -> None:
     assert DOCUMENTATION_CONSISTENCY.validate_repository(REPOSITORY_ROOT) == []
+
+
+@pytest.mark.parametrize(
+    ("candidate", "valid"),
+    [("0.10.2", True), ("0.10.3", True), ("0.10.1", False), ("0.10.4", False)],
+)
+def test_candidate_target_matches_version_checker_policy(tmp_path, candidate, valid):
+    (tmp_path / "VERSION").write_text("0.10.2\n", encoding="utf-8")
+    baseline = (REPOSITORY_ROOT / "docs/BASELINE.md").read_text(encoding="utf-8")
+    baseline = re.sub(
+        r"Stable baseline: Platform `[^`]+`", "Stable baseline: Platform `0.10.2`", baseline
+    )
+    baseline = re.sub(
+        r"Current candidate target: Platform `[^`]+`",
+        f"Current candidate target: Platform `{candidate}`", baseline,
+    )
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/BASELINE.md").write_text(baseline, encoding="utf-8")
+    errors = DOCUMENTATION_CONSISTENCY.validate_current_authority(tmp_path)
+    assert (not errors) == valid
+    if not valid:
+        assert errors == ["BASELINE.md candidate target must be the stable VERSION or next patch"]
 
 
 def test_markdown_links_accept_existing_local_target(tmp_path: Path) -> None:

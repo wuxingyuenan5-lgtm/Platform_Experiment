@@ -3,13 +3,28 @@
     <div class="basis-panel__head">
       <div>
         <h3>期现价差</h3>
-        <p>永续合约中间价 − 现货中间价，正值表示合约升水</p>
+        <p>合约mid - 现货mid</p>
       </div>
-      <span>近 24 小时 · 15 分钟</span>
+      <div class="basis-panel__ranges" role="group" aria-label="期现价差时间范围">
+        <a
+          class="basis-panel__template-link"
+          href="https://cn.tradingview.com/chart/fLzPjgRY/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          tradingview模板
+        </a>
+        <button
+          v-for="range in ranges"
+          :key="range.label"
+          type="button"
+          :class="{ active: selectedRange === range.label }"
+          @click="selectedRange = range.label"
+        >
+          {{ range.label }}
+        </button>
+      </div>
     </div>
-    <p class="basis-panel__note">
-      BTC 使用已采集的同时报价；XAUT、ETH、CRCL、MSTR 使用同时间桶历史收盘价，缺少任一腿时不补点。
-    </p>
     <p v-if="loading" class="basis-panel__status" role="status">正在读取期现价差…</p>
     <p v-else-if="error" class="basis-panel__status basis-panel__status--error" role="alert">
       {{ error }}
@@ -19,16 +34,24 @@
 </template>
 
 <script setup lang="ts">
-  import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
+  import { ref, watch, type Ref } from 'vue';
+  import { useKeepAliveActive } from '@/hooks/web/useKeepAliveActive';
   import { useECharts } from '@/hooks/web/useECharts';
   import { researchSeries, type ResearchResponse } from '@/api/platform/strategyResearch';
 
   const symbols = ['XAUT', 'BTC', 'ETH', 'CRCL', 'MSTR'] as const;
   const chartRef = ref<HTMLDivElement>();
   const chart = useECharts(chartRef as Ref<HTMLDivElement>);
+  const pageActive = useKeepAliveActive();
   const rowsBySymbol = ref<Record<string, Array<Record<string, any>>>>({});
   const loading = ref(false);
   const error = ref('');
+  const ranges = [
+    { label: '近24小时', hours: 24 },
+    { label: '近7日', hours: 24 * 7 },
+    { label: '近30日', hours: 24 * 30 },
+  ] as const;
+  const selectedRange = ref<(typeof ranges)[number]['label']>('近24小时');
   let timer: ReturnType<typeof setInterval> | undefined;
 
   function rowsFrom(response: ResearchResponse) {
@@ -47,7 +70,8 @@
     loading.value = true;
     error.value = '';
     const end = new Date();
-    const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    const range = ranges.find((item) => item.label === selectedRange.value) ?? ranges[0];
+    const start = new Date(end.getTime() - range.hours * 60 * 60 * 1000);
     try {
       const response = await researchSeries(
         'funding-btc',
@@ -92,12 +116,17 @@
   }
 
   watch(rowsBySymbol, render, { deep: true });
-  onMounted(() => {
-    void load();
-    timer = setInterval(() => void load(), 60_000);
+  watch(selectedRange, () => {
+    if (pageActive.value) void load();
   });
-  onBeforeUnmount(() => {
-    if (timer) clearInterval(timer);
+  watch(pageActive, (active) => {
+    if (active) {
+      void load();
+      timer = setInterval(() => void load(), 60_000);
+    } else if (timer) {
+      clearInterval(timer);
+      timer = undefined;
+    }
   });
 </script>
 
@@ -128,7 +157,6 @@
   }
 
   .basis-panel__head p,
-  .basis-panel__note,
   .basis-panel__head > span,
   .basis-panel__status {
     margin: 4px 0 0;
@@ -136,12 +164,47 @@
     font-size: 12px;
   }
 
-  .basis-panel__head > span {
-    white-space: nowrap;
+  .basis-panel__ranges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
   }
 
-  .basis-panel__note {
-    margin-top: 0;
+  .basis-panel__ranges button {
+    padding: 5px 10px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .basis-panel__template-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 8px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: 12px;
+    line-height: 1.4;
+    text-decoration: none;
+  }
+
+  .basis-panel__template-link:hover,
+  .basis-panel__template-link:focus-visible {
+    border-color: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+  }
+
+  .basis-panel__ranges button.active {
+    border-color: var(--strategy-accent-soft);
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent-strong);
+    font-weight: 700;
   }
 
   .basis-panel__status--error {
@@ -156,6 +219,10 @@
     .basis-panel__head {
       flex-direction: column;
       gap: 4px;
+    }
+
+    .basis-panel__ranges {
+      justify-content: flex-start;
     }
   }
 </style>

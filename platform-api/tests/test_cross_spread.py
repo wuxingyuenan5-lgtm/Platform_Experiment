@@ -1,5 +1,6 @@
-from decimal import Decimal
+import asyncio
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
@@ -10,14 +11,15 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.cross_spread import (
     CrossSpreadLiveSizing,
+    get_cross_spread_snapshot,
     get_cross_spread_trading_rules,
     submit_cross_spread_market_command,
 )
-from tests.test_cross_spread_market_lifecycle import available_snapshot
 from app.cross_spread_live_read_client import LiveInstrumentSpecification
 from app.database import connection
 from app.main import app
 from app.schemas import CrossSpreadMarketCommandRequest
+from tests.test_cross_spread_market_lifecycle import available_snapshot
 
 
 @pytest.fixture(autouse=True)
@@ -27,6 +29,7 @@ def _isolate_development_auth():
     settings.environment = "development"
     settings.auth_mode = "development"
     settings.development_roles = "admin"
+    settings.research_refresh_enabled = False
     yield
     for name, value in original.items():
         setattr(settings, name, value)
@@ -164,6 +167,7 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
     settings = get_settings()
     settings.database_path = str(tmp_path / "cross-spread-snapshot.db")
     settings.runtime_base_url = "http://runtime.local"
+    settings.cross_spread_market_snapshot_interval_seconds = 3600
 
     def fake_get(url: str, timeout: float, params: dict[str, str]) -> httpx.Response:
         assert url == "http://runtime.local/gateway/cross-spread/snapshot"
@@ -218,6 +222,10 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
         authenticate_ceo(client)
         response = client.get("/api/v1/trading/cross-spread/snapshot")
         repeat_response = client.get("/api/v1/trading/cross-spread/snapshot")
+        with connection() as db:
+            assert db.execute("SELECT COUNT(*) FROM market_spread_snapshots").fetchone()[0] == 0
+        get_cross_spread_snapshot(record_history=True)
+        get_cross_spread_snapshot(record_history=True)
 
     assert response.status_code == 200
     assert repeat_response.status_code == 200
@@ -255,6 +263,45 @@ def test_cross_spread_snapshot_proxies_runtime_market_data(monkeypatch, tmp_path
             "mt5Mid": "3331.20",
         }
     ]
+
+
+def test_snapshot_monitor_explicitly_owns_history_sampling(monkeypatch):
+    from app import cross_spread_observability_routes as routes
+
+    async def sleep(_seconds):
+        return None
+
+    async def to_thread(reader, **kwargs):
+        assert reader is get_cross_spread_snapshot
+        assert kwargs == {"record_history": True}
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(routes.asyncio, "sleep", sleep)
+    monkeypatch.setattr(routes.asyncio, "to_thread", to_thread)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(routes.run_market_snapshot_monitor())
+
+
+def test_sampler_does_not_republish_stale_fallback(monkeypatch):
+    snapshot = available_snapshot()
+
+    def unavailable(*args, **kwargs):
+        raise httpx.ConnectError("Runtime unavailable")
+
+    def unexpected_save(*args, **kwargs):
+        pytest.fail("A stale fallback must not become a new history observation")
+
+    monkeypatch.setattr("app.cross_spread.get_bybit_account_id", lambda: "bybit-live-main")
+    monkeypatch.setattr("app.cross_spread.get_mt5_account_id", lambda: "mt5-live-main")
+    monkeypatch.setattr("app.runtime_transport.get", unavailable)
+    monkeypatch.setattr(
+        "app.cross_spread.get_latest_cross_spread_market_snapshot", lambda **_: snapshot
+    )
+    monkeypatch.setattr("app.cross_spread.save_cross_spread_market_snapshot", unexpected_save)
+    result = get_cross_spread_snapshot(record_history=True)
+    assert result.as_of == snapshot.as_of
+    assert result.bybit.execution_block_reason == "runtime_snapshot_stale"
+    assert result.mt5.open_allowed is False
 
 
 def test_cross_spread_market_command_maps_open_long_to_two_market_legs(

@@ -99,6 +99,12 @@ def _instrument(db, *, venue_id: str, instrument_type: str, external_symbol: str
         JOIN contract_specifications cs ON cs.instrument_id = i.id
         WHERE m.venue_id = ? AND m.status = 'active'
           AND i.instrument_type = ? AND cs.data_quality_state = 'complete'
+          AND cs.effective_from = (
+              SELECT MAX(current_cs.effective_from)
+              FROM contract_specifications current_cs
+              WHERE current_cs.instrument_id = i.id
+                AND current_cs.data_quality_state = 'complete'
+          )
     """
     values: list[str] = [venue_id, instrument_type]
     if external_symbol is not None:
@@ -258,18 +264,24 @@ def validate_funding_plan_markets(plan: ExecutionPlan) -> None:
 
 
 def validate_funding_close_capacity(
-    db: Connection, strategy_instance_id: str, parameters: dict[str, object]
+    db: Connection, strategy_instance_id: str, parameters: dict[str, object], plan: ExecutionPlan
 ) -> None:
     """Check group capacity inside the transaction that declares a close intent."""
     target_id = str(parameters.get("targetOpenInstructionId") or "")
     target = db.execute(
-        "SELECT execution_batch_id FROM strategy_runs WHERE id=? "
+        "SELECT execution_batch_id,execution_plan_json FROM strategy_runs WHERE id=? "
         "AND strategy_instance_id=? AND action='open'",
         (target_id, strategy_instance_id),
     ).fetchone()
     if target is None or not target[0]:
         raise _unprocessable("Funding close target is unavailable")
     batch_id = target[0]
+    original = ExecutionPlan.model_validate_json(target["execution_plan_json"])
+    def identity(leg):
+        return leg.role, leg.account_id, leg.instrument_id, leg.external_symbol
+
+    if {identity(leg) for leg in plan.legs} != {identity(leg) for leg in original.legs}:
+        raise HTTPException(409, "Funding close must preserve original accounts and instruments")
     rows = db.execute(
         "SELECT f.*, f.id AS fill_id, o.quantity AS requested_quantity, legs.role "
         "FROM fills f JOIN orders o ON o.id=f.order_id JOIN ("

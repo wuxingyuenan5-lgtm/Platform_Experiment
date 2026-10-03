@@ -21,6 +21,42 @@ new vm.Script(`(function (require, module, exports) { ${output}\n})`).runInThisC
   moduleUnderTest.exports,
 );
 
+test('US/global cards, table, breadth and rotation never fall back to sample facts', () => {
+  const seed = { id: 'us-spy', symbol: 'SPY', name: '标普500', price: '$999', d1: '+99%', spark: [99], d200: '▲', x50200: '▲' };
+  const config = { id: 'us', detailGroups: [{ label: '指数', rows: [seed] }],
+    overviewChip: 'sample', updatedAt: 'sample', overviewCards: [{...seed, change: '+99%'}],
+    moverCards: [], breadthCards: [{ value: '99%', tag: 'high', delta: '5' }],
+    volatilityCards: [{ title: 'VIX', value: '99' }], rotationHeatmap: [{ symbol: 'SPY', d1: '+99%' }] };
+  const empty = moduleUnderTest.exports.mergeTerminalMarket(config, []);
+  assert.equal(empty.detailGroups[0].rows[0].price, '—');
+  assert.equal(empty.detailGroups[0].rows[0].x50200, '—');
+  assert.deepEqual(empty.overviewCards[0].spark, []);
+  assert.equal(empty.overviewCards[0].change, '—');
+  assert.equal(empty.rotationHeatmap[0].d1, '—');
+  assert.equal(empty.breadthCards[0].value, '—');
+  assert.equal(empty.volatilityCards[0].value, '—');
+  const live = moduleUnderTest.exports.mergeTerminalMarket(config, [{
+    id: 'us-spy', symbol: 'SPY', status: 'ready', unit: 'price', changeUnit: 'percent',
+    close: '12.34', change1d: '2.5', spark30d: ['12', '12.34'], signals: { d10: '▲' },
+  }]);
+  assert.equal(live.detailGroups[0].rows[0].price, '$12.34');
+  assert.equal(live.detailGroups[0].rows[0].d10, '▲');
+  assert.equal(live.overviewCards[0].change, '+2.50%');
+  assert.equal(live.rotationHeatmap[0].d1, '+2.50%');
+  assert.equal(config.overviewChip, 'sample');
+});
+
+test('macro missing rows and continuous commodity futures preserve truthful display', () => {
+  const config = [{ label: '商品', rows: [{ id: 'gold-xauusd', name: '现货黄金', symbol: 'XAUUSD', price: '99', spark: [99] }] }];
+  assert.equal(moduleUnderTest.exports.mergeMacroMarketDetail(config, [])[0].rows[0].price, '—');
+  const result = moduleUnderTest.exports.mergeLiveMarketDetail(config, [{
+    id: 'gold-xau-row', name: '黄金期货（连续合约）', symbol: 'GC=F', status: 'ready',
+    qualityFlags: ['continuous_futures_not_spot'], spark30d: ['10'], unit: 'price', changeUnit: 'percent', close: '10',
+  }])[0].rows[0];
+  assert.equal(result.symbol, 'GC=F');
+  assert.equal(result.name, '黄金期货（连续合约）');
+});
+
 test('live market detail updates the complete visible row instead of only the sparkline', () => {
   const groups = [
     {

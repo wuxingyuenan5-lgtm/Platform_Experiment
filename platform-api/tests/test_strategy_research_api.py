@@ -69,21 +69,11 @@ def test_funding_basis_all_series_are_returned_from_one_backend_route(client, mo
     monkeypatch.setattr(
         routes,
         "read_projection",
-        lambda kind, *args, **kwargs: [btc_row]
+        lambda kind, entity=None, *args, **kwargs: [btc_row]
         if kind in {"spread_valid", "spread_all"}
-        else [],
-    )
-    monkeypatch.setattr(
-        routes,
-        "funding_candle_basis_rows",
-        lambda symbol, *args: [
-            {
-                "timeMs": stamp,
-                "validDurationMs": 900000,
-                "quality": [],
-                "ohlc": {"midSpread": {"close": "2.5"}},
-            }
-        ],
+        else ([dict(btc_row, ohlc={"midSpread": {"close": "2.5"}})]
+              if kind == "funding_basis" and entity == "ETH"
+              else [])
     )
 
     response = client.get(
@@ -103,6 +93,20 @@ def test_funding_basis_all_series_are_returned_from_one_backend_route(client, mo
     assert set(data["seriesBySymbol"]) == set(data["symbols"])
     assert data["seriesBySymbol"]["BTC"][0]["ohlc"]["midSpread"]["close"] == "1.25"
     assert data["seriesBySymbol"]["ETH"][0]["ohlc"]["midSpread"]["close"] == "2.5"
+
+
+def test_funding_basis_skips_large_linear_projection_when_spot_is_missing(monkeypatch):
+    from app import strategy_research_routes as routes
+
+    calls = []
+
+    def fake_read_projection(kind, entity, *args, **kwargs):
+        calls.append(entity)
+        return []
+
+    monkeypatch.setattr(routes, "read_projection", fake_read_projection)
+    assert routes.funding_candle_basis_rows("XAUT", 0, 1, 900000) == []
+    assert calls == ["XAUTUSDT:spot:trade"]
 
 
 def test_private_scope_denied_to_public_research_reader(client):
