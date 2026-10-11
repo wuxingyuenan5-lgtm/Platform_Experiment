@@ -1,3 +1,5 @@
+import { loadDashboardSnapshot } from './dashboardSnapshotCache';
+
 import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
 
 import {
@@ -66,6 +68,12 @@ export interface AShareMarketTurnoverResponse {
   historyCounts?: number[];
   historyIndustries?: Array<{ industry: string; counts: number[]; historyTotal: number }>;
   historicalRows?: Array<AShareMarketTurnoverRow & { observedAt: string }>;
+  history?: Array<{
+    observedAt: string;
+    totalAmountYuan?: string | number | null;
+    amountChangePct?: string | number | null;
+    source?: string | null;
+  }>;
   rows: AShareMarketTurnoverRow[];
 }
 
@@ -190,7 +198,13 @@ export interface AShareDashboardResponse {
       date: string;
       targets: Record<
         string,
-        { amount100m?: number | null; amountShareOfA?: number | null; turnoverPct?: number | null }
+        {
+          amount100m?: number | null;
+          amountShareOfA?: number | null;
+          turnoverPct?: number | null;
+          price?: number | null;
+          priceIndexCode?: string | null;
+        }
       >;
       combined?: { amount100m?: number | null; amountShareOfA?: number | null };
     }>;
@@ -198,7 +212,13 @@ export interface AShareDashboardResponse {
       date: string;
       targets: Record<
         string,
-        { amount100m?: number | null; amountShareOfA?: number | null; turnoverPct?: number | null }
+        {
+          amount100m?: number | null;
+          amountShareOfA?: number | null;
+          turnoverPct?: number | null;
+          price?: number | null;
+          priceIndexCode?: string | null;
+        }
       >;
       combined?: { amount100m?: number | null; amountShareOfA?: number | null };
     };
@@ -207,6 +227,7 @@ export interface AShareDashboardResponse {
       amount100m?: number | null;
       amountShareOfA?: number | null;
       turnoverPct?: number | null;
+      price?: number | null;
     }>;
   }> | null;
   marketHistory?: Array<{
@@ -220,7 +241,27 @@ export interface AShareDashboardResponse {
     totalAmountYuan?: string | number | null;
     amountChangePct?: string | number | null;
     marketBreadthPct?: string | number | null;
+    csi300Close?: string | number | null;
+    communicationPrice?: string | number | null;
+    innovationPrice?: string | number | null;
   }>;
+}
+
+export interface AShareMarketHistoryRow {
+  observedAt: string;
+  totalAmountYuan?: string | number | null;
+  amountChangePct?: string | number | null;
+  source?: string | null;
+}
+
+export interface AShareMarketHistoryResponse {
+  rows: AShareMarketHistoryRow[];
+  coverageStart?: string | null;
+  coverageEnd?: string | null;
+  tradingDays: number;
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface StockSnapshotResponse {
@@ -260,6 +301,8 @@ export interface MacroExpectationResponse {
 export type MarketDetailStatus = 'ready' | 'partial' | 'degraded' | 'stale' | 'no_data' | 'error';
 
 export interface MarketDetailRow {
+  sampleSize?: number | null;
+  expectedSampleSize?: number | null;
   id: string;
   name: string;
   symbol: string;
@@ -303,6 +346,8 @@ export interface MacroDashboardObservation {
 }
 
 export interface MacroDashboardSeries {
+  priceLower?: string | number | null;
+  priceUpper?: string | number | null;
   seriesId: string;
   label: string;
   status: string;
@@ -322,28 +367,51 @@ export interface MacroDashboardSeries {
   observations: MacroDashboardObservation[];
 }
 
+export interface OptionExposureLeg {
+  symbol: string;
+  expiry: string;
+  strike: string | number;
+  side: 'call' | 'put';
+  openInterest: string | number;
+  gamma: string | number;
+  underlyingPrice: string | number;
+  multiplier: string | number;
+  exposureUsd: string | number;
+}
+
+export interface OptionExposureSnapshot {
+  market: 'deribit' | 'ibit';
+  status: string;
+  source: string;
+  sourceUrl: string;
+  collectedAt: string;
+  asOf: string | null;
+  underlyingLastTradeAt: string | null;
+  underlyingPrice: string | number;
+  totalContracts: number;
+  excludedContracts: number;
+  totalOpenInterest: string | number;
+  includedOpenInterest: string | number;
+  qualityFlags: string[];
+  legs: OptionExposureLeg[];
+}
+
 export interface MacroDashboardResponse {
   schemaVersion: '1.0';
   status: string;
   asOf: string;
   groups: Record<string, MacroDashboardSeries[]>;
+  optionExposure?: Record<string, OptionExposureSnapshot>;
 }
 
-// Multiple cards on one hedge-board page consume the same dashboard snapshot.
-// Share only the in-flight read so each domain is fetched once per render burst,
-// including consumers outside MacroSeriesChart (for example the CFTC panel),
-// without pinning a stale snapshot for the lifetime of the SPA.
-const dashboardPromises = new Map<string, Promise<MacroDashboardResponse>>();
-
-const loadDashboard = (key: string, url: string) => {
-  const cached = dashboardPromises.get(key);
-  if (cached) return cached;
-  const request = researchRequest<MacroDashboardResponse>({ method: 'GET', url }).finally(() => {
-    dashboardPromises.delete(key);
-  });
-  dashboardPromises.set(key, request);
-  return request;
-};
+const loadDashboard = (key: string, url: string) =>
+  loadDashboardSnapshot(key, getUserSystemCsrfToken(), () =>
+    researchRequest<MacroDashboardResponse>({
+      method: 'GET',
+      url,
+      headers: { 'Cache-Control': 'no-cache' },
+    }),
+  );
 
 const SESSION_INVALIDATION_CODES = new Set([
   'invalid_session',
@@ -441,6 +509,13 @@ export const getAShareLiveMarketTurnover = () =>
   researchRequest<AShareMarketTurnoverResponse>({
     method: 'GET',
     url: '/research/a-share/live-market-turnover',
+  });
+
+export const getAShareMarketHistory = (page = 1, pageSize = 100) =>
+  researchRequest<AShareMarketHistoryResponse>({
+    method: 'GET',
+    url: '/research/a-share/market-history',
+    params: { page, page_size: pageSize },
   });
 
 export const refreshAShareResearch = () =>

@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     strategy_research_min_free_bytes: int = 1_000_000_000
     research_refresh_enabled: bool = True
     research_refresh_interval_seconds: float = 900.0
+    choice_csd_enabled: bool = False
+    choice_sdk_root: str = str(Path.home() / ".choice" / "EMQuantAPI_Python" / "python3")
+    choice_csd_timeout_seconds: float = 75.0
 
     # Synthetic FOK pricing reserves a fixed MT5 price amount before deriving the
     # Bybit limit. Zero is the safe default until the controlled host sets evidence-based

@@ -51,6 +51,7 @@ def isolated_settings(monkeypatch, tmp_path):
     settings.database_path = str(tmp_path / "platform.db")
     settings.strategy_research_enabled = False
     settings.strategy_research_path = str(tmp_path / "strategy-research")
+    settings.choice_csd_enabled = False
 
 
 @pytest.fixture(autouse=True)

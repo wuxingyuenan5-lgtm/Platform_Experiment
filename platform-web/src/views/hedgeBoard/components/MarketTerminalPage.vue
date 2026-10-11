@@ -235,6 +235,24 @@
               <td class="market-terminal__rotation-name">
                 <strong>{{ row.symbol }}</strong>
                 <span>{{ row.label }}</span>
+                <small class="market-terminal__rotation-source">
+                  <a
+                    v-if="row.sourceUrl"
+                    :href="row.sourceUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >{{ row.source }}</a
+                  >
+                  <span v-else-if="row.source">{{ row.source }}</span>
+                  {{ row.observationDate || '暂无数据'
+                  }}{{
+                    row.dataStatus === 'stale'
+                      ? ' · 待更新'
+                      : row.dataStatus === 'partial'
+                      ? ' · 部分数据'
+                      : ''
+                  }}
+                </small>
               </td>
               <td :class="heatmapClass(row.d1)">{{ row.d1 }}</td>
               <td :class="heatmapClass(row.w1)">{{ row.w1 }}</td>
@@ -932,6 +950,7 @@
     width: 100%;
     min-width: 0;
     max-width: 100%;
+    container: market-terminal / inline-size;
   }
 
   .market-terminal__overview-strip,
@@ -954,7 +973,7 @@
 
   .market-terminal__overview-strip {
     display: grid;
-    grid-template-columns: 1.05fr 1fr;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
     min-width: 0;
     max-width: 100%;
     padding: 12px;
@@ -1017,7 +1036,7 @@
 
   .market-terminal__market-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -1173,7 +1192,7 @@
 
   .market-terminal__vol-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -1414,6 +1433,14 @@
     width: 100%;
   }
 
+  .market-terminal__overview-panel,
+  .market-terminal__side-panel,
+  .market-terminal__market-card,
+  .market-terminal__rotation-panel,
+  .market-terminal__rotation-chip {
+    border-radius: 12px;
+  }
+
   .market-terminal__rotation-table {
     width: 100%;
     min-width: 920px;
@@ -1429,7 +1456,19 @@
   }
 
   .market-terminal__rotation-name {
+    position: sticky;
+    z-index: 1;
+    left: 0;
+    background: #f8fbfd;
     text-align: left !important;
+  }
+
+  .market-terminal__rotation-source {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 11px;
+    white-space: nowrap;
   }
 
   .market-terminal__rotation-name strong,
@@ -1627,7 +1666,7 @@
     color: #4b77b9;
   }
 
-  @media (max-width: 1280px) {
+  @container market-terminal (max-width: 1000px) {
     .market-terminal__overview-strip {
       grid-template-columns: 1fr;
     }
@@ -1637,7 +1676,7 @@
     }
   }
 
-  @media (max-width: 960px) {
+  @container market-terminal (max-width: 560px) {
     .market-terminal__market-grid,
     .market-terminal__breadth-grid,
     .market-terminal__vol-grid,

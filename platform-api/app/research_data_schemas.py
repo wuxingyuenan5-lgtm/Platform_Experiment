@@ -237,6 +237,7 @@ class ShortTermEmotionSnapshot(ResearchApiModel):
 class AShareMarketHistoryRow(ResearchApiModel):
     observed_at: date
     source: str | None = None
+    csi300_close: Decimal | None = Field(default=None, gt=0)
     up: int | None = Field(default=None, ge=0)
     down: int | None = Field(default=None, ge=0)
     flat: int | None = Field(default=None, ge=0)

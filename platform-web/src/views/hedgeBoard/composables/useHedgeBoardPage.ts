@@ -84,9 +84,9 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
 };
 
 const widgetTextOverrides: Record<string, { title?: string }> = {
-  'etf-weekly-flows': { title: '全球各地区ETF每周流入' },
-  'central-bank-holders': { title: '全球央行黄金储备' },
-  'central-bank-buyers': { title: '各国央行黄金净购买量' },
+  'etf-weekly-flows': { title: '全球黄金 ETF 资金流' },
+  'central-bank-holders': { title: '官方黄金储备 · 分国家' },
+  'central-bank-buyers': { title: '央行黄金净购买 · 主要国家' },
 };
 
 const ETF_REFERENCE_URL = 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows';

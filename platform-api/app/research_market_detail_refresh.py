@@ -71,7 +71,8 @@ async def refresh_market_details(*, force: bool = False) -> dict[str, str]:
                         write_dataset,
                         dataset,
                         snapshot.model_dump(mode="json", by_alias=True),
-                        source="Yahoo Finance",
+                        source=" / ".join(sorted({row.source for row in snapshot.rows}))
+                        or "unavailable",
                         run_id=run_id,
                         observed_at=snapshot.as_of,
                         status=snapshot.status,

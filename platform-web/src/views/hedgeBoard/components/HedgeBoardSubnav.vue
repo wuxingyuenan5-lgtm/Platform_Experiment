@@ -40,12 +40,13 @@
     padding: 8px 4px 10px;
     overflow-x: auto;
     background: var(--strategy-bg);
-    gap: 10px;
+    gap: 8px;
   }
 
   .module-subnav button {
-    min-width: 156px;
-    padding: 10px 12px;
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 8px 12px;
     border: 1px solid var(--strategy-border);
     border-radius: 12px;
     background: var(--strategy-surface);
@@ -63,15 +64,15 @@
 
   .module-subnav__title-row strong {
     color: #111827;
-    font-size: 14px;
-    font-weight: 800;
+    font-size: 13px;
+    font-weight: 650;
     white-space: nowrap;
   }
 
   .module-subnav__index {
-    color: #111827;
-    font-size: 14px;
-    font-weight: 800;
+    color: #8091a2;
+    font-size: 13px;
+    font-weight: 650;
   }
 
   .module-subnav--gold {
@@ -86,7 +87,7 @@
 
   .module-subnav--gold .module-subnav__title-row strong,
   .module-subnav--gold .module-subnav__index {
-    color: #111827;
-    font-size: 14px;
+    color: #8091a2;
+    font-size: 13px;
   }
 </style>

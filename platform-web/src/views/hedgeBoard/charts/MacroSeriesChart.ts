@@ -1,4 +1,5 @@
-import { defineComponent, h, onMounted, type PropType, ref, shallowRef } from 'vue';
+import { useDashboardRefresh } from '../useDashboardRefresh';
+import { defineComponent, h, type PropType, ref, shallowRef } from 'vue';
 
 import {
   getCommodityDashboardV1,
@@ -7,9 +8,9 @@ import {
   type MacroDashboardSeries,
 } from '@/api/hedgeResearch';
 
-const WIDTH = 960;
-const HEIGHT = 320;
-const PADDING = { left: 58, right: 90, top: 24, bottom: 38 };
+import SourceSeriesPlot from './SourceSeriesPlot.vue';
+import { unitText, frequencyText } from './sourceSeriesOptions';
+
 const COLORS = ['#165dff', '#0f8b6d', '#c7931a', '#7c3aed', '#dc2626', '#64748b'];
 const controlStyle = {
   border: '1px solid #dbe4ea',
@@ -28,7 +29,7 @@ interface ChartPoint {
 }
 
 function seriesPoints(series: MacroDashboardSeries, years: number): ChartPoint[] {
-  const cutoff = Date.now() - years * 366 * 24 * 60 * 60 * 1000;
+  const cutoff = years === 0 ? -Infinity : Date.now() - years * 366 * 24 * 60 * 60 * 1000;
   return series.observations
     .map((item) => ({
       date: item.date,
@@ -47,20 +48,23 @@ export default defineComponent({
   name: 'MacroSeriesChart',
   props: {
     groupId: { type: String, required: true },
-    presentation: { type: String as PropType<'time' | 'distribution'>, default: 'time' },
+    presentation: { type: String as PropType<'time' | 'distribution' | 'curve'>, default: 'time' },
     years: { type: Number, default: 5 },
     unitLabel: { type: String, default: '' },
+    curveValueLabel: { type: String, default: '结算价' },
     preferredSeriesIds: { type: Array as PropType<string[]>, default: () => [] },
     dataDomain: { type: String as PropType<'macro' | 'commodity' | 'crypto'>, default: 'macro' },
   },
   setup(props) {
-    const selectedYears = ref(props.years);
+    const selectedYears = ref(0);
+    const hidden = ref(new Set<string>());
     const search = ref('');
     const tableView = ref(false);
+    const tablePage = ref(0);
     const series = shallowRef<MacroDashboardSeries[]>([]);
     const status = ref<'loading' | 'ready' | 'error'>('loading');
 
-    onMounted(async () => {
+    useDashboardRefresh(async () => {
       try {
         const loader =
           props.dataDomain === 'commodity'
@@ -85,6 +89,58 @@ export default defineComponent({
     return () => {
       if (status.value === 'loading') return h('div', { class: 'local-empty' }, '正在加载数据…');
       if (status.value === 'error') return h('div', { class: 'local-empty' }, '该组数据暂不可用。');
+      if (props.presentation === 'curve') {
+        const rows = series.value;
+        const values = rows.map((item) =>
+          item.latestValue === null ? NaN : Number(item.latestValue),
+        );
+        if (
+          values.some((value) => !Number.isFinite(value)) ||
+          values.length < 2 ||
+          rows.some((row) => !/^AU\d{4}$/.test(row.label))
+        )
+          return h('div', { class: 'local-empty' }, '当前期限结构数据不完整。');
+        return h('div', { class: 'local-widget-stack' }, [
+          h(
+            'div',
+            { class: 'chart-legend' },
+            `${rows[0].observationDate} · 上期所${props.curveValueLabel} · ${
+              props.unitLabel || '元/克'
+            }${rows.some((item) => item.isStale) ? ' · 待更新' : ''}`,
+          ),
+          h(SourceSeriesPlot, {
+            mode: 'curve',
+            series: rows,
+            colors: [props.unitLabel === '%' ? '#a14fba' : '#1689a4'],
+            unitLabel: props.unitLabel || '元/克',
+          }),
+          h('details', [
+            h('summary', { style: { cursor: 'pointer', fontSize: '12px' } }, '查看合约数据'),
+            h('table', { style: { width: '100%', fontSize: '12px', textAlign: 'left' } }, [
+              h('thead', [
+                h(
+                  'tr',
+                  [
+                    '合约',
+                    `${props.curveValueLabel}（${props.unitLabel || '元/克'}）`,
+                    '交易日',
+                  ].map((label) => h('th', label)),
+                ),
+              ]),
+              h(
+                'tbody',
+                rows.map((item) =>
+                  h('tr', [
+                    h('td', item.label),
+                    h('td', String(item.latestValue)),
+                    h('td', item.observationDate ?? '—'),
+                  ]),
+                ),
+              ),
+            ]),
+          ]),
+        ]);
+      }
       if (props.presentation === 'distribution') {
         const rows = series.value.filter((item) =>
           item.label.toLowerCase().includes(search.value.toLowerCase()),
@@ -125,9 +181,12 @@ export default defineComponent({
                       {
                         style: {
                           padding: '6px',
-                          background: `linear-gradient(to right, #165dff15 ${
-                            (100 * Number(item.latestValue ?? 0)) / maxValue
-                          }%, transparent 0)`,
+                          background: `linear-gradient(to right, ${
+                            Number(item.latestValue) < 0 ? '#dc262615' : '#165dff15'
+                          } ${Math.min(
+                            100,
+                            (100 * Math.abs(Number(item.latestValue ?? 0))) / maxValue,
+                          )}%, transparent 0)`,
                         },
                       },
                       [
@@ -152,7 +211,7 @@ export default defineComponent({
                         ? '—'
                         : `${Number(item.latestValue).toLocaleString('en-US', {
                             maximumFractionDigits: 8,
-                          })} ${item.unit}`,
+                          })} ${unitText(item.unit)}`,
                     ),
                     h(
                       'td',
@@ -168,13 +227,21 @@ export default defineComponent({
             'small',
             { style: { color: '#64748b' } },
             series.value.some((item) =>
-              item.qualityFlags.includes('observation_date_is_collection_date'),
+              item.qualityFlags.includes('addresses_not_people_or_entities'),
             )
+              ? '按来源余额区间统计地址数量，地址不等于持币人数或独立实体。日期沿用来源报表。'
+              : series.value.some((item) =>
+                  item.qualityFlags.includes('observation_date_is_collection_date'),
+                )
               ? '日期为本次采集日期，各企业披露时间可能不同；仅覆盖来源列出的企业。'
               : series.value.some((item) =>
                   item.qualityFlags.includes('source_updated_date_not_uniform_holdings_date'),
                 )
               ? '日期为来源最后更新日期，各机构披露与核验方式不同；过期数据保留待更新提示。'
+              : props.groupId === 'wgcReserves'
+              ? 'WGC 最新公开季度截面；各国申报存在时滞，— 表示源站尚无数值。国家记录不等于全球储备总量。'
+              : props.groupId === 'wgcPurchases'
+              ? 'WGC 月报中明确披露的主要国家当月净购买，单位按报告取整；负值为净售出。不含近似值及未披露购买，不代表完整国家覆盖。'
               : '按 UTXO 最后移动时价格分桶，不等同于投资者实际买入成本。',
           ),
         ]);
@@ -186,9 +253,9 @@ export default defineComponent({
       const allPoints = plotted
         .flatMap((item) => item.points)
         .filter((point): point is ChartPoint & { value: number } => point.value !== null);
-      if (!allPoints.length) return h('div', { class: 'local-empty' }, '当前窗口没有有效观测。');
+
       const controls = h('div', { class: 'chart-legend', style: { gap: '12px' } }, [
-        ...[1, 3, 5, 10]
+        ...[0.25, 1, 3, 0]
           .filter((years) => years <= props.years)
           .map((years) =>
             h(
@@ -203,9 +270,10 @@ export default defineComponent({
                 },
                 onClick: () => {
                   selectedYears.value = years;
+                  tablePage.value = 0;
                 },
               },
-              `${years}年`,
+              years === 0 ? '全部' : years === 0.25 ? '3个月' : `${years}年`,
             ),
           ),
         h(
@@ -221,24 +289,24 @@ export default defineComponent({
         ),
       ]);
       if (tableView.value) {
-        const dates = [
+        const allDates = [
           ...new Set(plotted.flatMap(({ points }) => points.map((point) => point.date))),
         ]
           .sort()
-          .reverse()
-          .slice(0, 90);
+          .reverse();
+        const dates = allDates.slice(tablePage.value * 40, (tablePage.value + 1) * 40);
         const values = plotted.map(
-          ({ points }) => new Map(points.map((point) => [point.date, point.value])),
+          ({ item }) => new Map(item.observations.map((point) => [point.date, point.value])),
         );
         return h('div', { class: 'local-widget-stack' }, [
           controls,
           h('div', { style: { overflow: 'auto', maxHeight: '320px' } }, [
             h('table', { style: { width: '100%', textAlign: 'right', fontSize: '12px' } }, [
-              h('caption', '所选窗口最近90个观测日；— 表示该来源当日无观测'),
+              h('caption', `${allDates.length} 个观测日 · — 表示缺失`),
               h('thead', [
                 h('tr', [
                   h('th', '日期'),
-                  ...plotted.map(({ item }) => h('th', `${item.label} (${item.unit})`)),
+                  ...plotted.map(({ item }) => h('th', `${item.label} (${unitText(item.unit)})`)),
                 ]),
               ]),
               h(
@@ -254,162 +322,108 @@ export default defineComponent({
               ),
             ]),
           ]),
+          h('div', { class: 'source-table-pages' }, [
+            h(
+              'button',
+              {
+                type: 'button',
+                style: controlStyle,
+                disabled: tablePage.value === 0,
+                onClick: () => {
+                  tablePage.value -= 1;
+                },
+              },
+              '上一页',
+            ),
+            h(
+              'span',
+              `${allDates.length ? tablePage.value + 1 : 0} / ${Math.ceil(allDates.length / 40)}`,
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                style: controlStyle,
+                disabled: (tablePage.value + 1) * 40 >= allDates.length,
+                onClick: () => {
+                  tablePage.value += 1;
+                },
+              },
+              '下一页',
+            ),
+          ]),
         ]);
       }
-      const minTime = Math.min(...allPoints.map((item) => item.time));
-      const maxTime = Math.max(...allPoints.map((item) => item.time));
-      const units = [...new Set(plotted.map(({ item }) => item.unit))];
-      const scales = new Map(
-        units.map((unit) => {
-          const values = plotted
-            .filter(({ item }) => item.unit === unit)
-            .flatMap(({ points }) => points.map((point) => point.value))
-            .filter((value): value is number => value !== null);
-          const low = values.length ? Math.min(...values) : 0;
-          const high = values.length ? Math.max(...values) : 1;
-          const pad = Math.max((high - low) * 0.08, Math.abs(high) * 0.001, 1e-10);
-          return [unit, { min: low - pad, max: high + pad }];
-        }),
-      );
-      const innerWidth = WIDTH - PADDING.left - PADDING.right;
-      const innerHeight = HEIGHT - PADDING.top - PADDING.bottom;
-      const x = (time: number) => ((time - minTime) / Math.max(maxTime - minTime, 1)) * innerWidth;
-      const y = (value: number, unit = units[0]) => {
-        const scale = scales.get(unit)!;
-        return ((scale.max - value) / (scale.max - scale.min)) * innerHeight;
-      };
-      const scale = scales.get(units[0])!;
-      const ticks = Array.from(
-        { length: 5 },
-        (_, index) => scale.min + ((scale.max - scale.min) * index) / 4,
-      );
+      const visible = plotted.filter(({ item }) => !hidden.value.has(item.seriesId));
       const format = (value: number) =>
         new Intl.NumberFormat('en-US', {
-          maximumFractionDigits: Math.abs(value) < 0.01 ? 10 : 3,
-          notation: Math.abs(value) >= 1000000 ? 'compact' : 'standard',
+          maximumFractionDigits: Math.abs(value) < 0.01 ? 8 : 4,
         }).format(value);
 
       return h('div', { class: 'local-widget-stack' }, [
         controls,
         h(
           'div',
-          { class: 'chart-legend' },
+          { class: 'source-series-summary' },
           plotted.map(({ item }, index) =>
-            h('span', { key: item.seriesId }, [
-              h('i', { style: { backgroundColor: COLORS[index % COLORS.length] } }),
-              `${item.label} · ${
-                item.latestValue === null ? '—' : format(Number(item.latestValue))
-              } ${item.unit} · ${item.observationDate ?? '—'}${
-                item.isStale ? ' · 数据待更新' : ''
-              }`,
-            ]),
+            h(
+              'button',
+              {
+                key: item.seriesId,
+                type: 'button',
+                class: 'source-series-legend',
+                'aria-pressed': !hidden.value.has(item.seriesId),
+                disabled: visible.length === 1 && !hidden.value.has(item.seriesId),
+                onClick: () => {
+                  const next = new Set(hidden.value);
+                  next.has(item.seriesId) ? next.delete(item.seriesId) : next.add(item.seriesId);
+                  hidden.value = next;
+                },
+              },
+              [
+                h('i', { style: { backgroundColor: COLORS[index % COLORS.length] } }),
+                h('span', { class: 'source-series-summary__name' }, item.label),
+                h(
+                  'strong',
+                  {},
+                  `${item.latestValue == null ? '—' : format(Number(item.latestValue))} ${unitText(
+                    item.unit,
+                  )}`,
+                ),
+                h(
+                  'small',
+                  {},
+                  `${item.observationDate ?? '—'}${item.isStale ? ' · 数据待更新' : ''}`,
+                ),
+              ],
+            ),
           ),
         ),
-        h('div', { class: 'chart-shell' }, [
-          h('svg', { viewBox: `0 0 ${WIDTH} ${HEIGHT}`, class: 'local-chart-svg', role: 'img' }, [
-            h('g', { transform: `translate(${PADDING.left},${PADDING.top})` }, [
-              ...ticks.flatMap((tick) => {
-                const tickY = y(tick);
-                return [
-                  h('line', {
-                    x1: 0,
-                    x2: innerWidth,
-                    y1: tickY,
-                    y2: tickY,
-                    class: 'chart-grid-line',
-                  }),
-                  h(
-                    'text',
-                    { x: -10, y: tickY + 4, textAnchor: 'end', class: 'chart-axis-label' },
-                    format(tick),
-                  ),
-                ];
+        allPoints.length
+          ? h(SourceSeriesPlot, {
+              series: visible.map(({ item, points }) => {
+                const dates = new Set(points.map((point) => point.date));
+                return {
+                  ...item,
+                  observations: item.observations.filter((row) => dates.has(row.date)),
+                };
               }),
-              ...units.slice(1).flatMap((unit) => {
-                const rightScale = scales.get(unit)!;
-                return Array.from({ length: 5 }, (_, i) => {
-                  const value = rightScale.min + ((rightScale.max - rightScale.min) * i) / 4;
-                  return h(
-                    'text',
-                    { x: innerWidth + 8, y: y(value, unit) + 4, class: 'chart-axis-label' },
-                    format(value),
-                  );
-                });
-              }),
-              ...plotted.flatMap(({ item, points }, index) => {
-                let penDown = false;
-                const path = points
-                  .map((point) => {
-                    if (point.value === null) {
-                      penDown = false;
-                      return '';
-                    }
-                    const command = penDown ? 'L' : 'M';
-                    penDown = true;
-                    return `${command}${x(point.time).toFixed(2)},${y(
-                      point.value,
-                      item.unit,
-                    ).toFixed(2)}`;
-                  })
-                  .join(' ');
-                const last = points.filter((point) => point.value !== null).at(-1);
-                return [
-                  h('path', {
-                    key: item.seriesId,
-                    d: path,
-                    fill: 'none',
-                    stroke: COLORS[index % COLORS.length],
-                    strokeWidth: 2.4,
-                  }),
-                  ...(last
-                    ? [
-                        h(
-                          'circle',
-                          {
-                            cx: x(last.time),
-                            cy: y(last.value!, item.unit),
-                            r: 3.5,
-                            fill: COLORS[index % COLORS.length],
-                          },
-                          [h('title', `${item.label} ${last.date}: ${last.value} ${item.unit}`)],
-                        ),
-                      ]
-                    : []),
-                ];
-              }),
-              h(
-                'text',
-                { x: 0, y: innerHeight + 28, class: 'chart-axis-label' },
-                new Date(minTime).toISOString().slice(0, 10),
-              ),
-              h(
-                'text',
-                {
-                  x: innerWidth,
-                  y: innerHeight + 28,
-                  textAnchor: 'end',
-                  class: 'chart-axis-label',
-                },
-                new Date(maxTime).toISOString().slice(0, 10),
-              ),
-              h(
-                'text',
-                { x: innerWidth / 2, y: -10, textAnchor: 'middle', class: 'chart-axis-label' },
-                units.length > 1
-                  ? `${units[0]} (左) / ${units[1]} (右)`
-                  : props.unitLabel || units[0],
-              ),
-            ]),
-          ]),
-        ]),
+              colors: visible.map(({ item }) => COLORS[series.value.indexOf(item) % COLORS.length]),
+              unitLabel: props.unitLabel,
+            })
+          : h('div', { class: 'local-empty' }, '当前窗口没有观测，可切换其他范围。'),
         h(
           'div',
-          { class: 'chart-legend' },
-          series.value.map((item) =>
+          { class: 'source-series-footer' },
+          [
+            ...new Map(
+              series.value.map((item) => [`${item.source}|${item.sourceUrl}`, item]),
+            ).values(),
+          ].map((item) =>
             h(
               'a',
               { href: item.sourceUrl || undefined, target: '_blank', rel: 'noopener noreferrer' },
-              `来源：${item.source} · ${item.frequency}${
+              `来源：${item.source} · ${frequencyText(item.frequency)}${
                 item.qualityFlags.includes('upstream_refresh_failed')
                   ? ' · 最近采集失败，保留旧值'
                   : ''

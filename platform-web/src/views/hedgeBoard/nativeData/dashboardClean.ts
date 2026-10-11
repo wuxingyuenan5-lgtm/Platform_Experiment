@@ -11,8 +11,13 @@ export type LocalWidgetKey =
   | 'crypto-coinbase-premium'
   | 'crypto-margin-rate'
   | 'crypto-eth-reserves'
+  | 'gold-shfe-curve'
+  | 'gold-shfe-iv'
+  | 'gold-open-interest'
+  | 'crypto-halving-cycles'
   | 'gold-borrow-fee'
   | 'crypto-urpd'
+  | 'crypto-address-distribution'
   | 'crypto-treasuries'
   | 'crypto-strategy-holdings'
   | 'gold-comex-inventory'
@@ -23,6 +28,10 @@ export type LocalWidgetKey =
   | 'gold-gvz'
   | 'crypto-strc'
   | 'crypto-deribit-metrics'
+  | 'crypto-dvol'
+  | 'crypto-etf-premium'
+  | 'crypto-gex-deribit'
+  | 'crypto-gex-ibit'
   | 'crypto-stablecoins'
   | 'crypto-fear-greed'
   | 'crypto-funding'
@@ -543,10 +552,15 @@ export const researchModules: ResearchModule[] = [
               ),
             },
           ),
-          externalReference(
-            '全球黄金期货未平仓量',
-            'MacroMicro · 分交易所累计未平仓量',
-            'https://en.macromicro.me/collections/45/mm-gold-price/110916/global-gold-futures-open-interest-by-exchanges-stacked-bar-chart',
+          localChart(
+            '黄金期货未平仓量',
+            'COMEX GC / 上期所 AU · 分市场持仓，全球总量暂缺',
+            'gold-open-interest',
+            {
+              height: 480,
+              sourceUrl:
+                'https://en.macromicro.me/collections/45/mm-gold-price/110916/global-gold-futures-open-interest-by-exchanges-stacked-bar-chart',
+            },
           ),
           externalReference(
             '商品期货持仓分析',
@@ -558,16 +572,16 @@ export const researchModules: ResearchModule[] = [
             'CME · 注册 / 合格 / 合计 · 金衡盎司 · 按活动日归档，历史从接入日积累',
             'gold-comex-inventory',
           ),
-          localChart('各国央行黄金净购买量', '', 'central-bank-buyers', {
+          localChart('央行黄金净购买 · 主要国家', '', 'central-bank-buyers', {
             height: 420,
-            sourceNote: 'External Link · World Gold Council · permission_required',
+            sourceNote: 'World Gold Council · 月报披露',
             referenceLinks: macroMicroReference(
               'https://en.macromicro.me/charts/93189/gold-demand-central-banks-and-other-inst',
             ),
           }),
-          localChart('全球央行黄金储备', '', 'central-bank-holders', {
+          localChart('官方黄金储备 · 分国家', '', 'central-bank-holders', {
             height: 420,
-            sourceNote: 'External Link · World Gold Council · permission_required',
+            sourceNote: 'World Gold Council / IMF · 季度截面',
             referenceLinks: macroMicroReference(
               'https://en.macromicro.me/charts/78898/world-central-bank-gold-reserves',
             ),
@@ -616,15 +630,22 @@ export const researchModules: ResearchModule[] = [
             'Interactive Brokers 经 ChartExchange · 单一券商最新快照，历史从接入日积累',
             'gold-borrow-fee',
           ),
-          externalReference(
-            '沪金期限结构',
-            '奇货可查 · AU 近远月结构',
-            'https://x.qhkch.com/fundamental/futurespot/fut_spot_structure?variety=%E6%B2%AA%E9%87%91',
-          ),
-          externalReference(
+          localChart('沪金期限结构', '上期所 · 各交割合约日结算价 · 元/克', 'gold-shfe-curve', {
+            sourceUrl: 'https://www.shfe.com.cn/reports/tradedata/dailyandweeklydata/',
+          }),
+          localChart(
             '沪金期权波动率',
-            'OpenVlab · AU 隐含波动率分析',
-            'https://www.openvlab.cn/volatility/analysis/AU',
+            '上期所公布的各月份隐含波动率 · 非 ATM 波动率',
+            'gold-shfe-iv',
+            {
+              sourceUrl: 'https://www.openvlab.cn/volatility/analysis/AU',
+              referenceLinks: [
+                {
+                  label: '上期所数据',
+                  href: 'https://www.shfe.com.cn/reports/tradedata/dailyandweeklydata/',
+                },
+              ],
+            },
           ),
           externalReference(
             'CME QuikStrike 黄金期权',
@@ -691,9 +712,9 @@ export const researchModules: ResearchModule[] = [
             height: 620,
             hide_side_toolbar: false,
           }),
-          advancedChart('BTC IV (DERIBIT DVOL)', '', 'DERIBIT:DVOL', {
+          localChart('BTC IV (DERIBIT DVOL)', '30 日预期年化波动率 · UTC 日收盘', 'crypto-dvol', {
             height: 320,
-            sourceUrl: undefined,
+            sourceUrl: 'https://www.deribit.com/statistics/BTC/volatility-index',
           }),
         ],
       },
@@ -768,7 +789,7 @@ export const researchModules: ResearchModule[] = [
           ),
           externalReference(
             'STRC ATM Tracker',
-            'Bitcoin for Corporations · ATM 融资进度',
+            '暂无已接通数据 · Bitcoin for Corporations · ATM 融资进度',
             'https://bitcoinforcorporations.com/strc-atm-tracker/',
           ),
           localChart(
@@ -798,13 +819,13 @@ export const researchModules: ResearchModule[] = [
           ),
           externalReference(
             '全市场期货未平仓量',
-            'CoinGlass · 跨交易所 OI',
+            '暂无已接通数据 · CoinGlass · 跨交易所 OI',
             'https://www.coinglass.com/zh/pro/futures/OpenInterest',
           ),
           localChart('资费详情', 'Binance BTC / ETH · 单一交易所历史资金费率', 'crypto-funding'),
           externalReference(
             'CoinGlass 加密衍生品风险指数',
-            'CoinGlass · 衍生品市场风险指标',
+            '暂无已接通数据 · CoinGlass · 衍生品市场风险指标',
             'https://www.coinglass.com/zh-TW/pro/i/CDRI',
           ),
           localChart(
@@ -820,7 +841,7 @@ export const researchModules: ResearchModule[] = [
           ),
           externalReference(
             'BTC 清算热力图',
-            'CoinGlass · 杠杆清算密集区',
+            '暂无已接通数据 · CoinGlass · 杠杆清算密集区',
             'https://www.coinglass.com/zh/pro/futures/LiquidationHeatMap?coin=BTC',
           ),
         ],
@@ -829,28 +850,32 @@ export const researchModules: ResearchModule[] = [
         id: 'crypto-external-research',
         eyebrow: 'Research Links',
         title: '期权分析',
-        description: '受许可或维护边界限制的专题，保留精确数据入口，不复制第三方静态快照。',
-        layout: 'three',
+        description: '期权隐波、持仓与 Gamma 敞口估算。',
+        layout: 'two',
         widgets: [
-          localChart('Greeks.live BTC Data Lab', 'Deribit 期权数据实验室', 'crypto-atm-iv-term', {
+          localChart('BTC 期权隐含波动率', 'Deribit 期权数据实验室', 'crypto-atm-iv-term', {
             height: 420,
             sourceUrl: 'https://www.greeks.live/deribit/tools/datalab/BTC',
           }),
           localChart(
-            'Deribit BTC Options Metrics',
+            'BTC 期权持仓与多空比',
             'Call / Put 未平仓量与 Put/Call 比率 · 日内采集快照，历史从接入日积累',
             'crypto-deribit-metrics',
           ),
-          externalReference(
-            'Laevitas BTC Gamma Exposure',
-            'Deribit BTC 期权 GEX',
-            'https://app.laevitas.ch/assets/options/gex/btc/deribit',
+          localChart(
+            'Deribit BTC Gamma 敞口估算',
+            '公开期权链 · 远期 Gamma 模型',
+            'crypto-gex-deribit',
+            {
+              sourceUrl:
+                'https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option',
+              height: 590,
+            },
           ),
-          externalReference(
-            'IBIT Gamma Exposure',
-            'Barchart · IBIT 期权 GEX',
-            'https://www.barchart.com/etfs-funds/quotes/IBIT/gamma-exposure',
-          ),
+          localChart('IBIT Gamma 敞口估算', 'Cboe 延迟期权链 · 公布 Gamma', 'crypto-gex-ibit', {
+            sourceUrl: 'https://www.cboe.com/delayed_quotes/ibit/quote_table',
+            height: 590,
+          }),
         ],
       },
       {
@@ -860,14 +885,23 @@ export const researchModules: ResearchModule[] = [
         description: '用于观察筹码成本分布、地址结构、周期位置与研究观点。',
         layout: 'three',
         widgets: [
-          externalReference(
-            'BTC ETF 溢价',
-            'CoinGlass · 比特币 ETF 溢价与折价',
-            'https://www.coinglass.com/pro/etf/Premium',
+          localChart(
+            'BTC ETF 溢价 / 折价',
+            'IBIT / BITB / HODL · 发行方日度披露',
+            'crypto-etf-premium',
+            {
+              sourceUrl: 'https://www.coinglass.com/pro/etf/Premium',
+              referenceLinks: [
+                {
+                  label: '发行方数据',
+                  href: 'https://www.ishares.com/us/products/333011/ishares-bitcoin-trust-etf',
+                },
+              ],
+            },
           ),
           externalReference(
             'BTC 三大驱动因素',
-            'MacroMicro · 流动性、实际利率与 GDP',
+            '暂无已接通数据 · MacroMicro · 流动性、实际利率与 GDP',
             'https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP',
           ),
           localChart(
@@ -875,15 +909,26 @@ export const researchModules: ResearchModule[] = [
             'BGeometrics · UTXO 最后移动时的价格区间与 BTC 数量，不等于投资者持仓成本',
             'crypto-urpd',
           ),
-          externalReference(
-            'Bitcoin Address Distribution',
-            'Bitcoin Magazine Pro · 地址持币分布',
-            'https://charts.bgeometrics.com/bitcoin_distribution_addr_tables.html',
-          ),
-          externalReference(
+          localChart(
             'Bitcoin 减半周期表现',
-            'CoinGlass · 历次减半后的价格路径',
-            'https://www.coinglass.com/pro/i/bitcoin-price-performance-since-halving',
+            'Blockchain.com · 四次减半日价格归一为 100',
+            'crypto-halving-cycles',
+            {
+              height: 480,
+              sourceUrl: 'https://www.coinglass.com/pro/i/bitcoin-price-performance-since-halving',
+              referenceLinks: [
+                {
+                  label: '价格数据',
+                  href: 'https://www.blockchain.com/explorer/charts/market-price',
+                },
+              ],
+            },
+          ),
+          localChart(
+            'Bitcoin Address Distribution',
+            'BGeometrics · 按来源余额区间统计地址数量，地址不等于持币人数或独立实体',
+            'crypto-address-distribution',
+            { sourceUrl: 'https://charts.bgeometrics.com/bitcoin_distribution_addr_tables.html' },
           ),
           externalReference(
             'Glassnode Week On-chain',
@@ -909,7 +954,7 @@ export const researchModules: ResearchModule[] = [
           ),
           externalReference(
             '交易所链上资金监控',
-            'OKLink · CEX 地址与链上资金流跟踪',
+            '暂无已接通数据 · OKLink · CEX 地址与链上资金流跟踪',
             'https://www.oklink.com/zh-hans/cex-list',
           ),
         ],

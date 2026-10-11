@@ -12,6 +12,7 @@ from app.config import get_settings
 from app.research_a_share_refresh import refresh_a_share_research
 from app.research_a_share_repository import (
     read_index_history,
+    read_market_amount_page,
     read_refresh_status,
     read_stock_detail,
     read_stock_pool,
@@ -125,6 +126,15 @@ async def a_share_dashboard(
         _raise_service_error(exc)
     _cache_header(response, 0)
     return result
+
+
+@router.get("/a-share/market-history")
+async def a_share_market_history(
+    _: ResearchPrincipal,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=500),
+) -> dict[str, object]:
+    return await asyncio.to_thread(read_market_amount_page, page, page_size)
 
 
 @router.get("/a-share/stocks/{code}/snapshot", response_model=StockSnapshotResponse)

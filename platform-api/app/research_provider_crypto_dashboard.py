@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from app.research_local_data import read_local_json
 from app.research_provider_errors import ResearchProviderError
 from app.research_provider_macro_dashboard import MacroDashboardResponse
@@ -17,9 +19,14 @@ class CryptoDashboardProvider:
             if document.get("schemaVersion") != "1.0":
                 raise ResearchProviderError("crypto_dashboard_schema_mismatch")
             contract = MacroDashboardResponse.model_validate(document)
+            for snapshot in contract.option_exposure.values():
+                snapshot.apply_freshness(datetime.now(timezone.utc))
+            if any(s.status != 'ready' for s in contract.option_exposure.values()):
+                contract.status = 'partial'
             if not any(contract.groups.values()):
                 raise ResearchProviderError("crypto_dashboard_without_series")
-            self._last_known_good = contract.model_copy(deep=True)
+            # The route only serializes this contract; stale_copy owns mutation isolation.
+            self._last_known_good = contract
             return contract
         except Exception as exc:
             if self._last_known_good is not None:

@@ -14,16 +14,14 @@
     </header>
 
     <div v-if="error" class="error-state">{{ error }}</div>
-    <div v-if="loading && !events.length" class="loading-state">正在读取配置化市场预期数据…</div>
+    <div v-if="loading && !events.length" class="loading-state">正在读取市场预期数据…</div>
     <div v-else-if="response" class="category-list">
       <section v-for="group in groupedEvents" :key="group.category" class="category-section">
         <header
           ><h3>{{ categoryLabel(group.category) }}</h3
           ><span>{{ group.events.length }}项</span></header
         >
-        <div v-if="!group.events.length" class="category-empty"
-          >当前暂无可用事件，数据源恢复后会自动显示。</div
-        >
+        <div v-if="!group.events.length" class="category-empty">当前没有符合筛选条件的事件。</div>
         <div v-else class="event-grid">
           <article v-for="event in group.events" :key="event.id" class="event-card">
             <div class="event-card__header">
@@ -31,29 +29,43 @@
               <strong>{{ formatProbability(event.probability) }}</strong>
             </div>
             <h4 :title="event.originalLabel || undefined">{{ event.label }}</h4>
-            <svg viewBox="0 0 220 72" preserveAspectRatio="none" aria-label="事件概率历史曲线">
+            <svg
+              v-if="event.chart.count"
+              viewBox="0 0 220 72"
+              preserveAspectRatio="none"
+              aria-label="事件概率历史曲线"
+            >
               <line x1="0" y1="18" x2="220" y2="18" />
               <line x1="0" y1="36" x2="220" y2="36" />
               <line x1="0" y1="54" x2="220" y2="54" />
-              <polyline :points="historyPoints(event.history)" />
+              <polyline v-if="event.chart.count > 1" :points="event.chart.points" />
+              <circle
+                v-else-if="event.chart.single"
+                :cx="event.chart.single.x"
+                :cy="event.chart.single.y"
+                r="3"
+              />
             </svg>
+            <p v-if="event.chart.count < 2" class="history-empty">{{
+              event.chart.count ? '仅有一次观测，尚无历史走势' : '暂无历史观测'
+            }}</p>
             <div class="event-metrics">
               <span
                 >1日
-                <b :class="changeTone(changeOver(event, 1))">{{
-                  formatChange(changeOver(event, 1))
+                <b :class="changeTone(event.chart.change1d)">{{
+                  formatChange(event.chart.change1d)
                 }}</b></span
               >
               <span
                 >7日
-                <b :class="changeTone(changeOver(event, 7))">{{
-                  formatChange(changeOver(event, 7))
+                <b :class="changeTone(event.chart.change7d)">{{
+                  formatChange(event.chart.change7d)
                 }}</b></span
               >
-              <span>来源 <b>配置白名单</b></span>
+              <span>来源 <b>Polymarket</b></span>
             </div>
             <footer>
-              <span>{{ formatUpdated(event.history) }}</span>
+              <span>{{ formatUpdated(event.chart.lastAt) }}</span>
               <a
                 :href="event.sourceUrl || response?.sourceUrl || dataFileUrl"
                 target="_blank"
@@ -75,10 +87,11 @@
     getMacroExpectations,
     type MacroExpectationEvent,
     type MacroExpectationResponse,
-    type MacroProbabilityPoint,
     type ResearchSourceMeta,
   } from '@/api/hedgeResearch';
   import ResearchSourceState from '../research/components/ResearchSourceState.vue';
+
+  import { probabilityHistory } from './probabilityHistory';
 
   const dataFileUrl = 'https://polymarket.com/markets';
 
@@ -87,7 +100,9 @@
   const error = ref('');
 
   const events = computed(() =>
-    (response.value?.events || []).filter((event) => event.category !== 'monetary_policy'),
+    (response.value?.events || [])
+      .filter((event) => event.category !== 'monetary_policy')
+      .map((event) => ({ ...event, chart: probabilityHistory(event.history) })),
   );
   const sourceMeta = computed<ResearchSourceMeta | null>(() => {
     if (!response.value) return null;
@@ -160,48 +175,11 @@
     return value == null ? '' : value > 0 ? 'is-positive' : value < 0 ? 'is-negative' : '';
   }
 
-  function sortedHistory(history: MacroProbabilityPoint[]) {
-    return history
-      .map((point) => ({
-        observedAt: new Date(point.observedAt).getTime(),
-        probability: number(point.probability),
-      }))
-      .filter(
-        (point): point is { observedAt: number; probability: number } =>
-          Number.isFinite(point.observedAt) && point.probability != null,
-      )
-      .sort((left, right) => left.observedAt - right.observedAt);
+  function formatUpdated(timestamp: number | undefined) {
+    return timestamp == null
+      ? '更新时间未知'
+      : `更新 ${new Date(timestamp).toLocaleString('zh-CN', { hour12: false })}`;
   }
-
-  function changeOver(event: MacroExpectationEvent, days: number) {
-    const history = sortedHistory(event.history);
-    if (history.length < 2) return null;
-    const latest = history[history.length - 1];
-    const cutoff = latest.observedAt - days * 86_400_000;
-    const priorValues = history.filter((point) => point.observedAt <= cutoff);
-    const prior = priorValues.length ? priorValues[priorValues.length - 1] : null;
-    return prior ? latest.probability - prior.probability : null;
-  }
-
-  function historyPoints(history: MacroProbabilityPoint[]) {
-    const values = sortedHistory(history).map((point) => point.probability);
-    if (!values.length) return '0,36 220,36';
-    if (values.length === 1) return `0,${72 - values[0] * 0.72} 220,${72 - values[0] * 0.72}`;
-    return values
-      .map(
-        (value, index) =>
-          `${((index / (values.length - 1)) * 220).toFixed(2)},${(72 - value * 0.72).toFixed(2)}`,
-      )
-      .join(' ');
-  }
-
-  function formatUpdated(history: MacroProbabilityPoint[]) {
-    const values = sortedHistory(history);
-    const latest = values.length ? values[values.length - 1] : null;
-    if (!latest) return '更新时间未知';
-    return `更新 ${new Date(latest.observedAt).toLocaleString('zh-CN', { hour12: false })}`;
-  }
-
   onMounted(() => void load());
 </script>
 
@@ -348,6 +326,15 @@
   .event-card line {
     stroke-width: 1;
     stroke: var(--strategy-border);
+  }
+
+  .event-card circle {
+    fill: var(--strategy-accent-strong);
+  }
+
+  .history-empty {
+    color: var(--strategy-text-3);
+    font-size: 12px;
   }
 
   .event-card polyline {

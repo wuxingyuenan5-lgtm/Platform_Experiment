@@ -156,22 +156,39 @@ export function mergeTerminalMarket(
     detailGroups: mergeLiveMarketDetail(config.detailGroups, remoteRows),
     overviewCards: cards(config.overviewCards ?? []),
     moverCards: cards(config.moverCards ?? []),
-    breadthCards: config.breadthCards?.map((item) => ({
-      ...item,
-      value: UNAVAILABLE,
-      tag: '暂无数据',
-      delta: UNAVAILABLE,
-    })),
+    breadthCards: config.breadthCards?.map((item) => {
+      const row = remoteRows.find((candidate) => candidate.id === item.id);
+      const value = row && !['error', 'no_data'].includes(row.status) ? numeric(row.close) : null;
+      return {
+        ...item,
+        value: value === null ? UNAVAILABLE : `${value.toFixed(1)}%`,
+        tag:
+          value === null
+            ? '暂无数据'
+            : `${row?.status === 'stale' ? '旧数据 · ' : ''}${row?.sampleSize}/${
+                row?.expectedSampleSize
+              } 样本`,
+        delta: row?.observationDate ?? UNAVAILABLE,
+      };
+    }),
     volatilityCards: config.volatilityCards?.map((item) => ({
       ...item,
       value: numeric(lookup(item.title)?.close)?.toFixed(2) ?? UNAVAILABLE,
-      badge: lookup(item.title) ? '最近观测' : '暂无数据',
+      badge: lookup(item.title)
+        ? `${lookup(item.title)?.status === 'stale' ? '旧数据 · ' : ''}${
+            lookup(item.title)?.observationDate ?? '最近观测'
+          }`
+        : '暂无数据',
       badgeTone: 'neutral',
     })),
     rotationHeatmap: config.rotationHeatmap?.map((item) => {
       const row = lookup(item.symbol);
       return {
         ...item,
+        observationDate: row?.observationDate ?? undefined,
+        source: row?.source ?? undefined,
+        sourceUrl: row?.sourceUrl ?? undefined,
+        dataStatus: row?.status ?? 'no_data',
         d1: signed(row?.change1d, 'percent'),
         w1: signed(row?.change1w, 'percent'),
         m1: signed(row?.change1m, 'percent'),

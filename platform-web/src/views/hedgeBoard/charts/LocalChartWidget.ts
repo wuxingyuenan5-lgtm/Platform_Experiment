@@ -11,6 +11,11 @@ import FedWatchPanel from '../components/FedWatchPanel.vue';
 import PolymarketFedPanel from '../components/PolymarketFedPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
 import MacroSeriesChart from './MacroSeriesChart';
+import BitcoinHalvingPanel from '../components/BitcoinHalvingPanel.vue';
+import GoldOpenInterestPanel from '../components/GoldOpenInterestPanel.vue';
+import UrpdPanel from '../components/UrpdPanel.vue';
+import OptionExposurePanel from '../components/OptionExposurePanel.vue';
+import WgcEtfFlowPanel from '../components/WgcEtfFlowPanel.vue';
 
 const externalGoldResearch = {
   'etf-weekly-flows': {
@@ -283,11 +288,19 @@ export default defineComponent({
           case 'spdr-holdings-vs-price':
             return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'spdrHoldings' });
           case 'etf-weekly-flows':
-            return renderExternalGoldResearch(key);
+            return h(WgcEtfFlowPanel);
           case 'central-bank-holders':
-            return renderExternalGoldResearch(key);
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'wgcReserves',
+              presentation: 'distribution',
+            });
           case 'central-bank-buyers':
-            return renderExternalGoldResearch(key);
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'wgcPurchases',
+              presentation: 'distribution',
+            });
           case 'commodity-wti-curve':
           case 'commodity-brent-curve':
           case 'commodity-copper-curve':
@@ -322,12 +335,52 @@ export default defineComponent({
             });
           case 'crypto-deribit-metrics':
             return h(MacroSeriesChart, { dataDomain: 'crypto', groupId: 'deribitOptions' });
+          case 'crypto-dvol':
+            return h(MacroSeriesChart, { dataDomain: 'crypto', groupId: 'dvol', unitLabel: '%' });
+          case 'crypto-etf-premium':
+            return h('div', { class: 'local-widget-stack' }, [
+              h(MacroSeriesChart, { dataDomain: 'crypto', groupId: 'etfPremium', unitLabel: '%' }),
+              h(
+                'small',
+                { style: { color: '#64748b', padding: '0 12px' } },
+                'IBIT / BITB / HODL 发行方公布的折溢价。各基金 NAV 定价窗口与数据日期可能不同。',
+              ),
+            ]);
+          case 'crypto-gex-deribit':
+            return h(OptionExposurePanel, { market: 'deribit' });
+          case 'crypto-gex-ibit':
+            return h(OptionExposurePanel, { market: 'ibit' });
           case 'crypto-eth-reserves':
             return h(MacroSeriesChart, {
               dataDomain: 'crypto',
               groupId: 'ethReserves',
               presentation: 'distribution',
             });
+          case 'gold-shfe-curve':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'shfeGoldCurve',
+              presentation: 'curve',
+            });
+          case 'gold-shfe-iv':
+            return h('div', [
+              h(MacroSeriesChart, {
+                dataDomain: 'commodity',
+                groupId: 'shfeGoldIv',
+                presentation: 'curve',
+                curveValueLabel: '隐含波动率',
+                unitLabel: '%',
+              }),
+              h(
+                'p',
+                { style: { color: '#64748b', fontSize: '12px', padding: '0 12px' } },
+                '交易所公布的月份波动率；平值隐波、行权价微笑曲线与历史对比暂缺。',
+              ),
+            ]);
+          case 'gold-open-interest':
+            return h(GoldOpenInterestPanel);
+          case 'crypto-halving-cycles':
+            return h(BitcoinHalvingPanel);
           case 'gold-borrow-fee':
             return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'gldBorrow' });
           case 'crypto-coinbase-premium':
@@ -343,9 +396,11 @@ export default defineComponent({
               unitLabel: '% / hour',
             });
           case 'crypto-urpd':
+            return h(UrpdPanel);
+          case 'crypto-address-distribution':
             return h(MacroSeriesChart, {
               dataDomain: 'crypto',
-              groupId: 'urpd',
+              groupId: 'addressDistribution',
               presentation: 'distribution',
             });
           case 'crypto-treasuries':

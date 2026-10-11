@@ -186,8 +186,9 @@ assert(
     localChartWidgetSource.includes("'central-bank-holders': {") &&
     localChartWidgetSource.includes("'central-bank-buyers': {") &&
     localChartWidgetSource.includes('return renderExternalGoldResearch(key);') &&
-    localChartWidgetSource.includes('External Link · permission_required'),
-  'Hedge board local chart owner must preserve official-sector cards without rendering static reserve snapshots.',
+    localChartWidgetSource.includes('当前无法取得 WGC 的可下载数据。') &&
+    localChartWidgetSource.includes('SPDR 单只基金持仓不能替代全球 ETF 或央行统计。'),
+  'Hedge board local chart owner must keep unavailable WGC cards explicit without substituting SPDR or static reserve snapshots.',
 );
 assert(
   reserveRankingSource.includes("name: 'ReserveRanking'") &&

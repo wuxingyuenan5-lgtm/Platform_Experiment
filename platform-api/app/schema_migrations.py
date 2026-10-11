@@ -1022,6 +1022,33 @@ PLATFORM_MIGRATIONS += (
         "CREATE INDEX idx_account_capital_coverage_end "
         "ON account_capital_coverage(account_id,asset_scope,julianday(end_at) DESC)",
     )),
+    Migration(version=42, name="a-share-source-history-archive", statements=(
+        """CREATE TABLE research_a_share_market_archive (
+            universe_key TEXT NOT NULL CHECK(universe_key IN ('all_a','sh_sz_a')),
+            trade_date TEXT NOT NULL, amount_yuan TEXT,
+            up INTEGER, down INTEGER, flat INTEGER, limit_up INTEGER, limit_down INTEGER,
+            market_breadth_pct TEXT, source_name TEXT NOT NULL,
+            definition_version TEXT, payload_json TEXT NOT NULL,
+            quality_status TEXT NOT NULL DEFAULT 'ready', imported_at TEXT NOT NULL,
+            PRIMARY KEY(universe_key,trade_date))""",
+        """CREATE INDEX idx_a_share_market_archive_date
+            ON research_a_share_market_archive(trade_date,universe_key)""",
+        """CREATE TABLE research_a_share_price_history (
+            instrument_code TEXT NOT NULL, trade_date TEXT NOT NULL,
+            source_name TEXT NOT NULL, definition_version TEXT NOT NULL DEFAULT '',
+            industry_level TEXT NOT NULL DEFAULT '', close TEXT,
+            payload_json TEXT NOT NULL, quality_status TEXT NOT NULL DEFAULT 'ready',
+            imported_at TEXT NOT NULL,
+            PRIMARY KEY(instrument_code,trade_date,source_name,
+                definition_version,industry_level))""",
+        """CREATE INDEX idx_a_share_price_history_lookup
+            ON research_a_share_price_history(instrument_code,trade_date)""",
+        """CREATE TABLE research_a_share_archive_conflicts (
+            id INTEGER PRIMARY KEY, table_name TEXT NOT NULL, natural_key TEXT NOT NULL,
+            existing_payload_json TEXT NOT NULL, incoming_payload_json TEXT NOT NULL,
+            source_name TEXT NOT NULL, reason TEXT NOT NULL, observed_at TEXT NOT NULL,
+            UNIQUE(table_name,natural_key,incoming_payload_json))""",
+    )),
 )
 
 

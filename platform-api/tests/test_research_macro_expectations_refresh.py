@@ -48,6 +48,13 @@ def test_event_parser_falls_back_to_market_url_without_parent_event() -> None:
     assert event["sourceUrl"] == "https://polymarket.com/market/fed-cut-2026"
 
 
+def test_untranslated_events_preserve_distinct_subjects_and_deadlines() -> None:
+    now = datetime(2026, 9, 15, tzinfo=UTC)
+    titles = ["US x Iran ceasefire continues through October 15?", "US x Iran ceasefire continues through November 15?"]
+    events = [_event_from_market(_market(question=title), now) for title in titles]
+    assert [event["label"] for event in events] == titles
+
+
 def test_category_does_not_match_fed_inside_unrelated_words() -> None:
     now = datetime(2026, 9, 15, tzinfo=UTC)
     row = _market(question="Will the Federation win the next parliamentary election?")

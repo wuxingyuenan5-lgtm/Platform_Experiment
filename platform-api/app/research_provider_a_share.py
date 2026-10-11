@@ -156,6 +156,7 @@ class AShareResearchProvider:
             raise ResearchProviderError("innovation_drug_quote_unavailable") from exc
         row = payload.get("data") or {}
         amount = _decimal(row.get("f48"))
+        price = _decimal(row.get("f43"))
         turnover_raw = _decimal(row.get("f168"))
         timestamp = _integer(row.get("f86"))
         return_raw = _decimal(row.get("f170"))
@@ -164,6 +165,7 @@ class AShareResearchProvider:
         return {
             "observed_at": datetime.fromtimestamp(timestamp, UTC),
             "amount_yuan": amount,
+            "close": price if price is not None and price > 0 else None,
             # The dashboard contract stores percentage points (3.27 means 3.27%),
             # while the chart converts that value to a fraction for percent axes.
             "turnover_pct": turnover_raw,
@@ -212,6 +214,7 @@ class AShareResearchProvider:
         ):
             row = payload.get("data") or {}
             amount = _decimal(row.get("f48"))
+            price = _decimal(row.get("f43"))
             turnover = _decimal(row.get("f168"))
             timestamp = _integer(row.get("f86"))
             if (
@@ -228,6 +231,7 @@ class AShareResearchProvider:
                     "code": code,
                     "board_code": board_code,
                     "amount_yuan": amount,
+                    "close": price if price is not None and price > 0 else None,
                     "turnover_pct": turnover,
                     "observed_at": datetime.fromtimestamp(timestamp, UTC),
                     "source": f"东方财富行业板块{board_code}",

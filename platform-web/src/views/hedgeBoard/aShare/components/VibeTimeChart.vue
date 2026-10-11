@@ -1,5 +1,6 @@
 <template>
-  <article class="vibe-time-chart">
+  <article class="vibe-time-chart"
+    ><div ref="plotMeasure" class="vibe-chart-measure"></div>
     <header class="vibe-chart-head"
       ><h3>{{ title }}</h3
       ><div class="range-buttons" role="group" :aria-label="`${title}历史范围`"
@@ -36,7 +37,8 @@
     <div v-else class="vibe-chart-stage">
       <svg
         class="vibe-chart-svg"
-        viewBox="0 0 1200 350"
+        :viewBox="`0 0 ${plotWidth} ${plotHeight}`"
+        :style="{ height: `${plotHeight}px` }"
         tabindex="0"
         role="img"
         :aria-label="`${title}，${shownDates[0]}至${shownDates.at(-1)}，左右方向键查看数值`"
@@ -46,32 +48,50 @@
         @blur="hover = null"
         @keydown.left.prevent="moveHover(-1)"
         @keydown.right.prevent="moveHover(1)"
+        @wheel.prevent="onWheel"
+        @pointerdown="onPointerDown"
+        @pointermove="onPointerMove"
+        @pointerup="onPointerUp"
+        @pointercancel="onPointerUp"
+        @dblclick="onDoubleClick"
       >
-        <g v-for="tick in ticks" :key="tick">
+        <defs>
+          <clipPath :id="clipId">
+            <rect :x="left" :y="top" :width="right - left" :height="bottom - top" />
+          </clipPath>
+        </defs>
+        <g v-for="tick in axisTicks('left')" :key="`left-${tick}`">
           <line
             :x1="left"
-            :y1="top + tick * (bottom - top)"
+            :y1="axisY('left', tick)"
             :x2="right"
-            :y2="top + tick * (bottom - top)"
+            :y2="axisY('left', tick)"
             class="chart-grid"
           />
-          <text :x="left - 10" :y="top + tick * (bottom - top) + 4" text-anchor="end">
-            {{ axisLabel('left', tick) }}
+          <text :x="left - 10" :y="axisY('left', tick) + 4" text-anchor="end">
+            {{ tickLabel('left', tick) }}
           </text>
-          <text v-if="rightLabel" :x="right + 10" :y="top + tick * (bottom - top) + 4">
-            {{ axisLabel('right', tick) }}
+        </g>
+        <g v-if="rightLabel">
+          <text
+            v-for="tick in axisTicks('right')"
+            :key="`right-${tick}`"
+            :x="right + 10"
+            :y="axisY('right', tick) + 4"
+          >
+            {{ tickLabel('right', tick) }}
           </text>
         </g>
         <text
           v-for="index in dateTicks"
           :key="index"
           :x="x(index)"
-          y="336"
+          :y="plotHeight - 14"
           :text-anchor="index === start ? 'start' : index === end ? 'end' : 'middle'"
         >
           {{ dates[index]?.slice(5) }}
         </text>
-        <g v-for="entry in visible" :key="entry.item.name">
+        <g v-for="entry in visible" :key="entry.item.name" :clip-path="`url(#${clipId})`">
           <template v-if="entry.item.type === 'bar'">
             <rect
               v-for="bar in bars(entry.item)"
@@ -94,6 +114,7 @@
             <polyline
               :points="segment.map((point) => `${point.x},${point.y}`).join(' ')"
               :stroke="entry.item.color"
+              :stroke-width="entry.item.lineWidth || 2"
               class="vibe-chart-line"
             />
           </template>
@@ -130,7 +151,7 @@
       </div>
       <div class="vibe-chart-range__viewport">
         <svg viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
-          <polyline :points="overviewPoints" />
+          <polyline v-for="(segment, index) in overviewPoints" :key="index" :points="segment" />
         </svg>
         <span class="vibe-chart-range__rail" aria-hidden="true"></span>
         <span class="vibe-chart-range__selection" aria-hidden="true"></span>
@@ -142,6 +163,7 @@
           :max="maxIndex"
           :aria-label="`${title}起始日期`"
           @input="onStartInput"
+          @wheel.prevent="onRangeWheel"
         />
         <input
           v-model.number="endIndex"
@@ -151,6 +173,7 @@
           :max="maxIndex"
           :aria-label="`${title}结束日期`"
           @input="onEndInput"
+          @wheel.prevent="onRangeWheel"
         />
       </div>
     </div>
@@ -162,17 +185,24 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { computed, getCurrentInstance, ref, watch } from 'vue';
+  import { useElementSize } from '@vueuse/core';
+  import { overviewSegments } from './overviewSegments';
+
+  const clipId = `vibe-chart-plot-clip-${getCurrentInstance()!.uid}`;
 
   export interface Series {
     name: string;
     values: Array<number | null | undefined>;
     type: 'bar' | 'line' | 'area';
-    axis?: 'left' | 'right';
+    axis?: 'left' | 'right' | 'hidden-price';
     color: string;
     sign?: 1 | -1;
     unit?: string;
     percent?: boolean;
+    domain?: [number, number];
+    ticks?: number[];
+    lineWidth?: number;
   }
   const props = defineProps<{
     title: string;
@@ -186,11 +216,23 @@
   const endIndex = ref(0);
   const hidden = ref(new Set<number>());
   const hover = ref<number | null>(null);
-  const left = 76,
-    right = 1100,
-    top = 22,
-    bottom = 302;
-  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const plotMeasure = ref<HTMLElement>();
+  const { width: measuredWidth } = useElementSize(plotMeasure);
+  const plotWidth = computed(() => Math.max(280, measuredWidth.value || 600));
+  const plotHeight = computed(() =>
+    Math.round(Math.max(280, Math.min(420, plotWidth.value / 1.8))),
+  );
+  const left = 62,
+    top = 22;
+  const bottom = computed(() => plotHeight.value - 48);
+  const right = computed(() => plotWidth.value - (props.rightLabel ? 66 : 24));
+  const defaultTicks = [0, 0.25, 0.5, 0.75, 1];
+  const axisState = ref<Record<'left' | 'right', { domain: [number, number]; manual: boolean }>>({
+    left: { domain: [0, 1], manual: false },
+    right: { domain: [0, 1], manual: false },
+  });
+  const priceBounds = ref<[number, number]>([0, 1]);
+  const drag = ref<{ region: 'left' | 'right' | 'plot'; x: number; y: number } | null>(null);
   const maxIndex = computed(() => Math.max(0, props.dates.length - 1));
   const start = computed(() =>
     Math.max(0, Math.min(startIndex.value, Math.max(0, endIndex.value - 1))),
@@ -214,13 +256,16 @@
       entry.item.values.slice(start.value, end.value + 1).some((value) => numeric(value) != null),
     ),
   );
-  const dateTicks = computed(() => [
-    ...new Set(
-      Array.from({ length: 7 }, (_, i) =>
-        Math.round(start.value + ((end.value - start.value) * i) / 6),
+  const dateTicks = computed(() => {
+    const count = Math.max(2, Math.min(7, Math.floor((right.value - left) / 85) + 1));
+    return [
+      ...new Set(
+        Array.from({ length: count }, (_, i) =>
+          Math.round(start.value + ((end.value - start.value) * i) / (count - 1)),
+        ),
       ),
-    ),
-  ]);
+    ];
+  });
   const rangeStartPercent = computed(() =>
     maxIndex.value ? (start.value / maxIndex.value) * 100 : 0,
   );
@@ -228,53 +273,52 @@
     maxIndex.value ? (end.value / maxIndex.value) * 100 : 100,
   );
   const overviewPoints = computed(() => {
-    const item = visible.value[0]?.item || props.series[0];
-    if (!item) return '';
-    const values = item.values.map((raw) => numeric(raw));
-    const finite = values.filter((value): value is number => value != null);
-    if (!finite.length) return '';
-    const min = Math.min(...finite);
-    const max = Math.max(...finite);
-    return values
-      .map((value, index) => {
-        const x = (index / Math.max(values.length - 1, 1)) * 100;
-        const y = value == null || max === min ? 10 : 18 - ((value - min) / (max - min)) * 16;
-        return `${x.toFixed(2)},${y.toFixed(2)}`;
-      })
-      .join(' ');
+    const item = visible.value[0]?.item;
+    return item ? overviewSegments(item.values) : [];
   });
-  const bounds = computed(() => {
-    const domain = (axis: string): [number, number] => {
-      const items = visible.value.filter((entry) => (entry.item.axis || 'left') === axis);
-      const values = items
-        .flatMap((entry) =>
-          entry.item.values.slice(start.value, end.value + 1).map((value) => {
-            const n = numeric(value);
-            return n == null ? null : n * (entry.item.sign || 1);
-          }),
-        )
-        .filter((value): value is number => value != null);
-      if (!values.length) return [0, 1];
-      let min = Math.min(...values),
-        max = Math.max(...values);
-      if (items.some((entry) => entry.item.type === 'bar')) {
-        min = Math.min(min, 0);
-        max = Math.max(max, 0);
-      }
-      if (max === min) {
-        min -= Math.abs(min) * 0.05 || 1;
-        max += Math.abs(max) * 0.05 || 1;
-      }
-      const margin = (max - min) * 0.08;
-      return [min - margin, max + margin];
-    };
-    return { left: domain('left'), right: domain('right') };
-  });
+  function dataDomain(axis: 'left' | 'right'): [number, number] {
+    const items = visible.value.filter((entry) => (entry.item.axis || 'left') === axis);
+    const values = items
+      .flatMap((entry) =>
+        entry.item.values.map((value) => {
+          const n = numeric(value);
+          return n == null ? null : n * (entry.item.sign || 1);
+        }),
+      )
+      .filter((value): value is number => value != null);
+    const fixed = items.find((entry) => entry.item.domain)?.item.domain;
+    if (fixed) return fixed;
+    if (!values.length) return [0, 1];
+    let min = Math.min(...values),
+      max = Math.max(...values);
+    if (items.some((entry) => entry.item.type === 'bar')) {
+      min = Math.min(min, 0);
+      max = Math.max(max, 0);
+    }
+    if (max === min) {
+      min -= Math.abs(min) * 0.05 || 1;
+      max += Math.abs(max) * 0.05 || 1;
+    }
+    const margin = (max - min) * 0.08;
+    return [min - margin, max + margin];
+  }
+  const bounds = computed(() => ({
+    left: axisState.value.left.domain,
+    right: axisState.value.right.domain,
+  }));
   const x = (index: number) =>
-    left + ((right - left) * (index - start.value)) / Math.max(1, end.value - start.value);
+    left + ((right.value - left) * (index - start.value)) / Math.max(1, end.value - start.value);
   const y = (value: number, item: Series) => {
-    const [min, max] = bounds.value[item.axis || 'left'];
-    return bottom - ((value - min) / (max - min)) * (bottom - top);
+    const axis = item.axis === 'hidden-price' ? 'left' : item.axis || 'left';
+    let plotted = value;
+    if (item.axis === 'hidden-price') {
+      const [pMin, pMax] = priceBounds.value;
+      plotted = pMin === pMax ? 0.5 : (value - pMin) / (pMax - pMin);
+      const [lMin, lMax] = dataDomain('left');
+      plotted = lMin + plotted * (lMax - lMin);
+    }
+    const [min, max] = bounds.value[axis];
+    return bottom.value - ((plotted - min) / (max - min)) * (bottom.value - top);
   };
   type Point = { x: number; y: number };
   function segments(item: Series): Point[][] {
@@ -291,13 +335,16 @@
     return result;
   }
   function areaPath(points: Point[], item: Series) {
-    const baseline = Math.min(bottom, Math.max(top, y(0, item)));
+    const baseline = Math.min(bottom.value, Math.max(top, y(0, item)));
     return `M${points[0].x},${baseline} L${points
       .map((point) => `${point.x},${point.y}`)
       .join(' L')} L${points.at(-1)?.x},${baseline} Z`;
   }
   function bars(item: Series) {
-    const width = Math.max(0.5, Math.min(10, ((right - left) / shownDates.value.length) * 0.65));
+    const width = Math.max(
+      0.5,
+      Math.min(10, ((right.value - left) / shownDates.value.length) * 0.65),
+    );
     return item.values.slice(start.value, end.value + 1).flatMap((raw, offset) => {
       const value = numeric(raw);
       if (value == null) return [];
@@ -314,14 +361,22 @@
       ];
     });
   }
-  function axisLabel(axis: 'left' | 'right', tick: number) {
+  function axisTicks(axis: 'left' | 'right') {
     const [min, max] = bounds.value[axis];
-    const value = max - tick * (max - min);
+    const item = visible.value.find((entry) => (entry.item.axis || 'left') === axis)?.item;
+    if (!axisState.value[axis].manual && item?.ticks) return item.ticks;
+    return defaultTicks.map((position) => max - position * (max - min));
+  }
+  function axisY(axis: 'left' | 'right', value: number) {
+    const [min, max] = bounds.value[axis];
+    return bottom.value - ((value - min) / (max - min)) * (bottom.value - top);
+  }
+  function tickLabel(axis: 'left' | 'right', tick: number) {
     const percent = visible.value.find((entry) => (entry.item.axis || 'left') === axis)?.item
       .percent;
     return percent
-      ? `${(value * 100).toFixed(1)}%`
-      : value.toLocaleString('zh-CN', { maximumFractionDigits: 1 });
+      ? `${(tick * 100).toFixed(1)}%`
+      : tick.toLocaleString('zh-CN', { maximumFractionDigits: 1 });
   }
   function valueLabel(raw: unknown, item: Series) {
     const value = numeric(raw);
@@ -334,15 +389,24 @@
     const next = new Set(hidden.value);
     next.has(index) ? next.delete(index) : next.add(index);
     hidden.value = next;
+    syncAutoAxisDomains();
+  }
+  function syncAutoAxisDomains() {
+    for (const axis of ['left', 'right'] as const) {
+      if (!axisState.value[axis].manual)
+        axisState.value[axis] = { domain: dataDomain(axis), manual: false };
+    }
   }
   function onMove(event: MouseEvent) {
     const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
-    const position = ((event.clientX - rect.left) / rect.width) * 1200;
+    const position = ((event.clientX - rect.left) / rect.width) * plotWidth.value;
     hover.value = Math.max(
       start.value,
       Math.min(
         end.value,
-        Math.round(start.value + ((position - left) / (right - left)) * (end.value - start.value)),
+        Math.round(
+          start.value + ((position - left) / (right.value - left)) * (end.value - start.value),
+        ),
       ),
     );
   }
@@ -355,6 +419,92 @@
     endIndex.value = max;
     startIndex.value = size ? Math.max(0, max - size + 1) : 0;
     hover.value = null;
+  }
+  function resetAxis(axis: 'left' | 'right') {
+    axisState.value[axis] = { domain: dataDomain(axis), manual: false };
+  }
+  function resetTime() {
+    setPreset(preset.value ?? 90);
+  }
+  function axisAt(event: MouseEvent | WheelEvent): 'left' | 'right' | 'plot' {
+    const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
+    const px = ((event.clientX - rect.left) / rect.width) * plotWidth.value;
+    return px < left ? 'left' : px > right.value ? 'right' : 'plot';
+  }
+  function onWheel(event: WheelEvent) {
+    const region = axisAt(event);
+    if (region === 'plot') {
+      const span = Math.max(2, end.value - start.value + 1);
+      const next = Math.max(
+        2,
+        Math.min(props.dates.length, span * (event.deltaY > 0 ? 1.12 : 0.88)),
+      );
+      const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
+      const position = ((event.clientX - rect.left) / rect.width) * plotWidth.value;
+      const ratio = Math.max(0, Math.min(1, (position - left) / (right.value - left)));
+      const center = start.value + ratio * (end.value - start.value);
+      startIndex.value = Math.max(0, Math.round(center - ratio * (next - 1)));
+      endIndex.value = Math.min(maxIndex.value, startIndex.value + Math.round(next) - 1);
+      preset.value = null;
+    } else updateAxis(region, event.deltaY, event.clientY, event.currentTarget as SVGSVGElement);
+  }
+  function updateAxis(
+    axis: 'left' | 'right',
+    delta: number,
+    pointerY: number,
+    element: SVGSVGElement,
+  ) {
+    const current = axisState.value[axis].domain;
+    const rect = element.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (pointerY - rect.top) / rect.height));
+    const factor = delta > 0 ? 1.12 : 0.88;
+    const range = current[1] - current[0];
+    const anchor = current[1] - ratio * range;
+    const nextRange = range * factor;
+    axisState.value[axis] = {
+      domain: [anchor - (1 - ratio) * nextRange, anchor + ratio * nextRange],
+      manual: true,
+    };
+  }
+  function onPointerDown(event: PointerEvent) {
+    const region = axisAt(event);
+    drag.value = { region, x: event.clientX, y: event.clientY };
+    (event.currentTarget as SVGSVGElement).setPointerCapture(event.pointerId);
+  }
+  function onPointerMove(event: PointerEvent) {
+    if (!drag.value) return;
+    const dx = event.clientX - drag.value.x;
+    const dy = event.clientY - drag.value.y;
+    if (drag.value.region === 'plot') {
+      const span = end.value - start.value;
+      const shift = Math.round((-dx / 1024) * span);
+      startIndex.value = Math.max(0, Math.min(maxIndex.value - span, start.value + shift));
+      endIndex.value = Math.min(maxIndex.value, startIndex.value + span);
+      for (const axis of ['left', 'right'] as const) {
+        const [min, max] = axisState.value[axis].domain;
+        const shift = ((max - min) * dy) / (bottom.value - top);
+        axisState.value[axis] = { domain: [min + shift, max + shift], manual: true };
+      }
+    } else updateAxis(drag.value.region, dy, event.clientY, event.currentTarget as SVGSVGElement);
+    drag.value = { ...drag.value, x: event.clientX, y: event.clientY };
+  }
+  function onPointerUp() {
+    drag.value = null;
+  }
+  function onDoubleClick(event: MouseEvent) {
+    const region = axisAt(event);
+    if (region === 'left' || region === 'right') resetAxis(region);
+    else resetTime();
+  }
+  function onRangeWheel(event: WheelEvent) {
+    const span = Math.max(2, end.value - start.value + 1);
+    const next = Math.max(
+      2,
+      Math.min(props.dates.length, Math.round(span * (event.deltaY > 0 ? 1.15 : 0.85))),
+    );
+    endIndex.value = Math.min(maxIndex.value, start.value + next - 1);
+    startIndex.value = Math.max(0, endIndex.value - next + 1);
+    preset.value = null;
   }
   function onStartInput(event: Event) {
     const value = Number((event.target as HTMLInputElement).value);
@@ -374,20 +524,30 @@
     if (!value) return '—';
     return value.length > 10 ? value.slice(5, 16).replace('T', ' ') : value.slice(5);
   }
-  watch([() => props.dates.length, () => props.dates[0], () => props.dates.at(-1)], () => {
-    const max = maxIndex.value;
-    if (preset.value != null) {
-      endIndex.value = max;
-      startIndex.value = preset.value ? Math.max(0, max - preset.value + 1) : 0;
-    } else {
-      startIndex.value = Math.min(startIndex.value, Math.max(0, max - 1));
-      endIndex.value = Math.max(
-        startIndex.value + (max > 0 ? 1 : 0),
-        Math.min(endIndex.value, max),
-      );
-    }
-    hover.value = null;
-  });
+  watch(
+    [() => props.dates.length, () => props.dates[0], () => props.dates.at(-1), () => props.series],
+    () => {
+      const max = maxIndex.value;
+      if (preset.value != null) {
+        endIndex.value = max;
+        startIndex.value = preset.value ? Math.max(0, max - preset.value + 1) : 0;
+      } else {
+        startIndex.value = Math.min(startIndex.value, Math.max(0, max - 1));
+        endIndex.value = Math.max(
+          startIndex.value + (max > 0 ? 1 : 0),
+          Math.min(endIndex.value, max),
+        );
+      }
+      hover.value = null;
+      syncAutoAxisDomains();
+      const prices = props.series
+        .filter((item) => item.axis === 'hidden-price')
+        .flatMap((item) => item.values.map(numeric))
+        .filter((value): value is number => value != null);
+      if (prices.length) priceBounds.value = [Math.min(...prices), Math.max(...prices)];
+    },
+    { immediate: true, deep: true },
+  );
   setPreset(90);
 </script>
 
@@ -588,11 +748,14 @@
     z-index: 3;
   }
 
+  .vibe-chart-measure {
+    width: 100%;
+    height: 0;
+  }
+
   .vibe-chart-svg {
     display: block;
     width: 100%;
-    height: auto;
-    min-height: 210px;
   }
 
   svg text {
@@ -607,7 +770,6 @@
   }
 
   .vibe-chart-line {
-    stroke-width: 2;
     fill: none;
   }
 
@@ -646,10 +808,6 @@
   @media (max-width: 680px) {
     .vibe-time-chart {
       padding: 12px;
-    }
-
-    .vibe-chart-svg {
-      min-height: 170px;
     }
 
     footer span {

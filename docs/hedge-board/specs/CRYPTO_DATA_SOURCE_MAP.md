@@ -18,7 +18,7 @@
 | 主题 | 原始来源 | 交付原因 |
 |---|---|---|
 | BTC / ETH ETF 流量、企业财库周度流入 | SoSoValue | 原站维护证券流量与财库分类。 |
-| 尚未接通的链上估值、地址与资金流 | Checkonchain、Glassnode、CryptoQuant、Arkham、BGeometrics | 稳定币与 URPD 已本地采集；地址分布尝试的公开 BGeometrics 余额/币数接口返回空正文，未虚构数据。 |
+| 尚未接通的链上估值与资金流 | Checkonchain、Glassnode、CryptoQuant、Arkham、BGeometrics | 稳定币、URPD 与六档 BTC 地址分布已本地采集；其余未接通指标保留明确缺口。 |
 | 多 Venue 衍生品、清算、期权与波动率 | CoinGlass、Deribit、Greeks.live、Bybit、OKX | 不将单一来源误标为聚合数据。 |
 | 公开研究布局 | TradingView 及明确原始网页 | 仅新标签页跳转，不依赖用户登录态或私有模板。 |
 
@@ -35,11 +35,24 @@
 - 稳定币：DefiLlama `stablecoincharts/all`，汇总 `totalCirculatingUSD`，保留每日原值。
 - 恐惧贪婪：Alternative.me 官方 API，0–100，页面紧邻数据注明来源。
 - Deribit：BTC option book summary 的 Call/Put OI 与 Put/Call 比率；单一交易所快照，历史从接入日积累，ATM IV 原链路保留。
+- BTC DVOL 主图读取独立生产端的完整 UTC 日收盘历史；按官方 OHLC 第五项取 close，逐页处理 continuation，排除未闭合当日，保留缺失值和原始响应。[Deribit 字段定义](https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data)。原小时历史接口同步修正 close 字段、分页及不必要的两位小数截断。
 - BitcoinTreasuries：可公开读取的上市公司持仓样本及 Strategy；采集日不冒充统一披露日，不能由样本余额变化推成财库周净流入。
 - Strategic ETH Reserve：只纳入 ACTIVE 实体，排除未审/停用记录；保留原始更新时间与 PUBLIC_REPORT / SELF_REPORTED / WALLET_TRACKING 标识。旧披露仍可 stale，抓取成功不代表所有实体当日披露。
-- BGeometrics URPD：UTXO 最后移动价格分桶及 BTC 数量；这是链上价格分布，非已证实的投资者成本。
+- BGeometrics URPD：UTXO 最后移动价格分桶及 BTC 数量；这是链上价格分布，非已证实的投资者成本。生产端校验全部区间后发布，priceLower / priceUpper 原生数值边界贯穿 JSON、DuckDB 和 API；页面按价格比例绘制柱状图，保留键盘查看与数据表，缺失量不画作零。
 - STRC：Yahoo 交易所日线价格，不冒充实时 ATM 发行额或收益率；最新交易日可能未收盘。
 - Coinbase/Binance 日线溢价：闭合 UTC 日线精确日期相交，并用 Coinbase USDT/USD 调整计价币，公式和输入版本由生产端保留。
 - 保证金借贷：Bybit USDT 公开 VIP 0 小时费率；非用户账户实际成本。Binance 资金费率单独接入原有历史组，不冒充全市场聚合。
+- 加密明细参与度：BTC/ETH/SOL/BNB/XRP/DOGE/HYPE 固定观察池，排除 UTC 当前日期，用同日且历史足够的币种计算高于 20/50/200 日均线的比例；覆盖数与日期同步展示。HYPE 来源缺失时保留 6/7 partial，不用同名代币替换，也不混入上市公司或 ETF。
 
-财库周净流入、全市场合约 OI/清算热力、CoinGlass CDRI、GEX、STRC ATM 实际发行及完整地址分布尚未形成可靠的本地数据链；这些缺口与文章、作者、Seasonal Chart 等明确外部研究工具分开对待。
+财库周净流入、全市场合约 OI/清算热力、CoinGlass CDRI、STRC ATM 实际发行尚未形成可靠的本地数据链；这些缺口与文章、作者、Seasonal Chart 等明确外部研究工具分开对待。
+
+- BTC 地址分布：使用 BGeometrics 公开 HTML 日报的六档 Today 地址数，保留原始余额分桶、报表日期和未指定时区；核对分桶合计与 Total，地址不等于人数/实体。原报表历史变化列合计不一致，未纳入；本地历史从接入日积累。
+
+- Bitcoin 减半周期：Blockchain.com 跨交易所日度 USD 市场均价，保存未抽样历史与四次减半日=100 的派生序列；按 2012-11-28 / 2016-07-09 / 2020-05-11 / 2024-04-20 UTC 日期归一。来源：[市场价格方法](https://www.blockchain.com/explorer/charts/market-price)、[区块 210000](https://www.blockchain.com/explorer/blocks/btc/210000)、[420000](https://www.blockchain.com/explorer/blocks/btc/420000)、[630000](https://www.blockchain.com/explorer/blocks/btc/630000)、[840000](https://www.blockchain.com/explorer/blocks/btc/840000)。排除未闭合 UTC 当日，零报价作缺失；周期截止下一次减半前一日，无插值、无后续预测。页面按距减半日的天数对齐，可切换范围、对数/线性及查看对应日期。
+- 减半图展示参考 CoinGlass 的多周期叠线与顶部图例，默认展示完整周期，支持显隐且至少保留一条；价格指数仍以减半日=100，累计涨跌另列。参考站包含首次减半前的 Epoch 1，本地没有相应可验证基准，仍只展示四次已落库的减半周期。
+- 未接通的 CDRI、全市场 OI/清算、ATM 发行及交易所链上资金流卡片明确显示缺口，保留参考入口。
+
+- BTC ETF 折溢价覆盖 IBIT、BITB、HODL。IBIT：从 iShares 产品页公开图表取得逐日序列，并与页面最新日期/数值核对；沿用发行方展示的小数精度，原始高精度字段和页面保留在归档。真实历史目前从 2025-01-02 开始，未补造更早记录；当前日以后不发布。该指标为收盘价相对 NAV 的百分比，NAV 的比特币定价窗口与收盘时点不同，不能当作无风险套利空间或全市场 ETF 聚合。
+
+- BITB：Bitwise 公开产品页 premiumDiscount 图表；采用折溢价自身日期，比例与百分数交叉核对。HODL：VanEck 官方 historical-prices XLSX 的 `% Premium/Discount`，保留公布百分数，不以舍入后的 NAV/价格重算；排除上市前及空成交量日期，保留源站零成交量日期。三只基金独立展示，不合成全市场值。
+- GEX：Deribit public instrument/book summary 推导远期 Gamma；Cboe IBIT 公开延迟期权链使用公布 Gamma、标准 100 股乘数。Call 正 / Put 负仅为 OI 敞口代理；显示纳入合约和 OI 覆盖，缺失隐波合约排除，报价/OI 日期未知时明确标识。支持到期日、近价/全行权价和数据表；完整方法、保存路径及刷新时效见 RESEARCH_DATA 合同。

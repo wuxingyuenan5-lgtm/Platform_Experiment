@@ -19,7 +19,8 @@ class CommodityDashboardProvider:
             contract = MacroDashboardResponse.model_validate(document)
             if not any(contract.groups.values()):
                 raise ResearchProviderError("commodity_dashboard_without_series")
-            self._last_known_good = contract.model_copy(deep=True)
+            # The route only serializes this contract; stale_copy owns mutation isolation.
+            self._last_known_good = contract
             return contract
         except Exception as exc:
             if self._last_known_good is not None:

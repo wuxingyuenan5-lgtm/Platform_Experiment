@@ -9,6 +9,7 @@ from pydantic import Field, field_validator
 from app.research_data_schemas import ResearchApiModel
 from app.research_local_data import read_local_json
 from app.research_provider_errors import ResearchProviderError
+from app.research_option_exposure import OptionExposureSnapshot
 
 
 class MacroDashboardObservation(ResearchApiModel):
@@ -26,6 +27,8 @@ class MacroDashboardSeries(ResearchApiModel):
     timezone: str
     source: str
     source_series_id: str | None = None
+    price_lower: Decimal | None = None
+    price_upper: Decimal | None = None
     source_url: str | None = None
     observation_date: str | None = None
     as_of: str | None = None
@@ -48,10 +51,13 @@ class MacroDashboardResponse(ResearchApiModel):
     status: str
     as_of: str
     groups: dict[str, list[MacroDashboardSeries]]
+    option_exposure: dict[str, OptionExposureSnapshot] = Field(default_factory=dict)
 
     def stale_copy(self) -> MacroDashboardResponse:
         result = self.model_copy(deep=True)
         result.status = "stale"
+        for snapshot in result.option_exposure.values():
+            snapshot.status = 'stale'
         for series in (item for group in result.groups.values() for item in group):
             if series.status not in {"error", "no_data"}:
                 series.status = "stale"
@@ -75,7 +81,8 @@ class MacroDashboardProvider:
             contract = MacroDashboardResponse.model_validate(document)
             if not any(contract.groups.values()):
                 raise ResearchProviderError("macro_dashboard_without_series")
-            self._last_known_good = contract.model_copy(deep=True)
+            # The route only serializes this contract; stale_copy owns mutation isolation.
+            self._last_known_good = contract
             return contract
         except Exception as exc:
             if self._last_known_good is not None:

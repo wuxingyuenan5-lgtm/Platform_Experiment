@@ -40,8 +40,10 @@ execution_risk_actions venue_reconciliation_runs reconciliation_differences live
 live_trading_session_claims financial_facts formal_positions formal_pnl_results
 formal_strategy_nav_snapshots execution_resource_claims execution_balance_reservations
 internal_capital_transfers funding_spot_release_commands funding_perpetual_attempts
+funding_exit_plans
 order_execution_intents account_sync_status account_risk_snapshots research_a_share_refresh_runs
 research_a_share_dataset_snapshots research_a_share_history research_a_share_pool_config
+research_a_share_market_archive research_a_share_price_history research_a_share_archive_conflicts
 account_venue_snapshots venue_account_events balance_snapshots operational_alerts
 operational_alert_scan_runs controlled_operation_runs production_backup_records
 production_restore_drills account_capital_movements account_capital_coverage account_capital_sync
@@ -206,6 +208,65 @@ def crowding_checks(payload, market_dates):
     return result
 
 
+def a_share_archive_check(db: sqlite3.Connection) -> AuditCheck:
+    """Validate the owned archive without applying snapshot freshness rules."""
+    market_rows = db.execute(
+        """SELECT universe_key,COUNT(*) AS rows,MIN(trade_date) AS earliest,
+        MAX(trade_date) AS latest,
+        SUM(CASE WHEN quality_status NOT IN ('ready','stale') THEN 1 ELSE 0 END) AS invalid
+        FROM research_a_share_market_archive GROUP BY universe_key"""
+    ).fetchall()
+    price_rows = db.execute(
+        """SELECT instrument_code,COUNT(*) AS rows,MIN(trade_date) AS earliest,
+        MAX(trade_date) AS latest,
+        SUM(CASE WHEN close IS NULL OR CAST(close AS REAL) <= 0 THEN 1 ELSE 0 END) AS missing,
+        SUM(CASE WHEN quality_status NOT IN ('ready','stale') THEN 1 ELSE 0 END) AS invalid
+        FROM research_a_share_price_history GROUP BY instrument_code"""
+    ).fetchall()
+    conflict_count = db.execute(
+        "SELECT COUNT(*) AS n FROM research_a_share_archive_conflicts"
+    ).fetchone()["n"]
+    markets = {row["universe_key"]: dict(row) for row in market_rows}
+    prices = {row["instrument_code"]: dict(row) for row in price_rows}
+    required_markets = {"all_a", "sh_sz_a"}
+    required_prices = {"000300.SH", "801102.SWI", "BK0448", "BK1106"}
+    missing_markets = sorted(required_markets - set(markets))
+    missing_prices = sorted(required_prices - set(prices))
+    invalid_rows = sum(int(row["invalid"] or 0) for row in market_rows) + sum(
+        int(row["invalid"] or 0) for row in price_rows
+    )
+    missing_closes = sum(int(row["missing"] or 0) for row in price_rows)
+    status = (
+        "error"
+        if invalid_rows or missing_closes
+        else "warning"
+        if missing_markets or missing_prices or conflict_count
+        else "healthy"
+    )
+    message = (
+        "归档包含无效质量状态或价格"
+        if status == "error"
+        else "归档品种不完整或存在待核对冲突"
+        if status == "warning"
+        else "A股来源归档完整且无冲突"
+    )
+    return check(
+        "a_share.archive",
+        "A股来源归档",
+        "A股研究",
+        status,
+        message,
+        markets=markets,
+        prices=prices,
+        missingMarkets=missing_markets,
+        missingPrices=missing_prices,
+        invalidRows=invalid_rows,
+        missingCloses=missing_closes,
+        conflicts=conflict_count,
+        rule="历史归档按独立品种保留来源、NULL与冲突，不套用短周期快照时效",
+    )
+
+
 def inspect_database(now, *, deep=False):
     checks = []
     with read_only_connection() as db:
@@ -232,6 +293,7 @@ def inspect_database(now, *, deep=False):
                 scope="全表结构/外键；事件驱动表不设置每日新增要求",
             )
         )
+        checks.append(a_share_archive_check(db))
         snapshots = {
             r["dataset"]: dict(r)
             for r in db.execute("SELECT * FROM research_a_share_dataset_snapshots")

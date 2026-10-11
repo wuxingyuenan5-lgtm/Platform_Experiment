@@ -91,6 +91,10 @@ export interface RotationHeatmapRow {
   m1: string;
   ytd: string;
   y1: string;
+  observationDate?: string;
+  source?: string;
+  sourceUrl?: string;
+  dataStatus?: string;
 }
 
 export interface MarketTerminalPageConfig {
@@ -4174,7 +4178,7 @@ export const marketTerminalConfigs: Record<TerminalMarketId, MarketTerminalPageC
     overviewChip: 'XAUUSD 基准距52周高点: -2.10%',
     overviewCards: goldOverviewCards,
     moverCards: goldMoverCards,
-    breadthSubtitle: '商品观察池中站上对应均线的占比',
+    breadthSubtitle: '8种商品连续期货中高于对应日均线的占比；按同日有效样本计算',
     breadthCards: goldBreadthCards,
     volatilityCards: goldVolatilityCards,
     detailColumns,
@@ -4192,7 +4196,8 @@ export const marketTerminalConfigs: Record<TerminalMarketId, MarketTerminalPageC
     overviewChip: 'BTC 基准距52周高点: -6.10%',
     overviewCards: cryptoOverviewCards,
     moverCards: cryptoMoverCards,
-    breadthSubtitle: '加密观察池中站上对应均线的占比',
+    breadthSubtitle:
+      'BTC、ETH、SOL、BNB、XRP、DOGE、HYPE中高于对应日均线的占比；按同日有效样本计算',
     breadthCards: cryptoBreadthCards,
     volatilityCards: cryptoVolatilityCards,
     detailColumns,

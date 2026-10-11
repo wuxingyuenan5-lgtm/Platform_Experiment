@@ -51,12 +51,18 @@
     limit_up?: number | null;
     limit_down?: number | null;
     market_breadth?: number | null;
+    csi300Close?: number | string | null;
   }
   type CrowdingRow = {
     date: string;
     targets?: Record<
       string,
-      { amount100m?: number | null; amountShareOfA?: number | null; turnoverPct?: number | null }
+      {
+        amount100m?: number | null;
+        amountShareOfA?: number | null;
+        turnoverPct?: number | null;
+        price?: number | null;
+      }
     >;
     combined?: { amount100m?: number | null; amountShareOfA?: number | null };
   };
@@ -64,6 +70,7 @@
     date: string;
     amountShareOfA?: number | null;
     turnoverPct?: number | null;
+    price?: number | null;
   };
   const props = defineProps<{
     rows: HistoryRow[];
@@ -78,6 +85,8 @@
       type: 'bar',
       color: '#ef4444',
       unit: '家',
+      domain: [-6000, 6000],
+      ticks: [4000, 2000, 0, -2000, -4000],
     },
     {
       name: '下跌家数',
@@ -86,6 +95,8 @@
       color: '#10b981',
       sign: -1,
       unit: '家',
+      domain: [-6000, 6000],
+      ticks: [4000, 2000, 0, -2000, -4000],
     },
     {
       name: '涨停家数',
@@ -94,6 +105,17 @@
       axis: 'right',
       color: '#ef4444',
       unit: '家',
+      domain: [-300, 300],
+      ticks: [200, 100, 0, -100, -200],
+    },
+    {
+      name: '沪深300',
+      values: props.rows.map((row) => row.csi300Close),
+      type: 'line',
+      axis: 'hidden-price',
+      color: '#7c3aed',
+      unit: '点',
+      lineWidth: 3,
     },
     {
       name: '跌停家数',
@@ -103,6 +125,8 @@
       color: '#10b981',
       sign: -1,
       unit: '家',
+      domain: [-300, 300],
+      ticks: [200, 100, 0, -100, -200],
     },
   ]);
   const breadthSeries = computed<Series[]>(() => [
@@ -134,6 +158,14 @@
         const value = row.targets?.['通信设备']?.turnoverPct;
         return value == null ? null : value / 100;
       }),
+    },
+    {
+      name: '申万通信设备指数',
+      values: crowdingRows.value.map((row) => row.targets?.['通信设备']?.price),
+      type: 'line',
+      axis: 'hidden-price',
+      color: '#0f766e',
+      unit: '点',
     },
   ]);
   const fourIndustrySeries = computed<Series[]>(() => [
@@ -172,6 +204,14 @@
         row.turnoverPct == null ? null : row.turnoverPct / 100,
       ),
     },
+    {
+      name: '创新药价格',
+      type: 'line',
+      axis: 'hidden-price',
+      color: '#be185d',
+      unit: '点',
+      values: innovationRows.value.map((row) => row.price),
+    },
   ]);
 </script>
 
@@ -179,5 +219,16 @@
   .vibe-trend-charts {
     display: grid;
     gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vibe-trend-charts > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  @container ashare-overview (max-width: 1000px) {
+    .vibe-trend-charts {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 </style>

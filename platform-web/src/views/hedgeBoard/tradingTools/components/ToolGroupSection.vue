@@ -14,11 +14,7 @@
     </div>
 
     <div class="tool-group-section__grid">
-      <ToolLinkCard
-        v-for="tool in group.tools"
-        :key="tool.id"
-        :tool="tool"
-      />
+      <ToolLinkCard v-for="tool in group.tools" :key="tool.id" :tool="tool" />
     </div>
   </section>
 </template>
@@ -27,30 +23,24 @@
   .tool-group-section {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 12px;
   }
 
   .tool-group-section__head {
-    border-bottom: 1px solid rgba(204, 216, 227, 0.9);
-    padding-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgb(204 216 227 / 90%);
   }
 
   .tool-group-section__head h3 {
     margin: 0;
-    font-size: 24px;
-    line-height: 1.2;
     color: #18313c;
+    font-size: 18px;
+    line-height: 1.2;
   }
 
   .tool-group-section__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 18px;
-  }
-
-  @media (max-width: 900px) {
-    .tool-group-section__grid {
-      grid-template-columns: 1fr;
-    }
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 12px;
   }
 </style>

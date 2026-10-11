@@ -48,36 +48,16 @@
       </div>
 
       <div class="cftc-chart-shell">
-        <svg
-          viewBox="0 0 960 220"
-          role="img"
-          :aria-label="`${selectedMarket.label} CFTC 净头寸历史`"
+        <SourceSeriesPlot
+          :key="selectedKey"
+          :series="netSeries"
+          :colors="['#165dff', '#d18b1f']"
+          unit-label="手"
+        />
+        <p class="cftc-note"
+          >{{ firstDate || '—' }} 至 {{ latestDate || '—' }} ·
+          {{ netSeries.some((item) => item.isStale) ? '数据待更新' : '周度报告' }}</p
         >
-          <line
-            v-for="tick in ticks"
-            :key="tick"
-            x1="48"
-            x2="936"
-            :y1="y(tick)"
-            :y2="y(tick)"
-            class="grid"
-          />
-          <line x1="48" x2="936" :y1="y(0)" :y2="y(0)" class="zero" />
-          <text
-            v-for="tick in ticks"
-            :key="`label-${tick}`"
-            x="40"
-            :y="y(tick) + 4"
-            text-anchor="end"
-            class="axis"
-          >
-            {{ compact(tick) }}
-          </text>
-          <path v-if="managedPath" :d="managedPath" class="line line--managed" />
-          <path v-if="producerPath" :d="producerPath" class="line line--producer" />
-          <text x="52" y="210" class="axis">{{ firstDate || '—' }}</text>
-          <text x="932" y="210" text-anchor="end" class="axis">{{ latestDate || '—' }}</text>
-        </svg>
         <div class="cftc-legend">
           <span><i class="dot dot--managed"></i>Managed Money 净头寸</span>
           <span><i class="dot dot--producer"></i>Producer / Merchant 净头寸</span>
@@ -108,8 +88,12 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
+  import { useDashboardRefresh } from '../useDashboardRefresh';
+
+  import { computed, ref } from 'vue';
   import { getCommodityDashboardV1, type MacroDashboardSeries } from '@/api/hedgeResearch';
+
+  import SourceSeriesPlot from '../charts/SourceSeriesPlot.vue';
 
   type MarketKey = 'gold' | 'silver' | 'copper' | 'wti' | 'naturalGas';
   type MarketConfig = { key: MarketKey; label: string; net: string; percentile: string };
@@ -149,20 +133,17 @@
   const producerSeries = computed(
     () => netSeries.value.find((item) => item.seriesId.includes('producer_merchant')) ?? null,
   );
-  const latest = (series: MacroDashboardSeries | undefined) => {
-    const points = (series?.observations ?? []).filter((point) =>
-      Number.isFinite(Number(point.value)),
-    );
-    return points.length ? points[points.length - 1] : null;
-  };
+  const latest = (series: MacroDashboardSeries | null | undefined) =>
+    series ? { date: series.observationDate, value: series.latestValue } : null;
   const managedMoneyNet = computed(() => number(latest(managedSeries.value)?.value));
   const producerNet = computed(() => number(latest(producerSeries.value)?.value));
   const percentile = computed(() => number(latest(percentileSeries.value)?.value));
   const latestDate = computed(() => latest(managedSeries.value)?.date ?? null);
   const firstDate = computed(
     () =>
-      managedSeries.value?.observations?.find((point) => Number.isFinite(Number(point.value)))
-        ?.date ?? null,
+      managedSeries.value?.observations?.find(
+        (point) => point.value != null && Number.isFinite(Number(point.value)),
+      )?.date ?? null,
   );
   const selectedMarket = computed(() => (managedSeries.value ? config.value : null));
   const rows = computed<Row[]>(() =>
@@ -184,52 +165,21 @@
       .filter((row) => row.managed != null || row.producer != null || row.percentile != null),
   );
 
-  const values = computed(() =>
-    [...(managedSeries.value?.observations ?? []), ...(producerSeries.value?.observations ?? [])]
-      .map((point) => Number(point.value))
-      .filter(Number.isFinite),
-  );
-  const minValue = computed(() => (values.value.length ? Math.min(...values.value, 0) : -1));
-  const maxValue = computed(() => (values.value.length ? Math.max(...values.value, 0) : 1));
-  const ticks = computed(() =>
-    Array.from(
-      { length: 5 },
-      (_, index) => minValue.value + ((maxValue.value - minValue.value) * index) / 4,
-    ),
-  );
-  const y = (value: number) =>
-    24 + ((maxValue.value - value) / Math.max(maxValue.value - minValue.value, 1)) * 156;
-  const path = (series: MacroDashboardSeries | undefined) => {
-    const points = (series?.observations ?? [])
-      .filter((point) => Number.isFinite(Number(point.value)))
-      .slice(-156);
-    if (points.length < 2) return '';
-    return points
-      .map(
-        (point, index) =>
-          `${index ? 'L' : 'M'}${48 + (index / (points.length - 1)) * 888},${y(
-            Number(point.value),
-          )}`,
-      )
-      .join(' ');
-  };
-  const managedPath = computed(() => path(managedSeries.value));
-  const producerPath = computed(() => path(producerSeries.value ?? undefined));
   const number = (value: string | number | null | undefined) => {
+    if (value == null || value === '') return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   };
   const signed = (value: number | null) =>
     value == null ? '—' : `${value > 0 ? '+' : ''}${Math.round(value).toLocaleString('en-US')}`;
-  const compact = (value: number) =>
-    Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(0)}k` : Math.round(value).toString();
   const tone = (value: number | null) =>
     value == null ? '' : value > 0 ? 'positive' : value < 0 ? 'negative' : '';
 
-  onMounted(async () => {
+  useDashboardRefresh(async () => {
     try {
       const dashboard = await getCommodityDashboardV1();
       groups.value = dashboard.groups;
+      error.value = '';
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : 'CFTC 数据暂不可用';
     } finally {
@@ -240,7 +190,7 @@
 
 <style scoped lang="less">
   .cftc-panel {
-    padding: 4px 2px 0;
+    padding: 0 20px 18px;
     color: var(--hedge-cool-text, #18313c);
   }
 

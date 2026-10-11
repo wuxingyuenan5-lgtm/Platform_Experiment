@@ -43,6 +43,8 @@ class MarketDetailRow(ResearchApiModel):
     spark_30d: list[Decimal] = Field(default_factory=list)
     spark_90d: list[Decimal] = Field(default_factory=list)
     signals: dict[str, str | None] = Field(default_factory=dict)
+    sample_size: int | None = None
+    expected_sample_size: int | None = None
 
 
 class MarketDetailResponse(ResearchApiModel):
@@ -142,8 +144,6 @@ class MarketDetailProvider:
                 series[row_id] = ratio
                 timezones[row_id] = timezones.get(numerator, "UTC")
         rows = [_market_row(row_id, points) for row_id, points in series.items() if points]
-        if not rows:
-            raise ResearchProviderError("market_detail_no_live_rows")
         for row in rows:
             row.timezone = timezones.get(row.id, "UTC")
             row.symbol = yahoo_symbols.get(row.id, row.id).replace("%5E", "^")
@@ -159,11 +159,19 @@ class MarketDetailProvider:
             ).date() - timedelta(days=7):
                 row.status = "stale"
                 row.quality_flags.append("old_source_observation")
+        if market_id == "us":
+            rows.extend(await asyncio.to_thread(_cboe_rows))
+        rows.extend(_breadth_rows(market_id, series))
+        if not rows:
+            raise ResearchProviderError("market_detail_no_live_rows")
         now = datetime.now(UTC)
         return MarketDetailResponse(
             market_id=market_id,
             status="partial"
-            if len(rows) < len(yahoo_symbols) + len(derived)
+            if len(series) < len(yahoo_symbols) + len(derived)
+            or (
+                market_id == "us" and not {"us-dspx", "us-cor1m"}.issubset({row.id for row in rows})
+            )
             or any(row.status != "ready" for row in rows)
             else "ready",
             as_of=max(row.observation_date or "" for row in rows),
@@ -268,6 +276,107 @@ MARKET_SYMBOLS = {
     "us": US_YAHOO_SYMBOLS,
     "global": GLOBAL_YAHOO_SYMBOLS,
 }
+
+# Fixed research pools; never presented as whole-market or S&P 500 breadth.
+BREADTH_POOLS = {
+    "gold": tuple(FUTURES_LABELS),
+    "crypto": tuple(
+        f"crypto-{symbol}-row" for symbol in ("btc", "eth", "sol", "bnb", "xrp", "doge", "hype")
+    ),
+}
+
+
+def _cboe_rows() -> list[MarketDetailRow]:
+    rows = []
+    for symbol in ("DSPX", "COR1M"):
+        try:
+            document = read_local_json(f"public/v1/macro/series/{symbol.lower()}.json")
+            if document.get("seriesId") != symbol.lower():
+                raise ValueError("Cboe series identity mismatch")
+            points = [
+                (item["date"], Decimal(str(item["value"])))
+                for item in document["observations"]
+                if item["value"] is not None
+            ]
+            if not points or any(not value.is_finite() for _, value in points):
+                raise ValueError("invalid Cboe values")
+            if [day for day, _ in points] != sorted({day for day, _ in points}):
+                raise ValueError("unordered or duplicate Cboe dates")
+            row = _market_row(f"us-{symbol.lower()}", points)
+            row.symbol, row.name, row.unit = symbol, f"Cboe {symbol}", "index"
+            row.source, row.source_url = document["source"], document["sourceUrl"]
+            row.timezone, row.frequency = document["timezone"], document["frequency"]
+            row.status = document["status"]
+            row.quality_flags = list(document.get("qualityFlags", []))
+            retrieved = datetime.fromisoformat(document["retrievedAt"].replace("Z", "+00:00"))
+            if retrieved.tzinfo is None:
+                raise ValueError("Cboe retrieval timestamp lacks timezone")
+            if datetime.now(UTC) - retrieved > timedelta(days=1) or date.fromisoformat(
+                points[-1][0]
+            ) < datetime.now(UTC).date() - timedelta(days=7):
+                row.status = "stale"
+                row.quality_flags.append("stale_source_artifact")
+            rows.append(row)
+        except (ResearchProviderError, ValueError, KeyError, TypeError, OSError):
+            # The refresh layer preserves this symbol's last good row as stale.
+            continue
+    return rows
+
+
+def _breadth_rows(
+    market_id: str, series: dict[str, list[tuple[str, Decimal]]]
+) -> list[MarketDetailRow]:
+    pool = BREADTH_POOLS.get(market_id, ())
+    timezone_name = "UTC" if market_id == "crypto" else "America/New_York"
+    today = datetime.now(ZoneInfo(timezone_name)).date().isoformat()
+    # A day must have ended in the source timezone. Do not mix an open daily
+    # bar into participation while the research table still shows live quotes.
+    available = [[point for point in series.get(key, []) if point[0] < today] for key in pool]
+    available = [points for points in available if points]
+    if not available:
+        return []
+    observed = max(points[-1][0] for points in available)
+    rows = []
+    for window in (20, 50, 200):
+        eligible = [
+            points for points in available if points[-1][0] == observed and len(points) >= window
+        ]
+        above = sum(
+            points[-1][1] > sum((value for _, value in points[-window:]), Decimal(0)) / window
+            for points in eligible
+        )
+        value = Decimal(above) * 100 / len(eligible) if eligible else None
+        status = "ready" if len(eligible) == len(pool) else "partial" if eligible else "no_data"
+        if eligible and date.fromisoformat(observed) < datetime.now(UTC).date() - timedelta(days=7):
+            status = "stale"
+        rows.append(
+            MarketDetailRow(
+                id=f"{market_id}-b{window}",
+                name=f"{window}日参与度",
+                symbol=f"BREADTH{window}",
+                status=status,
+                unit="percent",
+                change_unit="absolute",
+                frequency="daily",
+                timezone=timezone_name,
+                observation_date=observed,
+                as_of=observed,
+                source="Yahoo Finance / Platform research pool",
+                source_url="https://finance.yahoo.com/",
+                methodology_version="fixed-pool-same-date-sma-v1",
+                close=value,
+                sample_size=len(eligible),
+                expected_sample_size=len(pool),
+                quality_flags=[
+                    "fixed_pool:" + ",".join(pool),
+                    "strictly_above_sma",
+                    "same_observation_date_only",
+                    "completed_source_calendar_dates_only",
+                ]
+                + (["incomplete_sample"] if len(eligible) != len(pool) else []),
+            )
+        )
+    return rows
 
 
 def _ratio_series(

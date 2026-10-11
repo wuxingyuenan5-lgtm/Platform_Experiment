@@ -38,9 +38,14 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
+  import { computed, onMounted, ref } from 'vue';
   import { Modal } from 'ant-design-vue';
-  import { researchRequest, type AShareDashboardResponse } from '@/api/hedgeResearch';
+  import {
+    getMarketDetail,
+    researchRequest,
+    type MarketDetailRow,
+    type AShareDashboardResponse,
+  } from '@/api/hedgeResearch';
   import MarketTerminalPage from '../../components/MarketTerminalPage.vue';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
   import VibeTimeChart from './VibeTimeChart.vue';
@@ -52,6 +57,15 @@
 
   const props = defineProps<{ dashboard: AShareDashboardResponse | null }>();
   const base = marketTerminalConfigs.aShare;
+  const chinaYield = ref<MarketDetailRow | null>(null);
+  onMounted(async () => {
+    try {
+      const snapshot = await getMarketDetail('macro');
+      chinaYield.value = snapshot.rows.find((row) => row.symbol === 'CN10Y') ?? null;
+    } catch {
+      chinaYield.value = null;
+    }
+  });
   const tabs: Array<{ id: TerminalMarketId; label: string; path: string }> = [
     { id: 'aShare', label: 'A股', path: '/hedge-board/a-share' },
   ];
@@ -77,6 +91,18 @@
               ...row,
               value: breadth && breadth.down > 0 ? (breadth.up / breadth.down).toFixed(2) : '—',
               badge: breadth?.breadthState || '暂无数据',
+              ranges: '',
+            }
+          : row.id === 'a-cn10y' &&
+            chinaYield.value?.close != null &&
+            !['error', 'no_data'].includes(chinaYield.value.status)
+          ? {
+              ...row,
+              value: `${Number(chinaYield.value.close).toFixed(2)}%`,
+              badge: `${
+                ['stale', 'degraded'].includes(chinaYield.value.status) ? '旧数据 · ' : ''
+              }${chinaYield.value.observationDate ?? ''}`,
+              description: `中国10年国债收益率 · ${chinaYield.value.source}`,
               ranges: '',
             }
           : { ...row, value: '—', badge: '暂无数据', ranges: '' },

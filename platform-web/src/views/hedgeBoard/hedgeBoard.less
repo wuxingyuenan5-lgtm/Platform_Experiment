@@ -1,6 +1,11 @@
 @import '../strategy/shared/strategy-theme.less';
 @import './charts/etfResearchPanels.less';
 
+// The research board has responsive layouts; the legacy shell minimum must not clip them.
+#app:has(.hedge-board) {
+  min-width: 0;
+}
+
 .hedge-board {
   --hedge-cool-border: rgb(201 213 226 / 72%);
   --hedge-cool-border-strong: rgb(175 190 207 / 82%);
@@ -119,6 +124,140 @@
 
   .local-widget-stack {
     padding: 0 20px 18px;
+  }
+
+  .local-widget-stack .local-widget-stack {
+    padding: 0;
+  }
+
+  .source-series-legend {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 5px 0;
+    border: 0;
+    background: transparent;
+    color: #405870;
+    font-size: 12px;
+    line-height: 1.55;
+    text-align: left;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .source-series-legend i {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+  }
+
+  .source-series-legend[aria-pressed='false'] {
+    opacity: 0.45;
+  }
+
+  .source-series-legend:disabled {
+    cursor: default;
+  }
+
+  .source-series-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    margin: 12px 0 4px;
+  }
+
+  .source-series-summary .source-series-legend {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr);
+    align-content: start;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #e5ecf3;
+    border-radius: 8px;
+    background: #f8fafc;
+    gap: 3px 8px;
+  }
+
+  .source-series-summary .source-series-legend i {
+    margin-top: 5px;
+    border-radius: 50%;
+  }
+
+  .source-series-summary__name {
+    overflow-wrap: anywhere;
+    color: #60758a;
+    line-height: 1.4;
+  }
+
+  .source-series-summary strong,
+  .source-series-summary small {
+    grid-column: 2;
+  }
+
+  .source-series-summary strong {
+    color: #20384d;
+    font-size: 14px;
+  }
+
+  .source-series-summary small {
+    color: #738497;
+    font-size: 11px;
+  }
+
+  .source-series-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding-top: 10px;
+    border-top: 1px solid #e8eef4;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .source-series-footer a {
+    color: #60758a;
+    overflow-wrap: anywhere;
+  }
+
+  .source-series-legend:focus-visible,
+  .local-widget-stack button:focus-visible {
+    outline: 2px solid #477bc2;
+    outline-offset: 3px;
+  }
+
+  .source-table-pages {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+    font-size: 12px;
+  }
+
+  .source-table-pages button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .local-widget-stack th,
+  .local-widget-stack td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #edf1f5;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .local-widget-stack th {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    background: #f6f9fc;
+  }
+
+  .local-widget-stack caption {
+    padding: 8px 0;
+    color: #627488;
+    font-size: 12px;
+    text-align: left;
   }
 
   .chart-section--gold .local-widget-stack {

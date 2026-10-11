@@ -50,6 +50,35 @@ def test_missing_crowding_turnover_and_absent_day_are_not_zero():
     assert rows[1]["status"] == "error"
 
 
+def test_a_share_archive_audit_keeps_instrument_identities_and_conflicts_visible(store):
+    with connection() as db:
+        for universe in ("all_a", "sh_sz_a"):
+            db.execute(
+                """INSERT INTO research_a_share_market_archive
+                (universe_key,trade_date,amount_yuan,source_name,payload_json,
+                 quality_status,imported_at) VALUES (?,?,?,?,?,'ready',?)""",
+                (universe, "2026-10-09", "1", "fixture", "{}", "2026-10-09T08:00:00+00:00"),
+            )
+        for code in ("000300.SH", "801102.SWI", "BK0448", "BK1106"):
+            db.execute(
+                """INSERT INTO research_a_share_price_history
+                (instrument_code,trade_date,source_name,definition_version,industry_level,
+                 close,payload_json,quality_status,imported_at)
+                VALUES (?,?,?,'fixture-v1','',?,'{}','ready',?)""",
+                (code, "2026-10-09", "fixture", "1", "2026-10-09T08:00:00+00:00"),
+            )
+        assert audit.a_share_archive_check(db)["status"] == "healthy"
+        db.execute(
+            """INSERT INTO research_a_share_archive_conflicts
+            (table_name,natural_key,existing_payload_json,incoming_payload_json,
+             source_name,reason,observed_at) VALUES ('price','x','{}','{\"x\":1}',
+             'fixture','natural_key_conflict','2026-10-09T08:00:00+00:00')"""
+        )
+        item = audit.a_share_archive_check(db)
+        assert item["status"] == "warning"
+        assert item["evidence"]["conflicts"] == 1
+
+
 def test_alert_dedup_recovery_reopen_and_restart_read(store):
     now = datetime.now(UTC)
     item = audit.check("x", "test", "test", "error", "stopped")

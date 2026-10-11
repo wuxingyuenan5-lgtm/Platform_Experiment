@@ -46,6 +46,16 @@ test('US/global cards, table, breadth and rotation never fall back to sample fac
   assert.equal(config.overviewChip, 'sample');
 });
 
+test('rotation preserves each instrument source date and stale state, missing rows stay empty', () => {
+  const config = { id: 'global', detailGroups: [], rotationHeatmap: [{symbol: 'EWA'}, {symbol: 'RSX'}] };
+  const result = moduleUnderTest.exports.mergeTerminalMarket(config, [{symbol:'EWA', status:'stale', observationDate:'2026-10-08', source:'Yahoo Finance', sourceUrl:'https://finance.yahoo.com/quote/EWA', change1d:'1.5'}]);
+  assert.equal(result.rotationHeatmap[0].observationDate, '2026-10-08');
+  assert.equal(result.rotationHeatmap[0].dataStatus, 'stale');
+  assert.equal(result.rotationHeatmap[0].source, 'Yahoo Finance');
+  assert.equal(result.rotationHeatmap[1].observationDate, undefined);
+  assert.equal(result.rotationHeatmap[1].d1, '—');
+});
+
 test('macro missing rows and continuous commodity futures preserve truthful display', () => {
   const config = [{ label: '商品', rows: [{ id: 'gold-xauusd', name: '现货黄金', symbol: 'XAUUSD', price: '99', spark: [99] }] }];
   assert.equal(moduleUnderTest.exports.mergeMacroMarketDetail(config, [])[0].rows[0].price, '—');
@@ -113,4 +123,15 @@ test('live market detail updates the complete visible row instead of only the sp
   assert.equal(row.y1, '+6.00%');
   assert.equal(row.high, '-7.00%');
   assert.deepEqual(row.spark, [98, 99, 100]);
+});
+
+test('breadth displays coverage and source date, not seed values', () => {
+  const config = { detailGroups: [], breadthCards: [{ id: 'gold-b20', value: '99%' }] };
+  const result = moduleUnderTest.exports.mergeTerminalMarket(config, [{
+    id: 'gold-b20', symbol: 'BREADTH20', status: 'partial', close: '62.5',
+    sampleSize: 7, expectedSampleSize: 8, observationDate: '2026-10-09',
+  }]);
+  assert.equal(result.breadthCards[0].value, '62.5%');
+  assert.equal(result.breadthCards[0].tag, '7/8 样本');
+  assert.equal(result.breadthCards[0].delta, '2026-10-09');
 });

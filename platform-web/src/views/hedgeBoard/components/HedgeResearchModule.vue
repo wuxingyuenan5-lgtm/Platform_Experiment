@@ -51,12 +51,21 @@
         :class="`widget-grid--${section.layout ?? 'three'}`"
       >
         <article
-          v-for="widget in section.widgets"
+          v-for="widget in orderedWidgets(section)"
           :key="`${section.id}-${widget.title}`"
           class="widget-card"
           :class="{
             'widget-card--local-chart': widget.kind === 'local-chart',
+            'widget-card--reference': widget.kind === 'external-link',
+            'widget-card--wide':
+              widget.localKey === 'macro-global-m2' ||
+              widget.localKey === 'macro-fed-balance-structure' ||
+              widget.localKey === 'etf-weekly-flows',
             'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
+            'widget-card--halving': widget.localKey === 'crypto-halving-cycles',
+            'widget-card--urpd': widget.localKey === 'crypto-urpd',
+            'widget-card--etf-premium': widget.localKey === 'crypto-etf-premium',
+            'widget-card--cftc': widget.localKey === 'cftc-positioning',
           }"
         >
           <div v-if="!shouldHideWidgetHeader(section.id, widget)" class="widget-card__header">
@@ -107,7 +116,6 @@
             </div>
             <div v-else-if="widget.kind === 'external-link'" class="external-reference-card">
               <p>{{ widget.subtitle }}</p>
-              <span>点击卡片右上角打开完整工具</span>
             </div>
             <VisibleChart
               v-else-if="widget.kind === 'local-chart' && widget.localKey"
@@ -147,6 +155,16 @@
     tradingViewWidget: Component;
     widgetErrorBoundary: Component;
   }>();
+
+  function orderedWidgets(section: ChartSection) {
+    return [
+      ...section.widgets.filter((widget) => widget.localKey === 'etf-weekly-flows'),
+      ...section.widgets.filter(
+        (widget) => widget.kind !== 'external-link' && widget.localKey !== 'etf-weekly-flows',
+      ),
+      ...section.widgets.filter((widget) => widget.kind === 'external-link'),
+    ];
+  }
 
   const navigationSections = computed(() => [
     ...props.sections,
@@ -194,22 +212,28 @@
   @import '../../strategy/shared/strategy-theme.less';
   @import './marketDetailSection.less';
 
-  @media (max-width: 1200px) {
-    .widget-grid--three,
-    .widget-grid--two {
-      grid-template-columns: 1fr;
+  @container research-section (max-width: 1440px) {
+    .widget-grid--three {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @container research-section (max-width: 960px) {
+    .widget-card--etf-premium {
+      grid-column: 1 / -1;
     }
 
-    .widget-card--macro-fedwatch {
-      grid-column: auto;
+    .widget-grid--three,
+    .widget-grid--two {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
   @media (max-width: 768px) {
     .formula-strip,
     .chart-section {
-      padding: 18px;
-      border-radius: 20px;
+      padding: 12px;
+      border-radius: 14px;
     }
 
     .formula-strip {
@@ -224,8 +248,7 @@
   }
 
   .external-reference-card {
-    min-height: 96px;
-    padding: 4px 18px 18px;
+    padding: 8px 18px 16px;
     color: var(--hedge-cool-muted, #6d8293);
     font-size: 13px;
     line-height: 1.65;
@@ -258,10 +281,19 @@
     grid-column: 1 / -1;
   }
 
+  .widget-card--halving,
+  .widget-card--urpd {
+    grid-column: 1 / -1;
+  }
+
+  .widget-card--etf-premium {
+    grid-column: span 2;
+  }
+
   .formula-strip,
   .chart-section {
-    padding: 22px;
-    border-radius: 24px;
+    padding: 16px;
+    border-radius: 16px;
   }
 
   .formula-strip {
@@ -293,6 +325,7 @@
   }
 
   .chart-section {
+    container: research-section / inline-size;
     display: flex;
     flex-direction: column;
     gap: 18px;
@@ -300,7 +333,7 @@
 
   .chart-section__heading h4 {
     margin: 0;
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 800;
   }
 
@@ -334,6 +367,7 @@
   .widget-grid {
     display: grid;
     gap: 16px;
+    align-items: start;
   }
 
   .widget-grid--hero {
@@ -351,11 +385,11 @@
   .widget-card {
     min-width: 0;
     overflow: hidden;
-    border-radius: 20px;
+    border-radius: 14px;
   }
 
   .widget-card__header {
-    padding: 14px 16px 0;
+    padding: 18px 20px 0;
   }
 
   .widget-card__header-main {
@@ -366,15 +400,15 @@
   }
 
   .widget-card--local-chart .widget-card__header-main {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    display: flex;
+    flex-wrap: wrap;
     align-items: start;
+    padding-bottom: 12px;
   }
 
   .widget-card--local-chart .widget-card__title-row {
-    grid-column: 2;
-    justify-self: center;
-    text-align: center;
+    flex: 1 1 190px;
+    text-align: left;
   }
 
   .widget-card__title-row h5 {
@@ -384,7 +418,7 @@
   }
 
   .widget-card--local-chart .widget-card__title-row h5 {
-    font-size: 17px;
+    font-size: 16px;
     line-height: 1.35;
   }
 
@@ -457,14 +491,33 @@
   }
 
   .widget-card--local-chart .widget-card__actions {
-    grid-column: 3;
-    justify-self: end;
+    flex: 0 1 auto;
+  }
+
+  .widget-card--cftc {
+    grid-column: 1 / -1;
+  }
+
+  #crypto-external-research-content {
+    align-items: stretch;
+  }
+
+  #crypto-external-research-content :deep(.source-series-summary .source-series-legend) {
+    min-height: 96px;
   }
 
   .chart-section--gold {
-    padding: 22px 24px 24px;
-    border-radius: 20px;
+    padding: 16px;
+    border-radius: 16px;
     background: linear-gradient(180deg, rgb(255 255 255 / 98%), rgb(243 248 252 / 98%)), #fff;
     box-shadow: 0 16px 36px rgb(31 41 55 / 4%);
+  }
+
+  .widget-card--wide {
+    grid-column: 1 / -1;
+  }
+
+  .widget-card--reference {
+    box-shadow: none;
   }
 </style>

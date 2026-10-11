@@ -31,6 +31,8 @@ class _Response:
                         "frequency": "daily",
                         "timezone": "UTC",
                         "source": "binance_public_api",
+                        "priceLower": "0.123456789",
+                        "priceUpper": "1.234567891",
                         "isStale": False,
                         "methodologyVersion": "binance_spot_daily_close_v1",
                         "qualityFlags": ["venue_binance", "mode_venue_not_aggregate"],
@@ -57,3 +59,5 @@ def test_crypto_dashboard_provider_preserves_decimal(monkeypatch: pytest.MonkeyP
     provider = CryptoDashboardProvider(timeout_seconds=5, user_agent="test")
     contract = asyncio.run(provider.get())
     assert str(contract.groups["binanceSpot"][0].latest_value) == "77439"
+    assert str(contract.groups["binanceSpot"][0].price_lower) == "0.123456789"
+    assert contract.model_dump(mode="json", by_alias=True)["groups"]["binanceSpot"][0]["priceUpper"] == "1.234567891"

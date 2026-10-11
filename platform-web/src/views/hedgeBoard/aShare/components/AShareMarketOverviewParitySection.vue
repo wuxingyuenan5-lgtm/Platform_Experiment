@@ -295,10 +295,11 @@
     >
       <article class="panel">
         <div class="market-amount-summary">
-          <strong>{{ marketAmountRows.length }} 个交易日</strong>
+          <strong>{{ marketAmountData?.tradingDays ?? marketAmountRows.length }} 个交易日</strong>
           <span>
-            {{ marketAmountRows.at(-1)?.observedAt || '—' }} 至
-            {{ marketAmountRows[0]?.observedAt || '—' }} · 单位：亿元 · 最新日期在最上方
+            {{ marketAmountData?.coverageStart || marketAmountRows.at(-1)?.observedAt || '—' }} 至
+            {{ marketAmountData?.coverageEnd || marketAmountRows[0]?.observedAt || '—' }} ·
+            单位：亿元 · 最新日期在最上方
           </span>
         </div>
         <div v-if="marketAmountRows.length" class="table-shell market-amount-table">
@@ -312,7 +313,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in marketAmountRows" :key="row.observedAt">
+              <tr v-for="row in pagedMarketAmountRows" :key="row.observedAt">
                 <td class="is-left">{{ row.observedAt }}</td>
                 <td class="is-right">{{
                   formatHundredMillion(
@@ -323,13 +324,32 @@
                   {{ formatPct(row.amountChangePct) }}
                 </td>
                 <td class="is-left source-cell" :title="row.source || '来源未记录'">
-                  {{ row.source || '来源未记录' }}
+                  {{ row.source || '来源缺失' }}
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <div v-else class="empty">暂无全A成交额历史数据</div>
+        <div
+          v-if="marketAmountPageCount > 1"
+          class="market-amount-pagination"
+          aria-label="全A成交额历史分页"
+        >
+          <button type="button" :disabled="marketAmountPage <= 1" @click="marketAmountPage -= 1"
+            >上一页</button
+          >
+          <span>第 {{ marketAmountPage }} / {{ marketAmountPageCount }} 页</span>
+          <button
+            type="button"
+            :disabled="marketAmountPage >= marketAmountPageCount"
+            @click="marketAmountPage += 1"
+            >下一页</button
+          >
+        </div>
+        <div v-if="!marketAmountRows.length" class="empty">{{
+          marketAmountError ||
+          (marketAmountLoading ? '正在加载全A成交额历史' : '暂无全A成交额历史数据')
+        }}</div>
       </article>
     </Modal>
     <Modal
@@ -379,9 +399,11 @@
   import {
     getAShareLiveSectorFundFlow,
     getAShareLiveMarketTurnover,
+    getAShareMarketHistory,
     type AShareDashboardResponse,
     type AShareLiveSectorFundFlowResponse,
     type AShareMarketTurnoverResponse,
+    type AShareMarketHistoryResponse,
     type ResearchSourceMeta,
   } from '@/api/hedgeResearch';
   import { Modal } from 'ant-design-vue';
@@ -431,6 +453,10 @@
   const ladderOpen = ref(false);
   const hotMatrixOpen = ref(false);
   const marketAmountHistoryOpen = ref(false);
+  const marketAmountPage = ref(1);
+  const marketAmountData = shallowRef<AShareMarketHistoryResponse | null>(null);
+  const marketAmountLoading = ref(false);
+  const marketAmountError = ref('');
   const selectedHotDate = ref('');
   const hotHistoryRange = ref<10 | 30 | 'all'>(10);
   const visibleHotDates = computed(() => {
@@ -453,13 +479,49 @@
       limit_down: row.limitDown,
       total_amount_100m: row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
       market_breadth: row.marketBreadthPct == null ? null : Number(row.marketBreadthPct) / 100,
+      csi300Close: row.csi300Close == null ? null : Number(row.csi300Close),
     })),
   );
-  const marketAmountRows = computed(() =>
-    [...(props.dashboard?.marketHistory || [])].sort((a, b) =>
-      b.observedAt.localeCompare(a.observedAt),
-    ),
+  const marketAmountRows = computed(() => {
+    if (marketAmountData.value) return marketAmountData.value.rows;
+    const sourceRows = props.dashboard?.marketHistory || [];
+    const rows = sourceRows
+      .map((row, index) => ({
+        ...row,
+        amountChangePct:
+          row.amountChangePct ??
+          (index > 0 &&
+          row.totalAmountYuan != null &&
+          sourceRows[index - 1]?.totalAmountYuan != null
+            ? ((Number(row.totalAmountYuan) - Number(sourceRows[index - 1].totalAmountYuan)) /
+                Number(sourceRows[index - 1].totalAmountYuan)) *
+              100
+            : null),
+      }))
+      .sort((a, b) => b.observedAt.localeCompare(a.observedAt));
+    return rows;
+  });
+  const marketAmountPageCount = computed(() =>
+    marketAmountData.value ? Math.max(1, Math.ceil(marketAmountData.value.total / 100)) : 1,
   );
+  const pagedMarketAmountRows = computed(() => marketAmountRows.value);
+  async function loadMarketAmountHistory() {
+    marketAmountLoading.value = true;
+    try {
+      marketAmountData.value = await getAShareMarketHistory(marketAmountPage.value, 100);
+      marketAmountError.value = '';
+    } catch (error) {
+      marketAmountError.value = error instanceof Error ? error.message : '全A成交额历史加载失败';
+    } finally {
+      marketAmountLoading.value = false;
+    }
+  }
+  watch(marketAmountHistoryOpen, (open) => {
+    if (open) void loadMarketAmountHistory();
+  });
+  watch(marketAmountPage, () => {
+    if (marketAmountHistoryOpen.value) void loadMarketAmountHistory();
+  });
   const latestHistory = computed(() => allHistoryRows.value.at(-1) || null);
   const hotStockCount = computed(() => turnoverData.value?.highTurnoverCount ?? null);
   const updatedAt = computed(() => props.dashboard?.generatedAt || '');
@@ -727,7 +789,15 @@
 
   .overview-card {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    container: ashare-overview / inline-size;
     gap: 14px;
+  }
+
+  .overview-card > *,
+  .panel {
+    min-width: 0;
   }
 
   .overview-header,
@@ -1301,6 +1371,30 @@
     white-space: nowrap;
   }
 
+  .market-amount-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+    color: var(--strategy-text-3);
+    font-size: 11px;
+  }
+
+  .market-amount-pagination button {
+    padding: 4px 8px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 6px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-2);
+    cursor: pointer;
+  }
+
+  .market-amount-pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   table {
     width: 100%;
     min-width: 560px;
@@ -1472,11 +1566,11 @@
 
   @media (max-width: 900px) {
     .overview-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .emotion-detail {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .metric-grid {
@@ -1484,21 +1578,35 @@
     }
 
     .rotation-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .history-charts {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
   @media (max-width: 560px) {
+    .ladder-trigger {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .ladder-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .panel-title {
+      flex-wrap: wrap;
+    }
+
     .metric-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .overview-meta-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .overview-header {

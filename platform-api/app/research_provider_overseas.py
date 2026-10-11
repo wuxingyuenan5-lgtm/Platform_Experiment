@@ -881,23 +881,30 @@ def fetch_deribit_dvol(days: int = 90) -> dict[str, Any]:
     """
     end_ms = int(datetime.now().timestamp() * 1000)
     start_ms = end_ms - days * 86_400_000
-    res = _deribit_get(
-        "get_volatility_index_data",
-        {
-            "currency": "BTC",
-            "start_timestamp": start_ms,
-            "end_timestamp": end_ms,
-            "resolution": 3600,
-        },
-    )["result"]
-    history: list[dict[str, Any]] = []
-    latest: float | None = None
-    for point in res.get("data", []):
-        ts = point[0]
-        v = point[1]
-        if v is None:
-            continue
-        row = {"ts": int(ts), "value": round(float(v), 2)}
-        history.append(row)
-        latest = float(v)
-    return {"latest": latest, "history": history}
+    values: dict[int, float] = {}
+    for _ in range(100):
+        res = _deribit_get(
+            "get_volatility_index_data",
+            {"currency": "BTC", "start_timestamp": start_ms,
+             "end_timestamp": end_ms, "resolution": 3600},
+        )["result"]
+        for point in res["data"]:
+            ts, _, _, _, value = point
+            if value is None:
+                continue
+            value = float(value)
+            if not math.isfinite(value) or value < 0:
+                raise ValueError("invalid DVOL close")
+            if ts in values and values[ts] != value:
+                raise ValueError("conflicting DVOL candle")
+            values[int(ts)] = value
+        continuation = res.get("continuation")
+        if continuation is None:
+            break
+        if type(continuation) is not int or not start_ms <= continuation < end_ms:
+            raise ValueError("DVOL pagination did not advance")
+        end_ms = continuation
+    else:
+        raise ValueError("DVOL pagination limit exceeded")
+    history = [{"ts": ts, "value": value} for ts, value in sorted(values.items())]
+    return {"latest": history[-1]["value"] if history else None, "history": history}

@@ -239,6 +239,311 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _conflict_evidence(record: Any, fields: tuple[str, ...]) -> str:
+    evidence: dict[str, Any] = {}
+    for field in fields:
+        value = record[field]
+        if field == "payload_json":
+            try:
+                value = json.loads(value)
+            except (TypeError, json.JSONDecodeError):
+                pass
+            evidence["payload"] = value
+        else:
+            evidence[field] = _jsonable(value)
+    return json.dumps(evidence, ensure_ascii=False, sort_keys=True)
+
+
+def write_market_archive(row: dict[str, Any], *, db: sqlite3.Connection | None = None) -> str:
+    """Idempotently persist one source market aggregate; never overwrite conflicts."""
+    universe = str(row.get("universe_key") or row.get("dataset"))
+    trade_date = str(row["trade_date"])
+    payload = _jsonable(row.get("payload", row))
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    values = (
+        universe,
+        trade_date,
+        str(row["amount_yuan"]) if row.get("amount_yuan") is not None else None,
+        row.get("up"),
+        row.get("down"),
+        row.get("flat"),
+        row.get("limit_up"),
+        row.get("limit_down"),
+        str(row["market_breadth_pct"]) if row.get("market_breadth_pct") is not None else None,
+        str(row.get("source_name") or row.get("source") or ""),
+        row.get("definition_version"),
+        encoded,
+        row.get("quality_status", "ready"),
+        _now(),
+    )
+    with nullcontext(db) if db is not None else connection() as target:
+        existing = target.execute(
+            "SELECT * FROM research_a_share_market_archive WHERE universe_key=? AND trade_date=?",
+            (universe, trade_date),
+        ).fetchone()
+        if existing is None:
+            target.execute(
+                """INSERT INTO research_a_share_market_archive
+                (universe_key,trade_date,amount_yuan,up,down,flat,limit_up,limit_down,
+                 market_breadth_pct,source_name,definition_version,payload_json,
+                 quality_status,imported_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                values,
+            )
+            return "inserted"
+        incoming = dict(zip(existing.keys(), values, strict=True))
+        if all(
+            existing[key] == incoming[key]
+            for key in (
+                "amount_yuan",
+                "up",
+                "down",
+                "flat",
+                "limit_up",
+                "limit_down",
+                "market_breadth_pct",
+                "source_name",
+                "definition_version",
+                "payload_json",
+                "quality_status",
+            )
+        ):
+            return "skipped"
+        target.execute(
+            """INSERT OR IGNORE INTO research_a_share_archive_conflicts
+            (table_name,natural_key,existing_payload_json,incoming_payload_json,source_name,reason,observed_at)
+            VALUES (?,?,?,?,?,?,?)""",
+            (
+                "market",
+                f"{universe}:{trade_date}",
+                _conflict_evidence(
+                    existing,
+                    (
+                        "amount_yuan",
+                        "up",
+                        "down",
+                        "flat",
+                        "limit_up",
+                        "limit_down",
+                        "market_breadth_pct",
+                        "source_name",
+                        "definition_version",
+                        "payload_json",
+                        "quality_status",
+                    ),
+                ),
+                _conflict_evidence(
+                    incoming,
+                    (
+                        "amount_yuan",
+                        "up",
+                        "down",
+                        "flat",
+                        "limit_up",
+                        "limit_down",
+                        "market_breadth_pct",
+                        "source_name",
+                        "definition_version",
+                        "payload_json",
+                        "quality_status",
+                    ),
+                ),
+                values[9],
+                "natural_key_conflict",
+                _now(),
+            ),
+        )
+        return "conflict"
+
+
+def write_price_archive(row: dict[str, Any], *, db: sqlite3.Connection | None = None) -> str:
+    """Idempotently persist an index/industry close and record immutable conflicts."""
+    code = str(row["instrument_code"])
+    trade_date = str(row.get("trade_date") or row.get("observed_at"))[:10]
+    source = str(row.get("source_name") or row.get("source") or "")
+    definition = str(row.get("definition_version") or row.get("definition_level") or "")
+    industry_level = str(row.get("industry_level") or "")
+    close = row.get("close", row.get("price"))
+    encoded = json.dumps(_jsonable(row.get("payload", row)), ensure_ascii=False, sort_keys=True)
+    values = (
+        code,
+        trade_date,
+        source,
+        definition,
+        industry_level,
+        str(close) if close is not None else None,
+        encoded,
+        row.get("quality_status", "ready"),
+        _now(),
+    )
+    with nullcontext(db) if db is not None else connection() as target:
+        existing = target.execute(
+            """SELECT * FROM research_a_share_price_history
+            WHERE instrument_code=? AND trade_date=? AND source_name=?
+              AND definition_version=? AND industry_level=?""",
+            (code, trade_date, source, definition, industry_level),
+        ).fetchone()
+        if existing is None:
+            target.execute(
+                """INSERT INTO research_a_share_price_history
+                (instrument_code,trade_date,source_name,definition_version,industry_level,
+                 close,payload_json,quality_status,imported_at) VALUES (?,?,?,?,?,?,?,?,?)""",
+                values,
+            )
+            return "inserted"
+        try:
+            same_close = (
+                existing["close"] is None
+                and values[5] is None
+                or existing["close"] is not None
+                and values[5] is not None
+                and Decimal(str(existing["close"])) == Decimal(str(values[5]))
+            )
+        except InvalidOperation:
+            same_close = existing["close"] == values[5]
+        # The first accepted raw payload remains the evidence record. A later
+        # observation with the same natural key and numeric close is idempotent;
+        # only a changed value or quality state is a conflict.
+        if same_close and existing["quality_status"] == values[7]:
+            return "skipped"
+        target.execute(
+            """INSERT OR IGNORE INTO research_a_share_archive_conflicts
+            (table_name,natural_key,existing_payload_json,incoming_payload_json,source_name,reason,observed_at)
+            VALUES (?,?,?,?,?,?,?)""",
+            (
+                "price",
+                f"{code}:{trade_date}:{source}:{definition}:{industry_level}",
+                _conflict_evidence(
+                    existing,
+                    (
+                        "close",
+                        "source_name",
+                        "definition_version",
+                        "industry_level",
+                        "payload_json",
+                        "quality_status",
+                    ),
+                ),
+                _conflict_evidence(
+                    dict(zip(existing.keys(), values, strict=True)),
+                    (
+                        "close",
+                        "source_name",
+                        "definition_version",
+                        "industry_level",
+                        "payload_json",
+                        "quality_status",
+                    ),
+                ),
+                source,
+                "natural_key_conflict",
+                _now(),
+            ),
+        )
+        return "conflict"
+
+
+def archive_a_share_audit() -> dict[str, Any]:
+    with connection() as db:
+        result: dict[str, Any] = {"market": {}, "prices": {}}
+        fields = ("amount_yuan", "up", "down", "flat", "limit_up", "limit_down")
+        for universe_row in db.execute(
+            "SELECT DISTINCT universe_key FROM research_a_share_market_archive"
+        ).fetchall():
+            universe = str(universe_row["universe_key"])
+            coverage: dict[str, Any] = {}
+            for field in fields:
+                row = db.execute(
+                    f"""SELECT MIN(CASE WHEN {field} IS NOT NULL THEN trade_date END) earliest,
+                    MAX(CASE WHEN {field} IS NOT NULL THEN trade_date END) latest,
+                    SUM(CASE WHEN {field} IS NOT NULL THEN 1 ELSE 0 END) non_empty,
+                    SUM(CASE WHEN {field} IS NULL THEN 1 ELSE 0 END) missing
+                    FROM research_a_share_market_archive WHERE universe_key=?""",
+                    (universe,),
+                ).fetchone()
+                coverage[field] = dict(row)
+            result["market"][universe] = coverage
+        for row in db.execute(
+            """SELECT instrument_code,MIN(trade_date) earliest,MAX(trade_date) latest,
+            COUNT(*) total,SUM(CASE WHEN close IS NOT NULL THEN 1 ELSE 0 END) non_empty,
+            SUM(CASE WHEN close IS NULL THEN 1 ELSE 0 END) missing
+            FROM research_a_share_price_history GROUP BY instrument_code"""
+        ).fetchall():
+            item = dict(row)
+            result["prices"][item.pop("instrument_code")] = item
+        result["conflicts"] = db.execute(
+            "SELECT COUNT(*) AS count FROM research_a_share_archive_conflicts"
+        ).fetchone()["count"]
+    return result
+
+
+def read_market_amount_page(page: int = 1, page_size: int = 100) -> dict[str, Any]:
+    page = max(1, int(page))
+    page_size = min(500, max(1, int(page_size)))
+    with connection() as db:
+        total = db.execute(
+            "SELECT COUNT(*) AS n FROM research_a_share_market_archive "
+            "WHERE universe_key='all_a' AND quality_status <> 'conflict'"
+        ).fetchone()["n"]
+        rows = db.execute(
+            """SELECT trade_date,amount_yuan,source_name FROM research_a_share_market_archive
+            WHERE universe_key='all_a' AND quality_status <> 'conflict'
+            ORDER BY trade_date DESC LIMIT ? OFFSET ?""",
+            (page_size, (page - 1) * page_size),
+        ).fetchall()
+        coverage = db.execute(
+            "SELECT MIN(trade_date) AS start, MAX(trade_date) AS end "
+            "FROM research_a_share_market_archive WHERE universe_key='all_a' "
+            "AND quality_status <> 'conflict'"
+        ).fetchone()
+        all_rows = db.execute(
+            "SELECT trade_date,amount_yuan FROM research_a_share_market_archive "
+            "WHERE universe_key='all_a' AND quality_status <> 'conflict' ORDER BY trade_date"
+        ).fetchall()
+    previous = None
+    changes: dict[str, Decimal | None] = {}
+    for row in all_rows:
+        current = Decimal(str(row["amount_yuan"])) if row["amount_yuan"] is not None else None
+        changes[row["trade_date"]] = (
+            (current / previous - Decimal("1")) * 100
+            if current is not None and previous and previous > 0
+            else None
+        )
+        previous = current
+    return {
+        "rows": [
+            {
+                "observedAt": row["trade_date"],
+                "totalAmountYuan": row["amount_yuan"],
+                "amountChangePct": changes.get(row["trade_date"]),
+                "source": _display_source(row["source_name"]),
+            }
+            for row in rows
+        ],
+        "coverageStart": coverage["start"],
+        "coverageEnd": coverage["end"],
+        "tradingDays": total,
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+    }
+
+
+def _display_source(value: str | None) -> str | None:
+    source = str(value or "").strip()
+    lowered = source.lower()
+    if not source:
+        return None
+    if "choice" in lowered:
+        return "Choice（历史聚合）"
+    if "eastmoney" in lowered or "东方财富" in source:
+        return "东方财富（延迟行情）"
+    if "legu" in lowered or "乐咕" in source:
+        return "乐咕"
+    if "tencent" in lowered or "腾讯" in source:
+        return "腾讯指数日线"
+    return source
+
+
 def start_refresh(run_id: str, target_trade_date: str | None) -> None:
     with connection() as db:
         db.execute(
@@ -504,6 +809,90 @@ def read_dashboard() -> AShareDashboardResponse | None:
             }
         )
         previous_amount = amount
+    # Imported archives own their explicit universes. The first-screen chart
+    # receives only dates needed by SH/SZ structure or CSI 300, while the full
+    # all-A amount history remains on the paginated endpoint.
+    with connection() as db:
+        archive_rows = db.execute(
+            "SELECT * FROM research_a_share_market_archive ORDER BY trade_date"
+        ).fetchall()
+        price_rows = db.execute(
+            """SELECT instrument_code,trade_date,close,source_name,quality_status
+            FROM research_a_share_price_history
+            WHERE instrument_code IN ('000300.SH','801102.SWI','BK0448','BK1106')
+            ORDER BY trade_date,source_name"""
+        ).fetchall()
+    by_date = {str(item.get("observedAt")): item for item in market_history}
+    for row in archive_rows:
+        if row["quality_status"] == "conflict" or row["universe_key"] != "sh_sz_a":
+            continue
+        if row["up"] is None and row["down"] is None:
+            continue
+        item = by_date.setdefault(row["trade_date"], {"observedAt": row["trade_date"]})
+        item.update(
+            {
+                "up": row["up"],
+                "down": row["down"],
+                "flat": row["flat"],
+                "limitUp": row["limit_up"],
+                "limitDown": row["limit_down"],
+                "marketBreadthPct": row["market_breadth_pct"],
+            }
+        )
+
+    price_candidates: dict[tuple[str, str], list[sqlite3.Row]] = {}
+    for row in price_rows:
+        price_candidates.setdefault((row["instrument_code"], row["trade_date"]), []).append(row)
+
+    def _valid_price(code: str, trade_date: str) -> str | None:
+        candidates = price_candidates.get((code, trade_date), [])
+        if any(row["quality_status"] == "conflict" for row in candidates):
+            return None
+        closes: set[Decimal] = set()
+        for row in candidates:
+            if row["close"] is None:
+                continue
+            try:
+                closes.add(Decimal(str(row["close"])))
+            except InvalidOperation:
+                return None
+        return str(next(iter(closes))) if len(closes) == 1 else None
+
+    for (code, trade_date), _candidates in price_candidates.items():
+        if code == "000300.SH":
+            by_date.setdefault(trade_date, {"observedAt": trade_date})["csi300Close"] = (
+                _valid_price(code, trade_date)
+            )
+
+    for row in archive_rows:
+        if row["universe_key"] == "all_a" and row["trade_date"] in by_date:
+            item = by_date[row["trade_date"]]
+            item["totalAmountYuan"] = row["amount_yuan"]
+            item["source"] = _display_source(row["source_name"])
+
+    market_history = [by_date[key] for key in sorted(by_date)]
+
+    if crowding_row is not None and isinstance(values.get("crowding", {}).get("data"), dict):
+        crowding_data = values["crowding"]["data"]
+        communication_history = []
+        for point in crowding_data.get("history", []):
+            item = dict(point)
+            targets = dict(item.get("targets") or {})
+            communication = dict(targets.get("通信设备") or {})
+            communication["price"] = _valid_price("801102.SWI", str(item.get("date")))
+            communication["priceIndexCode"] = "801102.SWI"
+            targets["通信设备"] = communication
+            item["targets"] = targets
+            communication_history.append(item)
+        crowding_data["history"] = communication_history
+        crowding_data["innovationHistory"] = [
+            {
+                **point,
+                "price": _valid_price("BK1106", str(point.get("date"))),
+                "priceBoardCode": "BK1106",
+            }
+            for point in crowding_data.get("innovationHistory", [])
+        ]
     latest_run = read_refresh_status()
     if latest_run and latest_run["status"] == "error":
         for value in values.values():

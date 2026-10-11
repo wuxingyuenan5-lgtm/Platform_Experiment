@@ -26,6 +26,8 @@ from app.research_a_share_repository import (
     read_tracked_codes,
     start_refresh,
     summarize_stock_pool,
+    write_market_archive,
+    write_price_archive,
 )
 from app.research_data_schemas import (
     AShareBreadthSnapshot,
@@ -33,11 +35,45 @@ from app.research_data_schemas import (
     AShareIndexSnapshot,
 )
 from app.research_provider_a_share import INDEX_DEFINITIONS
+from app.research_provider_choice import choice_csd_close
 from app.research_service import _PROVIDER, collect_a_share_dashboard
+from app.research_write_lock import RESEARCH_DB_WRITE_LOCK
 
 _REFRESH_LOCK = asyncio.Lock()
 _CHINA = ZoneInfo("Asia/Shanghai")
 _LOGGER = logging.getLogger(__name__)
+
+
+async def _write_market_archive_locked(row: dict[str, Any]) -> str:
+    async with RESEARCH_DB_WRITE_LOCK:
+        return await asyncio.to_thread(write_market_archive, row)
+
+
+async def _write_price_archive_locked(row: dict[str, Any]) -> str:
+    async with RESEARCH_DB_WRITE_LOCK:
+        return await asyncio.to_thread(write_price_archive, row)
+
+
+async def _start_refresh_locked(run_id: str, target_trade_date: str | None) -> None:
+    async with RESEARCH_DB_WRITE_LOCK:
+        await asyncio.to_thread(start_refresh, run_id, target_trade_date)
+
+
+async def _finish_refresh_locked(
+    run_id: str,
+    status: str,
+    *,
+    error_code: str | None = None,
+    message: str | None = None,
+) -> None:
+    async with RESEARCH_DB_WRITE_LOCK:
+        await asyncio.to_thread(
+            finish_refresh,
+            run_id,
+            status,
+            error_code=error_code,
+            message=message,
+        )
 
 
 def _history_return(points: list[AShareIndexHistoryPoint], sessions: int) -> float | None:
@@ -57,7 +93,7 @@ def _history_ytd(points: list[AShareIndexHistoryPoint]) -> float | None:
 
 def _scheduled_refresh_due(now: datetime | None = None) -> bool:
     local = (now or datetime.now(UTC)).astimezone(_CHINA)
-    if local.time() < time(15, 5):
+    if local.time() < time(15, 10):
         return False
     try:
         with read_only_connection() as db:
@@ -107,6 +143,59 @@ def _breadth(spots: Any, emotion: Any) -> AShareBreadthSnapshot | Exception:
         trade_date=date.fromisoformat(trade_date) if trade_date else None,
         total_amount_yuan=sum((row.turnover_yuan for row in spots), Decimal("0")),
     )
+
+
+def _daily_market_archive_row(
+    universe_key: str,
+    trade_date: str,
+    rows: list[Any],
+    emotion: Any,
+) -> dict[str, Any]:
+    changes = [row.return_pct for row in rows if row.return_pct is not None]
+    up = sum(value > 0 for value in changes)
+    down = sum(value < 0 for value in changes)
+    flat = sum(value == 0 for value in changes)
+    total = up + down + flat
+    aligned_emotion = (
+        universe_key == "all_a"
+        and not isinstance(emotion, BaseException)
+        and emotion.trade_date
+        and str(emotion.trade_date) == trade_date
+    )
+    limit_up = emotion.limit_up_count if aligned_emotion else None
+    limit_down = emotion.limit_down_count if aligned_emotion else None
+    payload = {
+        "date": trade_date,
+        "universe": universe_key,
+        "advance": up,
+        "decline": down,
+        "flat": flat,
+        "limit_up": limit_up,
+        "limit_down": limit_down,
+        "total_amount_yuan": sum((row.turnover_yuan for row in rows), Decimal("0")),
+        "market_breadth_pct": (
+            Decimal(100) * Decimal(up - down) / Decimal(total) if total else None
+        ),
+    }
+    return {
+        "universe_key": universe_key,
+        "trade_date": trade_date,
+        "amount_yuan": payload["total_amount_yuan"],
+        "up": up,
+        "down": down,
+        "flat": flat,
+        "limit_up": limit_up,
+        "limit_down": limit_down,
+        "market_breadth_pct": payload["market_breadth_pct"],
+        "source_name": (
+            "东方财富全市场延迟行情 / 涨跌停池"
+            if universe_key == "all_a"
+            else "东方财富沪深A延迟行情"
+        ),
+        "definition_version": "platform-daily-v1",
+        "payload": payload,
+        "quality_status": ("ready" if universe_key != "all_a" or aligned_emotion else "partial"),
+    }
 
 
 def _crowding(
@@ -216,9 +305,7 @@ def _crowding(
             "turnoverPct": float(innovation["turnover_pct"]),
             "source": innovation.get("source"),
         }
-        innovation_history = [
-            row for row in innovation_history if row.get("date") != trade_date
-        ]
+        innovation_history = [row for row in innovation_history if row.get("date") != trade_date]
         innovation_history = sorted(
             [*innovation_history, innovation_row], key=lambda row: row["date"]
         )[-2000:]
@@ -251,39 +338,35 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
         return "not_due"
     today = datetime.now(_CHINA).date().isoformat()
     latest = read_refresh_status()
-    if (
-        not force
-        and latest
-        and latest["status"] == "ready"
-        and latest["targetTradeDate"] == today
-    ):
+    if not force and latest and latest["status"] == "ready" and latest["targetTradeDate"] == today:
         return "up_to_date"
     if _REFRESH_LOCK.locked():
         return "busy"
     async with _REFRESH_LOCK:
         run_id = f"a-share-{uuid4().hex}"
-        start_refresh(run_id, None)
+        await _start_refresh_locked(run_id, None)
         try:
             codes = read_tracked_codes()
             previous = read_stock_pool(codes)
             prior_by_code = {row["code"]: row for row in previous["focusStocks"]}
             # Keep heterogeneous gather groups within its typed tuple overloads.
-            (indices, spots, memberships, emotion), (sector_quotes, innovation, histories) = (
-                await asyncio.gather(
-                    asyncio.gather(
-                        _collect(_PROVIDER.index_snapshots(), 180),
-                        _collect(_PROVIDER.a_share_spot(), 180),
-                        _collect(_PROVIDER.shenwan_memberships()),
-                        _collect(_PROVIDER.short_term_emotion()),
-                        return_exceptions=True,
-                    ),
-                    asyncio.gather(
-                        _collect(_PROVIDER.sector_crowding_snapshot()),
-                        _collect(_PROVIDER.innovation_drug_snapshot()),
-                        _collect(_PROVIDER.stock_daily_histories(codes), 240),
-                        return_exceptions=True,
-                    ),
-                )
+            (
+                (indices, spots, memberships, emotion),
+                (sector_quotes, innovation, histories),
+            ) = await asyncio.gather(
+                asyncio.gather(
+                    _collect(_PROVIDER.index_snapshots(), 180),
+                    _collect(_PROVIDER.a_share_spot(), 180),
+                    _collect(_PROVIDER.shenwan_memberships()),
+                    _collect(_PROVIDER.short_term_emotion()),
+                    return_exceptions=True,
+                ),
+                asyncio.gather(
+                    _collect(_PROVIDER.sector_crowding_snapshot()),
+                    _collect(_PROVIDER.innovation_drug_snapshot()),
+                    _collect(_PROVIDER.stock_daily_histories(codes), 240),
+                    return_exceptions=True,
+                ),
             )
             breadth = _breadth(spots, emotion)
             dashboard = await collect_a_share_dashboard(
@@ -331,6 +414,100 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 dashboard.breadth.meta.status = "partial"
                 dashboard.breadth.meta.message = "涨跌分布与涨跌停池未取得同一交易日的完整数据"
             _crowding(dashboard, trade_date, spots, sector_quotes, innovation)
+            choice_settings = get_settings()
+            choice_enabled = choice_settings.choice_csd_enabled
+            choice_communication_close = (
+                await asyncio.to_thread(
+                    choice_csd_close,
+                    trade_date,
+                    sdk_root=choice_settings.choice_sdk_root,
+                    timeout_seconds=choice_settings.choice_csd_timeout_seconds,
+                )
+                if trade_date and choice_enabled
+                else None
+            )
+            if trade_date and isinstance(spots, list):
+                try:
+                    all_a_archive = _daily_market_archive_row("all_a", trade_date, spots, emotion)
+                    # Do not consume the immutable natural key with a partial row;
+                    # the next retry may still obtain the matching limit pool.
+                    if all_a_archive["quality_status"] == "ready":
+                        await _write_market_archive_locked(all_a_archive)
+                    sh_sz_rows = [row for row in spots if row.security_code[:1] in {"0", "3", "6"}]
+                    await _write_market_archive_locked(
+                        _daily_market_archive_row("sh_sz_a", trade_date, sh_sz_rows, emotion)
+                    )
+                except Exception:
+                    _LOGGER.warning("a_share_market_archive_write_failed", exc_info=True)
+
+            if isinstance(indices, list):
+                for item in indices:
+                    if item.code == "000300" and item.history:
+                        point = item.history[-1]
+                        try:
+                            await _write_price_archive_locked(
+                                {
+                                    "instrument_code": "000300.SH",
+                                    "trade_date": point.observed_at,
+                                    "close": point.close,
+                                    "source_name": dashboard.market_detail.meta.source,
+                                    "definition_version": "close-v1",
+                                    "payload": point,
+                                }
+                            )
+                        except Exception:
+                            _LOGGER.warning("a_share_benchmark_archive_write_failed", exc_info=True)
+            if isinstance(sector_quotes, list):
+                for quote in sector_quotes:
+                    if quote.get("board_code") == "BK0448" and quote.get("close") is not None:
+                        try:
+                            await _write_price_archive_locked(
+                                {
+                                    "instrument_code": "BK0448",
+                                    "trade_date": quote["observed_at"],
+                                    "close": quote["close"],
+                                    "source_name": quote["source"],
+                                    "definition_version": "exact-board-price-v1",
+                                    "industry_level": "eastmoney-board",
+                                    "payload": quote,
+                                }
+                            )
+                        except Exception:
+                            _LOGGER.warning("a_share_bk0448_archive_write_failed", exc_info=True)
+            if trade_date and choice_communication_close is not None:
+                try:
+                    await _write_price_archive_locked(
+                        {
+                            "instrument_code": "801102.SWI",
+                            "trade_date": trade_date,
+                            "close": choice_communication_close,
+                            "source_name": "choice-csd-close-801102.SWI",
+                            "definition_version": "choice-csd-daily-close-v1",
+                            "industry_level": "swi-l1",
+                            "payload": {
+                                "instrumentCode": "801102.SWI",
+                                "tradeDate": trade_date,
+                                "close": choice_communication_close,
+                            },
+                        }
+                    )
+                except Exception:
+                    _LOGGER.warning("a_share_choice_archive_write_failed", exc_info=True)
+            if isinstance(innovation, dict) and innovation.get("close") is not None:
+                try:
+                    await _write_price_archive_locked(
+                        {
+                            "instrument_code": "BK1106",
+                            "trade_date": innovation["observed_at"],
+                            "close": innovation["close"],
+                            "source_name": innovation["source"],
+                            "definition_version": "innovation-drug-price-v1",
+                            "industry_level": "eastmoney-board",
+                            "payload": innovation,
+                        }
+                    )
+                except Exception:
+                    _LOGGER.warning("a_share_bk1106_archive_write_failed", exc_info=True)
             member_by_code = (
                 {row.security_code: row for row in memberships}
                 if isinstance(memberships, list)
@@ -497,24 +674,36 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 if pool_ready
                 and trade_date
                 and all(module.meta.status == "ready" for module in modules)
+                and (not choice_enabled or choice_communication_close is not None)
                 else "partial"
             )
             if not any(module.data for module in modules) and not quotes:
                 raise RuntimeError("本次采集未获得有效市场数据")
             missing = sum(row["status"] != "ready" for row in stock_rows)
-            publish_refresh(
-                run_id,
-                dashboard,
-                pool=pool,
-                datasets=datasets,
-                histories=history_sets,
-                trade_date=trade_date,
-                status=status,
-                message=f"股票池{len(stock_rows)}只，{missing}只数据不完整" if missing else None,
+            refresh_message = (
+                f"股票池{len(stock_rows)}只，{missing}只数据不完整" if missing else None
             )
+            if choice_enabled and choice_communication_close is None:
+                refresh_message = (
+                    f"{refresh_message}；Choice CSD未取得801102.SWI收盘价"
+                    if refresh_message
+                    else "Choice CSD未取得801102.SWI收盘价"
+                )
+            async with RESEARCH_DB_WRITE_LOCK:
+                await asyncio.to_thread(
+                    publish_refresh,
+                    run_id,
+                    dashboard,
+                    pool=pool,
+                    datasets=datasets,
+                    histories=history_sets,
+                    trade_date=trade_date,
+                    status=status,
+                    message=refresh_message,
+                )
             return status
         except asyncio.CancelledError:
-            finish_refresh(
+            await _finish_refresh_locked(
                 run_id,
                 "error",
                 error_code="refresh_interrupted",
@@ -522,7 +711,12 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             )
             raise
         except Exception as exc:
-            finish_refresh(run_id, "error", error_code=type(exc).__name__, message=str(exc)[:500])
+            await _finish_refresh_locked(
+                run_id,
+                "error",
+                error_code=type(exc).__name__,
+                message=str(exc)[:500],
+            )
             return "error"
 
 

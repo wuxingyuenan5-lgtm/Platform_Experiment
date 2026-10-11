@@ -97,16 +97,9 @@ def _localize_title(title: str, category: str) -> str:
         candidate = {"François Baroin": "弗朗索瓦·巴鲁安"}.get(match.group(1), match.group(1))
         return f"{candidate}将赢得2027年法国总统大选吗？"
 
-    # Keep unknown additions readable and Chinese rather than leaking an
-    # English provider title into the product.  The original remains in the
-    # separate originalLabel field for audit and source comparison.
-    category_label = {
-        "monetary_policy": "货币政策",
-        "macro": "宏观经济",
-        "geopolitics": "地缘政治",
-        "election": "选举与政策",
-    }[category]
-    return f"{category_label}事件（市场原题见来源）"
+    # Preserve the contract's subject, outcome and deadline when no verified
+    # translation exists. Category-only titles make distinct markets identical.
+    return title
 
 
 def _number(value: Any) -> float | None:
