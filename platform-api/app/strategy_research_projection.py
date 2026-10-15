@@ -92,11 +92,11 @@ def funding_basis_status():
 
 
 def project_candle_next():
-    """Project closed BTC/XAUT candles without waiting on spread replay.
+    """Project shared closed minute/daily candles without waiting on spread replay.
 
-    The strategy archive also contains high-volume order-book events.  The
-    hedge-board cumulative producer only needs the already-derived one-minute
-    candles, so it gets a small independent cursor and can stay fresh while
+    The strategy archive also contains high-volume order-book events. The
+    hedge-board producers need derived candles, so they share a small
+    independent cursor and can stay fresh while
     the full spread projection catches up.
     """
     with connection() as db:
@@ -137,15 +137,23 @@ def project_candle_next():
         if (
             row.get("priceType") != "trade"
             or row.get("quality")
-            or int(row.get("intervalMs", 0)) != 60000
-            or row.get("symbol") not in {"BTCUSDT", "XAUTUSDT"}
-            or row.get("category") != "linear"
+            or not (
+                (
+                    int(row.get("intervalMs", 0)) == 60000
+                    and row.get("symbol") in {"BTCUSDT", "XAUTUSDT"}
+                    and row.get("category") in {"linear", "spot"}
+                )
+                or (
+                    int(row.get("intervalMs", 0)) == 86400000
+                    and row.get("symbol") in {"BTCUSDT", "ETHUSDT"}
+                    and row.get("category") == "spot"
+                )
+            )
         ):
             continue
         entity = f"{row['symbol']}:{row['category']}:{row['priceType']}"
-        values[("historical_candle", entity, int(row["closeTimeMs"]))] = json.dumps(
-            row, separators=(",", ":")
-        )
+        kind = "daily_candle" if int(row["intervalMs"]) == 86400000 else "historical_candle"
+        values[(kind, entity, int(row["closeTimeMs"]))] = json.dumps(row, separators=(",", ":"))
     with connection() as db:
         assert_sqlite_safe(db)
         if values:
@@ -194,8 +202,10 @@ def project_next():
         columns=["layer", "kind", "event_json"],
         # Raw order-book JSON is retained in the archive but is not an input
         # to this projection. Filter in Arrow before converting/decoding it.
-        filters=[[("layer", "=", "derived")],
-                 [("layer", "=", "raw"), ("kind", "=", "market_scan")]],
+        filters=[
+            [("layer", "=", "derived")],
+            [("layer", "=", "raw"), ("kind", "=", "market_scan")],
+        ],
     )
     rows = []
     market_scan_rows = []
@@ -229,6 +239,13 @@ def project_next():
     for r in rows:
         kind = r["kind"]
         if kind == "historical_candle":
+            if (
+                int(r["intervalMs"]) == 86400000
+                and not r.get("quality")
+                and r["priceType"] == "trade"
+                and r["category"] == "spot"
+            ):
+                put("daily_candle", r["symbol"] + ":spot:trade", r["closeTimeMs"], r)
             if int(r["intervalMs"]) == 60000 and not r.get("quality") and r["priceType"] == "trade":
                 entity = r["symbol"] + ":" + r["category"] + ":" + r["priceType"]
                 put(kind, entity, r["closeTimeMs"], r)
@@ -292,8 +309,7 @@ def project_next():
                 [*entities, lo, hi],
             ).fetchall()
         candles = {
-            (row["entity"], int(row["at_ms"])): json.loads(row["payload_json"])
-            for row in existing
+            (row["entity"], int(row["at_ms"])): json.loads(row["payload_json"]) for row in existing
         }
         candles.update(candle_payloads)
         for symbol_base, stamps in candle_stamps.items():
@@ -324,9 +340,7 @@ def project_next():
                         "timeMs": str(stamp),
                         "validDurationMs": 60000,
                         "quality": [],
-                        "ohlc": {
-                            "midSpread": {"close": str(linear_close - spot_close)}
-                        },
+                        "ohlc": {"midSpread": {"close": str(linear_close - spot_close)}},
                         "basisSource": "same_bucket_historical_closes",
                         "linearClose": str(linear_close),
                         "spotClose": str(spot_close),

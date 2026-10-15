@@ -416,3 +416,39 @@ def test_price_history_expands_backward_when_retention_window_grows(tmp_path):
     assert client.calls[0]["start"] == last_closed - 2 * 86400000 + INTERVAL_MS
     assert state["floor"] == client.calls[0]["start"]
     assert not state["complete"]
+
+
+def test_daily_spot_history_uses_own_cursor_closed_days_and_no_repeat(tmp_path):
+    from types import SimpleNamespace
+    from app.research_price_history import capture_prices
+
+    day = 86400000
+    calls, events = [], []
+    clock = 2000 * day + 12345
+
+    def get_kline(**kw):
+        calls.append(kw)
+        return {"retCode": 0, "result": {"list": [[str(kw["start"]), "1", "2", "1", "2"]]}}
+
+    def capture(*args, **kwargs):
+        events.append(args)
+        return 1
+
+    client = SimpleNamespace(
+        get_server_time=lambda: {"retCode": 0, "result": {"timeNano": str(clock * 1000000)}},
+        get_kline=get_kline,
+    )
+    spool = SimpleNamespace(root=tmp_path, error=None, durable_sequence=1, capture=capture)
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        state = capture_prices(client, spool, "spot", symbol, "trade", days=1200, interval="D")
+        assert not state["complete"]
+        assert calls[-1]["interval"] == "D" and calls[-1]["category"] == "spot"
+        assert calls[-1]["start"] % day == 0
+        state = capture_prices(client, spool, "spot", symbol, "trade", days=1200, interval="D")
+        assert state["complete"] and calls[-1]["end"] == 1999 * day
+        count = len(calls)
+        capture_prices(client, spool, "spot", symbol, "trade", days=1200, interval="D")
+        assert len(calls) == count
+        assert (tmp_path / f"price-spot-{symbol}-trade-1d.json").exists()
+    assert events[0][1] == "bybit:spot:BTCUSDT:trade:1d"
+    assert events[0][3]["intervalMs"] == str(day)

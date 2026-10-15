@@ -900,3 +900,59 @@ def test_read_routes_expose_status_field_for_stale_reporting() -> None:
     assert 'read_dataset_health' in source
     assert source.count('"status": health["status"]') >= 4
     assert source.count('"lastError": health["lastError"]') >= 4
+
+
+@pytest.mark.parametrize("asset", ["btc", "eth"])
+def test_etf_uses_shared_spot_exact_closed_days_and_ignores_legacy_contract(
+    overseas_db, seed_run, asset
+):
+    import json
+
+    seed_run("spot-test")
+    dataset = "crypto_etf_flow" if asset == "btc" else "crypto_eth_etf_flow"
+    repository.write_overseas_points(
+        "spot-test",
+        dataset,
+        [
+            ("2026-09-10", "__meta__", {"tickers": ["Total"], "coinUnit": asset.upper()}),
+            ("2026-09-09", "Total", {"flow": 1, "coinFlow": 999, "price": 999}),
+            ("2026-09-10", "Total", {"flow": 2, "coinFlow": 888, "price": 888}),
+        ],
+        source="fixture",
+    )
+    stamp = int(datetime(2026, 9, 10, tzinfo=UTC).timestamp() * 1000)
+    with connection() as db:
+        for kind, entity, at, close in [
+            ("daily_candle", f"{asset.upper()}USDT:spot:trade", stamp, "100"),
+            ("historical_candle", f"{asset.upper()}USDT:linear:trade", stamp + 86400000, "999"),
+            # A nearly closed day must not substitute for a missing exact close.
+            (
+                "historical_candle",
+                f"{asset.upper()}USDT:spot:trade",
+                stamp + 86400000 - 60000,
+                "200",
+            ),
+        ]:
+            db.execute(
+                "INSERT INTO research_strategy_projection VALUES(?,?,?,?)",
+                (kind, entity, at, json.dumps({"close": close, "quality": []})),
+            )
+    result = repository.read_etf_flow(asset=asset)
+    assert [d["price"] for d in result["days"]] == [100, None]
+    assert result["flowUnit"] == "US$m"  # no mixed-unit conversion on incomplete coverage
+    assert [d["totalFlow"] for d in result["days"]] == [1, 2]
+    assert result["priceSource"] == "Bybit spot UTC daily close (USDT)"
+    with connection() as db:
+        db.execute(
+            "INSERT INTO research_strategy_projection VALUES(?,?,?,?)",
+            (
+                "daily_candle",
+                f"{asset.upper()}USDT:spot:trade",
+                stamp + 86400000,
+                json.dumps({"close": "200", "quality": []}),
+            ),
+        )
+    result = repository.read_etf_flow(asset=asset)
+    assert [d["price"] for d in result["days"]] == [100, 200]
+    assert result["flowUnit"] == asset.upper()
+    assert [d["totalFlow"] for d in result["days"]] == [10000, 10000]

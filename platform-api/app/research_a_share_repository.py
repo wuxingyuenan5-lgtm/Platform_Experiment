@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.database import connection
+from app.a_share_research_policy import market_breadth_pct
 from app.research_data_schemas import (
     AShareDashboardResponse,
     AShareIndexHistoryPoint,
@@ -689,12 +690,7 @@ def write_dashboard(
                 "limitUp": breadth.limit_up,
                 "limitDown": breadth.limit_down,
                 "totalAmountYuan": breadth.total_amount_yuan,
-                "marketBreadthPct": round(
-                    100 * (breadth.up - breadth.down) / (breadth.up + breadth.down + breadth.flat),
-                    2,
-                )
-                if breadth.up + breadth.down + breadth.flat
-                else None,
+                "marketBreadthPct": market_breadth_pct(breadth.up, breadth.down),
             }
             db.execute(
                 """INSERT INTO research_a_share_history
@@ -871,6 +867,12 @@ def read_dashboard() -> AShareDashboardResponse | None:
             item["source"] = _display_source(row["source_name"])
 
     market_history = [by_date[key] for key in sorted(by_date)]
+    for item in market_history:
+        # Imported archives retain their native ratio, while platform-daily-v1
+        # retained a percent using a different denominator. Neither raw field
+        # defines the serving unit: derive the chart's consistent net advancing
+        # percentage from the same up/down counts, without rewriting evidence.
+        item["marketBreadthPct"] = market_breadth_pct(item.get("up"), item.get("down"))
 
     if crowding_row is not None and isinstance(values.get("crowding", {}).get("data"), dict):
         crowding_data = values["crowding"]["data"]

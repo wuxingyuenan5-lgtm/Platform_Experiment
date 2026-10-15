@@ -19,7 +19,7 @@ import calendar
 import math
 import re
 import ssl
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -33,8 +33,6 @@ _CME_SETTLEMENTS_URL = (
     "https://www.cmegroup.com/CmeWS/mvc/Settlements/Futures/Settlements/305/FUT"
 )
 _YAHOO_ZQ_SPARK_URL = "https://query1.finance.yahoo.com/v7/finance/spark"
-_YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
-_BYBIT_KLINE_URL = "https://api.bybit.com/v5/market/kline"
 _FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 
 # FOMC 会议结束日（决议公布日）。来源：
@@ -111,61 +109,6 @@ def _recent_business_day(d: date) -> date:
     while d.weekday() >= 5:
         d -= timedelta(days=1)
     return d
-
-
-def fetch_crypto_daily_prices(asset: str, start_date: str, end_date: str) -> dict[str, float]:
-    """Fetch daily BTC/ETH closes used only to convert ETF USD flows to coins."""
-    symbol = {"btc": "BTCUSDT", "eth": "ETHUSDT"}.get(asset.lower().strip())
-    if symbol is None:
-        raise ValueError(f"unsupported_crypto_asset:{asset}")
-    start = date.fromisoformat(start_date)
-    end = date.fromisoformat(end_date) + timedelta(days=1)
-    response = _get(
-        _BYBIT_KLINE_URL,
-        params={
-            "category": "linear",
-            "symbol": symbol,
-            "interval": "D",
-            "start": int(
-                datetime.combine(start, datetime.min.time(), tzinfo=UTC).timestamp() * 1000
-            ),
-            "end": int(datetime.combine(end, datetime.min.time(), tzinfo=UTC).timestamp() * 1000)
-            - 1,
-            "limit": 1000,
-        },
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if payload.get("retCode") != 0:
-        raise ResearchProviderError(f"bybit_daily_price_error:{payload.get('retCode')}")
-    prices: dict[str, float] = {}
-    for row in (payload.get("result") or {}).get("list", []):
-        if len(row) < 5:
-            continue
-        observed = datetime.fromtimestamp(int(row[0]) / 1000, tz=UTC).date()
-        prices[observed.isoformat()] = float(row[4])
-    if prices:
-        return prices
-    # Keep a read-only fallback for a temporary Bybit outage.
-    yahoo_response = _get(
-        f"{_YAHOO_CHART_URL}/{symbol.replace('USDT', '-USD')}",
-        params={
-            "period1": int(datetime.combine(start, datetime.min.time(), tzinfo=UTC).timestamp()),
-            "period2": int(datetime.combine(end, datetime.min.time(), tzinfo=UTC).timestamp()),
-            "interval": "1d",
-            "events": "history",
-            "includeAdjustedClose": "true",
-        },
-    )
-    yahoo_response.raise_for_status()
-    result = ((yahoo_response.json().get("chart") or {}).get("result") or [None])[0] or {}
-    timestamps = result.get("timestamp") or []
-    closes = (((result.get("indicators") or {}).get("quote") or [{}])[0]).get("close") or []
-    for timestamp, close in zip(timestamps, closes, strict=False):
-        if close is not None:
-            observed = datetime.fromtimestamp(int(timestamp), tz=UTC).date()
-            prices[observed.isoformat()] = float(close)
-    return prices
 
 
 def _fetch_fred_series(series_id: str) -> float:

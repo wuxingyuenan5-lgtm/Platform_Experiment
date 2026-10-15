@@ -1,192 +1,195 @@
 <template>
-  <article class="vibe-time-chart"
-    ><div ref="plotMeasure" class="vibe-chart-measure"></div>
-    <header class="vibe-chart-head"
-      ><h3>{{ title }}</h3
-      ><div class="range-buttons" role="group" :aria-label="`${title}历史范围`"
-        ><button
-          v-for="size in [60, 90, 0]"
-          :key="size"
+  <ChartExpand :title="title" @expanded-change="chartExpanded = $event">
+    <article class="vibe-time-chart"
+      ><div ref="plotMeasure" class="vibe-chart-measure"></div>
+      <header class="vibe-chart-head"
+        ><h3>{{ title }}</h3
+        ><div class="range-buttons" role="group" :aria-label="`${title}历史范围`"
+          ><button
+            v-for="size in [60, 90, 0]"
+            :key="size"
+            type="button"
+            :aria-pressed="preset === size"
+            :class="{ active: preset === size }"
+            @click="setPreset(size)"
+            >{{ size ? `近${size}日` : '全部' }}</button
+          ></div
+        ></header
+      >
+      <div class="vibe-chart-subtitle"
+        ><span>{{ yLabel }}</span
+        ><span v-if="rightLabel">右轴：{{ rightLabel }}</span></div
+      >
+      <div class="vibe-chart-legend">
+        <button
+          v-for="(item, index) in series"
+          :key="item.name"
           type="button"
-          :aria-pressed="preset === size"
-          :class="{ active: preset === size }"
-          @click="setPreset(size)"
-          >{{ size ? `近${size}日` : '全部' }}</button
-        ></div
-      ></header
-    >
-    <div class="vibe-chart-subtitle"
-      ><span>{{ yLabel }}</span
-      ><span v-if="rightLabel">右轴：{{ rightLabel }}</span></div
-    >
-    <div class="vibe-chart-legend">
-      <button
-        v-for="(item, index) in series"
-        :key="item.name"
-        type="button"
-        class="vibe-legend-btn"
-        :class="{ off: hidden.has(index) }"
-        :aria-pressed="!hidden.has(index)"
-        @click="toggle(index)"
-        ><i :style="{ background: item.color }"></i>{{ item.name }}</button
-      >
-    </div>
-    <div v-if="!hasValues" class="chart-empty">{{
-      visible.length ? '此范围暂无有效数据' : '点击图例选择要显示的数据'
-    }}</div>
-    <div v-else class="vibe-chart-stage">
-      <svg
-        class="vibe-chart-svg"
-        :viewBox="`0 0 ${plotWidth} ${plotHeight}`"
-        :style="{ height: `${plotHeight}px` }"
-        tabindex="0"
-        role="img"
-        :aria-label="`${title}，${shownDates[0]}至${shownDates.at(-1)}，左右方向键查看数值`"
-        @mousemove="onMove"
-        @mouseleave="hover = null"
-        @focus="hover = end"
-        @blur="hover = null"
-        @keydown.left.prevent="moveHover(-1)"
-        @keydown.right.prevent="moveHover(1)"
-        @wheel.prevent="onWheel"
-        @pointerdown="onPointerDown"
-        @pointermove="onPointerMove"
-        @pointerup="onPointerUp"
-        @pointercancel="onPointerUp"
-        @dblclick="onDoubleClick"
-      >
-        <defs>
-          <clipPath :id="clipId">
-            <rect :x="left" :y="top" :width="right - left" :height="bottom - top" />
-          </clipPath>
-        </defs>
-        <g v-for="tick in axisTicks('left')" :key="`left-${tick}`">
-          <line
-            :x1="left"
-            :y1="axisY('left', tick)"
-            :x2="right"
-            :y2="axisY('left', tick)"
-            class="chart-grid"
-          />
-          <text :x="left - 10" :y="axisY('left', tick) + 4" text-anchor="end">
-            {{ tickLabel('left', tick) }}
-          </text>
-        </g>
-        <g v-if="rightLabel">
-          <text
-            v-for="tick in axisTicks('right')"
-            :key="`right-${tick}`"
-            :x="right + 10"
-            :y="axisY('right', tick) + 4"
-          >
-            {{ tickLabel('right', tick) }}
-          </text>
-        </g>
-        <text
-          v-for="index in dateTicks"
-          :key="index"
-          :x="x(index)"
-          :y="plotHeight - 14"
-          :text-anchor="index === start ? 'start' : index === end ? 'end' : 'middle'"
+          class="vibe-legend-btn"
+          :class="{ off: hidden.has(index) }"
+          :aria-pressed="!hidden.has(index)"
+          @click="toggle(index)"
+          ><i :style="{ background: item.color }"></i>{{ item.name }}</button
         >
-          {{ dates[index]?.slice(5) }}
-        </text>
-        <g v-for="entry in visible" :key="entry.item.name" :clip-path="`url(#${clipId})`">
-          <template v-if="entry.item.type === 'bar'">
-            <rect
-              v-for="bar in bars(entry.item)"
-              :key="bar.index"
-              :x="bar.x"
-              :y="bar.y"
-              :width="bar.width"
-              :height="bar.height"
-              :fill="entry.item.color"
-              opacity="0.4"
-            />
-          </template>
-          <template v-else v-for="(segment, index) in segments(entry.item)" :key="index">
-            <path
-              v-if="entry.item.type === 'area'"
-              :d="areaPath(segment, entry.item)"
-              :fill="entry.item.color"
-              opacity="0.12"
-            />
-            <polyline
-              :points="segment.map((point) => `${point.x},${point.y}`).join(' ')"
-              :stroke="entry.item.color"
-              :stroke-width="entry.item.lineWidth || 2"
-              class="vibe-chart-line"
-            />
-          </template>
-        </g>
-        <line
-          v-if="hover != null"
-          :x1="x(hover)"
-          :x2="x(hover)"
-          :y1="top"
-          :y2="bottom"
-          class="hover-line"
-        />
-      </svg>
-      <div v-if="hover != null" class="vibe-chart-tooltip" role="status"
-        ><b>{{ dates[hover] }}</b
-        ><div v-for="entry in visible" :key="entry.item.name"
-          ><i :style="{ background: entry.item.color }"></i>{{ entry.item.name }}：{{
-            valueLabel(entry.item.values[hover], entry.item)
-          }}</div
-        ></div
-      >
-    </div>
-    <div
-      v-if="dates.length > 1"
-      class="vibe-chart-range"
-      :style="{
-        '--range-start': `${rangeStartPercent}%`,
-        '--range-end': `${rangeEndPercent}%`,
-      }"
-    >
-      <div class="vibe-chart-range__labels" aria-hidden="true">
-        <span>{{ formatDateLabel(dates[start]) }}</span>
-        <span>{{ formatDateLabel(dates[end]) }}</span>
       </div>
-      <div class="vibe-chart-range__viewport">
-        <svg viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
-          <polyline v-for="(segment, index) in overviewPoints" :key="index" :points="segment" />
+      <div v-if="!hasValues" class="chart-empty">{{
+        visible.length ? '此范围暂无有效数据' : '点击图例选择要显示的数据'
+      }}</div>
+      <div v-else class="vibe-chart-stage">
+        <svg
+          class="vibe-chart-svg"
+          :viewBox="`0 0 ${plotWidth} ${plotHeight}`"
+          :style="{ height: `${plotHeight}px` }"
+          tabindex="0"
+          role="img"
+          :aria-label="`${title}，${shownDates[0]}至${shownDates.at(-1)}，左右方向键查看数值`"
+          @mousemove="onMove"
+          @mouseleave="hover = null"
+          @focus="hover = end"
+          @blur="hover = null"
+          @keydown.left.prevent="moveHover(-1)"
+          @keydown.right.prevent="moveHover(1)"
+          @wheel.prevent="onWheel"
+          @pointerdown="onPointerDown"
+          @pointermove="onPointerMove"
+          @pointerup="onPointerUp"
+          @pointercancel="onPointerUp"
+          @dblclick="onDoubleClick"
+        >
+          <defs>
+            <clipPath :id="clipId">
+              <rect :x="left" :y="top" :width="right - left" :height="bottom - top" />
+            </clipPath>
+          </defs>
+          <g v-for="tick in axisTicks('left')" :key="`left-${tick}`">
+            <line
+              :x1="left"
+              :y1="axisY('left', tick)"
+              :x2="right"
+              :y2="axisY('left', tick)"
+              class="chart-grid"
+            />
+            <text :x="left - 10" :y="axisY('left', tick) + 4" text-anchor="end">
+              {{ tickLabel('left', tick) }}
+            </text>
+          </g>
+          <g v-if="rightLabel">
+            <text
+              v-for="tick in axisTicks('right')"
+              :key="`right-${tick}`"
+              :x="right + 10"
+              :y="axisY('right', tick) + 4"
+            >
+              {{ tickLabel('right', tick) }}
+            </text>
+          </g>
+          <text
+            v-for="index in dateTicks"
+            :key="index"
+            :x="x(index)"
+            :y="plotHeight - 14"
+            :text-anchor="index === start ? 'start' : index === end ? 'end' : 'middle'"
+          >
+            {{ dates[index]?.slice(5) }}
+          </text>
+          <g v-for="entry in visible" :key="entry.item.name" :clip-path="`url(#${clipId})`">
+            <template v-if="entry.item.type === 'bar'">
+              <rect
+                v-for="bar in bars(entry.item)"
+                :key="bar.index"
+                :x="bar.x"
+                :y="bar.y"
+                :width="bar.width"
+                :height="bar.height"
+                :fill="entry.item.color"
+                opacity="0.4"
+              />
+            </template>
+            <template v-else v-for="(segment, index) in segments(entry.item)" :key="index">
+              <path
+                v-if="entry.item.type === 'area'"
+                :d="areaPath(segment, entry.item)"
+                :fill="entry.item.color"
+                opacity="0.12"
+              />
+              <polyline
+                :points="segment.map((point) => `${point.x},${point.y}`).join(' ')"
+                :stroke="entry.item.color"
+                :stroke-width="entry.item.lineWidth || 2"
+                class="vibe-chart-line"
+              />
+            </template>
+          </g>
+          <line
+            v-if="hover != null"
+            :x1="x(hover)"
+            :x2="x(hover)"
+            :y1="top"
+            :y2="bottom"
+            class="hover-line"
+          />
         </svg>
-        <span class="vibe-chart-range__rail" aria-hidden="true"></span>
-        <span class="vibe-chart-range__selection" aria-hidden="true"></span>
-        <input
-          v-model.number="startIndex"
-          class="vibe-chart-range__thumb vibe-chart-range__thumb--start"
-          type="range"
-          min="0"
-          :max="maxIndex"
-          :aria-label="`${title}起始日期`"
-          @input="onStartInput"
-          @wheel.prevent="onRangeWheel"
-        />
-        <input
-          v-model.number="endIndex"
-          class="vibe-chart-range__thumb vibe-chart-range__thumb--end"
-          type="range"
-          min="0"
-          :max="maxIndex"
-          :aria-label="`${title}结束日期`"
-          @input="onEndInput"
-          @wheel.prevent="onRangeWheel"
-        />
+        <div v-if="hover != null" class="vibe-chart-tooltip" role="status"
+          ><b>{{ dates[hover] }}</b
+          ><div v-for="entry in visible" :key="entry.item.name"
+            ><i :style="{ background: entry.item.color }"></i>{{ entry.item.name }}：{{
+              valueLabel(entry.item.values[hover], entry.item)
+            }}</div
+          ></div
+        >
       </div>
-    </div>
-    <footer
-      >{{ shownDates[0] || '—' }} — {{ shownDates.at(-1) || '—'
-      }}<span>{{ shownDates.length }}个交易日 · 空缺数据不连线</span></footer
-    >
-  </article>
+      <div
+        v-if="dates.length > 1"
+        class="vibe-chart-range"
+        :style="{
+          '--range-start': `${rangeStartPercent}%`,
+          '--range-end': `${rangeEndPercent}%`,
+        }"
+      >
+        <div class="vibe-chart-range__labels" aria-hidden="true">
+          <span>{{ formatDateLabel(dates[start]) }}</span>
+          <span>{{ formatDateLabel(dates[end]) }}</span>
+        </div>
+        <div class="vibe-chart-range__viewport">
+          <svg viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true">
+            <polyline v-for="(segment, index) in overviewPoints" :key="index" :points="segment" />
+          </svg>
+          <span class="vibe-chart-range__rail" aria-hidden="true"></span>
+          <span class="vibe-chart-range__selection" aria-hidden="true"></span>
+          <input
+            v-model.number="startIndex"
+            class="vibe-chart-range__thumb vibe-chart-range__thumb--start"
+            type="range"
+            min="0"
+            :max="maxIndex"
+            :aria-label="`${title}起始日期`"
+            @input="onStartInput"
+            @wheel.prevent="onRangeWheel"
+          />
+          <input
+            v-model.number="endIndex"
+            class="vibe-chart-range__thumb vibe-chart-range__thumb--end"
+            type="range"
+            min="0"
+            :max="maxIndex"
+            :aria-label="`${title}结束日期`"
+            @input="onEndInput"
+            @wheel.prevent="onRangeWheel"
+          />
+        </div>
+      </div>
+      <footer
+        >{{ shownDates[0] || '—' }} — {{ shownDates.at(-1) || '—'
+        }}<span>{{ shownDates.length }}个交易日 · 空缺数据不连线</span></footer
+      >
+    </article>
+  </ChartExpand>
 </template>
 
 <script setup lang="ts">
+  import ChartExpand from '../../components/ChartExpand.vue';
   import { computed, getCurrentInstance, ref, watch } from 'vue';
-  import { useElementSize } from '@vueuse/core';
+  import { useElementSize, useWindowSize } from '@vueuse/core';
   import { overviewSegments } from './overviewSegments';
 
   const clipId = `vibe-chart-plot-clip-${getCurrentInstance()!.uid}`;
@@ -211,6 +214,8 @@
     dates: string[];
     series: Series[];
   }>();
+  const chartExpanded = ref(false);
+  const { height: viewportHeight } = useWindowSize();
   const preset = ref<number | null>(90);
   const startIndex = ref(0);
   const endIndex = ref(0);
@@ -220,7 +225,11 @@
   const { width: measuredWidth } = useElementSize(plotMeasure);
   const plotWidth = computed(() => Math.max(280, measuredWidth.value || 600));
   const plotHeight = computed(() =>
-    Math.round(Math.max(280, Math.min(420, plotWidth.value / 1.8))),
+    Math.round(
+      chartExpanded.value
+        ? Math.max(320, viewportHeight.value - 360)
+        : Math.max(280, Math.min(420, plotWidth.value / 1.8)),
+    ),
   );
   const left = 62,
     top = 22;

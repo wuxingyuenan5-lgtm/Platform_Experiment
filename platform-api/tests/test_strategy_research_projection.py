@@ -213,3 +213,41 @@ def test_large_shard_projects_every_row_without_decoding_unused_raw_payloads(arc
     assert {row["close"] for row in rows} == {"1.123456789012"}
     assert not decoded_raw
     assert project_next() is False
+
+
+@pytest.mark.parametrize("fast", [False, True])
+def test_shared_daily_spot_projection_preserves_resolution_and_raw_prices(archive, fast):
+    from app.strategy_research_projection import project_candle_next
+
+    events = []
+    for i, symbol in enumerate(("BTCUSDT", "ETHUSDT")):
+        raw = event(i + 1)
+        raw.update(
+            kind="price_history",
+            stream=f"bybit:spot:{symbol}:trade:1d",
+            ingestionMode="backfill",
+            payload={
+                "intervalMs": "86400000",
+                "symbol": symbol,
+                "category": "spot",
+                "priceType": "trade",
+                "response": {
+                    "result": {"list": [["1721692800000", "10", "12", "9", "11.123456789012"]]}
+                },
+            },
+        )
+        events.append(raw)
+    publish(
+        {
+            "schemaVersion": "market-events.v1",
+            "after": None,
+            "nextCursor": "daily",
+            "events": events,
+        }
+    )
+    assert (project_candle_next if fast else project_next)()
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        rows = read_projection("daily_candle", f"{symbol}:spot:trade")
+        assert len(rows) == 1 and rows[0]["close"] == "11.123456789012"
+        assert rows[0]["closeTimeMs"] == "1721779200000"
+        assert read_projection("historical_candle", f"{symbol}:spot:trade") == []

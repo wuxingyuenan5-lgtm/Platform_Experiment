@@ -224,7 +224,12 @@ def a_share_archive_check(db: sqlite3.Connection) -> AuditCheck:
         FROM research_a_share_price_history GROUP BY instrument_code"""
     ).fetchall()
     conflict_count = db.execute(
-        "SELECT COUNT(*) AS n FROM research_a_share_archive_conflicts"
+        "SELECT COUNT(*) AS n FROM research_a_share_archive_conflicts "
+        "WHERE reason != 'premature_close_corrected'"
+    ).fetchone()["n"]
+    corrected_count = db.execute(
+        "SELECT COUNT(*) AS n FROM research_a_share_archive_conflicts "
+        "WHERE reason = 'premature_close_corrected'"
     ).fetchone()["n"]
     markets = {row["universe_key"]: dict(row) for row in market_rows}
     prices = {row["instrument_code"]: dict(row) for row in price_rows}
@@ -248,7 +253,7 @@ def a_share_archive_check(db: sqlite3.Connection) -> AuditCheck:
         if status == "error"
         else "归档品种不完整或存在待核对冲突"
         if status == "warning"
-        else "A股来源归档完整且无冲突"
+        else "A股来源归档完整且无待核对冲突"
     )
     return check(
         "a_share.archive",
@@ -263,6 +268,7 @@ def a_share_archive_check(db: sqlite3.Connection) -> AuditCheck:
         invalidRows=invalid_rows,
         missingCloses=missing_closes,
         conflicts=conflict_count,
+        correctedConflicts=corrected_count,
         rule="历史归档按独立品种保留来源、NULL与冲突，不套用短周期快照时效",
     )
 
@@ -321,18 +327,24 @@ def inspect_database(now, *, deep=False):
             "A股日度生产执行",
             "后台任务",
             "error"
-            if due and not attempted_today
+            if due and (not attempted_today or latest_run["status"] == "error")
             else "warning"
-            if local.hour >= 16 and is_trading_day is None
+            if (due and latest_run["status"] != "ready")
+            or (local.hour >= 16 and is_trading_day is None)
             else "healthy",
             "交易日今日后台未留下执行记录"
             if due and not attempted_today
+            else "今日后台执行失败"
+            if due and latest_run["status"] == "error"
+            else "今日后台尚未取得完整收盘数据"
+            if due and latest_run["status"] != "ready"
             else "已过检查时点，但交易日历不可用，无法判断是否应执行"
             if local.hour >= 16 and is_trading_day is None
             else "今日为非交易日，无需日度行情生产"
             if is_trading_day is False
             else "未到时限或已有执行记录",
             lastAttempt=latest_run["started_at"] if latest_run else None,
+            lastStatus=latest_run["status"] if latest_run else None,
             tradingDay=is_trading_day,
             rule="仅按平台缓存的独立交易日历判断；交易日16点后应有执行记录",
             )
@@ -677,14 +689,21 @@ def inspect_artifacts(now):
                     series_row.get("label", series_id),
                     "研究文件库",
                     series_row.get("retrievedAt"),
-                    {"weekly": 240, "monthly": 1080, "quarterly": 2880}.get(
+                    {"daily_business_day": 72, "weekly": 240, "monthly": 1080, "quarterly": 2880}.get(
                         str(series_row.get("frequency", "")).lower(), 48
                     ),
                     now,
                     frequency=series_row.get("frequency"),
                     sourceDate=series_row.get("observationDate"),
                 )
-                if series_row.get("isStale") or status not in {"ready", "available"}:
+                if str(series_row.get("frequency", "")).lower() == "daily_business_day":
+                    previous_weekday = now.date() - timedelta(days=1)
+                    while previous_weekday.weekday() >= 5:
+                        previous_weekday -= timedelta(days=1)
+                    observed = str(series_row.get("observationDate") or "")[:10]
+                    if observed and observed < previous_weekday.isoformat() and item["status"] == "healthy":
+                        item.update(status="warning", message="来源观测日期落后于最近工作日")
+                if (series_row.get("isStale") or status not in {"ready", "available"}) and item["status"] != "error":
                     item.update(status="warning", message="来源未就绪或声明数据陈旧")
                 results.append(item)
         except Exception as exc:

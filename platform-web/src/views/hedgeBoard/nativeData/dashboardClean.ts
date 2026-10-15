@@ -64,6 +64,9 @@ export type LocalWidgetKey =
   | 'crypto-intraday-cumulative-volatility'
   | 'gold-intraday-cumulative-volatility'
   | 'cftc-positioning'
+  | 'gold-positioning'
+  | 'gold-report'
+  | 'gold-analysts'
   | 'spdr-daily-flow'
   | 'spdr-holdings-vs-price'
   | 'etf-weekly-flows'
@@ -660,12 +663,12 @@ export const researchModules: ResearchModule[] = [
           ),
           localChart(
             'CFTC 持仓报告',
-            '官方 CFTC PRE 周度持仓；点击后加载历史分位与净头寸。',
+            'CFTC 官方周度持仓；黄金支持多口径历史，保留白银、铜、WTI 与天然气。',
             'cftc-positioning',
             {
               height: 620,
               deferUntilExpanded: true,
-              sourceNote: 'CFTC PRE Disaggregated Futures Only · 周度落库序列',
+              sourceNote: 'CFTC 官方黄金多口径及商品周度落库序列',
               referenceLinks: [
                 {
                   label: 'CFTC 官方报告',
@@ -688,6 +691,14 @@ export const researchModules: ResearchModule[] = [
             height: 420,
           }),
         ],
+      },
+      {
+        id: 'gold-research-analysts',
+        eyebrow: 'Analyst Views',
+        title: '金属分析师跟踪',
+        description: '',
+        layout: 'hero',
+        widgets: [localChart('分析师观点与情景', '', 'gold-analysts', { height: 720 })],
       },
     ],
   },
@@ -758,16 +769,6 @@ export const researchModules: ResearchModule[] = [
           localChart('ETH ETF 日流量 vs ETH 价格', 'SoSoValue', 'crypto-eth-etf-flow', {
             height: 420,
           }),
-          localChart('Bitcoin Treasuries Weekly Net Inflow', '', 'btc-treasury-flow', {
-            height: 420,
-            sourceNote: '',
-            referenceLinks: [
-              {
-                label: 'SoSoValue 参考 ↗',
-                href: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
-              },
-            ],
-          }),
           withReferenceLinks(
             localChart(
               '上市公司 BTC 持仓分布',
@@ -776,26 +777,37 @@ export const researchModules: ResearchModule[] = [
             ),
             [{ label: 'BitcoinTreasuries 参考', href: 'https://bitcointreasuries.net/' }],
           ),
-          localChart('稳定币市值历史', 'DefiLlama · 流通市值（USD）', 'crypto-stablecoins'),
-          localChart(
-            'Strategy BTC 持仓',
-            'BitcoinTreasuries 披露快照 · 历史从接入日积累，日期为采集日',
-            'crypto-strategy-holdings',
-          ),
           localChart(
             'Strategic ETH Reserve',
             '公开来源的 ACTIVE 实体；保留报告/自报/钱包追踪分类及原始更新时间，不代表统一时点储备',
             'crypto-eth-reserves',
           ),
-          externalReference(
-            'STRC ATM Tracker',
-            '暂无已接通数据 · Bitcoin for Corporations · ATM 融资进度',
-            'https://bitcoinforcorporations.com/strc-atm-tracker/',
+          localChart('稳定币市值历史', 'DefiLlama · 流通市值（USD）', 'crypto-stablecoins'),
+          withReferenceLinks(
+            localChart(
+              'STRC 股价历史',
+              '交易所日线收盘价 · Yahoo Finance · 最新交易日可能尚未收盘',
+              'crypto-strc',
+            ),
+            [
+              {
+                label: 'STRC ATM Tracker',
+                href: 'https://bitcoinforcorporations.com/strc-atm-tracker/',
+              },
+            ],
           ),
-          localChart(
-            'STRC 股价历史',
-            '交易所日线收盘价 · Yahoo Finance · 最新交易日可能尚未收盘',
-            'crypto-strc',
+          withReferenceLinks(
+            localChart(
+              'Strategy BTC 持仓',
+              'BitcoinTreasuries 披露快照 · 历史从接入日积累，日期为采集日',
+              'crypto-strategy-holdings',
+            ),
+            [
+              {
+                label: '企业财库周度流入参考',
+                href: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+              },
+            ],
           ),
         ],
       },

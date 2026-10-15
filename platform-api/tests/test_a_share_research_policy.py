@@ -11,11 +11,22 @@ from app.a_share_research_policy import (
     calculate_short_term_emotion_rates,
     classify_market_breadth,
     classify_speculation,
+    market_breadth_pct,
 )
 from app.research_cache import LastKnownGoodResearchCache
 from app.research_data_schemas import AShareTurnoverStock, ShenwanMembership
 
 pytestmark = pytest.mark.unit
+
+
+@pytest.mark.parametrize('up,down,expected', [
+    (2989, 2108, Decimal(88100) / Decimal(5097)),
+    (2713, 2166, Decimal(54700) / Decimal(4879)),
+    (10, 10, Decimal(0)), (10, 0, Decimal(100)), (0, 10, Decimal(-100)),
+    (0, 0, None), (None, 10, None), (10, None, None), (-1, 10, None),
+])
+def test_market_breadth_percent_has_one_unit_and_excludes_flat(up, down, expected):
+    assert market_breadth_pct(up, down) == expected
 
 
 def _stock(

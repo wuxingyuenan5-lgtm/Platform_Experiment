@@ -9,7 +9,7 @@
     />
     <VibeTimeChart
       title="市场宽度"
-      y-label="市场宽度（%）"
+      y-label="（上涨－下跌）/（上涨＋下跌）× 100%"
       :dates="dates"
       :series="breadthSeries"
     />
@@ -136,6 +136,8 @@
       type: 'line',
       color: '#123d68',
       percent: true,
+      domain: [-1, 1],
+      ticks: [1, 0.5, 0, -0.5, -1],
     },
   ]);
   const crowdingRows = computed(() => props.crowdingRows || []);

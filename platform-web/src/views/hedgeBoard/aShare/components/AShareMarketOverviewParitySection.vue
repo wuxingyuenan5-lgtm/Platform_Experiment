@@ -35,8 +35,8 @@
             ><span>百亿成交股</span
             ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></button
           >
-          <div
-            ><span>市场宽度</span
+          <div title="沪深A；（上涨家数－下跌家数）/（上涨家数＋下跌家数），不含平盘"
+            ><span>沪深A市场宽度</span
             ><strong>{{ formatPct(latestHistory?.market_breadth, true) }}</strong></div
           >
         </div>

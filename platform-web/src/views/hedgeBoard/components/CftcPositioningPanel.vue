@@ -3,9 +3,11 @@
     <div class="cftc-toolbar">
       <div>
         <p class="cftc-eyebrow">COT REPORT · WEEKLY</p>
-        <p class="cftc-note"
-          >CFTC PRE Disaggregated Futures Only；报告日通常滞后一周，不代表实时资金流。</p
-        >
+        <p class="cftc-note">{{
+          selectedKey === 'gold'
+            ? '黄金支持分项、传统及期货与期权口径；周度持仓不代表实时资金流。'
+            : 'CFTC PRE Disaggregated Futures Only；报告日通常滞后一周，不代表实时资金流。'
+        }}</p>
       </div>
       <div class="cftc-tabs" role="tablist" aria-label="CFTC 合约市场">
         <button
@@ -22,7 +24,8 @@
       </div>
     </div>
 
-    <div v-if="loading" class="cftc-empty">正在读取已落库的 CFTC 序列…</div>
+    <GoldPositioningPanel v-if="selectedKey === 'gold'" />
+    <div v-else-if="loading" class="cftc-empty">正在读取已落库的 CFTC 序列…</div>
     <div v-else-if="error" class="cftc-empty cftc-empty--error">{{ error }}</div>
     <div v-else-if="!selectedMarket" class="cftc-empty">当前没有可用的 CFTC 观测。</div>
     <template v-else>
@@ -94,6 +97,7 @@
   import { getCommodityDashboardV1, type MacroDashboardSeries } from '@/api/hedgeResearch';
 
   import SourceSeriesPlot from '../charts/SourceSeriesPlot.vue';
+  import GoldPositioningPanel from './GoldPositioningPanel.vue';
 
   type MarketKey = 'gold' | 'silver' | 'copper' | 'wti' | 'naturalGas';
   type MarketConfig = { key: MarketKey; label: string; net: string; percentile: string };

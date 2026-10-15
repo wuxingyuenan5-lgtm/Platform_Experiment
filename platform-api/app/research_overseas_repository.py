@@ -20,40 +20,40 @@ from app.research_a_share_repository import write_history_points
 
 
 def _read_shared_daily_prices(asset: str, dates: list[str]) -> dict[str, float]:
-    """Read daily reference closes from the strategy-owned Bybit projection.
+    """Join exact closed UTC days from the strategy-owned Bybit spot archive.
 
-    ETF flow rows remain the source-of-record for flow values.  This helper only
-    joins an optional price overlay from the shared strategy archive so the ETF
-    chart can render price on its own right-hand axis without duplicating raw
-    candles in the hedge-board database.
+    Reuse minute candles at midnight where present; shared daily history covers
+    earlier dates and ETH. Never substitute a contract or a partial-day close.
     """
-    # The current strategy archive owns BTC/XAUT candles.  Never map the XAUT
-    # series onto ETH ETF rows: an unavailable ETH price must stay unavailable.
-    if not dates or asset != "btc":
+    if not dates or asset not in {"btc", "eth"}:
         return {}
-    result: dict[str, float] = {}
-    with connection() as db:
-        rows = db.execute(
-            "SELECT payload_json FROM research_a_share_history "
-            "WHERE dataset=? AND entity_code=? AND observed_at>=? "
-            "AND observed_at<=? ORDER BY observed_at ASC",
-            (
-                "cumulative_volatility",
-                "btc:americas:1h",
-                dates[0],
-                dates[-1] + "T23:59:59.999Z",
-            ),
-        ).fetchall()
-    date_set = set(dates)
-    for row in rows:
-        try:
-            payload = json.loads(row["payload_json"] or "{}")
-            date = str(payload.get("sessionDate") or "")
-            close = float(payload["price"])
-        except (KeyError, TypeError, ValueError, OverflowError, json.JSONDecodeError):
-            continue
-        if close > 0 and date in date_set:
-            result[date] = close
+    from datetime import timedelta
+
+    from app.database_connection import read_only_connection
+
+    result = {}
+    entity = asset.upper() + "USDT:spot:trade"
+    with read_only_connection() as db:
+        for day in dates:
+            stamp = int(
+                (datetime.fromisoformat(day).replace(tzinfo=UTC) + timedelta(days=1)).timestamp()
+                * 1000
+            )
+            if stamp > int(datetime.now(UTC).timestamp() * 1000):
+                continue
+            for kind in ("historical_candle", "daily_candle"):
+                row = db.execute(
+                    "SELECT payload_json FROM research_strategy_projection "
+                    "WHERE kind=? AND entity=? AND at_ms=?",
+                    (kind, entity, stamp),
+                ).fetchone()
+                if row is None:
+                    continue
+                payload = json.loads(row[0])
+                close = Decimal(str(payload["close"]))
+                if close.is_finite() and close > 0 and not payload.get("quality"):
+                    result[day] = float(close)
+                    break
     return result
 
 
@@ -117,12 +117,16 @@ def write_iv_snapshot(
     """
     dataset = "crypto_iv_snapshot"
     points = [
-        (observed_at, p["tenor"], {
-            "iv": p["iv"],
-            "expiry": p["expiry"],
-            "daysToExpiry": p["daysToExpiry"],
-            "strike": p["strike"],
-        })
+        (
+            observed_at,
+            p["tenor"],
+            {
+                "iv": p["iv"],
+                "expiry": p["expiry"],
+                "daysToExpiry": p["daysToExpiry"],
+                "strike": p["strike"],
+            },
+        )
         for p in snapshot.get("tenors", [])
     ]
     with connection() as db:
@@ -139,11 +143,20 @@ def write_iv_snapshot(
             " DO UPDATE SET payload_json=excluded.payload_json,source=excluded.source,"
             " fetched_at=excluded.fetched_at,refresh_run_id=excluded.refresh_run_id",
             (
-                dataset, observed_at, "__meta__",
-                json.dumps({"index": snapshot.get("index"), "dvol": snapshot.get("dvol"),
-                            "observedAt": snapshot.get("observedAt")},
-                           ensure_ascii=False),
-                source, _now(), run_id,
+                dataset,
+                observed_at,
+                "__meta__",
+                json.dumps(
+                    {
+                        "index": snapshot.get("index"),
+                        "dvol": snapshot.get("dvol"),
+                        "observedAt": snapshot.get("observedAt"),
+                    },
+                    ensure_ascii=False,
+                ),
+                source,
+                _now(),
+                run_id,
             ),
         )
         if points:
@@ -157,13 +170,15 @@ def read_iv_snapshot_latest() -> dict[str, Any]:
     meta = series.pop("__meta__", {})
     tenors = []
     for tenor, payload in sorted(series.items(), key=lambda kv: _MAJOR_TENOR_INDEX.get(kv[0], 999)):
-        tenors.append({
-            "tenor": tenor,
-            "iv": payload.get("iv"),
-            "expiry": payload.get("expiry"),
-            "daysToExpiry": payload.get("daysToExpiry"),
-            "strike": payload.get("strike"),
-        })
+        tenors.append(
+            {
+                "tenor": tenor,
+                "iv": payload.get("iv"),
+                "expiry": payload.get("expiry"),
+                "daysToExpiry": payload.get("daysToExpiry"),
+                "strike": payload.get("strike"),
+            }
+        )
     return {
         "index": meta.get("index"),
         "dvol": meta.get("dvol"),
@@ -214,8 +229,7 @@ def read_latest_series(dataset: str) -> dict[str, Any]:
             (dataset, row["observed_at"]),
         ).fetchall()
     return {
-        r["entity_code"]: json.loads(r["payload_json"]) if r["payload_json"] else {}
-        for r in rows
+        r["entity_code"]: json.loads(r["payload_json"]) if r["payload_json"] else {} for r in rows
     }
 
 
@@ -378,14 +392,15 @@ def read_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
             cell[r["entity_code"]] = json.loads(r["payload_json"] or "{}")
     ordered_dates = sorted(dates)
     prices = _read_shared_daily_prices(asset_key, ordered_dates)
+    convert = bool(meta_payload.get("coinUnit")) and all(d in prices for d in ordered_dates)
     days_out: list[dict[str, Any]] = []
     cumulative = Decimal("0")
     for d in ordered_dates:
         flows = by_date.get(d, {})
         coin_flows = {
             ticker: (
-                payload.get("coinFlow")
-                if payload.get("coinFlow") is not None
+                float(payload["flow"]) * 1_000_000 / prices[d]
+                if convert and payload.get("flow") is not None
                 else payload.get("flow")
             )
             for ticker, payload in flows.items()
@@ -398,8 +413,8 @@ def read_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
         ]
         total_payload = flows.get("Total") or {}
         total_flow = (
-            total_payload.get("coinFlow")
-            if total_payload.get("coinFlow") is not None
+            float(total_payload["flow"]) * 1_000_000 / prices[d]
+            if convert and total_payload.get("flow") is not None
             else total_payload.get("flow")
         )
         if total_flow is None and values:
@@ -410,14 +425,7 @@ def read_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
                 cumulative += Decimal(str(total_flow))
         except (InvalidOperation, ValueError):
             pass
-        price = next(
-            (
-                payload.get("price")
-                for payload in flows.values()
-                if isinstance(payload, dict) and payload.get("price")
-            ),
-            prices.get(d),
-        )
+        price = prices.get(d)
         days_out.append(
             {
                 "date": d,
@@ -427,16 +435,10 @@ def read_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
                 "price": price,
             }
         )
-    has_coin_values = any(
-        isinstance(payload, dict) and payload.get("coinFlow") is not None
-        for day in by_date.values()
-        for payload in day.values()
-    )
     return {
         "observedAt": max(dates),
         "tickers": tickers,
-        "flowUnit": meta_payload.get("coinUnit")
-        or (asset_key.upper() if has_coin_values else "US$m"),
-        "priceSource": meta_payload.get("priceSource"),
+        "flowUnit": asset_key.upper() if convert else "US$m",
+        "priceSource": "Bybit spot UTC daily close (USDT)",
         "days": days_out,
     }

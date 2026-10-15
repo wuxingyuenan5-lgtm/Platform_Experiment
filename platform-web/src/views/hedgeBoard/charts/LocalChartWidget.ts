@@ -4,6 +4,9 @@ import CryptoMarketDetailPanel from '../components/CryptoMarketDetailPanel.vue';
 import BtcEtfFlowPanel from '../components/BtcEtfFlowPanel.vue';
 import CryptoIvTermPanel from '../components/CryptoIvTermPanel.vue';
 import CftcPositioningPanel from '../components/CftcPositioningPanel.vue';
+import GoldPositioningPanel from '../components/GoldPositioningPanel.vue';
+import GoldReportPanel from '../components/GoldReportPanel.vue';
+import GoldAnalystsPanel from '../components/GoldAnalystsPanel.vue';
 import CumulativeVolatilityPanel from '../components/CumulativeVolatilityPanel.vue';
 import GoldMarketDetailPanel from '../components/GoldMarketDetailPanel.vue';
 import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';
@@ -559,6 +562,12 @@ export default defineComponent({
             });
           case 'cftc-positioning':
             return h(CftcPositioningPanel);
+          case 'gold-positioning':
+            return h(GoldPositioningPanel);
+          case 'gold-report':
+            return h(GoldReportPanel);
+          case 'gold-analysts':
+            return h(GoldAnalystsPanel);
           case 'btc-etf-flow':
             return h(BtcEtfFlowPanel);
           case 'crypto-eth-etf-flow':

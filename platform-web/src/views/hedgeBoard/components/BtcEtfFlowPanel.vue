@@ -53,9 +53,9 @@
           class="etf-flow-panel__chart"
           :viewBox="`0 0 ${chart.width} ${chart.height}`"
           role="img"
-          :aria-label="`${assetLabel} ETF 日资金流与价格双轴图`"
+          :aria-label="`${assetLabel} ETF 日资金流与价格图`"
         >
-          <g v-for="tick in chart.yTicks" :key="tick.value">
+          <g v-for="tick in chart.priceTicks" :key="tick.value">
             <line
               :x1="chart.pad.left"
               :x2="chart.width - chart.pad.right"
@@ -67,16 +67,6 @@
               :x="chart.pad.left - 8"
               :y="tick.y + 4"
               text-anchor="end"
-              class="etf-flow-panel__axis"
-            >
-              {{ tick.label }}
-            </text>
-          </g>
-          <g v-for="tick in chart.priceTicks" :key="`price-${tick.value}`">
-            <text
-              :x="chart.width - chart.pad.right + 8"
-              :y="tick.y + 4"
-              text-anchor="start"
               class="etf-flow-panel__axis etf-flow-panel__axis--price"
             >
               {{ tick.label }}
@@ -101,7 +91,23 @@
           >
             <title>{{ bar.date }}：{{ formatFlow(bar.value) }} {{ flowUnit }}</title>
           </rect>
-          <path v-if="chart.priceLine" :d="chart.priceLine" class="etf-flow-panel__price-line" />
+          <path
+            v-if="showPrice && chart.priceLine"
+            :d="chart.priceLine"
+            class="etf-flow-panel__price-line"
+          />
+          <g v-if="showPrice && chart.hasPriceAxis">
+            <circle
+              v-for="point in chart.isolatedPrices"
+              :key="point.date"
+              :cx="point.x"
+              :cy="point.y"
+              r="2.5"
+              fill="#7c3aed"
+            >
+              <title>{{ point.date }}：{{ assetLabel }} {{ formatPrice(point.price) }}</title>
+            </circle>
+          </g>
           <g v-for="tick in chart.xTicks" :key="tick.label">
             <text
               :x="tick.x"
@@ -113,8 +119,8 @@
             </text>
           </g>
           <text
-            v-if="chart.lastPrice != null"
-            :x="chart.width - chart.pad.right + 8"
+            v-if="showPrice && chart.lastPrice != null"
+            :x="chart.pad.left + 8"
             :y="chart.priceLabelY"
             text-anchor="start"
             class="etf-flow-panel__price-label"
@@ -124,8 +130,16 @@
         </svg>
         <div class="etf-flow-panel__chart-legend">
           <span><i class="is-flow"></i>日净流入 / 流出（{{ flowUnit }}）</span>
-          <span v-if="chart.hasPriceAxis"
-            ><i class="is-price"></i>{{ assetLabel }} 价格（右轴）</span
+          <button
+            v-if="chart.hasPriceAxis"
+            type="button"
+            :aria-pressed="showPrice"
+            :class="{ 'is-hidden': !showPrice }"
+            @click="showPrice = !showPrice"
+            ><i class="is-price"></i>{{ assetLabel }} 价格（左轴）</button
+          >
+          <span v-if="chart.pricedCount < visibleDays.length"
+            >价格覆盖 {{ chart.pricedCount }}/{{ visibleDays.length }} 个日期 · 缺口不连线</span
           >
         </div>
         <div v-if="days.length > 1" class="etf-flow-panel__range">
@@ -221,6 +235,7 @@
   const error = ref('');
   const data = ref<CryptoEtfFlowData | null>(null);
   const mode = ref<'chart' | 'table'>('chart');
+  const showPrice = ref(true);
 
   const tickers = computed(() => data.value?.tickers ?? []);
   const days = computed(() => data.value?.days ?? []);
@@ -272,7 +287,12 @@
   const chart = computed(() => {
     const width = 920;
     const height = 310;
-    const pad = { left: 54, right: 74, top: 18, bottom: 38 };
+    const pad = {
+      left: 74,
+      right: 18,
+      top: 18,
+      bottom: 38,
+    };
     const innerWidth = width - pad.left - pad.right;
     const innerHeight = height - pad.top - pad.bottom;
     const flowRows = visibleDays.value.map((day) => ({
@@ -287,11 +307,10 @@
       (row): row is typeof row & { price: number } =>
         row.price != null && Number.isFinite(row.price),
     );
-    // A partial overlay creates detached, misleading price segments. Only
-    // render the right-axis line when the shared strategy archive covers most
-    // of the ETF window; unavailable history must remain unavailable.
+    // Render actual observations at their ETF dates, breaking the path at
+    // missing prices instead of hiding an otherwise valid sparse history.
     const hasPriceAxis = priced.length > 0;
-    const hasPriceLine = priced.length >= 10 && priced.length / Math.max(flowRows.length, 1) >= 0.6;
+    const hasPriceLine = priced.length > 0;
     const visiblePrices = hasPriceAxis ? priced : [];
     const rawPriceMin = priced.length ? Math.min(...priced.map((row) => row.price)) : 0;
     const rawPriceMax = priced.length ? Math.max(...priced.map((row) => row.price)) : 1;
@@ -336,8 +355,6 @@
           .filter(Boolean)
           .join(' ')
       : '';
-    const tickValues = [-maxAbs, -maxAbs / 2, 0, maxAbs / 2, maxAbs];
-    const yTicks = tickValues.map((value) => ({ value, y: y(value), label: formatCompact(value) }));
     const priceTicks = hasPriceAxis
       ? Array.from({ length: 5 }, (_, index) => {
           const value = priceMin + (priceSpan * index) / 4;
@@ -353,18 +370,28 @@
         })
       : [];
     const lastPrice = visiblePrices.at(-1)?.price ?? null;
+    const isolatedPrices = flowRows.flatMap((row, index) => {
+      if (row.price == null || !Number.isFinite(row.price)) return [];
+      const hasNeighbor = [flowRows[index - 1]?.price, flowRows[index + 1]?.price].some(
+        (value) => value != null && Number.isFinite(value),
+      );
+      return hasNeighbor
+        ? []
+        : [{ date: row.date, price: row.price, x: x(index), y: priceY(row.price) }];
+    });
     return {
       width,
       height,
       pad,
       bars,
-      yTicks,
       priceTicks,
       xTicks,
       zeroY: y(0),
       priceLine,
       hasPriceAxis,
       hasPriceLine,
+      isolatedPrices,
+      pricedCount: priced.length,
       lastPrice,
       priceLabelY: lastPrice == null ? pad.top : priceY(lastPrice) - 8,
     };
@@ -401,12 +428,6 @@
     if (Math.abs(value) < 0.05) return '0.0';
     const sign = value > 0 ? '+' : '';
     return `${sign}${value.toFixed(1)}`;
-  }
-
-  function formatCompact(value: number): string {
-    const absolute = Math.abs(value);
-    const formatted = absolute >= 1000 ? `${(absolute / 1000).toFixed(1)}k` : absolute.toFixed(0);
-    return `${value < 0 ? '-' : value > 0 ? '+' : ''}${formatted}`;
   }
 
   function formatPrice(value: number): string {
@@ -578,10 +599,29 @@
     font-size: 11px;
   }
 
-  .etf-flow-panel__chart-legend span {
+  .etf-flow-panel__chart-legend span,
+  .etf-flow-panel__chart-legend button {
     display: inline-flex;
     align-items: center;
     gap: 5px;
+  }
+
+  .etf-flow-panel__chart-legend button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .etf-flow-panel__chart-legend button.is-hidden {
+    opacity: 0.45;
+  }
+
+  .etf-flow-panel__chart-legend button:focus-visible {
+    outline: 2px solid #7c3aed;
+    outline-offset: 4px;
   }
 
   .etf-flow-panel__chart-legend i {

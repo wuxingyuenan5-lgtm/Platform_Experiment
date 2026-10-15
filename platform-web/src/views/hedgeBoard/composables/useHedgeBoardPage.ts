@@ -72,6 +72,8 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
     'gold-cftc',
     'gold-rates',
     'gold-browser-toolbox',
+    'gold-intraday-cumulative-volatility',
+    'gold-research-analysts',
   ],
   crypto: [
     'crypto-market',

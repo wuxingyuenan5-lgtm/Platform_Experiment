@@ -35,6 +35,7 @@ from app.research_overseas_repository import (
     read_latest_series,
 )
 from app.research_provider_commodity_dashboard import CommodityDashboardProvider
+from app.research_gold import read_gold, analyst_page
 from app.research_provider_crypto_dashboard import CryptoDashboardProvider
 from app.research_provider_errors import ResearchProviderError
 from app.research_provider_macro import (
@@ -343,6 +344,32 @@ async def commodity_dashboard_v1(
         ) from exc
     _cache_header(response, 300)
     return result
+
+
+@router.get("/commodity/gold-positioning")
+def gold_positioning(_: ResearchPrincipal):
+    try:
+        return read_gold("gold-positioning")
+    except ResearchProviderError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/commodity/gold-report")
+def gold_report(_: ResearchPrincipal):
+    try:
+        return read_gold("gold-report")
+    except ResearchProviderError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/commodity/analyst-views")
+def gold_analysts(_: ResearchPrincipal, author: str = Query("", max_length=80),
+                  stance: str = Query("", max_length=30), query: str = Query("", max_length=150),
+                  page: int = Query(1, ge=1), page_size: int = Query(12, ge=1, le=50)):
+    try:
+        return analyst_page(author=author, stance=stance, query=query, page=page, page_size=page_size)
+    except ResearchProviderError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/crypto/dashboard-v1", response_model=MacroDashboardResponse)

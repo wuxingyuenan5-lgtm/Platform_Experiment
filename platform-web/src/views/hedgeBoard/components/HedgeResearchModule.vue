@@ -33,7 +33,7 @@
           <h4>{{ resolveSectionTitle(section.id, section.title) }}</h4>
         </div>
         <button
-          v-if="isMarketDetailSection(section)"
+          v-if="isCollapsibleSection(section)"
           type="button"
           class="section-toggle market-detail-section-toggle"
           :aria-expanded="isMarketDetailExpanded(section.id)"
@@ -45,22 +45,26 @@
       </div>
 
       <div
-        v-if="!isMarketDetailSection(section) || isMarketDetailExpanded(section.id)"
+        v-if="!isCollapsibleSection(section) || isMarketDetailExpanded(section.id)"
         :id="`${section.id}-content`"
         class="widget-grid"
         :class="`widget-grid--${section.layout ?? 'three'}`"
       >
-        <article
+        <ChartExpand
           v-for="widget in orderedWidgets(section)"
+          :title="resolveWidgetTitle(widget.localKey, widget.title)"
+          :enabled="widget.kind !== 'external-link'"
           :key="`${section.id}-${widget.title}`"
           class="widget-card"
           :class="{
             'widget-card--local-chart': widget.kind === 'local-chart',
             'widget-card--reference': widget.kind === 'external-link',
+            'widget-card--expandable': widget.kind !== 'external-link',
             'widget-card--wide':
               widget.localKey === 'macro-global-m2' ||
               widget.localKey === 'macro-fed-balance-structure' ||
-              widget.localKey === 'etf-weekly-flows',
+              widget.localKey === 'etf-weekly-flows' ||
+              widget.localKey === 'crypto-strategy-holdings',
             'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
             'widget-card--halving': widget.localKey === 'crypto-halving-cycles',
             'widget-card--urpd': widget.localKey === 'crypto-urpd',
@@ -125,7 +129,7 @@
             </VisibleChart>
             <component :is="tradingViewWidget" v-else :widget="widget" />
           </component>
-        </article>
+        </ChartExpand>
       </div>
     </section>
   </section>
@@ -135,6 +139,7 @@
   import { computed, ref, type Component } from 'vue';
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
   import VisibleChart from './VisibleChart';
+  import ChartExpand from './ChartExpand.vue';
   import type { ChartSection, LocalWidgetKey, WidgetConfig } from '../nativeData/dashboardClean';
 
   const props = defineProps<{
@@ -187,6 +192,10 @@
     expandedDeferredWidgetIds.value = isDeferredWidgetExpanded(sectionId, widget)
       ? expandedDeferredWidgetIds.value.filter((item) => item !== id)
       : [...expandedDeferredWidgetIds.value, id];
+  }
+
+  function isCollapsibleSection(section: ChartSection) {
+    return isMarketDetailSection(section) || section.id === 'gold-research-analysts';
   }
 
   function isMarketDetailSection(section: ChartSection) {
@@ -390,6 +399,10 @@
 
   .widget-card__header {
     padding: 18px 20px 0;
+  }
+
+  .widget-card--expandable .widget-card__header-main {
+    padding-right: 40px;
   }
 
   .widget-card__header-main {

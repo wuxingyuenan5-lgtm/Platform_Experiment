@@ -297,15 +297,26 @@ class ResearchCapture:
             self.stop_event.wait(300)
 
     def _prices(self):
-        from app.research_price_history import STREAMS, capture_prices
+        from app.research_price_history import (
+            DAILY_HISTORY_DAYS,
+            DAILY_SPOT_STREAMS,
+            STREAMS,
+            capture_prices,
+        )
 
         assert self.spool
         while not self.stop_event.is_set() and not self.spool.error:
             complete = True
-            for category, symbol, price_type in STREAMS:
+            streams = [(c, s, p, "D", DAILY_HISTORY_DAYS) for c, s, p in DAILY_SPOT_STREAMS]
+            streams += [
+                (c, s, p, "1", self.settings.research_price_history_days) for c, s, p in STREAMS
+            ]
+            for category, symbol, price_type, interval, days in streams:
                 if self.stop_event.is_set():
                     return
-                key = f"history:{category}:{symbol}:{price_type}"
+                key = f"history:{category}:{symbol}:{price_type}" + (
+                    ":1d" if interval == "D" else ""
+                )
                 try:
                     client = self.gateway.bybit._connections.client(
                         self.settings.research_bybit_account_id
@@ -316,7 +327,8 @@ class ResearchCapture:
                         category,
                         symbol,
                         price_type,
-                        self.settings.research_price_history_days,
+                        days,
+                        interval=interval,
                     )
                     complete = complete and state["complete"]
                     self.source_health[key] = {

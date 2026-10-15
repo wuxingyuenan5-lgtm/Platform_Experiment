@@ -55,6 +55,13 @@ def annualized_volatility_20(closes: Sequence[Decimal | float | int]) -> Decimal
     return Decimal(str(volatility)).quantize(PCT_QUANT, rounding=ROUND_HALF_UP)
 
 
+def market_breadth_pct(up: int | None, down: int | None) -> Decimal | None:
+    """Net advancing share in percentage points; flat stocks are excluded."""
+    if up is None or down is None or up < 0 or down < 0 or up + down == 0:
+        return None
+    return Decimal(100) * Decimal(up - down) / Decimal(up + down)
+
+
 def classify_market_breadth(up: int, down: int) -> str:
     if up < 0 or down < 0:
         raise ValueError("up and down counts must be non-negative")

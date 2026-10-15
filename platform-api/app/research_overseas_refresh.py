@@ -24,6 +24,7 @@ from app.research_cumulative_volatility import refresh_cumulative_volatility
 from app.research_macro_expectations_refresh import refresh_macro_expectations
 from app.research_market_detail_refresh import refresh_market_details
 from app.research_overseas_repository import (
+    _read_shared_daily_prices,
     read_latest_fetched_at,
     write_iv_snapshot,
     write_overseas_points,
@@ -31,7 +32,6 @@ from app.research_overseas_repository import (
 )
 from app.research_provider_overseas import (
     fetch_btc_iv_snapshot,
-    fetch_crypto_daily_prices,
     fetch_deribit_iv,
     fetch_etf_flow,
     fetch_fedwatch,
@@ -43,8 +43,8 @@ _REFRESH_LOCK = asyncio.Lock()
 
 _SOURCE_FEDWATCH = "CME FedWatch (30-Day Fed Funds Futures)"
 _SOURCE_ETF = {
-    "btc": "Farside UK BTC Spot ETF Flows; Bybit daily close conversion",
-    "eth": "Farside UK ETH Spot ETF Flows; Bybit daily close conversion",
+    "btc": "Farside UK BTC Spot ETF Flows; shared Bybit spot UTC daily close conversion",
+    "eth": "Farside UK ETH Spot ETF Flows; shared Bybit spot UTC daily close conversion",
 }
 _SOURCE_IV = "Deribit BTC Options ATM IV"
 
@@ -155,18 +155,9 @@ async def _collect_etf_flow(force: bool, asset: str = "btc") -> tuple[str, str]:
         # history on each daily refresh also backfills dates missing before
         # the long-window contract was enabled.
         data = await asyncio.to_thread(fetch_etf_flow, 3650, asset_key)
-        try:
-            prices = await asyncio.to_thread(
-                fetch_crypto_daily_prices,
-                asset_key,
-                data["days"][0]["date"],
-                data["days"][-1]["date"],
-            )
-        except Exception:
-            # ETF flow refresh remains usable when the independent price
-            # conversion source is temporarily unavailable. Rows retain the
-            # original USD flow and are converted on the next successful run.
-            prices = {}
+        prices = await asyncio.to_thread(
+            _read_shared_daily_prices, asset_key, [day["date"] for day in data["days"]]
+        )
         # Never publish a mixed-unit series: a partial price map would make
         # some rows BTC/ETH and the remaining rows USD while the card exposes
         # only one unit label. Wait for a complete daily-close window instead.
@@ -176,7 +167,9 @@ async def _collect_etf_flow(force: bool, asset: str = "btc") -> tuple[str, str]:
         latest = data["days"][-1]["date"]
         meta = {"tickers": tickers, "unit": "US$m"}
         if prices:
-            meta.update({"coinUnit": asset_key.upper(), "priceSource": "Bybit daily linear close"})
+            meta.update(
+                {"coinUnit": asset_key.upper(), "priceSource": "Bybit spot UTC daily close (USDT)"}
+            )
         points: list[tuple[str, str, dict]] = [(latest, "__meta__", meta)]
         for day in data["days"]:
             for ticker in tickers:
@@ -187,9 +180,7 @@ async def _collect_etf_flow(force: bool, asset: str = "btc") -> tuple[str, str]:
                     if usd_flow is not None and price and price > 0
                     else None
                 )
-                points.append(
-                    (day["date"], ticker, {"flow": usd_flow, "coinFlow": coin_flow, "price": price})
-                )
+                points.append((day["date"], ticker, {"flow": usd_flow, "coinFlow": coin_flow}))
         async with RESEARCH_DB_WRITE_LOCK:
             await asyncio.to_thread(
                 write_overseas_points, run_id, dataset, points, source=_SOURCE_ETF[asset_key]
@@ -239,9 +230,7 @@ async def _collect_deribit_iv(force: bool) -> tuple[str, str]:
         # 2. 抓 1M/3M/6M/1Y 快照（按日累积）
         snap = await asyncio.to_thread(fetch_btc_iv_snapshot)
         async with RESEARCH_DB_WRITE_LOCK:
-            await asyncio.to_thread(
-                write_iv_snapshot, run_id, today, snap, source=_SOURCE_IV
-            )
+            await asyncio.to_thread(write_iv_snapshot, run_id, today, snap, source=_SOURCE_IV)
             await asyncio.to_thread(finish_refresh, run_id, "ready")
         return "ready", ""
     except BaseException as exc:
@@ -304,9 +293,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     if not settings.research_refresh_enabled:
         yield
         return
-    task = asyncio.create_task(
-        _run_periodic(max(60.0, settings.research_refresh_interval_seconds))
-    )
+    task = asyncio.create_task(_run_periodic(max(60.0, settings.research_refresh_interval_seconds)))
     market_task = asyncio.create_task(_run_market_periodic())
     try:
         yield

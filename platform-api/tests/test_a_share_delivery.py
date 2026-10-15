@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from decimal import Decimal
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -281,6 +282,36 @@ def test_full_market_turnover_history_includes_backend_day_change_and_source(res
     assert rows[-2].amount_change_pct is None
     assert rows[-1].observed_at.isoformat() == "2030-01-03"
     assert rows[-1].amount_change_pct == 10
+
+
+def test_market_width_normalizes_both_archive_units_without_changing_raw_evidence(research_db):
+    asyncio.run(refresh.refresh_a_share_research(force=True))
+    cases = [
+        ('2030-01-02', 2989, 2108, 113, '0.17284677261134002', 'B_001004'),
+        ('2030-01-03', 2713, 2166, 137, '10.90510366826156299840510367', 'platform-daily-v1'),
+        ('2030-01-04', 10, 10, 50, '0', 'B_001004'),
+        ('2030-01-05', 0, 0, 50, '0', 'platform-daily-v1'),
+    ]
+    for day, up, down, flat, native, definition in cases:
+        assert repository.write_market_archive(dict(
+            universe_key='sh_sz_a', trade_date=day, up=up, down=down, flat=flat,
+            market_breadth_pct=native, source_name='fixture', definition_version=definition,
+            payload={'native_width': native},
+        )) == 'inserted'
+    repository.start_refresh('missing-counts', '2030-01-06')
+    repository.finish_refresh('missing-counts', 'ready')
+    repository.write_history_points('missing-counts', 'market', [
+        ('2030-01-06', 'market', {'marketBreadthPct': 99}),
+    ], source='fixture')
+    rows = {row.observed_at.isoformat(): row for row in repository.read_dashboard().market_history}
+    for day, up, down, flat, native, definition in cases:
+        expected = Decimal(100) * (up-down) / (up+down) if up+down else None
+        assert rows[day].market_breadth_pct == expected
+    assert rows['2030-01-06'].market_breadth_pct is None
+    with connection() as db:
+        stored = db.execute("SELECT trade_date,market_breadth_pct,payload_json FROM research_a_share_market_archive WHERE trade_date >= '2030-01-02' ORDER BY trade_date").fetchall()
+    assert [row['market_breadth_pct'] for row in stored] == [case[4] for case in cases]
+    assert [json.loads(row['payload_json']) for row in stored] == [{'native_width': case[4]} for case in cases]
 
 
 def test_revision_replaces_daily_qualifiers_and_persists_a_zero_day(research_db, monkeypatch):

@@ -115,6 +115,15 @@ def _quote_date(row: Any) -> str | None:
     return observed.astimezone(_CHINA).date().isoformat() if observed else None
 
 
+def _closed_quote(row: Any, trade_date: str) -> bool:
+    observed = row.get("observed_at") if isinstance(row, dict) else row.observed_at
+    return bool(
+        isinstance(observed, datetime)
+        and _quote_date(row) == trade_date
+        and observed.astimezone(_CHINA).time() >= time(15)
+    )
+
+
 def _breadth(spots: Any, emotion: Any) -> AShareBreadthSnapshot | Exception:
     if isinstance(spots, BaseException) or not spots:
         return RuntimeError("全市场行情暂不可用")
@@ -204,11 +213,31 @@ def _crowding(
     spots: list[Any] | BaseException,
     sector_quotes: list[dict[str, Any]] | BaseException,
     innovation: dict[str, Any] | BaseException,
+    close_confirmed: bool,
 ) -> None:
     # Persist direct sector-board quotes only when all fields and dates align.
     from app.research_data_schemas import ResearchModuleResult, ResearchSourceMeta
 
     previous = read_dataset("crowding") or {}
+    if trade_date and not close_confirmed:
+        history = [row for row in previous.get("history", []) if row.get("date") != trade_date]
+        innovation_history = [
+            row for row in previous.get("innovationHistory", []) if row.get("date") != trade_date
+        ]
+        dashboard.crowding = ResearchModuleResult(
+            meta=ResearchSourceMeta(
+                source="东方财富四行业板块报价 / 全A成交额 / 东方财富创新药BK1106",
+                fetched_at=dashboard.generated_at,
+                status="partial",
+                message="收盘数据尚未完成更新，保留此前有效观测",
+            ),
+            data={
+                "history": history,
+                "latest": history[-1] if history else None,
+                "innovationHistory": innovation_history,
+            },
+        )
+        return
     if not trade_date:
         if previous:
             dashboard.crowding = ResearchModuleResult(
@@ -413,7 +442,37 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             ):
                 dashboard.breadth.meta.status = "partial"
                 dashboard.breadth.meta.message = "涨跌分布与涨跌停池未取得同一交易日的完整数据"
-            _crowding(dashboard, trade_date, spots, sector_quotes, innovation)
+            close_window_open = bool(
+                trade_date
+                and (trade_date < today or datetime.now(_CHINA).time() >= time(16, 15))
+            )
+            spots_closed = bool(
+                close_window_open
+                and isinstance(spots, list)
+                and spots
+                and all(_closed_quote(row, trade_date) for row in spots)
+            )
+            sectors_closed = bool(
+                close_window_open
+                and isinstance(sector_quotes, list)
+                and len(sector_quotes) == 4
+                and all(_closed_quote(row, trade_date) for row in sector_quotes)
+            )
+            innovation_closed = bool(
+                close_window_open
+                and isinstance(innovation, dict)
+                and _closed_quote(innovation, trade_date)
+            )
+            if not spots_closed and dashboard.breadth.meta.status == "ready":
+                dashboard.breadth.meta.status = "partial"
+                dashboard.breadth.meta.message = "全市场收盘报价尚未完成更新"
+            if not close_window_open and dashboard.emotion.meta.status == "ready":
+                dashboard.emotion.meta.status = "partial"
+                dashboard.emotion.meta.message = "等待收盘数据完成更新"
+            _crowding(
+                dashboard, trade_date, spots, sector_quotes, innovation,
+                spots_closed and sectors_closed and innovation_closed,
+            )
             choice_settings = get_settings()
             choice_enabled = choice_settings.choice_csd_enabled
             choice_communication_close = (
@@ -426,7 +485,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 if trade_date and choice_enabled
                 else None
             )
-            if trade_date and isinstance(spots, list):
+            if trade_date and spots_closed and isinstance(spots, list):
                 try:
                     all_a_archive = _daily_market_archive_row("all_a", trade_date, spots, emotion)
                     # Do not consume the immutable natural key with a partial row;
@@ -457,7 +516,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                             )
                         except Exception:
                             _LOGGER.warning("a_share_benchmark_archive_write_failed", exc_info=True)
-            if isinstance(sector_quotes, list):
+            if sectors_closed and isinstance(sector_quotes, list):
                 for quote in sector_quotes:
                     if quote.get("board_code") == "BK0448" and quote.get("close") is not None:
                         try:
@@ -493,7 +552,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                     )
                 except Exception:
                     _LOGGER.warning("a_share_choice_archive_write_failed", exc_info=True)
-            if isinstance(innovation, dict) and innovation.get("close") is not None:
+            if innovation_closed and isinstance(innovation, dict) and innovation.get("close") is not None:
                 try:
                     await _write_price_archive_locked(
                         {
@@ -593,7 +652,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                         "research_baskets": prior.get("research_baskets", []),
                     }
                 )
-            pool_ready = all(row["status"] == "ready" for row in stock_rows)
+            pool_ready = spots_closed and all(row["status"] == "ready" for row in stock_rows)
             pool = summarize_stock_pool(
                 {
                     "meta": {
@@ -627,16 +686,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             if isinstance(spots, list) and spots:
                 datasets.append(("stocks", spots, "东方财富全市场行情"))
                 # A close date comes from quotes, never the scheduler's wall clock.
-                closed = trade_date and all(
-                    row.observed_at
-                    and (
-                        str(row.observed_at.astimezone(_CHINA).date()) < today
-                        or row.observed_at.astimezone(_CHINA).time() >= time(15)
-                    )
-                    for row in spots
-                    if _quote_date(row) == trade_date
-                )
-                if closed:
+                if spots_closed:
                     hot = [
                         (
                             trade_date,

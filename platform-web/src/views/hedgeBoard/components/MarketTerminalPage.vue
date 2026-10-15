@@ -308,7 +308,10 @@
         class="market-terminal-chart-modal"
         @click.self="closeTickerChart"
       >
-        <div class="market-terminal-chart-modal__dialog">
+        <ChartExpand
+          :title="`${chartModal.name || chartModal.symbol} 走势`"
+          class="market-terminal-chart-modal__dialog"
+        >
           <div class="market-terminal-chart-modal__header">
             <div>
               <p class="market-terminal-chart-modal__eyebrow">{{ chartModal.symbol }}</p>
@@ -336,7 +339,7 @@
               :class="{ 'is-hidden': chartModal.loading }"
             ></div>
           </div>
-        </div>
+        </ChartExpand>
       </div>
     </Teleport>
   </div>
@@ -344,6 +347,7 @@
 
 <script setup lang="ts">
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
+  import ChartExpand from './ChartExpand.vue';
   import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
   import {
     getMarketDetail,
