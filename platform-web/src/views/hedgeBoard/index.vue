@@ -23,7 +23,6 @@
         :class="{ 'terminal-content--gold': useUnifiedResearchUi }"
       >
         <MacroCalendarPanel v-if="activeCategory === 'macro'" />
-
         <HedgeResearchModule
           :module-id="activeModule.id"
           :module-label="activeModule.label"

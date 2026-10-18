@@ -159,6 +159,10 @@
     aspect-ratio: auto;
   }
 
+  .chart-expand__surface:modal :deep(.source-series-plot--drivers) {
+    min-height: 360px;
+  }
+
   .chart-expand__surface:modal :deep(.etf-flow-panel__chart) {
     max-height: none;
   }

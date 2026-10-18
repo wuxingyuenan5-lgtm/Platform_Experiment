@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+import asyncio
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
@@ -8,8 +9,8 @@ from pydantic import Field, field_validator
 
 from app.research_data_schemas import ResearchApiModel
 from app.research_local_data import read_local_json
-from app.research_provider_errors import ResearchProviderError
 from app.research_option_exposure import OptionExposureSnapshot
+from app.research_provider_errors import ResearchProviderError
 
 
 class MacroDashboardObservation(ResearchApiModel):
@@ -53,11 +54,60 @@ class MacroDashboardResponse(ResearchApiModel):
     groups: dict[str, list[MacroDashboardSeries]]
     option_exposure: dict[str, OptionExposureSnapshot] = Field(default_factory=dict)
 
+    def apply_freshness(self, now: datetime | None = None) -> None:
+        """Recheck observation age even when the producer leaves a valid old file.
+
+        Retrieval times may deliberately stay unchanged for unchanged releases.
+        Low-frequency periods therefore use their own publication tolerance.
+        Unknown disclosure schedules retain producer status, never a daily SLA.
+        """
+        now = now or datetime.now(UTC)
+        limits = {
+            "daily": 7,
+            "daily_business_day": 7,
+            "exchange_trading_day": 7,
+            "weekly": 14,
+            "monthly": 75,
+            "quarterly": 200,
+            "daily_last_collected_snapshot": 2,
+        }
+        for group in self.groups.values():
+            for series in group:
+                if series.status in {"error", "no_data"}:
+                    continue
+                limit = limits.get(series.frequency)
+                if limit is None:
+                    continue
+                observed = (
+                    series.observation_date
+                    or series.as_of
+                    or (series.observations[-1].date if series.observations else None)
+                )
+                try:
+                    day = datetime.fromisoformat((observed or "").replace("Z", "+00:00")).date()
+                except ValueError:
+                    series.status = "degraded"
+                    if "missing_observation_date" not in series.quality_flags:
+                        series.quality_flags.append("missing_observation_date")
+                    continue
+                if now.date() - day > timedelta(days=limit):
+                    series.status = "stale"
+                    series.is_stale = True
+                    if "stale_latest_observation" not in series.quality_flags:
+                        series.quality_flags.append("stale_latest_observation")
+        for snapshot in self.option_exposure.values():
+            snapshot.apply_freshness(now)
+        if any(s.status != "ready" for group in self.groups.values() for s in group) or any(
+            s.status != "ready" for s in self.option_exposure.values()
+        ):
+            if self.status == "ready":
+                self.status = "partial"
+
     def stale_copy(self) -> MacroDashboardResponse:
         result = self.model_copy(deep=True)
         result.status = "stale"
         for snapshot in result.option_exposure.values():
-            snapshot.status = 'stale'
+            snapshot.status = "stale"
         for series in (item for group in result.groups.values() for item in group):
             if series.status not in {"error", "no_data"}:
                 series.status = "stale"
@@ -75,10 +125,11 @@ class MacroDashboardProvider:
 
     async def get(self) -> MacroDashboardResponse:
         try:
-            document = read_local_json("public/v1/macro/dashboard.json")
+            document = await asyncio.to_thread(read_local_json, "public/v1/macro/dashboard.json")
             if document.get("schemaVersion") != "1.0":
                 raise ResearchProviderError("macro_dashboard_schema_mismatch")
             contract = MacroDashboardResponse.model_validate(document)
+            contract.apply_freshness()
             if not any(contract.groups.values()):
                 raise ResearchProviderError("macro_dashboard_without_series")
             # The route only serializes this contract; stale_copy owns mutation isolation.

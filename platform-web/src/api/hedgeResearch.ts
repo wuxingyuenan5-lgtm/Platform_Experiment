@@ -301,6 +301,9 @@ export interface MacroExpectationResponse {
 export type MarketDetailStatus = 'ready' | 'partial' | 'degraded' | 'stale' | 'no_data' | 'error';
 
 export interface MarketDetailRow {
+  currency?: string | null;
+  priceKind?: 'intraday' | 'close' | 'observation';
+  history?: Array<{ date: string; value: string }>;
   sampleSize?: number | null;
   expectedSampleSize?: number | null;
   id: string;
@@ -541,6 +544,34 @@ export const getMarketDetail = (marketId: 'macro' | 'gold' | 'crypto' | 'us' | '
   researchRequest<MarketDetailResponse>({
     method: 'GET',
     url: `/research/market-detail/${marketId}`,
+  });
+
+export interface CrossAssetComparison {
+  status: string;
+  days: number;
+  dates: string[];
+  unavailable: string[];
+  yieldChangeBp: string | null;
+  yieldDates: string[];
+  assets: Array<{
+    id: string;
+    label: string;
+    source: string;
+    asOf: string;
+    status: string;
+    normalized: string[];
+    returnPct: string;
+    drawdownPct: string;
+    correlation20: string | null;
+    downsideMeanPct: string | null;
+    downsideSamples: number;
+  }>;
+}
+export const getCrossAssetComparison = (days: number) =>
+  researchRequest<CrossAssetComparison>({
+    method: 'GET',
+    url: '/research/cross-asset',
+    params: { days },
   });
 
 export const getMacroDashboardV1 = () => loadDashboard('macro', '/research/macro/dashboard-v1');

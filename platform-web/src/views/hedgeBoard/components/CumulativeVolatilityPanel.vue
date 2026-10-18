@@ -74,7 +74,12 @@
 
     <p v-if="response?.message" class="cumulative-volatility__message">{{ response.message }}</p>
 
-    <div v-if="status === 'loading'" class="cumulative-volatility__empty"
+    <p v-if="missingDayCount" class="cumulative-volatility__message"
+      >所选区间有 {{ missingDayCount }} 天无观测，按实际日期显示，缺口处不连线。</p
+    >
+    <div
+      v-if="status === 'loading' && !response?.points.length"
+      class="cumulative-volatility__empty"
       >正在读取已落库的累计波动数据…</div
     >
     <div v-else-if="status === 'error' || !dates.length" class="cumulative-volatility__empty">
@@ -229,6 +234,7 @@
     computed,
     defineComponent,
     onMounted,
+    nextTick,
     onBeforeUnmount,
     PropType,
     ref,
@@ -299,7 +305,9 @@
   const customRangeApplied = ref(false);
   const customStartDate = ref('');
   const customEndDate = ref('');
-  let requestSerial = 0;
+  let loadSerial = 0;
+  let windowSerial = 0;
+  const loadingFull = ref(false);
   let rangeTimer: ReturnType<typeof setTimeout> | undefined;
 
   const plot = { left: 76, right: 1120, top: 22, bottom: 300 };
@@ -361,7 +369,22 @@
             .map((point) => point.sessionDate as string),
         ),
     );
-    return [...new Set(datesBySession.flatMap((sessionDates) => [...sessionDates]))].sort();
+    const observed = [
+      ...new Set(datesBySession.flatMap((sessionDates) => [...sessionDates])),
+    ].sort();
+    if (!observed.length) return [];
+    const start = Date.parse(observed[0]);
+    const end = Date.parse(observed.at(-1)!);
+    return Array.from({ length: Math.round((end - start) / 86_400_000) + 1 }, (_, i) =>
+      new Date(start + i * 86_400_000).toISOString().slice(0, 10),
+    );
+  });
+  const missingDayCount = computed(() => {
+    const selected = new Set(dates.value);
+    const observed = new Set(
+      points.value.filter((p) => selected.has(p.timestamp)).map((p) => p.sessionDate),
+    );
+    return visibleSessionDates.value.filter((day) => !observed.has(day)).length;
   });
   const pointsBySession = computed(() => {
     const selected = new Set(dates.value);
@@ -407,15 +430,16 @@
       .flatMap((map) => [...(map?.values() ?? [])])
       .filter(Number.isFinite),
   );
-  const samplesPerSessionDay = computed(() => {
-    let max = 1;
-    pointsBySession.value.forEach((byDate) =>
-      byDate.forEach((group) => {
-        max = Math.max(max, group.length);
-      }),
-    );
-    return max;
-  });
+  const renderedPrecision = computed(() => response.value?.interval ?? precision.value);
+  const samplesPerSessionDay = computed(
+    () => 480 / { '15m': 15, '1h': 60, '4h': 240 }[renderedPrecision.value],
+  );
+  function sampleSlot(point: (typeof points.value)[number]) {
+    const startHour = point.session === 'asia' ? -1 : point.session === 'europe' ? 7 : 15;
+    const start = Date.parse(point.sessionDate!) + startHour * 3_600_000;
+    const minutes = { '15m': 15, '1h': 60, '4h': 240 }[renderedPrecision.value];
+    return Math.floor((Date.parse(point.timestamp) - start) / (minutes * 60_000));
+  }
   const plotSlotCount = computed(() =>
     Math.max(1, visibleSessionDates.value.length * samplesPerSessionDay.value - 1),
   );
@@ -432,17 +456,17 @@
     visibleSessionSeries.value.map((series) => {
       const byDate = pointsBySession.value.get(series.key) ?? new Map();
       let path = '';
-      let pointIndex = 0;
+      let previousSlot: number | null = null;
       visibleSessionDates.value.forEach((sessionDate, dayIndex) => {
         const group = byDate.get(sessionDate) ?? [];
-        group.forEach((point, sampleIndex) => {
+        group.forEach((point) => {
           const value = visibleValueMap.value.get(series.key)?.get(point.timestamp) ?? NaN;
           if (!Number.isFinite(value)) return;
-          const slot = dayIndex * samplesPerSessionDay.value + sampleIndex;
-          path += `${pointIndex ? 'L' : 'M'}${xForSlot(slot).toFixed(2)},${yForValue(value).toFixed(
-            2,
-          )} `;
-          pointIndex += 1;
+          const slot = dayIndex * samplesPerSessionDay.value + sampleSlot(point);
+          path += `${previousSlot !== null && slot === previousSlot + 1 ? 'L' : 'M'}${xForSlot(
+            slot,
+          ).toFixed(2)},${yForValue(value).toFixed(2)} `;
+          previousSlot = slot;
         });
       });
       return { ...series, path: path.trim() };
@@ -488,9 +512,13 @@
   });
   const pricePath = computed(() => {
     let path = '';
-    pricePoints.value.forEach((point, index) => {
+    let previousDate: string | undefined;
+    pricePoints.value.forEach((point) => {
       const x = xForDate(point.sessionDate);
-      path += `${index ? 'L' : 'M'}${x.toFixed(2)},${yForPrice(point.value).toFixed(2)} `;
+      const continuous =
+        previousDate && Date.parse(point.sessionDate) - Date.parse(previousDate) === 86_400_000;
+      path += `${continuous ? 'L' : 'M'}${x.toFixed(2)},${yForPrice(point.value).toFixed(2)} `;
+      previousDate = point.sessionDate;
     });
     return path.trim();
   });
@@ -543,14 +571,17 @@
 
   function formatDate(value: string | undefined) {
     if (!value) return '—';
-    return value.slice(5, 16).replace('T', ' ');
+    return (
+      visibleSessionDates.value.length > 180 ? value.slice(0, 16) : value.slice(5, 16)
+    ).replace('T', ' ');
   }
 
   function valueAt(series: { key: string }, index: number) {
     const sessionDate = visibleSessionDates.value[Math.floor(index / samplesPerSessionDay.value)];
-    const point = pointsBySession.value.get(series.key)?.get(sessionDate)?.[
-      index % samplesPerSessionDay.value
-    ];
+    const point = pointsBySession.value
+      .get(series.key)
+      ?.get(sessionDate)
+      ?.find((p) => sampleSlot(p) === index % samplesPerSessionDay.value);
     const value = point ? Number(point.value) : null;
     return value == null ? '—' : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
   }
@@ -584,6 +615,10 @@
     customRangeOpen.value = false;
     customRangeApplied.value = false;
     days.value = value;
+    if (!allDates.value.length && !loadingFull.value) {
+      void load();
+      return;
+    }
     applyPresetIndices();
   }
 
@@ -613,23 +648,47 @@
 
   async function load() {
     clearTimeout(rangeTimer);
-    const serial = ++requestSerial;
+    const serial = ++loadSerial;
+    ++windowSerial;
+    loadingFull.value = true;
     status.value = 'loading';
     hoverIndex.value = null;
     try {
       const result = await getCumulativeVolatility(props.asset, 365, precision.value);
-      if (serial !== requestSerial) return;
+      if (serial !== loadSerial) return;
+      const previousWindow = customRangeApplied.value
+        ? {
+            start: allDates.value[startIndex.value],
+            end: allDates.value[endIndex.value],
+          }
+        : null;
       response.value = result.data;
       fullResponse.value = result.data;
-      applyPresetIndices();
-      customRangeApplied.value = false;
+      if (previousWindow?.start && previousWindow.end) {
+        startIndex.value = Math.max(
+          0,
+          allDates.value.findIndex((t) => t >= previousWindow.start),
+        );
+        endIndex.value = Math.max(
+          startIndex.value,
+          allDates.value.reduce((last, t, i) => (t <= previousWindow.end ? i : last), -1),
+        );
+      } else {
+        applyPresetIndices();
+        customRangeApplied.value = false;
+      }
       customRangeOpen.value = false;
-      if (!result.data.points.length) status.value = 'error';
+      await nextTick();
+      if (serial !== loadSerial) return;
+      loadingFull.value = false;
+      status.value = 'ready';
+      scheduleWindowRead();
     } catch (error) {
-      if (serial !== requestSerial) return;
+      if (serial !== loadSerial) return;
       console.warn('[hedgeBoard] cumulative volatility unavailable', props.asset, error);
       response.value = null;
       fullResponse.value = null;
+      loadingFull.value = false;
       status.value = 'error';
     }
   }
@@ -649,21 +708,21 @@
 
   function scheduleWindowRead() {
     clearTimeout(rangeTimer);
-    const serial = ++requestSerial;
+    if (loadingFull.value) return;
+    const serial = ++windowSerial;
     hoverIndex.value = null;
     if (!allDates.value.length) return;
-    status.value = 'loading';
+    const window = { start: allDates.value[startIndex.value], end: allDates.value[endIndex.value] };
+    const asset = props.asset;
+    const interval = precision.value;
     rangeTimer = setTimeout(async () => {
       try {
-        const result = await getCumulativeVolatility(props.asset, 365, precision.value, {
-          start: allDates.value[startIndex.value],
-          end: allDates.value[endIndex.value],
-        });
-        if (serial !== requestSerial) return;
+        const result = await getCumulativeVolatility(asset, 365, interval, window);
+        if (serial !== windowSerial) return;
         response.value = result.data;
         status.value = 'ready';
       } catch {
-        if (serial !== requestSerial) return;
+        if (serial !== windowSerial) return;
         status.value = 'error';
       }
     }, 180);
@@ -674,7 +733,8 @@
   watch([startIndex, endIndex], scheduleWindowRead);
   onBeforeUnmount(() => {
     clearTimeout(rangeTimer);
-    requestSerial += 1;
+    loadSerial += 1;
+    windowSerial += 1;
   });
 </script>
 
@@ -918,6 +978,17 @@
 
   .cumulative-volatility__legend-note {
     margin-left: auto;
+  }
+
+  :deep(.chart-range__label--start) {
+    left: 0 !important;
+    transform: none !important;
+  }
+
+  :deep(.chart-range__label--end) {
+    right: 0;
+    left: auto !important;
+    transform: none !important;
   }
 
   .cumulative-volatility__empty {

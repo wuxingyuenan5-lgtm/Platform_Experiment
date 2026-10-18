@@ -10,6 +10,7 @@ import httpx
 from pydantic import Field, ValidationError, field_validator
 
 from app.research_data_schemas import ResearchApiModel
+from app.research_equity_catalog import US_EXTRA_SYMBOLS
 from app.research_local_data import read_local_json
 from app.research_provider_errors import ResearchProviderError
 
@@ -45,6 +46,9 @@ class MarketDetailRow(ResearchApiModel):
     signals: dict[str, str | None] = Field(default_factory=dict)
     sample_size: int | None = None
     expected_sample_size: int | None = None
+    currency: str | None = None
+    price_kind: Literal["intraday", "close", "observation"] = "observation"
+    history: list[dict[str, str]] = Field(default_factory=list)
 
 
 class MarketDetailResponse(ResearchApiModel):
@@ -122,6 +126,9 @@ class MarketDetailProvider:
 
             async def fetch(row_id: str, symbol: str):
                 async with semaphore:
+                    if market_id == 'global' and row_id == 'global-rsx':
+                        from app.research_source_moex import fetch_imoex
+                        return await fetch_imoex(client, self._user_agent)
                     return await self._fetch_yahoo_history(client, row_id, symbol)
 
             results = await asyncio.gather(
@@ -130,11 +137,13 @@ class MarketDetailProvider:
             )
         series: dict[str, list[tuple[str, Decimal]]] = {}
         timezones: dict[str, str] = {}
+        quote_meta: dict[str, dict] = {}
         for result in results:
             if isinstance(result, BaseException):
                 continue
-            row_id, points, source_timezone = result
+            row_id, points, source_timezone, metadata = result
             timezones[row_id] = source_timezone
+            quote_meta[row_id] = metadata
             if points:
                 series[row_id] = points
         derived = GOLD_DERIVED if market_id == "gold" else {}
@@ -146,6 +155,29 @@ class MarketDetailProvider:
         rows = [_market_row(row_id, points) for row_id, points in series.items() if points]
         for row in rows:
             row.timezone = timezones.get(row.id, "UTC")
+            metadata = quote_meta.get(row.id, {})
+            row.currency = metadata.get("currency")
+            row.price_kind = metadata.get("price_kind", "observation")
+            row.as_of = metadata.get("as_of") or row.as_of
+            if metadata.get('source'):
+                row.source = metadata['source']
+                row.source_url = metadata['source_url']
+                row.name = metadata['name']
+                row.unit = metadata['unit']
+                row.quality_flags.extend(metadata.get('quality_flags', []))
+            if row.price_kind == "intraday":
+                row.quality_flags.append("unfinished_daily_bar")
+            # Date-labelled returns must not include an unfinished session.
+            today = datetime.now(ZoneInfo(row.timezone)).date().isoformat()
+            row.history = (
+                [
+                    {"date": day, "value": str(value)}
+                    for day, value in series[row.id]
+                    if day < today or (day == today and row.price_kind == "close")
+                ][-260:]
+                if market_id == "us" or row.id in {"gold-gld-row", "crypto-btc-row", "global-rsx"}
+                else []
+            )
             row.symbol = yahoo_symbols.get(row.id, row.id).replace("%5E", "^")
             if row.symbol.startswith("^"):
                 row.unit = "index"
@@ -181,7 +213,7 @@ class MarketDetailProvider:
 
     async def _fetch_yahoo_history(
         self, client: httpx.AsyncClient, row_id: str, symbol: str
-    ) -> tuple[str, list[tuple[str, Decimal]], str]:
+    ) -> tuple[str, list[tuple[str, Decimal]], str, dict]:
         response = await client.get(
             f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
             params={"range": "2y", "interval": "1d", "events": "history"},
@@ -191,7 +223,8 @@ class MarketDetailProvider:
         result = ((response.json().get("chart") or {}).get("result") or [None])[0] or {}
         timestamps = result.get("timestamp") or []
         closes = (((result.get("indicators") or {}).get("quote") or [{}])[0]).get("close") or []
-        timezone = ZoneInfo((result.get("meta") or {}).get("exchangeTimezoneName") or "UTC")
+        meta = result.get("meta") or {}
+        timezone = ZoneInfo(meta.get("exchangeTimezoneName") or "UTC")
         points: dict[str, Decimal] = {}
         for timestamp, close in zip(timestamps, closes, strict=False):
             if close is None:
@@ -200,7 +233,29 @@ class MarketDetailProvider:
             if not value.is_finite():
                 continue
             points[datetime.fromtimestamp(timestamp, tz=timezone).date().isoformat()] = value
-        return row_id, sorted(points.items()), timezone.key
+        ordered = sorted(points.items())
+        today = datetime.now(timezone).date().isoformat()
+        latest_day = ordered[-1][0] if ordered else None
+        regular_end = ((meta.get("currentTradingPeriod") or {}).get("regular") or {}).get("end")
+        open_bar = latest_day == today and (
+            meta.get("instrumentType") == "CRYPTOCURRENCY"
+            or regular_end is None
+            or datetime.now(UTC).timestamp() < regular_end
+        )
+        quote_time = meta.get("regularMarketTime")
+        as_of = datetime.fromtimestamp(quote_time, tz=timezone).isoformat() if quote_time else None
+        if as_of and as_of[:10] != latest_day:
+            as_of = None
+        return (
+            row_id,
+            ordered,
+            timezone.key,
+            {
+                "currency": meta.get("currency"),
+                "as_of": as_of,
+                "price_kind": "intraday" if open_bar else "close",
+            },
+        )
 
 
 GOLD_YAHOO_SYMBOLS = {
@@ -263,18 +318,22 @@ US_YAHOO_SYMBOLS = {
     ).split()
 }
 US_YAHOO_SYMBOLS.update({"us-ndx": "^NDX", "us-dji": "^DJI", "us-vix": "^VIX", "us-move": "^MOVE"})
+for _symbol in US_EXTRA_SYMBOLS:
+    if _symbol not in US_YAHOO_SYMBOLS.values():
+        US_YAHOO_SYMBOLS[f"us-{_symbol.lower().lstrip('^')}"] = _symbol
 GLOBAL_YAHOO_SYMBOLS = {
     f"global-{symbol.lower()}": symbol
     for symbol in (
         "EWA EWC EWQ EWG EWH EWI EWJ EWN EWS EWP EWL EWU ARGT EWZ ECH MCHI INDA EIDO "
-        "EWM EWW EPHE EPOL RSX EZA EWY EWT THD TUR VNM EFA EEM IEMG VEA VWO VIGI AIA"
+        "EWM EWW EPHE EPOL EZA EWY EWT THD TUR VNM EFA EEM IEMG VEA VWO VIGI AIA"
     ).split()
 }
 MARKET_SYMBOLS = {
     "gold": GOLD_YAHOO_SYMBOLS,
     "crypto": CRYPTO_YAHOO_SYMBOLS,
     "us": US_YAHOO_SYMBOLS,
-    "global": GLOBAL_YAHOO_SYMBOLS,
+    # Retain the catalogue identity for saved user layouts; the instrument is IMOEX.
+    "global": {**GLOBAL_YAHOO_SYMBOLS, "global-rsx": "IMOEX"},
 }
 
 # Fixed research pools; never presented as whole-market or S&P 500 breadth.
@@ -433,8 +492,8 @@ def _market_row(row_id: str, points: list[tuple[str, Decimal]]) -> MarketDetailR
         as_of=latest_date,
         source="Yahoo Finance",
         source_url="https://finance.yahoo.com/",
-        methodology_version="market-detail-close-v2",
-        quality_flags=["daily_close_price_return_excludes_distributions"],
+        methodology_version="market-detail-observation-v3",
+        quality_flags=["price_return_excludes_distributions"],
         close=latest,
         change_1d=_change_from_previous(parsed_points),
         change_1w=_change_from_cutoff(parsed_points, latest_day - timedelta(days=7)),

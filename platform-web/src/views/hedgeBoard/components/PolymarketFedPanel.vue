@@ -8,8 +8,8 @@
     <div v-else class="polymarket-fed-panel__body">
       <header class="polymarket-fed-panel__toolbar">
         <div>
-          <strong>美联储利率路径</strong>
-          <span>Polymarket 隐含概率 · 历史数据</span>
+          <strong>FOMC 会议利率路径</strong>
+          <span>加息、维持与降息概率 · 历史数据</span>
         </div>
         <div class="polymarket-fed-panel__ranges" role="tablist" aria-label="历史范围">
           <button

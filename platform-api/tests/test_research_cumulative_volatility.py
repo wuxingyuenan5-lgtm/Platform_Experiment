@@ -203,3 +203,33 @@ def test_provisional_refresh_replaces_bucket_and_keeps_other_assets(monkeypatch)
         cumulative._publish_samples("sample-test", [record("btc", "07:25", 4)], {"btc"})
     timestamp = read_cumulative_volatility("btc", 30, "4h")["points"][0]["timestamp"]
     assert timestamp.endswith("07:20:00Z")
+
+
+def test_internal_gap_rebuild_requires_valid_shared_source_and_does_not_loop_on_real_gaps():
+    import json
+    from app.database import connection
+    from app.research_a_share_repository import start_refresh, write_history_points
+    initialize_database()
+    start_refresh('gap-test', None)
+    origin = datetime.now(UTC).replace(hour=0,minute=0,second=0,microsecond=0)-timedelta(days=10)
+    records = []
+    for offset in (0,4):
+        stamp=(origin+timedelta(days=offset,hours=8)).isoformat().replace('+00:00','Z')
+        records.append((stamp,'gold:europe:15m',{'timestamp':stamp,'session':'europe','sessionDate':stamp[:10],'interval':'15m','value':'0','price':'100'}))
+    write_history_points('gap-test',cumulative.DATASET,records,source=cumulative.SOURCE)
+    assert not cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))
+    time=int((origin+timedelta(days=2,hours=8)).timestamp()*1000)
+    payload={'symbol':'XAUTUSDT','category':'linear','priceType':'trade','close':'100','quality':['invalid']}
+    with connection() as db:
+        db.execute("INSERT INTO research_strategy_projection VALUES(?,?,?,?)",('historical_candle','XAUTUSDT:linear:trade',time,json.dumps(payload)))
+    assert not cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))
+    payload['quality']=[]
+    with connection() as db:
+        db.execute("UPDATE research_strategy_projection SET payload_json=? WHERE kind='historical_candle' AND entity='XAUTUSDT:linear:trade'",(json.dumps(payload),))
+    assert cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))
+    assert not cumulative._has_recoverable_gap('btc',origin,origin+timedelta(days=5))
+    stamp=(origin+timedelta(days=2,hours=8)).isoformat().replace('+00:00','Z')
+    write_history_points('gap-test',cumulative.DATASET,[(stamp,'gold:europe:15m',{
+        'timestamp':stamp,'session':'europe','sessionDate':stamp[:10],'interval':'15m','value':'1','price':'100'
+    })],source=cumulative.SOURCE)
+    assert not cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))

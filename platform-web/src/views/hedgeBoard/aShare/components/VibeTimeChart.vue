@@ -6,13 +6,13 @@
         ><h3>{{ title }}</h3
         ><div class="range-buttons" role="group" :aria-label="`${title}历史范围`"
           ><button
-            v-for="size in [60, 90, 0]"
+            v-for="size in frequency === 'monthly' ? [36, 60, 0] : [60, 90, 0]"
             :key="size"
             type="button"
             :aria-pressed="preset === size"
             :class="{ active: preset === size }"
             @click="setPreset(size)"
-            >{{ size ? `近${size}日` : '全部' }}</button
+            >{{ size ? `近${size}${frequency === 'monthly' ? '期' : '日'}` : '全部' }}</button
           ></div
         ></header
       >
@@ -90,7 +90,7 @@
             :y="plotHeight - 14"
             :text-anchor="index === start ? 'start' : index === end ? 'end' : 'middle'"
           >
-            {{ dates[index]?.slice(5) }}
+            {{ formatDateLabel(dates[index]) }}
           </text>
           <g v-for="entry in visible" :key="entry.item.name" :clip-path="`url(#${clipId})`">
             <template v-if="entry.item.type === 'bar'">
@@ -180,7 +180,10 @@
       </div>
       <footer
         >{{ shownDates[0] || '—' }} — {{ shownDates.at(-1) || '—'
-        }}<span>{{ shownDates.length }}个交易日 · 空缺数据不连线</span></footer
+        }}<span
+          >{{ shownDates.length }}{{ frequency === 'monthly' ? '期（月度）' : '个交易日' }} ·
+          空缺数据不连线</span
+        ></footer
       >
     </article>
   </ChartExpand>
@@ -211,12 +214,15 @@
     title: string;
     yLabel: string;
     rightLabel?: string;
+    frequency?: 'monthly';
+    precision?: number;
     dates: string[];
     series: Series[];
   }>();
   const chartExpanded = ref(false);
   const { height: viewportHeight } = useWindowSize();
-  const preset = ref<number | null>(90);
+  const defaultWindow = props.frequency === 'monthly' ? 60 : 90;
+  const preset = ref<number | null>(defaultWindow);
   const startIndex = ref(0);
   const endIndex = ref(0);
   const hidden = ref(new Set<number>());
@@ -385,14 +391,16 @@
       .percent;
     return percent
       ? `${(tick * 100).toFixed(1)}%`
-      : tick.toLocaleString('zh-CN', { maximumFractionDigits: 1 });
+      : tick.toLocaleString('zh-CN', { maximumFractionDigits: props.precision ?? 1 });
   }
   function valueLabel(raw: unknown, item: Series) {
     const value = numeric(raw);
     if (value == null) return '—';
     return item.percent
       ? `${(value * 100).toFixed(2)}%`
-      : `${value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}${item.unit || ''}`;
+      : `${value.toLocaleString('zh-CN', { maximumFractionDigits: props.precision ?? 2 })}${
+          item.unit || ''
+        }`;
   }
   function toggle(index: number) {
     const next = new Set(hidden.value);
@@ -433,7 +441,7 @@
     axisState.value[axis] = { domain: dataDomain(axis), manual: false };
   }
   function resetTime() {
-    setPreset(preset.value ?? 90);
+    setPreset(preset.value ?? defaultWindow);
   }
   function axisAt(event: MouseEvent | WheelEvent): 'left' | 'right' | 'plot' {
     const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
@@ -531,6 +539,7 @@
   }
   function formatDateLabel(value: string | undefined) {
     if (!value) return '—';
+    if (props.frequency === 'monthly') return value.slice(0, 7);
     return value.length > 10 ? value.slice(5, 16).replace('T', ' ') : value.slice(5);
   }
   watch(
@@ -557,7 +566,7 @@
     },
     { immediate: true, deep: true },
   );
-  setPreset(90);
+  setPreset(defaultWindow);
 </script>
 
 <style scoped lang="less">

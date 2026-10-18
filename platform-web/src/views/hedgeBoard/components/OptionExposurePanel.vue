@@ -179,7 +179,8 @@
         ><a :href="snapshot.sourceUrl" target="_blank" rel="noopener noreferrer">{{
           snapshot.source
         }}</a>
-        · 采集 {{ timestamp(snapshot.collectedAt) }}</p
+        · 采集 {{ timestamp(snapshot.collectedAt) }} ·
+        {{ market === 'deribit' ? '每六小时快照，非实时敞口' : '日度快照，非实时敞口' }}</p
       >
     </template>
   </div>

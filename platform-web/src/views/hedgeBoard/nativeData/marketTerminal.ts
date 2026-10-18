@@ -44,6 +44,14 @@ export interface TerminalTableColumn {
 }
 
 export interface TerminalTableRow {
+  observationDate?: string;
+  asOf?: string;
+  source?: string;
+  sourceUrl?: string;
+  dataStatus?: string;
+  qualityFlags?: string[];
+  currency?: string;
+  priceKind?: string;
   id: string;
   name: string;
   symbol: string;
@@ -122,7 +130,7 @@ export interface MarketTerminalPageConfig {
 const detailColumns: TerminalTableColumn[] = [
   { key: 'name', label: '名称 / 代码' },
   { key: 'spark', label: '90日', align: 'center' },
-  { key: 'price', label: '收盘', align: 'right' },
+  { key: 'price', label: '最新观测', align: 'right' },
   { key: 'd1', label: '1D', align: 'center' },
   { key: 'ytd', label: 'YTD', align: 'center' },
   { key: 'qtd', label: 'QTD', align: 'center' },
@@ -2123,8 +2131,8 @@ const globalDetailGroups: TerminalTableGroup[] = [
       ),
       row(
         'global-rsx',
-        '俄罗斯',
-        'RSX',
+        '俄罗斯（MOEX 指数）',
+        'IMOEX',
         '5.62',
         '0.00%',
         '0.00%',
@@ -2602,8 +2610,8 @@ const globalRotationHeatmap: RotationHeatmapRow[] = [
   },
   {
     id: 'global-heat-rsx',
-    symbol: 'RSX',
-    label: '俄罗斯',
+    symbol: 'IMOEX',
+    label: '俄罗斯（MOEX 指数）',
     d1: '0.00%',
     w1: '0.00%',
     m1: '0.00%',

@@ -137,6 +137,7 @@ def test_artifact_failure_marks_cached_values_stale(monkeypatch, module, provide
                     "status": "ready",
                     "unit": "percent",
                     "frequency": "monthly",
+                    "observationDate": datetime.now(UTC).date().isoformat(),
                     "timezone": "UTC",
                     "source": "test",
                     "latestValue": "1.2345",
@@ -244,3 +245,15 @@ def test_partial_market_snapshot_has_one_source_specific_audit_check(db, monkeyp
     assert len(checks) == 1
     assert checks[0]["status"] == "warning"
     assert checks[0]["group"] == "市场明细"
+
+def test_instrument_replacement_never_relabels_old_prices(db,monkeypatch):
+    old=snapshot()
+    old.rows[0].symbol='OLD'
+    async def prior(_market):return old
+    monkeypatch.setattr(refresh._PROVIDER,'_get_live_market_detail',prior)
+    asyncio.run(refresh.refresh_market_details(force=True))
+    async def missing(_market):return snapshot().model_copy(update={'rows':[],'status':'partial'})
+    monkeypatch.setattr(refresh._PROVIDER,'_get_live_market_detail',missing)
+    asyncio.run(refresh.refresh_market_details(force=True))
+    result=asyncio.run(MarketDetailProvider(timeout_seconds=1,user_agent='test').get('us'))
+    assert result.rows==[]

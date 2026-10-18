@@ -66,6 +66,7 @@
               widget.localKey === 'etf-weekly-flows' ||
               widget.localKey === 'crypto-strategy-holdings',
             'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
+            'widget-card--macro-polymarket-fed': widget.localKey === 'macro-polymarket-fed',
             'widget-card--halving': widget.localKey === 'crypto-halving-cycles',
             'widget-card--urpd': widget.localKey === 'crypto-urpd',
             'widget-card--etf-premium': widget.localKey === 'crypto-etf-premium',
@@ -287,6 +288,10 @@
 
   /* FedWatch is a full-width matrix; keep Polymarket on the following grid row. */
   .widget-card--macro-fedwatch {
+    grid-column: 1 / -1;
+  }
+
+  .widget-card--macro-polymarket-fed {
     grid-column: 1 / -1;
   }
 

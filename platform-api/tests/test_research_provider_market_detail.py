@@ -13,6 +13,40 @@ from app.research_provider_market_detail import MarketDetailProvider
 pytestmark = pytest.mark.unit
 
 
+def test_yahoo_open_bar_preserves_quote_time_but_excludes_it_from_comparison(monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    timestamps = [int((today - timedelta(days=n)).timestamp()) for n in (2, 1, 0)]
+    payload = {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": timestamps,
+                    "meta": {
+                        "exchangeTimezoneName": "UTC",
+                        "currency": "USD",
+                        "instrumentType": "CRYPTOCURRENCY",
+                        "regularMarketTime": timestamps[-1] + 60,
+                    },
+                    "indicators": {"quote": [{"close": [10, 11, 99]}]},
+                }
+            ]
+        }
+    }
+    monkeypatch.setattr(
+        market_detail.httpx, "AsyncClient", lambda **kwargs: _Client(payload, **kwargs)
+    )
+    result = asyncio.run(
+        MarketDetailProvider(timeout_seconds=1, user_agent="test")._get_live_market_detail("crypto")
+    )
+    btc = next(row for row in result.rows if row.id == "crypto-btc-row")
+    assert btc.close == 99 and btc.price_kind == "intraday"
+    assert btc.currency == "USD" and "T00:01:00" in btc.as_of
+    assert [point["value"] for point in btc.history] == ["10", "11"]
+    assert "unfinished_daily_bar" in btc.quality_flags
+
+
 class _Response:
     def __init__(self, payload: Any) -> None:
         self._payload = payload

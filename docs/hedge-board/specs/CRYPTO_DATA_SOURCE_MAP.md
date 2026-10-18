@@ -40,7 +40,7 @@
 - Strategic ETH Reserve：只纳入 ACTIVE 实体，排除未审/停用记录；保留原始更新时间与 PUBLIC_REPORT / SELF_REPORTED / WALLET_TRACKING 标识。旧披露仍可 stale，抓取成功不代表所有实体当日披露。
 - BGeometrics URPD：UTXO 最后移动价格分桶及 BTC 数量；这是链上价格分布，非已证实的投资者成本。生产端校验全部区间后发布，priceLower / priceUpper 原生数值边界贯穿 JSON、DuckDB 和 API；页面按价格比例绘制柱状图，保留键盘查看与数据表，缺失量不画作零。
 - STRC：Yahoo 交易所日线价格，不冒充实时 ATM 发行额或收益率；最新交易日可能未收盘。
-- 加密资金面按 BTC/ETH ETF 两图、BTC/ETH 储备分布两表、稳定币/STRC 历史两图配对；Strategy 单公司 BTC 持仓历史占整行。未接通的 STRC ATM 与企业财库周度流入保留为相关图卡的外部参考入口，不再以空状态卡占用整行。
+- 加密资金面先展示 BTC/ETH ETF 两图，随后是独立的 BTC 财库公司每周变动卡，再依次排列上市公司 BTC 持仓分布、ETH 储备分布、稳定币和 STRC 历史；Strategy 单公司 BTC 持仓历史占整行。财库周变动参考 SoSoValue weekly-net-inflow，右上角提供放大与原页链接；当前未取得可核验的原页周度数据或快照，按 Owner 要求保留空态，不用公司余额差额或样例替代。STRC ATM 保留为股价卡的参考入口。
 - Coinbase/Binance 日线溢价：闭合 UTC 日线精确日期相交，并用 Coinbase USDT/USD 调整计价币，公式和输入版本由生产端保留。
 - 保证金借贷：Bybit USDT 公开 VIP 0 小时费率；非用户账户实际成本。Binance 资金费率单独接入原有历史组，不冒充全市场聚合。
 - 加密明细参与度：BTC/ETH/SOL/BNB/XRP/DOGE/HYPE 固定观察池，排除 UTC 当前日期，用同日且历史足够的币种计算高于 20/50/200 日均线的比例；覆盖数与日期同步展示。HYPE 来源缺失时保留 6/7 partial，不用同名代币替换，也不混入上市公司或 ETF。

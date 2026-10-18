@@ -2,7 +2,6 @@
   <section class="macro-expectation-panel">
     <header class="panel-header">
       <div>
-        <p>MARKET EXPECTATIONS</p>
         <h2>市场预期与事件概率</h2>
       </div>
       <div class="panel-actions">

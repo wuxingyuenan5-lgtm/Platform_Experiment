@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from app.research_local_data import read_local_json
 from app.research_provider_errors import ResearchProviderError
 from app.research_provider_macro_dashboard import MacroDashboardResponse
@@ -13,10 +15,13 @@ class CommodityDashboardProvider:
 
     async def get(self) -> MacroDashboardResponse:
         try:
-            document = read_local_json("public/v1/commodity/dashboard.json")
+            document = await asyncio.to_thread(
+                read_local_json, "public/v1/commodity/dashboard.json"
+            )
             if document.get("schemaVersion") != "1.0":
                 raise ResearchProviderError("commodity_dashboard_schema_mismatch")
             contract = MacroDashboardResponse.model_validate(document)
+            contract.apply_freshness()
             if not any(contract.groups.values()):
                 raise ResearchProviderError("commodity_dashboard_without_series")
             # The route only serializes this contract; stale_copy owns mutation isolation.

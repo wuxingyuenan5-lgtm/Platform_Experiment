@@ -90,7 +90,7 @@
     <div class="overview-grid">
       <article class="panel">
         <div class="panel-title"
-          ><div><h3>板块资金趋势榜</h3></div
+          ><div><h3>一级行业资金榜</h3></div
           ><ResearchSourceState :meta="sectorFlowMeta"
         /></div>
         <button

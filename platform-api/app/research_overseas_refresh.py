@@ -21,6 +21,7 @@ from fastapi import FastAPI
 from app.config import get_settings
 from app.research_a_share_repository import finish_refresh, start_refresh
 from app.research_cumulative_volatility import refresh_cumulative_volatility
+from app.research_equity_observatory import run_periodic as run_equity_periodic
 from app.research_macro_expectations_refresh import refresh_macro_expectations
 from app.research_market_detail_refresh import refresh_market_details
 from app.research_overseas_repository import (
@@ -295,12 +296,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         return
     task = asyncio.create_task(_run_periodic(max(60.0, settings.research_refresh_interval_seconds)))
     market_task = asyncio.create_task(_run_market_periodic())
+    equity_task = asyncio.create_task(run_equity_periodic())
     try:
         yield
     finally:
         task.cancel()
         market_task.cancel()
-        await asyncio.gather(task, market_task, return_exceptions=True)
+        equity_task.cancel()
+        await asyncio.gather(task, market_task, equity_task, return_exceptions=True)
 
 
 async def _run_market_periodic() -> None:

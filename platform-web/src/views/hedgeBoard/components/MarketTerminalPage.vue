@@ -15,11 +15,21 @@
           : `数据日期：${marketSnapshot.asOf ?? '—'}`
       }}
     </p>
+    <details
+      v-if="['us', 'global'].includes(config.id) && missingMarketRows.length"
+      class="market-terminal__coverage"
+    >
+      <summary>数据覆盖 · {{ missingMarketRows.length }} 项缺失或待更新</summary>
+      <p>{{ missingMarketRows.join('、') }}</p>
+    </details>
     <HedgeBoardSubnav
       v-if="displayConfig.id === 'us'"
       :sections="[
         { id: 'us-market-overview', title: '大盘表现' },
-        { id: detailSectionId, title: '美股市场明细' },
+        ...(detailSectionId ? [{ id: detailSectionId, title: '美股市场明细' }] : []),
+        { id: 'us-equity-themes', title: '主题产业链' },
+        { id: 'us-equity-valuation', title: '估值' },
+        { id: 'us-equity-structure', title: '结构与风险' },
         ...(displayConfig.rotationButtonLabel
           ? [{ id: 'us-market-rotation', title: displayConfig.rotationButtonLabel }]
           : []),
@@ -302,6 +312,7 @@
       </div>
     </section>
 
+    <EquityObservatoryPanel v-if="displayConfig.id === 'us'" market="us" />
     <Teleport to="body">
       <div
         v-if="chartModal.visible"
@@ -348,6 +359,7 @@
 <script setup lang="ts">
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
   import ChartExpand from './ChartExpand.vue';
+  import EquityObservatoryPanel from './EquityObservatoryPanel.vue';
   import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
   import {
     getMarketDetail,
@@ -411,6 +423,22 @@
       ? mergeTerminalMarket(props.config, marketSnapshot.value?.rows ?? [])
       : props.config,
   );
+  const missingMarketRows = computed(() =>
+    displayConfig.value.detailGroups.flatMap((group) =>
+      group.rows
+        .filter((row) => row.dataStatus && row.dataStatus !== 'ready')
+        .map(
+          (row) =>
+            `${row.name}（${
+              row.dataStatus === 'stale'
+                ? '待更新'
+                : row.dataStatus === 'no_data'
+                ? '暂无数据'
+                : '不完整'
+            }）`,
+        ),
+    ),
+  );
   async function loadMarket() {
     const market = props.config.id;
     if (market !== 'us' && market !== 'global') return;
@@ -447,7 +475,11 @@
 
   const emit = defineEmits<{ (event: 'index-chart', code: string, name: string): void }>();
   const rotationExpanded = ref(true);
-  const marketDetailExpanded = ref(false);
+  const marketDetailExpanded = ref(props.config.id === 'global');
+  watch(
+    () => props.config.id,
+    (marketId) => (marketDetailExpanded.value = marketId === 'global'),
+  );
   const rotationSortState = ref<SortState | null>(null);
   const chartContainerRef = ref<HTMLDivElement | null>(null);
   const chartModal = ref<ChartModalState>({
@@ -640,7 +672,7 @@
     EWW: 'AMEX:EWW',
     EPHE: 'AMEX:EPHE',
     EPOL: 'AMEX:EPOL',
-    RSX: 'AMEX:RSX',
+    IMOEX: 'MOEX:IMOEX',
     EZA: 'AMEX:EZA',
     EWY: 'AMEX:EWY',
     EWT: 'AMEX:EWT',
@@ -969,6 +1001,16 @@
   .market-terminal__detail-section {
     display: grid;
     min-width: 0;
+  }
+
+  .market-terminal__coverage {
+    margin: 8px 0;
+    color: #657989;
+    font-size: 12px;
+  }
+
+  .market-terminal__coverage summary {
+    cursor: pointer;
   }
 
   .market-terminal__detail-section .market-detail-section-heading {

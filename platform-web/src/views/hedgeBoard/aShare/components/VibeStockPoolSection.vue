@@ -295,9 +295,18 @@
           ><span>当前 {{ visibleRows.length }} 只</span
           ><span v-if="basketFilter">主题：{{ selectedBasketName }}</span
           ><span v-if="filter.startsWith('industry:')">行业：{{ filter.slice(9) }}</span></div
+        ><div class="table-toggle"
+          ><button
+            type="button"
+            class="toolbar"
+            :aria-expanded="stockTableOpen"
+            aria-controls="a-share-stock-pool-table"
+            @click="stockTableOpen = !stockTableOpen"
+            >{{ stockTableOpen ? '收起明细' : '展开明细' }}</button
+          ></div
         >
       </section>
-      <div class="table-shell"
+      <div v-if="stockTableOpen" id="a-share-stock-pool-table" class="table-shell"
         ><table
           ><thead
             ><tr
@@ -603,6 +612,7 @@
     removePool,
   } = useStockPool();
   const query = ref('');
+  const stockTableOpen = ref(false);
   const filter = ref('');
   const basketFilter = ref('');
   const sortKey = ref<keyof Stock | null>(null);
@@ -844,10 +854,12 @@
     color: var(--strategy-text-3);
     font-size: 12px;
   }
+
   .quote-status {
     color: #9a6700;
     font-size: 11px;
   }
+
   button:focus-visible,
   th:focus-visible,
   select:focus-visible,
@@ -856,10 +868,12 @@
     outline: 2px solid var(--strategy-accent);
     outline-offset: 3px;
   }
+
   button:disabled {
-    cursor: wait;
     opacity: 0.6;
+    cursor: wait;
   }
+
   .pool-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1194,8 +1208,8 @@
   .search-field input,
   .filter-field select {
     width: 100%;
-    height: 34px;
     min-width: 0;
+    height: 34px;
     padding: 0 10px;
     border: 1px solid var(--strategy-border);
     border-radius: 8px;
@@ -1285,8 +1299,8 @@
   }
 
   .matrix-zone {
-    stroke: #e2e8f0;
     stroke-width: 1;
+    stroke: #e2e8f0;
   }
 
   .matrix-zone--leader {
@@ -1686,8 +1700,8 @@
     }
 
     .matrix-panel .sub-panel-head {
-      align-items: flex-start;
       flex-direction: column;
+      align-items: flex-start;
     }
   }
 </style>

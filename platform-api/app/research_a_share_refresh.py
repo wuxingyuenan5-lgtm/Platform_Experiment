@@ -314,6 +314,7 @@ def _crowding(
         sector_message = "四行业板块报价读取失败，保留最近有效数据"
 
     innovation_history = list(previous.get("innovationHistory", []))
+    innovation_complete = False
     quote_date = _quote_date(innovation) if isinstance(innovation, dict) else None
     total_amount = (
         sum((row.turnover_yuan for row in spots), Decimal("0"))
@@ -338,7 +339,7 @@ def _crowding(
         innovation_history = sorted(
             [*innovation_history, innovation_row], key=lambda row: row["date"]
         )[-2000:]
-    innovation_complete = any(row.get("date") == trade_date for row in innovation_history)
+        innovation_complete = True
     complete = sectors_complete and innovation_complete
     messages = []
     if not sectors_complete:
@@ -443,8 +444,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 dashboard.breadth.meta.status = "partial"
                 dashboard.breadth.meta.message = "涨跌分布与涨跌停池未取得同一交易日的完整数据"
             close_window_open = bool(
-                trade_date
-                and (trade_date < today or datetime.now(_CHINA).time() >= time(16, 15))
+                trade_date and (trade_date < today or datetime.now(_CHINA).time() >= time(16, 15))
             )
             spots_closed = bool(
                 close_window_open
@@ -470,8 +470,12 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 dashboard.emotion.meta.status = "partial"
                 dashboard.emotion.meta.message = "等待收盘数据完成更新"
             _crowding(
-                dashboard, trade_date, spots, sector_quotes, innovation,
-                spots_closed and sectors_closed and innovation_closed,
+                dashboard,
+                trade_date,
+                spots,
+                sector_quotes if sectors_closed else RuntimeError("sector close unavailable"),
+                innovation if innovation_closed else RuntimeError("innovation close unavailable"),
+                spots_closed,
             )
             choice_settings = get_settings()
             choice_enabled = choice_settings.choice_csd_enabled
@@ -552,7 +556,11 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                     )
                 except Exception:
                     _LOGGER.warning("a_share_choice_archive_write_failed", exc_info=True)
-            if innovation_closed and isinstance(innovation, dict) and innovation.get("close") is not None:
+            if (
+                innovation_closed
+                and isinstance(innovation, dict)
+                and innovation.get("close") is not None
+            ):
                 try:
                     await _write_price_archive_locked(
                         {

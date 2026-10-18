@@ -1,5 +1,11 @@
 <template>
-  <div ref="chartRef" class="source-series-plot" role="img" :aria-label="description"></div>
+  <div
+    ref="chartRef"
+    class="source-series-plot"
+    :class="{ 'source-series-plot--drivers': mode === 'gold-drivers' }"
+    role="img"
+    :aria-label="description"
+  ></div>
 </template>
 
 <script setup lang="ts">
@@ -9,6 +15,8 @@
   import { useECharts } from '@/hooks/web/useECharts';
   import {
     buildSourceSeriesOptions,
+    buildRegionalStackOptions,
+    buildGoldDriversOptions,
     buildSourceCurveOptions,
     unitText,
   } from './sourceSeriesOptions';
@@ -17,7 +25,8 @@
     series: MacroDashboardSeries[];
     colors: string[];
     unitLabel?: string;
-    mode?: 'time' | 'curve';
+    barSeriesIds?: string[];
+    mode?: 'time' | 'curve' | 'regional-stack' | 'gold-drivers';
   }>();
   const chartRef = ref<HTMLDivElement | null>(null);
   const chart = useECharts(chartRef as Ref<HTMLDivElement>, 'light');
@@ -29,12 +38,21 @@
         : '。可拖动下方范围选择器查看区间，详细数据可切换至表格。'),
   );
   watch(
-    () => [props.series, props.colors, props.unitLabel, props.mode],
+    () => [props.series, props.colors, props.unitLabel, props.mode, props.barSeriesIds],
     () => {
       chart.setOptions(
-        (props.mode === 'curve'
+        (props.mode === 'gold-drivers'
+          ? buildGoldDriversOptions(props.series, props.colors)
+          : props.mode === 'regional-stack'
+          ? buildRegionalStackOptions(props.series)
+          : props.mode === 'curve'
           ? buildSourceCurveOptions(props.series, props.colors[0], props.unitLabel)
-          : buildSourceSeriesOptions(props.series, props.colors, props.unitLabel)) as EChartsOption,
+          : buildSourceSeriesOptions(
+              props.series,
+              props.colors,
+              props.unitLabel,
+              props.barSeriesIds,
+            )) as EChartsOption,
       );
     },
     { immediate: true },
@@ -49,5 +67,10 @@
     aspect-ratio: 1.8;
     min-height: 280px;
     max-height: 420px;
+  }
+
+  .source-series-plot--drivers {
+    min-height: 580px;
+    max-height: 700px;
   }
 </style>

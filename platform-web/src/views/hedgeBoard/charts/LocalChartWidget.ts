@@ -115,9 +115,9 @@ const externalGoldResearch = {
 
 const externalCryptoResearch = {
   'btc-treasury-flow': {
-    provider: 'BitcoinTreasuries.net',
-    description: '上市公司及机构 Bitcoin 持仓披露',
-    href: 'https://bitcointreasuries.net/',
+    provider: 'SoSoValue',
+    description: '上市公司买入 BTC 周度资金净流入',
+    href: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
   },
 } as const;
 
@@ -251,7 +251,7 @@ function renderExternalCryptoResearch(key: ExternalCryptoResearchKey) {
       h(
         'small',
         key === 'btc-treasury-flow'
-          ? '已接入企业持仓截面，但尚无可核验的每周买卖流量；持仓差额不能直接当作资金流。可访问 SoSoValue 参考。'
+          ? '暂未取得可核验的周度数据。'
           : '当前尚未取得可核验的数据，可访问参考网页查看原始指标。',
       ),
     ],
@@ -287,7 +287,17 @@ export default defineComponent({
           case 'macro-fedwatch':
             return h(FedWatchPanel);
           case 'spdr-daily-flow':
-            return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'spdrFlow' });
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'spdrFlow',
+              barSeriesIds: ['spdr_holdings_change'],
+            });
+          case 'china-gold-etf-flow':
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'chinaGoldEtfFlow',
+              barSeriesIds: ['wgc_china_etf_monthly_flow'],
+            });
           case 'spdr-holdings-vs-price':
             return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'spdrHoldings' });
           case 'etf-weekly-flows':
@@ -319,7 +329,12 @@ export default defineComponent({
           case 'gold-vs-gvz':
             return renderExternalGoldResearch(key);
           case 'gold-vs-real':
-            return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'goldRealYield' });
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'goldDrivers',
+              presentation: 'gold-drivers',
+              initiallyHiddenSeriesIds: ['dxy'],
+            });
           case 'macro-treasury-issuance':
             return h(MacroSeriesChart, { groupId: 'treasuryIssuance', unitLabel: 'USD' });
           case 'macro-net-liquidity':
@@ -447,7 +462,7 @@ export default defineComponent({
           case 'macro-market-detail-table':
             return h(MacroMarketDetailPanel);
           case 'macro-treasury-yields':
-            return h(MacroSeriesChart, { groupId: 'treasuryYields', unitLabel: '%' });
+            return h(MacroSeriesChart, { groupId: 'treasuryYields', years: 10, unitLabel: '%' });
           case 'macro-global-m2':
             return h(MacroSeriesChart, {
               groupId: 'globalM2Level',
@@ -469,7 +484,7 @@ export default defineComponent({
           case 'macro-market-inflation':
             return h(MacroSeriesChart, { groupId: 'marketInflation', years: 5, unitLabel: '%' });
           case 'macro-rate-corridor':
-            return h(MacroSeriesChart, { groupId: 'rateCorridor', years: 1, unitLabel: '%' });
+            return h(MacroSeriesChart, { groupId: 'rateCorridor', years: 10, unitLabel: '%' });
           case 'macro-risk-hy-oas':
             return h(MacroSeriesChart, { groupId: 'riskHighYieldOas', years: 5, unitLabel: '%' });
           case 'macro-risk-credit-ratio':

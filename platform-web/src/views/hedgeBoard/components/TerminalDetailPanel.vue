@@ -79,7 +79,12 @@
       </div>
     </section>
 
-    <div class="market-terminal__table-shell">
+    <div
+      class="market-terminal__table-shell"
+      tabindex="0"
+      role="region"
+      aria-label="市场明细，可横向滚动"
+    >
       <table class="market-terminal__table">
         <thead>
           <tr>
@@ -140,6 +145,27 @@
                   <span>{{ row.symbol }}</span>
                 </div>
 
+                <small
+                  v-if="row.dataStatus || row.observationDate"
+                  class="market-terminal__row-meta"
+                  :title="[row.source, row.asOf, row.currency].filter(Boolean).join(' · ')"
+                >
+                  {{ row.observationDate || '暂无日期' }} ·
+                  {{
+                    row.dataStatus === 'stale'
+                      ? '待更新'
+                      : row.dataStatus === 'partial' || row.dataStatus === 'degraded'
+                      ? '数据不完整'
+                      : row.dataStatus === 'no_data'
+                      ? '暂无数据'
+                      : row.priceKind === 'intraday'
+                      ? '盘中'
+                      : row.priceKind === 'close'
+                      ? '收盘'
+                      : '最近观测'
+                  }}
+                  <span v-if="row.currency"> · {{ row.currency }}</span>
+                </small>
                 <div v-if="editMode" class="market-terminal__row-tools">
                   <button
                     type="button"
@@ -887,7 +913,7 @@
     EWW: 'AMEX:EWW',
     EPHE: 'AMEX:EPHE',
     EPOL: 'AMEX:EPOL',
-    RSX: 'AMEX:RSX',
+    IMOEX: 'MOEX:IMOEX',
     EZA: 'AMEX:EZA',
     EWY: 'AMEX:EWY',
     EWT: 'AMEX:EWT',
@@ -1128,8 +1154,28 @@
     font-size: 12px;
   }
 
+  .market-terminal__detail {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .market-terminal__row-meta {
+    display: block;
+    margin-top: 4px;
+    color: #657b8b;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .market-terminal__table-shell:focus-visible {
+    outline: 2px solid #147d92;
+    outline-offset: 2px;
+  }
+
   .market-terminal__table-shell,
   .market-terminal__rotation-heatmap {
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
   }
 

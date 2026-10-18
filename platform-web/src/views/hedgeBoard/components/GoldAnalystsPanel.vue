@@ -31,14 +31,27 @@
           aria-label="搜索分析师文章"
           placeholder="搜索标题、观点或资产"
         /><button type="submit">搜索</button></form
-      ><span class="gold-meta">{{ data?.total ?? '—' }} 篇 · GoldPulse 观点整理</span></div
+      ><span class="gold-meta">{{ data?.total ?? '—' }} 篇 · 平台独立采集整理</span></div
     >
     <p v-if="error" class="gold-warning">{{ error }}</p
     ><p v-if="data?.status === 'stale'" class="gold-warning">更新暂时中断，保留最近取得的观点。</p>
+    <p v-if="data?.status === 'partial'" class="gold-warning"
+      >部分来源暂时不可用，已保留历史文章。</p
+    >
     <p v-if="loading && !data">正在读取观点…</p>
     <template v-if="data">
       <article v-for="article in data?.articles" :key="article.id" class="gold-article">
-        <small>{{ article.date || '日期未披露' }} · {{ authorName(article.analystId) }}</small>
+        <small
+          >{{ article.date || '日期未披露' }} · {{ authorName(article.analystId) }} ·
+          {{ article.sourcePublisher }} ·
+          {{
+            article.extractionStatus === 'public_excerpt'
+              ? '公开导语'
+              : article.extractionStatus === 'public_body'
+              ? '公开正文'
+              : '仅文章信息'
+          }}</small
+        >
         <h3>{{ article.headlineChinese || article.title }}</h3>
         <div
           ><span v-for="(view, i) in article.views.slice(0, 3)" :key="i" class="gold-tag"
@@ -51,7 +64,7 @@
         <template v-if="article.views.length">
           <p>{{ article.summary }}</p>
           <details
-            ><summary>展开 {{ article.views.length }} 条观点与条件</summary
+            ><summary>展开 {{ article.views.length }} 条原文要点</summary
             ><div v-for="view in article.views" :key="view.id" class="gold-view"
               ><b>{{ view.assetName }} · {{ directionLabel(view.stance) }}</b
               ><small> · {{ view.horizonText }}</small
@@ -68,7 +81,7 @@
             }}</p></details
           >
         </template>
-        <p v-else class="gold-meta">正文观点尚未读取。</p>
+        <p v-else class="gold-meta">未取得可整理的公开正文，保留作者、发布日期和原文链接。</p>
         <a
           v-if="article.urlOriginal"
           :href="article.urlOriginal"
@@ -123,7 +136,8 @@
         data.value = result;
         error.value = '';
       }
-    } catch {
+    } catch (cause) {
+      console.warn('Analyst page request failed', cause);
       if (token === generation) error.value = '分析师观点暂时不可用，请稍后重试。';
     } finally {
       if (token === generation) loading.value = false;

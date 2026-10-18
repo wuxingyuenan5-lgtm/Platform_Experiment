@@ -63,7 +63,8 @@ _EM_DELAY_HOSTS = ("push2delay2.eastmoney.com", "push2delay.eastmoney.com")
 _EM_DELAY_HOST_INDEX = 0
 _EM_ALL_A_FIELDS = "f2,f3,f5,f6,f8,f9,f12,f14,f18,f20,f23,f109,f124"
 _EM_ALL_A_FILTER = "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048"
-_EM_SECTOR_FLOW_FILTER = "m:90+t:2"
+# Official quote center industry_board_1 filter; t:2 mixes all three levels.
+_EM_SECTOR_FLOW_FILTER = "m:90+s:2+f:!50"
 _EM_SECTOR_FLOW_FIELDS = "f12,f14,f3,f62,f104,f105,f106"
 _CROWDING_SECTORS = {
     "通信设备": ("801102", "BK0448"),
@@ -92,9 +93,7 @@ async def _eastmoney_json(
         index = (start + offset) % len(_EM_DELAY_HOSTS)
         host = _EM_DELAY_HOSTS[index]
         try:
-            response = await client.get(
-                f"https://{host}{path}", params=params, headers=headers
-            )
+            response = await client.get(f"https://{host}{path}", params=params, headers=headers)
             response.raise_for_status()
             payload = response.json()
             if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
@@ -169,11 +168,7 @@ class AShareResearchProvider:
             # The dashboard contract stores percentage points (3.27 means 3.27%),
             # while the chart converts that value to a fraction for percent axes.
             "turnover_pct": turnover_raw,
-            "return_pct": (
-                return_raw / Decimal("100")
-                if return_raw is not None
-                else None
-            ),
+            "return_pct": (return_raw / Decimal("100") if return_raw is not None else None),
             "source": "东方财富创新药BK1106",
         }
 
@@ -238,8 +233,7 @@ class AShareResearchProvider:
                 }
             )
         dates = {
-            item["observed_at"].astimezone(ZoneInfo("Asia/Shanghai")).date()
-            for item in result
+            item["observed_at"].astimezone(ZoneInfo("Asia/Shanghai")).date() for item in result
         }
         if len(dates) != 1:
             raise ResearchProviderError("sector_crowding_quote_date_mismatch")
@@ -295,7 +289,13 @@ class AShareResearchProvider:
                     "name": name,
                     "return_pct": _decimal(row.get("f3")),
                     "net_inflow_yuan": net_inflow,
-                    "firm_count": _integer(row.get("f104")),
+                    "firm_count": (
+                        sum(_integer(row.get(key)) or 0 for key in ("f104", "f105", "f106"))
+                        if all(
+                            _decimal(row.get(key)) is not None for key in ("f104", "f105", "f106")
+                        )
+                        else None
+                    ),
                 }
         result = sorted(merged.values(), key=lambda item: item["net_inflow_yuan"], reverse=True)
         if not result:
@@ -374,9 +374,7 @@ class AShareResearchProvider:
             async with httpx.AsyncClient(
                 timeout=self._timeout_seconds, trust_env=False, verify=_HTTP_SSL_CONTEXT
             ) as client:
-                first_payload = await _eastmoney_clist(
-                    client, {**base_params, "pn": "1"}, headers
-                )
+                first_payload = await _eastmoney_clist(client, {**base_params, "pn": "1"}, headers)
                 first_data = first_payload.get("data") or {}
                 total = int(first_data.get("total") or 0)
                 first_rows = (
@@ -391,9 +389,7 @@ class AShareResearchProvider:
                 # Vibe limits pagination concurrency to avoid upstream bursts.
                 for start in range(2, page_count + 1, 3):
                     requests = [
-                        _eastmoney_clist(
-                            client, {**base_params, "pn": str(page)}, headers
-                        )
+                        _eastmoney_clist(client, {**base_params, "pn": str(page)}, headers)
                         for page in range(start, min(start + 3, page_count + 1))
                     ]
                     for payload in await asyncio.gather(*requests):

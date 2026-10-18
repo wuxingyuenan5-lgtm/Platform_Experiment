@@ -272,6 +272,35 @@ def _earliest_persisted_timestamp(asset: str) -> datetime | None:
         return None
 
 
+def _has_recoverable_gap(asset: str, start: datetime, end: datetime) -> bool:
+    """Rebuild internal missing days only when the shared archive can fill them."""
+    entities = tuple(f"{asset}:{session}:15m" for session in _SESSION_LABELS)
+    with connection() as db:
+        days = [datetime.fromisoformat(row[0]).replace(tzinfo=UTC) for row in db.execute(
+            "SELECT DISTINCT substr(observed_at,1,10) FROM research_a_share_history "
+            "WHERE dataset=? AND entity_code IN (?,?,?) AND observed_at>=? AND observed_at<=? ORDER BY 1",
+            (DATASET, *entities, start.isoformat().replace('+00:00','Z'), end.isoformat().replace('+00:00','Z')))]
+        for previous, following in zip(days, days[1:]):
+            missing_start = previous + timedelta(days=1)
+            if missing_start >= following:
+                continue
+            rows = db.execute(
+                "SELECT payload_json FROM research_strategy_projection WHERE kind='historical_candle' "
+                "AND entity=? AND at_ms>=? AND at_ms<? ORDER BY at_ms LIMIT 64",
+                (f'{_ASSETS[asset]}:linear:trade', int(missing_start.timestamp()*1000), int(following.timestamp()*1000)))
+            for row in rows:
+                try:
+                    payload = json.loads(row[0])
+                    close = Decimal(str(payload.get('close')))
+                    if (not payload.get('quality') and close.is_finite() and close > 0
+                        and payload.get('symbol') == _ASSETS[asset]
+                        and payload.get('category') == 'linear' and payload.get('priceType') == 'trade'):
+                        return True
+                except (TypeError, ValueError, InvalidOperation):
+                    continue
+    return False
+
+
 def _needs_price_backfill(asset: str) -> bool:
     """Detect pre-price-overlay derived rows and upgrade them in place once."""
     with connection() as db:
@@ -478,6 +507,7 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
             latest
             and (
                 _needs_price_backfill(asset)
+                or _has_recoverable_gap(asset, full_start, end)
                 or (
                     earliest
                     and earliest > full_start + _DERIVED_WINDOW_TOLERANCE

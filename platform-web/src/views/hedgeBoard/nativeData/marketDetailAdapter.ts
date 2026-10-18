@@ -71,6 +71,14 @@ function prepareLiveMarketDetail(groups: TerminalTableGroup[]): TerminalTableGro
     ...group,
     rows: group.rows.map((row) => ({
       ...row,
+      dataStatus: 'no_data',
+      observationDate: undefined,
+      asOf: undefined,
+      source: undefined,
+      sourceUrl: undefined,
+      currency: undefined,
+      priceKind: undefined,
+      qualityFlags: [],
       spark: [],
       price: UNAVAILABLE,
       d1: UNAVAILABLE,
@@ -281,6 +289,7 @@ export function mergeMacroMarketDetail(
       const close = numeric(remote.close);
       const next: TerminalTableRow = {
         ...row,
+        ...rowMetadata(remote),
         name: remote.name,
         symbol: remote.symbol,
         spark: (remote.spark90d?.length ? remote.spark90d : remote.spark30d)
@@ -300,6 +309,19 @@ export function mergeMacroMarketDetail(
   }));
 }
 
+function rowMetadata(remote: MarketDetailRow) {
+  return {
+    observationDate: remote.observationDate ?? undefined,
+    asOf: remote.asOf ?? undefined,
+    source: remote.source,
+    sourceUrl: remote.sourceUrl ?? undefined,
+    dataStatus: remote.status,
+    qualityFlags: remote.qualityFlags ?? [],
+    currency: remote.currency ?? undefined,
+    priceKind: remote.priceKind ?? 'observation',
+  };
+}
+
 export function mergeLiveMarketDetail(
   groups: TerminalTableGroup[],
   remoteRows: MarketDetailRow[],
@@ -310,6 +332,7 @@ export function mergeLiveMarketDetail(
     rows: group.rows.map((row) => {
       const remote = byId.get(LIVE_ROW_ID_BY_CATALOG_ID[row.id] ?? row.id);
       if (!remote || remote.status === 'no_data' || remote.status === 'error') return row;
+      if (row.symbol === 'IMOEX' && remote.symbol !== 'IMOEX') return row;
       const spark = (remote.spark90d?.length ? remote.spark90d : remote.spark30d)
         .map(Number)
         .filter(Number.isFinite);
@@ -318,6 +341,7 @@ export function mergeLiveMarketDetail(
         ...(remote.qualityFlags?.includes('continuous_futures_not_spot')
           ? { name: remote.name, symbol: remote.symbol }
           : {}),
+        ...rowMetadata(remote),
         ...Object.fromEntries(
           ['d10', 'd20', 'd50', 'd200', 'x2050', 'x50200'].map((key) => [
             key,

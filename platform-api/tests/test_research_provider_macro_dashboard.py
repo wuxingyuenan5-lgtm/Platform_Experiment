@@ -65,3 +65,30 @@ def test_macro_dashboard_provider_preserves_decimal_history(monkeypatch: pytest.
     series = contract.groups["growthProduction"][0]
     assert str(series.latest_value) == "2.1"
     assert str(series.observations[0].value) == "2.1"
+
+
+def test_reader_rechecks_age_without_marking_current_quarter_stale():
+    from datetime import UTC, datetime
+
+    contract = dashboard.MacroDashboardResponse.model_validate(_Response().json())
+    quarterly = contract.groups["growthProduction"][0]
+    daily = quarterly.model_copy(deep=True, update={"frequency": "daily_business_day"})
+    missing = daily.model_copy(deep=True, update={"status": "no_data", "latest_value": None})
+    contract.groups["daily"] = [daily, missing]
+    contract.apply_freshness(datetime(2026, 9, 2, tzinfo=UTC))
+    assert quarterly.status == "ready"
+    assert daily.status == "stale" and daily.is_stale
+    assert missing.status == "no_data" and missing.latest_value is None
+    assert contract.status == "partial"
+    contract.apply_freshness(datetime(2027, 9, 2, tzinfo=UTC))
+    assert quarterly.status == "stale"
+    assert daily.quality_flags.count("stale_latest_observation") == 1
+
+
+def test_valid_but_stopped_producer_is_not_ready(monkeypatch):
+    document = _Response().json()
+    series = document["groups"]["growthProduction"][0]
+    series.update(frequency="daily_business_day", observationDate="2020-01-01")
+    monkeypatch.setattr(dashboard, "read_local_json", lambda _: document)
+    result = asyncio.run(MacroDashboardProvider(timeout_seconds=1, user_agent="test").get())
+    assert result.groups["growthProduction"][0].status == "stale"

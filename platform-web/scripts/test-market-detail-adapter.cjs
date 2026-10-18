@@ -21,6 +21,20 @@ new vm.Script(`(function (require, module, exports) { ${output}\n})`).runInThisC
   moduleUnderTest.exports,
 );
 
+test('detail retains source observation semantics and clears them when a row disappears', () => {
+  const groups = [{label:'US', rows:[{id:'us-spy', symbol:'SPY', spark:[]}]}];
+  const rows = [{id:'us-spy', symbol:'SPY', status:'stale', unit:'price', changeUnit:'percent',
+    observationDate:'2026-10-15', asOf:'2026-10-15T10:32:00-04:00', currency:'USD',
+    priceKind:'intraday', source:'Yahoo Finance', qualityFlags:['unfinished_daily_bar'], spark30d:[], close:'12'}];
+  const merged = moduleUnderTest.exports.mergeLiveMarketDetail(groups, rows);
+  assert.equal(merged[0].rows[0].asOf, rows[0].asOf);
+  assert.equal(merged[0].rows[0].priceKind, 'intraday');
+  assert.equal(merged[0].rows[0].dataStatus, 'stale');
+  const removed = moduleUnderTest.exports.mergeLiveMarketDetail(merged, []);
+  assert.equal(removed[0].rows[0].observationDate, undefined);
+  assert.equal(removed[0].rows[0].dataStatus, 'no_data');
+});
+
 test('US/global cards, table, breadth and rotation never fall back to sample facts', () => {
   const seed = { id: 'us-spy', symbol: 'SPY', name: '标普500', price: '$999', d1: '+99%', spark: [99], d200: '▲', x50200: '▲' };
   const config = { id: 'us', detailGroups: [{ label: '指数', rows: [seed] }],
@@ -134,4 +148,13 @@ test('breadth displays coverage and source date, not seed values', () => {
   assert.equal(result.breadthCards[0].value, '62.5%');
   assert.equal(result.breadthCards[0].tag, '7/8 样本');
   assert.equal(result.breadthCards[0].delta, '2026-10-09');
+});
+
+test('IMOEX never displays obsolete RSX values under the replacement symbol', () => {
+ const groups=[{label:'新兴市场',rows:[{id:'global-rsx',name:'俄罗斯（MOEX 指数）',symbol:'IMOEX',spark:[]}]}];
+ const source={id:'global-rsx',symbol:'RSX',status:'ready',unit:'price',changeUnit:'percent',close:'5.62',spark30d:[5.6],spark90d:[]};
+ assert.equal(moduleUnderTest.exports.mergeLiveMarketDetail(groups,[source])[0].rows[0].price,'—');
+ const row=moduleUnderTest.exports.mergeLiveMarketDetail(groups,[{...source,symbol:'IMOEX',unit:'index',close:'2400.12',currency:'RUB'}])[0].rows[0];
+ assert.equal(row.price,'2400.12');
+ assert.equal(row.currency,'RUB');
 });

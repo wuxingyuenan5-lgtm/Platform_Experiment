@@ -17,6 +17,35 @@ from app.research_providers import FreeResearchProvider
 pytestmark = pytest.mark.unit
 
 
+def test_sector_flow_uses_single_level_and_counts_all_firms(monkeypatch):
+    async def quotes(_client, params, _headers):
+        assert params["fs"] == "m:90+s:2+f:!50"
+        return {
+            "data": {
+                "diff": [
+                    {
+                        "f12": "BK1",
+                        "f14": "测试行业",
+                        "f62": "123.456789",
+                        "f104": 3,
+                        "f105": 4,
+                        "f106": 2,
+                    },
+                    {"f12": "BK2", "f14": "缺失家数", "f62": "-1", "f104": 3},
+                ]
+            }
+        }
+
+    monkeypatch.setattr(a_share, "_eastmoney_clist", quotes)
+    provider = AShareResearchProvider(
+        timeout_seconds=1, user_agent="test", akshare_loader=lambda: None
+    )
+    rows = asyncio.run(provider.sector_fund_flow())
+    assert rows[0]["firm_count"] == 9
+    assert rows[0]["net_inflow_yuan"] == Decimal("123.456789")
+    assert rows[1]["firm_count"] is None
+
+
 class _Frame:
     empty = False
 
@@ -90,13 +119,9 @@ def test_eastmoney_clist_uses_delay2_node_first(monkeypatch: pytest.MonkeyPatch)
         async with a_share.httpx.AsyncClient() as client:
             return await a_share._eastmoney_clist(client, {"pn": "1"}, {})
 
-    assert asyncio.run(run()) == {
-        "data": {"qdate": 20260731, "pool": [{"c": "600000"}]}
-    }
+    assert asyncio.run(run()) == {"data": {"qdate": 20260731, "pool": [{"c": "600000"}]}}
     assert _Client.request is not None
-    assert _Client.request["url"] == (
-        "https://push2delay2.eastmoney.com/api/qt/clist/get"
-    )
+    assert _Client.request["url"] == ("https://push2delay2.eastmoney.com/api/qt/clist/get")
 
 
 def test_eastmoney_clist_fails_over_after_node_disconnect(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -149,9 +174,7 @@ def test_innovation_drug_snapshot_normalizes_quote_fields(monkeypatch: pytest.Mo
     assert result["return_pct"] == Decimal("-0.0002")
     assert result["observed_at"].isoformat() == "2026-09-23T07:39:31+00:00"
     assert QuoteClient.request is not None
-    assert QuoteClient.request["url"] == (
-        "https://push2delay2.eastmoney.com/api/qt/stock/get"
-    )
+    assert QuoteClient.request["url"] == ("https://push2delay2.eastmoney.com/api/qt/stock/get")
 
 
 def test_sector_crowding_snapshot_collects_direct_board_amount_and_turnover(monkeypatch) -> None:

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field, field_validator
 
 from app.auth import Principal, require_permission
@@ -18,6 +20,7 @@ from app.research_a_share_repository import (
     read_stock_pool,
     update_stock_pool_membership,
 )
+from app.research_cross_asset import read_cross_asset
 from app.research_cumulative_volatility import read_cumulative_volatility
 from app.research_data_schemas import (
     AShareDashboardResponse,
@@ -25,6 +28,8 @@ from app.research_data_schemas import (
     AShareMarketTurnoverResponse,
     StockSnapshotResponse,
 )
+from app.research_equity_observatory import read_equity_observatory
+from app.research_gold import analyst_page, read_gold
 from app.research_overseas_refresh import refresh_overseas
 from app.research_overseas_repository import (
     read_dataset_health,
@@ -35,7 +40,6 @@ from app.research_overseas_repository import (
     read_latest_series,
 )
 from app.research_provider_commodity_dashboard import CommodityDashboardProvider
-from app.research_gold import read_gold, analyst_page
 from app.research_provider_crypto_dashboard import CryptoDashboardProvider
 from app.research_provider_errors import ResearchProviderError
 from app.research_provider_macro import (
@@ -114,6 +118,19 @@ def _raise_service_error(exc: ResearchServiceError | ResearchWatchlistServiceErr
 
 def _cache_header(response: Response, seconds: int) -> None:
     response.headers["Cache-Control"] = f"private, max-age={seconds}, stale-if-error=3600"
+
+
+@router.get("/cross-asset")
+def cross_asset(_: ResearchPrincipal, days: int = Query(default=90, ge=30, le=180)):
+    return jsonable_encoder(read_cross_asset(days), custom_encoder={Decimal: str})
+
+
+@router.get("/equity-observatory/{market}")
+def equity_observatory(market: str, _: ResearchPrincipal, response: Response):
+    if market not in {"cn", "us"}:
+        raise HTTPException(422, detail="Unsupported equity market")
+    response.headers["Cache-Control"] = "no-store"
+    return jsonable_encoder(read_equity_observatory(market), custom_encoder={Decimal: str})
 
 
 @router.get("/a-share/dashboard", response_model=AShareDashboardResponse)
@@ -363,11 +380,18 @@ def gold_report(_: ResearchPrincipal):
 
 
 @router.get("/commodity/analyst-views")
-def gold_analysts(_: ResearchPrincipal, author: str = Query("", max_length=80),
-                  stance: str = Query("", max_length=30), query: str = Query("", max_length=150),
-                  page: int = Query(1, ge=1), page_size: int = Query(12, ge=1, le=50)):
+def gold_analysts(
+    _: ResearchPrincipal,
+    author: str = Query("", max_length=80),
+    stance: str = Query("", max_length=30),
+    query: str = Query("", max_length=150),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(12, ge=1, le=50),
+):
     try:
-        return analyst_page(author=author, stance=stance, query=query, page=page, page_size=page_size)
+        return analyst_page(
+            author=author, stance=stance, query=query, page=page, page_size=page_size
+        )
     except ResearchProviderError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -504,8 +528,12 @@ async def crypto_iv_history(
         }
     else:
         stats = {
-            "current": None, "rangeLow": None, "rangeHigh": None,
-            "historyLow": None, "historyHigh": None, "count": 0,
+            "current": None,
+            "rangeLow": None,
+            "rangeHigh": None,
+            "historyLow": None,
+            "historyHigh": None,
+            "count": 0,
         }
     return {
         "data": {

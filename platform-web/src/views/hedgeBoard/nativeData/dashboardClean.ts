@@ -67,6 +67,7 @@ export type LocalWidgetKey =
   | 'gold-positioning'
   | 'gold-report'
   | 'gold-analysts'
+  | 'china-gold-etf-flow'
   | 'spdr-daily-flow'
   | 'spdr-holdings-vs-price'
   | 'etf-weekly-flows'
@@ -437,10 +438,10 @@ export const researchModules: ResearchModule[] = [
           ),
           localChart('CME FedWatch · FOMC 利率概率', '期货隐含的 FOMC 利率概率', 'macro-fedwatch'),
           localChart(
-            'Polymarket 美联储利率路径',
-            '事件市场对下一次美联储决议的押注',
+            'Polymarket · FOMC 利率路径',
+            '各次 FOMC 会议的加息、维持与降息概率及历史变化',
             'macro-polymarket-fed',
-            { height: 280, sourceNote: 'External Link · Polymarket' },
+            { height: 360, sourceNote: 'Polymarket 公开市场历史快照 · 本地落库' },
           ),
         ],
       },
@@ -536,6 +537,15 @@ export const researchModules: ResearchModule[] = [
               ),
             },
           ),
+          localChart(
+            '中国黄金 ETF 资金流 vs 金价',
+            '中国大陆月度净资金流（USD） / COMEX 近月黄金期货（USD/oz）',
+            'china-gold-etf-flow',
+            {
+              height: 420,
+              sourceUrl: 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows',
+            },
+          ),
           localChart('全球各地区 ETF 每周流入', '', 'etf-weekly-flows', {
             height: 430,
             sourceNote: 'External Link · World Gold Council · permission_required',
@@ -595,16 +605,16 @@ export const researchModules: ResearchModule[] = [
         id: 'gold-rates',
         eyebrow: 'Rates & Inflation',
         title: '金价驱动分析',
-        description: '以实际利率为核心观察黄金的宏观驱动。',
+        description: '黄金、美元指数、长短端利差、名义利率与通胀预期。',
         layout: 'hero',
         widgets: [
           localChart(
             '金价驱动分析',
-            'COMEX 黄金近月期货与 10Y 实际利率，分别使用左右轴',
+            '黄金与美元、30Y−10Y 利差 / 10Y 名义利率、盈亏平衡通胀率与实际利率',
             'gold-vs-real',
             {
               height: 400,
-              sourceNote: 'FRED DFII10 / Yahoo GC=F',
+              sourceNote: 'U.S. Treasury / FRED / Yahoo Finance',
               referenceLinks: [
                 { label: 'TradingView 模板', href: 'https://cn.tradingview.com/chart/k8dNGuui/' },
                 {
@@ -769,6 +779,15 @@ export const researchModules: ResearchModule[] = [
           localChart('ETH ETF 日流量 vs ETH 价格', 'SoSoValue', 'crypto-eth-etf-flow', {
             height: 420,
           }),
+          localChart(
+            'BTC 财库公司每周变动',
+            'SoSoValue · 上市公司买入 BTC 周度资金净流入',
+            'btc-treasury-flow',
+            {
+              height: 420,
+              sourceUrl: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+            },
+          ),
           withReferenceLinks(
             localChart(
               '上市公司 BTC 持仓分布',
@@ -870,7 +889,7 @@ export const researchModules: ResearchModule[] = [
             sourceUrl: 'https://www.greeks.live/deribit/tools/datalab/BTC',
           }),
           localChart(
-            'BTC 期权持仓与多空比',
+            'BTC 期权持仓与看跌／看涨比',
             'Call / Put 未平仓量与 Put/Call 比率 · 日内采集快照，历史从接入日积累',
             'crypto-deribit-metrics',
           ),

@@ -401,7 +401,7 @@ async def get_live_a_share_sector_fund_flow() -> AShareLiveSectorFundFlowRespons
                 raise ResearchServiceError("live_sector_flow_empty", "实时板块资金流未返回有效数据")
             result = AShareLiveSectorFundFlowResponse(
                 fetched_at=_now(),
-                source="东方财富板块资金流（实时）",
+                source="东方财富一级行业资金流",
                 rows=rows,
             )
             _LIVE_SECTOR_FLOW_CACHE.store(cache_key, result)

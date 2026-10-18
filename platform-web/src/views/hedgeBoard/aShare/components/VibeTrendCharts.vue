@@ -110,7 +110,12 @@
     },
     {
       name: '沪深300',
-      values: props.rows.map((row) => row.csi300Close),
+      values: props.rows.map((row) => {
+        const value = row.csi300Close;
+        return value == null || value === '' || !Number.isFinite(Number(value))
+          ? null
+          : Number(value);
+      }),
       type: 'line',
       axis: 'hidden-price',
       color: '#7c3aed',

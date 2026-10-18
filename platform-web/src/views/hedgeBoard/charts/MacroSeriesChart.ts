@@ -9,7 +9,7 @@ import {
 } from '@/api/hedgeResearch';
 
 import SourceSeriesPlot from './SourceSeriesPlot.vue';
-import { unitText, frequencyText } from './sourceSeriesOptions';
+import { unitText, frequencyText, regionalFlowColor } from './sourceSeriesOptions';
 
 const COLORS = ['#165dff', '#0f8b6d', '#c7931a', '#7c3aed', '#dc2626', '#64748b'];
 const controlStyle = {
@@ -48,7 +48,14 @@ export default defineComponent({
   name: 'MacroSeriesChart',
   props: {
     groupId: { type: String, required: true },
-    presentation: { type: String as PropType<'time' | 'distribution' | 'curve'>, default: 'time' },
+    initiallyHiddenSeriesIds: { type: Array as PropType<string[]>, default: () => [] },
+    barSeriesIds: { type: Array as PropType<string[]>, default: () => [] },
+    presentation: {
+      type: String as PropType<
+        'time' | 'distribution' | 'curve' | 'regional-stack' | 'gold-drivers'
+      >,
+      default: 'time',
+    },
     years: { type: Number, default: 5 },
     unitLabel: { type: String, default: '' },
     curveValueLabel: { type: String, default: '结算价' },
@@ -56,8 +63,8 @@ export default defineComponent({
     dataDomain: { type: String as PropType<'macro' | 'commodity' | 'crypto'>, default: 'macro' },
   },
   setup(props) {
-    const selectedYears = ref(0);
-    const hidden = ref(new Set<string>());
+    const selectedYears = ref(props.presentation === 'gold-drivers' ? 1 : 0);
+    const hidden = ref(new Set<string>(props.initiallyHiddenSeriesIds));
     const search = ref('');
     const tableView = ref(false);
     const tablePage = ref(0);
@@ -354,7 +361,15 @@ export default defineComponent({
           ]),
         ]);
       }
-      const visible = plotted.filter(({ item }) => !hidden.value.has(item.seriesId));
+      const isAggregate = (item: MacroDashboardSeries) =>
+        props.presentation === 'regional-stack' && item.seriesId.endsWith('_global');
+      const colorFor = (item: MacroDashboardSeries, index: number) =>
+        props.presentation === 'regional-stack'
+          ? regionalFlowColor(item.seriesId)
+          : COLORS[index % COLORS.length];
+      const visible = plotted.filter(
+        ({ item }) => !isAggregate(item) && !hidden.value.has(item.seriesId),
+      );
       const format = (value: number) =>
         new Intl.NumberFormat('en-US', {
           maximumFractionDigits: Math.abs(value) < 0.01 ? 8 : 4,
@@ -367,21 +382,22 @@ export default defineComponent({
           { class: 'source-series-summary' },
           plotted.map(({ item }, index) =>
             h(
-              'button',
+              isAggregate(item) ? 'div' : 'button',
               {
                 key: item.seriesId,
                 type: 'button',
                 class: 'source-series-legend',
-                'aria-pressed': !hidden.value.has(item.seriesId),
+                'aria-pressed': isAggregate(item) ? undefined : !hidden.value.has(item.seriesId),
                 disabled: visible.length === 1 && !hidden.value.has(item.seriesId),
                 onClick: () => {
+                  if (isAggregate(item)) return;
                   const next = new Set(hidden.value);
                   next.has(item.seriesId) ? next.delete(item.seriesId) : next.add(item.seriesId);
                   hidden.value = next;
                 },
               },
               [
-                h('i', { style: { backgroundColor: COLORS[index % COLORS.length] } }),
+                h('i', { style: { backgroundColor: colorFor(item, index) } }),
                 h('span', { class: 'source-series-summary__name' }, item.label),
                 h(
                   'strong',
@@ -408,7 +424,14 @@ export default defineComponent({
                   observations: item.observations.filter((row) => dates.has(row.date)),
                 };
               }),
-              colors: visible.map(({ item }) => COLORS[series.value.indexOf(item) % COLORS.length]),
+              barSeriesIds: props.barSeriesIds,
+              colors: visible.map(({ item }) => colorFor(item, series.value.indexOf(item))),
+              mode:
+                props.presentation === 'gold-drivers'
+                  ? 'gold-drivers'
+                  : props.presentation === 'regional-stack'
+                  ? 'regional-stack'
+                  : 'time',
               unitLabel: props.unitLabel,
             })
           : h('div', { class: 'local-empty' }, '当前窗口没有观测，可切换其他范围。'),

@@ -31,6 +31,10 @@
         :sections="[
           { id: 'a-share-index-overview', title: '大盘指数' },
           { id: 'a-share-market-overview', title: '情绪与资金' },
+          { id: 'cn-equity-themes', title: '主题产业链' },
+          { id: 'cn-equity-valuation', title: '估值分布' },
+          { id: 'cn-equity-structure', title: '拥挤与参与' },
+          { id: 'cn-equity-hk', title: '港股观察' },
           { id: 'a-share-watchlist-pool', title: '股票池' },
         ]"
         module-label="A股"
@@ -49,6 +53,7 @@
         @query="selectedCode = $event"
       />
       <VibeStockPoolSection :refresh-key="refreshKey" @query="selectedCode = $event" />
+      <EquityObservatoryPanel market="cn" :refresh-key="refreshKey" />
       <StockResearchDrawer :code="selectedCode" @close="selectedCode = ''" />
     </div>
   </PageWrapper>
@@ -67,6 +72,7 @@
   import AShareMarketOverviewSection from './components/AShareMarketOverviewParitySection.vue';
   import VibeStockPoolSection from './components/VibeStockPoolSection.vue';
   import StockResearchDrawer from './components/StockResearchDrawer.vue';
+  import EquityObservatoryPanel from '../components/EquityObservatoryPanel.vue';
   import { useAShareResearch } from './useAShareResearch';
 
   const router = useRouter();
@@ -158,29 +164,26 @@
     --strategy-font-base: 13px;
     --strategy-shadow: 0 12px 28px rgb(26 54 93 / 6%);
     --strategy-shadow-soft: 0 3px 12px rgb(26 54 93 / 4%);
+
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
     min-width: 0;
     padding: 4px 0 32px;
-    color: var(--strategy-text-2);
     background: transparent;
+    color: var(--strategy-text-2);
+    gap: 18px;
     font-variant-numeric: tabular-nums;
   }
+
   .board-toolbar,
   .board-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
-    flex-wrap: wrap;
   }
+
   .board-toolbar {
-    justify-content: space-between;
-    padding: 10px 12px;
-    border: 1px solid #e5ebf3;
-    border-radius: 20px;
-    background: #fff;
-    box-shadow: 0 8px 24px rgb(15 23 42 / 4%);
     --strategy-accent: #da5b5b;
     --strategy-accent-soft: #fbf2f2;
     --strategy-accent-strong: #c94848;
@@ -192,7 +195,15 @@
     --strategy-font-base: 14px;
     --strategy-text-3: #485667;
     --strategy-shadow: 0 10px 24px rgb(17 34 68 / 4.5%);
+
+    justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px solid #e5ebf3;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgb(15 23 42 / 4%);
   }
+
   .refresh-button {
     min-height: 36px;
     padding: 7px 14px;
@@ -202,19 +213,23 @@
     color: var(--strategy-text-2);
     cursor: pointer;
   }
+
   .refresh-button--primary {
-    color: var(--strategy-accent);
-    background: var(--strategy-accent-soft);
     border-color: var(--strategy-accent-ring);
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent);
   }
+
   .refresh-button:disabled {
     opacity: 0.6;
     cursor: wait;
   }
+
   .refresh-button:focus-visible {
     outline: 2px solid var(--strategy-accent);
     outline-offset: 3px;
   }
+
   .dashboard-error {
     display: flex;
     justify-content: space-between;
@@ -225,22 +240,26 @@
     background: #fff8ed;
     color: #8f5517;
   }
+
   .dashboard-error button {
-    background: transparent;
     border: 0;
+    background: transparent;
     color: inherit;
     cursor: pointer;
   }
+
   #a-share-index-overview,
   :deep(#a-share-market-overview),
   :deep(#a-share-watchlist-pool) {
     scroll-margin-top: 80px;
   }
+
   @media (max-width: 680px) {
     .board-actions {
       width: 100%;
     }
   }
+
   @media (prefers-reduced-motion: reduce) {
     :deep(*) {
       scroll-behavior: auto;

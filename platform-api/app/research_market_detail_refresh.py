@@ -51,6 +51,9 @@ async def refresh_market_details(*, force: bool = False) -> dict[str, str]:
                 present = {row.id for row in snapshot.rows}
                 if previous:
                     for row in MarketDetailResponse.model_validate(previous).rows:
+                        expected_symbol = MARKET_SYMBOLS[market_id].get(row.id)
+                        if expected_symbol and row.symbol != expected_symbol.replace('%5E', '^'):
+                            continue
                         if row.id not in present:
                             row.status = "stale"
                             snapshot.rows.append(row)

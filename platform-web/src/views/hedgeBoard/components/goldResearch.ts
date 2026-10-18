@@ -63,10 +63,12 @@ export interface AnalystView {
   levels: { id: string; expressionRaw: string; confirmationText: string | null }[];
 }
 export interface AnalystArticle {
-  id: number;
+  id: string | number;
+  sourcePublisher?: string;
+  collectedAt?: string;
   analystId: string;
   title: string;
-  headlineChinese: string;
+  headlineChinese: string | null;
   date: string;
   publishedText: string;
   extractionStatus: string;
