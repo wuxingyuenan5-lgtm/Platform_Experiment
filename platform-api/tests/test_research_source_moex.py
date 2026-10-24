@@ -79,6 +79,7 @@ def test_official_history_pagination_incremental_cache_and_intraday(tmp_path, mo
     assert result[2] == "Europe/Moscow" and result[3]["price_kind"] == "intraday"
     assert result[3]["as_of"] == "2026-10-15T20:00:00+03:00"
     cache = moex.read_local_json(moex.CACHE_PATH)
+    assert not list((tmp_path / "public/v1").glob("*/series/*.json"))
     assert [r["date"] for r in cache["observations"]] == ["2026-10-13", "2026-10-14"]
     client.calls = []
     asyncio.run(moex.fetch_imoex(client, "test", now=NOW))

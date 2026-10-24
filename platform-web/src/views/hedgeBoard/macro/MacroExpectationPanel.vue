@@ -2,86 +2,95 @@
   <section class="macro-expectation-panel">
     <header class="panel-header">
       <div>
-        <h2>市场预期与事件概率</h2>
+        <h2>polymarket</h2>
       </div>
       <div class="panel-actions">
         <ResearchSourceState v-if="sourceMeta" :meta="sourceMeta" />
-        <button type="button" :disabled="loading" @click="load">{{
+        <button type="button" :disabled="loading" @click="load(true)">{{
           loading ? '刷新中…' : '刷新'
         }}</button>
+        <button
+          type="button"
+          :aria-expanded="expanded"
+          aria-controls="macro-expectation-content"
+          @click="expanded = !expanded"
+          >{{ expanded ? '收起' : '展开' }}</button
+        >
       </div>
     </header>
 
-    <div v-if="error" class="error-state">{{ error }}</div>
-    <div v-if="loading && !events.length" class="loading-state">正在读取市场预期数据…</div>
-    <div v-else-if="response" class="category-list">
-      <section v-for="group in groupedEvents" :key="group.category" class="category-section">
-        <header
-          ><h3>{{ categoryLabel(group.category) }}</h3
-          ><span>{{ group.events.length }}项</span></header
-        >
-        <div v-if="!group.events.length" class="category-empty">当前没有符合筛选条件的事件。</div>
-        <div v-else class="event-grid">
-          <article v-for="event in group.events" :key="event.id" class="event-card">
-            <div class="event-card__header">
-              <span>市场隐含概率</span>
-              <strong>{{ formatProbability(event.probability) }}</strong>
-            </div>
-            <h4 :title="event.originalLabel || undefined">{{ event.label }}</h4>
-            <svg
-              v-if="event.chart.count"
-              viewBox="0 0 220 72"
-              preserveAspectRatio="none"
-              aria-label="事件概率历史曲线"
-            >
-              <line x1="0" y1="18" x2="220" y2="18" />
-              <line x1="0" y1="36" x2="220" y2="36" />
-              <line x1="0" y1="54" x2="220" y2="54" />
-              <polyline v-if="event.chart.count > 1" :points="event.chart.points" />
-              <circle
-                v-else-if="event.chart.single"
-                :cx="event.chart.single.x"
-                :cy="event.chart.single.y"
-                r="3"
-              />
-            </svg>
-            <p v-if="event.chart.count < 2" class="history-empty">{{
-              event.chart.count ? '仅有一次观测，尚无历史走势' : '暂无历史观测'
-            }}</p>
-            <div class="event-metrics">
-              <span
-                >1日
-                <b :class="changeTone(event.chart.change1d)">{{
-                  formatChange(event.chart.change1d)
-                }}</b></span
+    <div v-if="expanded" id="macro-expectation-content">
+      <div v-if="error" class="error-state">{{ error }}</div>
+      <div v-if="loading && !events.length" class="loading-state">正在读取市场预期数据…</div>
+      <div v-else-if="response" class="category-list">
+        <section v-for="group in groupedEvents" :key="group.category" class="category-section">
+          <header
+            ><h3>{{ categoryLabel(group.category) }}</h3
+            ><span>{{ group.events.length }}项</span></header
+          >
+          <div v-if="!group.events.length" class="category-empty">当前没有符合筛选条件的事件。</div>
+          <div v-else class="event-grid">
+            <article v-for="event in group.events" :key="event.id" class="event-card">
+              <div class="event-card__header">
+                <span>市场隐含概率</span>
+                <strong>{{ formatProbability(event.probability) }}</strong>
+              </div>
+              <h4 :title="event.originalLabel || undefined">{{ event.label }}</h4>
+              <svg
+                v-if="event.chart.count"
+                viewBox="0 0 220 72"
+                preserveAspectRatio="none"
+                aria-label="事件概率历史曲线"
               >
-              <span
-                >7日
-                <b :class="changeTone(event.chart.change7d)">{{
-                  formatChange(event.chart.change7d)
-                }}</b></span
-              >
-              <span>来源 <b>Polymarket</b></span>
-            </div>
-            <footer>
-              <span>{{ formatUpdated(event.chart.lastAt) }}</span>
-              <a
-                :href="event.sourceUrl || response?.sourceUrl || dataFileUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                >查看来源</a
-              >
-            </footer>
-          </article>
-        </div>
-      </section>
+                <line x1="0" y1="18" x2="220" y2="18" />
+                <line x1="0" y1="36" x2="220" y2="36" />
+                <line x1="0" y1="54" x2="220" y2="54" />
+                <polyline v-if="event.chart.count > 1" :points="event.chart.points" />
+                <circle
+                  v-else-if="event.chart.single"
+                  :cx="event.chart.single.x"
+                  :cy="event.chart.single.y"
+                  r="3"
+                />
+              </svg>
+              <p v-if="event.chart.count < 2" class="history-empty">{{
+                event.chart.count ? '仅有一次观测，尚无历史走势' : '暂无历史观测'
+              }}</p>
+              <div class="event-metrics">
+                <span
+                  >1日
+                  <b :class="changeTone(event.chart.change1d)">{{
+                    formatChange(event.chart.change1d)
+                  }}</b></span
+                >
+                <span
+                  >7日
+                  <b :class="changeTone(event.chart.change7d)">{{
+                    formatChange(event.chart.change7d)
+                  }}</b></span
+                >
+                <span>来源 <b>Polymarket</b></span>
+              </div>
+              <footer>
+                <span>{{ formatUpdated(event.chart.lastAt) }}</span>
+                <a
+                  :href="event.sourceUrl || response?.sourceUrl || dataFileUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >查看来源</a
+                >
+              </footer>
+            </article>
+          </div>
+        </section>
+      </div>
+      <div v-else class="empty-state">{{ emptyMessage }}</div>
     </div>
-    <div v-else class="empty-state">{{ emptyMessage }}</div>
   </section>
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
+  import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
   import {
     getMacroExpectations,
     type MacroExpectationEvent,
@@ -92,11 +101,18 @@
 
   import { probabilityHistory } from './probabilityHistory';
 
+  import { useResearchSnapshots } from '../composables/researchWorkspace';
+
+  const snapshots = useResearchSnapshots();
+  const controller = new AbortController();
+  onBeforeUnmount(() => controller.abort());
   const dataFileUrl = 'https://polymarket.com/markets';
 
   const response = ref<MacroExpectationResponse | null>(null);
   const loading = ref(false);
   const error = ref('');
+  const props = defineProps<{ initiallyExpanded?: boolean }>();
+  const expanded = ref(props.initiallyExpanded ?? true);
 
   const events = computed(() =>
     (response.value?.events || [])
@@ -135,11 +151,14 @@
     }));
   });
 
-  async function load() {
+  async function load(force = false) {
     loading.value = true;
     error.value = '';
     try {
-      response.value = await getMacroExpectations();
+      response.value =
+        (!force && snapshots.get<MacroExpectationResponse>('expectations')) ||
+        (await getMacroExpectations(controller.signal));
+      snapshots.set('expectations', response.value);
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : '事件概率加载失败';
     } finally {

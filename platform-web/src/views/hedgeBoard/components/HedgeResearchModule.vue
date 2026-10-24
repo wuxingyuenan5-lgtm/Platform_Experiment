@@ -1,6 +1,7 @@
 <template>
   <section class="research-module" :class="{ 'research-module--gold': unified }" :id="moduleId">
     <HedgeBoardSubnav
+      v-if="!standalone"
       :sections="navigationSections"
       :module-label="moduleLabel"
       :unified="unified"
@@ -50,100 +51,120 @@
         class="widget-grid"
         :class="`widget-grid--${section.layout ?? 'three'}`"
       >
-        <ChartExpand
-          v-for="widget in orderedWidgets(section)"
-          :title="resolveWidgetTitle(widget.localKey, widget.title)"
-          :enabled="widget.kind !== 'external-link'"
+        <template
+          v-for="(widget, widgetIndex) in orderedWidgets(section)"
           :key="`${section.id}-${widget.title}`"
-          class="widget-card"
-          :class="{
-            'widget-card--local-chart': widget.kind === 'local-chart',
-            'widget-card--reference': widget.kind === 'external-link',
-            'widget-card--expandable': widget.kind !== 'external-link',
-            'widget-card--wide':
-              widget.localKey === 'macro-global-m2' ||
-              widget.localKey === 'macro-fed-balance-structure' ||
-              widget.localKey === 'etf-weekly-flows' ||
-              widget.localKey === 'crypto-strategy-holdings',
-            'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
-            'widget-card--macro-polymarket-fed': widget.localKey === 'macro-polymarket-fed',
-            'widget-card--halving': widget.localKey === 'crypto-halving-cycles',
-            'widget-card--urpd': widget.localKey === 'crypto-urpd',
-            'widget-card--etf-premium': widget.localKey === 'crypto-etf-premium',
-            'widget-card--cftc': widget.localKey === 'cftc-positioning',
-          }"
         >
-          <div v-if="!shouldHideWidgetHeader(section.id, widget)" class="widget-card__header">
-            <div class="widget-card__header-main">
-              <div class="widget-card__title-row">
-                <h5>{{ resolveWidgetTitle(widget.localKey, widget.title) }}</h5>
-              </div>
-              <div class="widget-card__actions">
-                <button
-                  v-if="widget.deferUntilExpanded"
-                  type="button"
-                  class="widget-card__defer-toggle"
-                  :aria-expanded="isDeferredWidgetExpanded(section.id, widget)"
-                  @click="toggleDeferredWidget(section.id, widget)"
+          <h5
+            v-if="
+              widget.region &&
+              (widgetIndex === 0 ||
+                orderedWidgets(section)[widgetIndex - 1].region !== widget.region)
+            "
+            class="research-region-heading"
+            >{{ widget.region }}</h5
+          >
+          <ChartExpand
+            :title="resolveWidgetTitle(widget.localKey, widget.title)"
+            :enabled="widget.kind !== 'external-link'"
+            class="widget-card"
+            :class="{
+              'widget-card--local-chart': widget.kind === 'local-chart',
+              'widget-card--reference': widget.kind === 'external-link',
+              'widget-card--expandable': widget.kind !== 'external-link',
+              'widget-card--wide':
+                widget.localKey === 'macro-global-m2' ||
+                widget.localKey === 'macro-fed-balance-structure' ||
+                widget.localKey === 'macro-fed-assets' ||
+                widget.localKey === 'macro-corporate-yields' ||
+                widget.localKey === 'etf-weekly-flows',
+              'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
+              'widget-card--macro-polymarket-fed': widget.localKey === 'macro-polymarket-fed',
+              'widget-card--halving': widget.localKey === 'crypto-halving-cycles',
+              'widget-card--urpd': widget.localKey === 'crypto-urpd',
+              'widget-card--etf-premium': widget.localKey === 'crypto-etf-premium',
+              'widget-card--cftc': widget.localKey === 'cftc-positioning',
+            }"
+          >
+            <div v-if="!shouldHideWidgetHeader(section.id, widget)" class="widget-card__header">
+              <div class="widget-card__header-main">
+                <div class="widget-card__title-row">
+                  <h5>{{ resolveWidgetTitle(widget.localKey, widget.title) }}</h5>
+                </div>
+                <p
+                  v-if="widget.region === '中国' || widget.localKey === 'macro-net-liquidity'"
+                  class="research-definition"
+                  >{{ widget.subtitle }}</p
                 >
-                  {{ isDeferredWidgetExpanded(section.id, widget) ? '收起' : '展开加载' }}
-                </button>
-                <a
-                  v-if="resolveWidgetSourceLink(widget)"
-                  class="widget-card__link"
-                  :href="resolveWidgetSourceLink(widget)"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {{ widget.sourceLinkLabel ?? '参考网页 ↗' }}
-                </a>
-                <a
-                  v-for="link in widget.referenceLinks ?? []"
-                  :key="link.href"
-                  class="widget-card__link"
-                  :href="link.href"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {{ link.label }} ↗
-                </a>
+                <div class="widget-card__actions">
+                  <button
+                    v-if="widget.deferUntilExpanded"
+                    type="button"
+                    class="widget-card__defer-toggle"
+                    :aria-expanded="isDeferredWidgetExpanded(section.id, widget)"
+                    @click="toggleDeferredWidget(section.id, widget)"
+                  >
+                    {{ isDeferredWidgetExpanded(section.id, widget) ? '收起' : '展开加载' }}
+                  </button>
+                  <a
+                    v-if="resolveWidgetSourceLink(widget)"
+                    class="widget-card__link"
+                    :href="resolveWidgetSourceLink(widget)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {{ widget.sourceLinkLabel ?? '参考网页 ↗' }}
+                  </a>
+                  <a
+                    v-for="link in widget.referenceLinks ?? []"
+                    :key="link.href"
+                    class="widget-card__link"
+                    :href="link.href"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {{ link.label }} ↗
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
 
-          <component :is="widgetErrorBoundary" :widget-title="widget.title">
-            <div
-              v-if="widget.deferUntilExpanded && !isDeferredWidgetExpanded(section.id, widget)"
-              class="deferred-widget-placeholder"
-            >
-              <strong>默认折叠</strong>
-              <span>点击“展开加载”后读取 CFTC 周度持仓历史</span>
-            </div>
-            <div v-else-if="widget.kind === 'external-link'" class="external-reference-card">
-              <p>{{ widget.subtitle }}</p>
-            </div>
-            <VisibleChart
-              v-else-if="widget.kind === 'local-chart' && widget.localKey"
-              :height="widget.height"
-            >
-              <component :is="localChartWidget" :widget="widget" />
-            </VisibleChart>
-            <component :is="tradingViewWidget" v-else :widget="widget" />
-          </component>
-        </ChartExpand>
+            <component :is="widgetErrorBoundary" :widget-title="widget.title">
+              <div
+                v-if="widget.deferUntilExpanded && !isDeferredWidgetExpanded(section.id, widget)"
+                class="deferred-widget-placeholder"
+              >
+                <strong>默认折叠</strong>
+                <span>点击“展开加载”后读取 CFTC 周度持仓历史</span>
+              </div>
+              <div v-else-if="widget.kind === 'external-link'" class="external-reference-card">
+                <p>{{ widget.subtitle }}</p>
+              </div>
+              <VisibleChart
+                v-else-if="widget.kind === 'local-chart' && widget.localKey"
+                :height="widget.height"
+              >
+                <component :is="localChartWidget" :widget="widget" />
+              </VisibleChart>
+              <component :is="tradingViewWidget" v-else :widget="widget" />
+            </component>
+          </ChartExpand>
+        </template>
       </div>
     </section>
   </section>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, type Component } from 'vue';
+  import { computed, type Component } from 'vue';
+  import { useResearchViewState } from '../composables/researchWorkspace';
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
   import VisibleChart from './VisibleChart';
   import ChartExpand from './ChartExpand.vue';
   import type { ChartSection, LocalWidgetKey, WidgetConfig } from '../nativeData/dashboardClean';
 
   const props = defineProps<{
+    standalone?: boolean;
     moduleId: string;
     moduleLabel: string;
     formula?: {
@@ -177,8 +198,18 @@
     ...(props.trailingNavigationSections ?? []),
   ]);
 
-  const expandedMarketDetailSectionIds = ref<string[]>([]);
-  const expandedDeferredWidgetIds = ref<string[]>([]);
+  const expandedMarketDetailSectionIds = useResearchViewState<string[]>(
+    'sections',
+    props.sections.map((section) => section.id),
+  );
+  const expandedDeferredWidgetIds = useResearchViewState<string[]>(
+    'deferred-widgets',
+    props.sections.flatMap((section) =>
+      section.widgets
+        .filter((widget) => widget.deferUntilExpanded)
+        .map((widget) => deferredWidgetId(section.id, widget)),
+    ),
+  );
 
   function deferredWidgetId(sectionId: string, widget: WidgetConfig) {
     return `${sectionId}-${widget.localKey ?? widget.title}`;
@@ -386,6 +417,22 @@
 
   .widget-grid--hero {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .research-region-heading {
+    grid-column: 1 / -1;
+    margin: 8px 0 0;
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .research-definition {
+    flex: 1 1 100%;
+    order: 2;
+    margin: 0;
+    color: #627488;
+    font-size: 12px;
+    line-height: 1.6;
   }
 
   .widget-grid--two {

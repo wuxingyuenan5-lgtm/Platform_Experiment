@@ -29,7 +29,15 @@ async function createPlugins({ isBuild, root, compress, enableAnalyze }: Options
   vitePlugins.push(configSvgIconsPlugin({ isBuild }));
 
   // vite-plugin-purge-icons
-  vitePlugins.push(purgeIcons());
+  const sourceRoot = root.replace(/\\/g, '/');
+  vitePlugins.push(
+    purgeIcons({
+      content: [
+        `${sourceRoot}/index.html`,
+        `${sourceRoot}/{src,packages}/**/*.{html,pug,vue,js,jsx,ts,tsx}`,
+      ],
+    }),
+  );
 
   // The following plugins only work in the production environment
   if (isBuild) {

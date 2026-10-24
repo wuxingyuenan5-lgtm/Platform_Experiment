@@ -80,6 +80,7 @@ def test_public_native_callback_precedes_sdk_book_rewrite(monkeypatch):
     monkeypatch.setattr(WebSocket, "__init__", construct)
     monkeypatch.setattr(WebSocket, "orderbook_stream", lambda *a, **k: None)
     monkeypatch.setattr(WebSocket, "ticker_stream", lambda *a, **k: None)
+    monkeypatch.setattr(WebSocket, "is_connected", lambda self: True)
     owner = BybitConnections(Settings())
     events = []
     owner.start_research_streams(lambda *a, **k: events.append((a, k)))
@@ -420,6 +421,7 @@ def test_price_history_expands_backward_when_retention_window_grows(tmp_path):
 
 def test_daily_spot_history_uses_own_cursor_closed_days_and_no_repeat(tmp_path):
     from types import SimpleNamespace
+
     from app.research_price_history import capture_prices
 
     day = 86400000

@@ -463,6 +463,22 @@ class ResearchCapture:
 def create_research_market_router(capture):
     router = APIRouter(tags=["research-market"])
 
+    @router.get("/v1/market-data/xauusd-daily")
+    def xauusd_daily(count: int = Query(default=1500, ge=1, le=2000)):
+        account = capture.settings.mt5_primary_account_id
+        if (
+            capture.settings.live_write_enabled
+            or not account
+            or account not in capture.settings.mt5_accounts
+        ):
+            raise HTTPException(503, "fixed MT5 research source unavailable or busy")
+        try:
+            return capture.gateway.get_research_daily_rates(account_id=account, count=count)
+        except Exception as exc:
+            raise HTTPException(
+                503, f"MT5 daily history unavailable: {type(exc).__name__}"
+            ) from exc
+
     @router.get("/v1/market-data/status")
     def status():
         return capture.status()

@@ -92,10 +92,15 @@
           >
             {{ formatDateLabel(dates[index]) }}
           </text>
-          <g v-for="entry in visible" :key="entry.item.name" :clip-path="`url(#${clipId})`">
+          <g
+            v-for="entry in geometry"
+            :key="entry.item.name"
+            v-memo="[entry]"
+            :clip-path="`url(#${clipId})`"
+          >
             <template v-if="entry.item.type === 'bar'">
               <rect
-                v-for="bar in bars(entry.item)"
+                v-for="bar in entry.bars"
                 :key="bar.index"
                 :x="bar.x"
                 :y="bar.y"
@@ -105,15 +110,15 @@
                 opacity="0.4"
               />
             </template>
-            <template v-else v-for="(segment, index) in segments(entry.item)" :key="index">
+            <template v-else v-for="(segment, index) in entry.segments" :key="index">
               <path
                 v-if="entry.item.type === 'area'"
-                :d="areaPath(segment, entry.item)"
+                :d="segment.area"
                 :fill="entry.item.color"
                 opacity="0.12"
               />
               <polyline
-                :points="segment.map((point) => `${point.x},${point.y}`).join(' ')"
+                :points="segment.points"
                 :stroke="entry.item.color"
                 :stroke-width="entry.item.lineWidth || 2"
                 class="vibe-chart-line"
@@ -190,8 +195,9 @@
 </template>
 
 <script setup lang="ts">
+  import { useResearchViewState } from '../../composables/researchWorkspace';
   import ChartExpand from '../../components/ChartExpand.vue';
-  import { computed, getCurrentInstance, ref, watch } from 'vue';
+  import { computed, getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue';
   import { useElementSize, useWindowSize } from '@vueuse/core';
   import { overviewSegments } from './overviewSegments';
 
@@ -216,12 +222,29 @@
     rightLabel?: string;
     frequency?: 'monthly';
     precision?: number;
+    initialWindow?: number;
     dates: string[];
     series: Series[];
   }>();
+  const remembered = useResearchViewState<{
+    preset: number | null;
+    start: string;
+    end: string;
+    hidden: number[];
+  } | null>(`chart:${props.title}`, null);
+  let restored = false;
+  onBeforeUnmount(() => {
+    if (props.dates.length)
+      remembered.value = {
+        preset: preset.value,
+        start: props.dates[startIndex.value],
+        end: props.dates[endIndex.value],
+        hidden: [...hidden.value],
+      };
+  });
   const chartExpanded = ref(false);
   const { height: viewportHeight } = useWindowSize();
-  const defaultWindow = props.frequency === 'monthly' ? 60 : 90;
+  const defaultWindow = props.initialWindow ?? (props.frequency === 'monthly' ? 60 : 90);
   const preset = ref<number | null>(defaultWindow);
   const startIndex = ref(0);
   const endIndex = ref(0);
@@ -321,6 +344,10 @@
     left: axisState.value.left.domain,
     right: axisState.value.right.domain,
   }));
+  const autoDomains = computed(() => ({
+    left: dataDomain('left'),
+    right: dataDomain('right'),
+  }));
   const x = (index: number) =>
     left + ((right.value - left) * (index - start.value)) / Math.max(1, end.value - start.value);
   const y = (value: number, item: Series) => {
@@ -329,7 +356,7 @@
     if (item.axis === 'hidden-price') {
       const [pMin, pMax] = priceBounds.value;
       plotted = pMin === pMax ? 0.5 : (value - pMin) / (pMax - pMin);
-      const [lMin, lMax] = dataDomain('left');
+      const [lMin, lMax] = autoDomains.value.left;
       plotted = lMin + plotted * (lMax - lMin);
     }
     const [min, max] = bounds.value[axis];
@@ -376,6 +403,19 @@
       ];
     });
   }
+  const geometry = computed(() =>
+    visible.value.map(({ item }) => ({
+      item,
+      bars: item.type === 'bar' ? bars(item) : [],
+      segments:
+        item.type === 'bar'
+          ? []
+          : segments(item).map((points) => ({
+              points: points.map((point) => `${point.x},${point.y}`).join(' '),
+              area: item.type === 'area' ? areaPath(points, item) : '',
+            })),
+    })),
+  );
   function axisTicks(axis: 'left' | 'right') {
     const [min, max] = bounds.value[axis];
     const item = visible.value.find((entry) => (entry.item.axis || 'left') === axis)?.item;
@@ -546,6 +586,16 @@
     [() => props.dates.length, () => props.dates[0], () => props.dates.at(-1), () => props.series],
     () => {
       const max = maxIndex.value;
+      if (!restored && props.dates.length && remembered.value) {
+        const saved = remembered.value;
+        preset.value = saved.preset;
+        const a = props.dates.findIndex((d) => d >= saved.start);
+        const z = props.dates.findIndex((d) => d >= saved.end);
+        startIndex.value = Math.max(0, a);
+        endIndex.value = z < 0 ? max : z;
+        hidden.value = new Set(saved.hidden);
+        restored = true;
+      }
       if (preset.value != null) {
         endIndex.value = max;
         startIndex.value = preset.value ? Math.max(0, max - preset.value + 1) : 0;
@@ -566,7 +616,6 @@
     },
     { immediate: true, deep: true },
   );
-  setPreset(defaultWindow);
 </script>
 
 <style scoped lang="less">

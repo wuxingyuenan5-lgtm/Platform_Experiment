@@ -23,7 +23,7 @@
       <p>{{ missingMarketRows.join('、') }}</p>
     </details>
     <HedgeBoardSubnav
-      v-if="displayConfig.id === 'us'"
+      v-if="!view && displayConfig.id === 'us'"
       :sections="[
         { id: 'us-market-overview', title: '大盘表现' },
         ...(detailSectionId ? [{ id: detailSectionId, title: '美股市场明细' }] : []),
@@ -41,7 +41,7 @@
     />
     <section
       :id="`${displayConfig.id}-market-overview`"
-      v-if="displayOverviewCards.length"
+      v-if="(!view || view === 'overview') && displayOverviewCards.length"
       class="market-terminal__overview-strip"
       :class="{
         'is-single': !(displayConfig.breadthCards?.length || displayConfig.volatilityCards?.length),
@@ -71,11 +71,11 @@
             </div>
             <svg
               class="market-terminal__market-spark"
-              viewBox="0 0 80 22"
+              viewBox="0 0 300 40"
               preserveAspectRatio="none"
             >
               <polyline
-                :points="compactSparkline(item.spark, 80, 22)"
+                :points="compactSparkline(item.spark, 300, 40)"
                 :class="sparkStrokeClass(item.change)"
               />
             </svg>
@@ -102,11 +102,11 @@
             <span v-if="item.price" class="market-terminal__market-price">{{ item.price }}</span>
             <svg
               class="market-terminal__market-spark"
-              viewBox="0 0 80 22"
+              viewBox="0 0 300 40"
               preserveAspectRatio="none"
             >
               <polyline
-                :points="compactSparkline(item.spark, 80, 22)"
+                :points="compactSparkline(item.spark, 300, 40)"
                 :class="sparkStrokeClass(item.change)"
               />
             </svg>
@@ -173,6 +173,7 @@
 
     <section
       :id="detailSectionId"
+      v-if="!view || view === 'details' || (displayConfig.id === 'us' && view === 'overview')"
       class="market-terminal__detail-section market-detail-section-shell"
     >
       <div class="market-terminal__panel-head market-detail-section-heading">
@@ -201,7 +202,10 @@
 
     <section
       :id="`${displayConfig.id}-market-rotation`"
-      v-if="displayConfig.rotationButtonLabel"
+      v-if="
+        (!view || view === 'rotation' || displayConfig.id === 'global') &&
+        displayConfig.rotationButtonLabel
+      "
       class="market-terminal__rotation"
     >
       <button type="button" class="market-terminal__rotation-button" @click="toggleRotation">
@@ -312,7 +316,7 @@
       </div>
     </section>
 
-    <EquityObservatoryPanel v-if="displayConfig.id === 'us'" market="us" />
+    <EquityObservatoryPanel v-if="!view && displayConfig.id === 'us'" market="us" />
     <Teleport to="body">
       <div
         v-if="chartModal.visible"
@@ -357,6 +361,7 @@
 </template>
 
 <script setup lang="ts">
+  import { useResearchSnapshots, useResearchViewState } from '../composables/researchWorkspace';
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
   import ChartExpand from './ChartExpand.vue';
   import EquityObservatoryPanel from './EquityObservatoryPanel.vue';
@@ -406,6 +411,7 @@
   }
 
   const props = defineProps<{
+    view?: string;
     config: MarketTerminalPageConfig;
     marketTabs: MarketTab[];
     detailSectionId?: string;
@@ -416,6 +422,8 @@
   const marketSnapshot = ref<MarketDetailResponse | null>(null);
   const marketLoading = ref(false);
   const marketError = ref(false);
+  const snapshots = useResearchSnapshots();
+  let marketController: AbortController | undefined;
   let marketRequestId = 0;
   let marketTimer: ReturnType<typeof setInterval> | undefined;
   const displayConfig = computed(() =>
@@ -443,11 +451,14 @@
     const market = props.config.id;
     if (market !== 'us' && market !== 'global') return;
     const requestId = ++marketRequestId;
+    marketController?.abort();
+    marketController = new AbortController();
     marketLoading.value = true;
     try {
-      const result = await getMarketDetail(market);
+      const result = await getMarketDetail(market, marketController.signal);
       if (requestId === marketRequestId) {
         marketSnapshot.value = result;
+        snapshots.set(`market:${market}`, result);
         marketError.value = false;
       }
     } catch {
@@ -460,9 +471,11 @@
     () => props.config.id,
     () => {
       ++marketRequestId;
-      marketSnapshot.value = null;
+      marketController?.abort();
+      marketSnapshot.value =
+        snapshots.get<MarketDetailResponse>(`market:${props.config.id}`) || null;
       clearInterval(marketTimer);
-      void loadMarket();
+      if (!marketSnapshot.value) void loadMarket();
       if (['us', 'global'].includes(props.config.id))
         marketTimer = setInterval(loadMarket, 300_000);
     },
@@ -470,17 +483,18 @@
   );
   onBeforeUnmount(() => {
     ++marketRequestId;
+    marketController?.abort();
     clearInterval(marketTimer);
   });
 
   const emit = defineEmits<{ (event: 'index-chart', code: string, name: string): void }>();
   const rotationExpanded = ref(true);
-  const marketDetailExpanded = ref(props.config.id === 'global');
+  const marketDetailExpanded = ref(true);
   watch(
     () => props.config.id,
-    (marketId) => (marketDetailExpanded.value = marketId === 'global'),
+    () => (marketDetailExpanded.value = true),
   );
-  const rotationSortState = ref<SortState | null>(null);
+  const rotationSortState = useResearchViewState<SortState | null>('market-rotation-sort', null);
   const chartContainerRef = ref<HTMLDivElement | null>(null);
   const chartModal = ref<ChartModalState>({
     visible: false,
@@ -816,7 +830,7 @@
         const x = (index / Math.max(series.length - 1, 1)) * width;
         const y =
           max === min ? height / 2 : height - 1 - ((value - min) / (max - min)) * (height - 2);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
+        return `${x.toFixed(3)},${y.toFixed(3)}`;
       })
       .join(' ');
   }
@@ -1148,12 +1162,13 @@
   .market-terminal__market-spark {
     display: block;
     width: 100%;
-    height: 28px;
+    height: 40px;
     margin-top: 8px;
   }
 
   .market-terminal__market-spark polyline,
   .market-terminal__sparkline polyline {
+    vector-effect: non-scaling-stroke;
     stroke-width: 1.5;
     stroke-linecap: round;
     fill: none;

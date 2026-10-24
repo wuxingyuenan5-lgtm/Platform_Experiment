@@ -1,3 +1,4 @@
+import { useResearchSnapshots } from '../composables/researchWorkspace';
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { Modal } from 'ant-design-vue';
 import { hasPermission } from '@/access/userAccess';
@@ -14,6 +15,8 @@ import {
 } from '@/api/platform/aShareStockPool';
 
 export function useStockPool() {
+  const snapshots = useResearchSnapshots();
+  const controller = new AbortController();
   const user = useUserStore();
   const canEditPool = computed(() =>
     hasPermission(user.getAuthentication?.permissions || [], 'research.write'),
@@ -35,17 +38,24 @@ export function useStockPool() {
   let generation = 0;
   let activeLoad: Promise<void> | null = null;
 
-  function load(): Promise<void> {
+  function load(force = true): Promise<void> {
     if (activeLoad) return activeLoad;
     const current = generation;
     loading.value = true;
     error.value = '';
     activeLoad = (async () => {
-      const results = await Promise.allSettled([getStockPool(), getPoolFocus()]);
+      const cached = !force && snapshots.get<PoolPayload>('stocks');
+      if (cached) data.value = cached;
+      const results = await Promise.allSettled([
+        cached || getStockPool(controller.signal),
+        getPoolFocus(controller.signal),
+      ]);
       if (current !== generation) return;
       const [pool, focus] = results;
-      if (pool.status === 'fulfilled') data.value = pool.value;
-      else error.value = pool.reason instanceof Error ? pool.reason.message : '股票池加载失败';
+      if (pool.status === 'fulfilled') {
+        data.value = pool.value;
+        snapshots.set('stocks', pool.value);
+      } else error.value = pool.reason instanceof Error ? pool.reason.message : '股票池加载失败';
       if (focus.status === 'fulfilled') {
         focusCodes.value = focus.value.codes;
         focusVersion = focus.value.rowVersion;
@@ -179,6 +189,7 @@ export function useStockPool() {
     },
   );
   onBeforeUnmount(() => {
+    controller.abort();
     generation += 1;
   });
   return {

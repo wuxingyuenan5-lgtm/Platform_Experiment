@@ -27,6 +27,7 @@ from app.member_holding_routes import router as member_holding_router
 from app.operational_metrics import router as operational_metrics_router
 from app.production_monitoring import router as production_monitoring_router
 from app.research_a_share_refresh import lifespan as research_lifespan
+from app.research_hk_share_refresh import lifespan as research_hk_lifespan
 from app.research_overseas_refresh import lifespan as research_overseas_lifespan
 from app.research_routes import router as research_router
 from app.research_watchlist_routes import router as research_watchlist_router
@@ -67,6 +68,7 @@ async def lifespan(_: FastAPI):
     try:
         async with (
             research_lifespan(_),
+            research_hk_lifespan(_),
             research_overseas_lifespan(_),
             strategy_research_lifespan(_),
             data_audit_lifespan(_),

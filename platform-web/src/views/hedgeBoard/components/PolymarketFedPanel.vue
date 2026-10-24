@@ -1,340 +1,315 @@
 <template>
-  <div class="polymarket-fed-panel">
-    <div v-if="loading" class="polymarket-fed-panel__state">加载 Polymarket 历史概率…</div>
-    <div v-else-if="error" class="polymarket-fed-panel__state polymarket-fed-panel__state--error">
-      {{ error }}
-    </div>
-    <div v-else-if="!events.length" class="polymarket-fed-panel__state">暂无货币政策事件数据</div>
-    <div v-else class="polymarket-fed-panel__body">
-      <header class="polymarket-fed-panel__toolbar">
-        <div>
-          <strong>FOMC 会议利率路径</strong>
-          <span>加息、维持与降息概率 · 历史数据</span>
-        </div>
-        <div class="polymarket-fed-panel__ranges" role="tablist" aria-label="历史范围">
-          <button
-            v-for="option in rangeOptions"
-            :key="option.value"
-            type="button"
-            :class="{ 'is-active': selectedRange === option.value }"
-            role="tab"
-            :aria-selected="selectedRange === option.value"
-            @click="selectedRange = option.value"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-      </header>
-
-      <div class="polymarket-fed-panel__contracts" role="tablist" aria-label="货币政策事件">
-        <button
-          v-for="(event, index) in events"
-          :key="event.id"
-          type="button"
-          class="polymarket-fed-panel__contract"
-          :class="{ 'is-active': selectedEventId === event.id }"
-          role="tab"
-          :aria-selected="selectedEventId === event.id"
-          @click="selectedEventId = event.id"
+  <div class="fomc-panel">
+    <p v-if="loading">加载会议概率…</p>
+    <p v-else-if="error">{{ error }}</p>
+    <p v-else-if="!meeting">暂无 FOMC 会议概率</p>
+    <template v-else>
+      <header
+        ><h3>美联储 {{ meeting.meetingDate }} 的决定？</h3
+        ><a :href="meeting.sourceUrl" target="_blank" rel="noopener noreferrer"
+          >参考网页 ↗</a
+        ></header
+      >
+      <nav aria-label="FOMC会议"
+        ><button
+          v-for="item in orderedMeetings"
+          :key="item.id"
+          :class="{ active: meeting.id === item.id }"
+          :aria-pressed="meeting.id === item.id"
+          @click="selectedId = item.id"
+          >{{ item.meetingDate }}{{ item.closed ? ' · 已结束' : '' }}</button
+        ></nav
+      >
+      <nav aria-label="图表范围"
+        ><button
+          v-for="years in [0.25, 1, 3, 5, 10, 0]"
+          :key="years"
+          :class="{ active: selectedYears === years }"
+          :aria-pressed="selectedYears === years"
+          @click="selectedYears = years"
+          >{{ years === 0 ? '全部' : years === 0.25 ? '3个月' : `${years}年` }}</button
+        ></nav
+      >
+      <div class="outcomes"
+        ><button
+          v-for="line in lines"
+          :key="line.id"
+          :aria-pressed="!hidden.has(line.id)"
+          :class="{ muted: hidden.has(line.id) }"
+          @click="toggle(line.id)"
+          ><i :style="{ background: line.color }"></i>{{ label(line.label) }}
+          <strong>{{ pct(line.probability) }}</strong></button
+        ></div
+      >
+      <p v-if="feed?.fomcStatus === 'stale' || meeting.status === 'stale'"
+        >部分历史暂不可用，保留已采集数据。</p
+      >
+      <div v-if="times.length" ref="chartHost" class="fomc-chart"
+        ><svg
+          :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
+          role="img"
+          :aria-label="`${meeting.meetingDate} FOMC各结果历史概率`"
         >
-          <span>{{ event.label }}</span>
-          <strong>{{ formatProbability(event.probability) }}</strong>
-          <small>{{ index + 1 }} / {{ events.length }}</small>
-        </button>
-      </div>
-
-      <section class="polymarket-fed-panel__chart" aria-label="Polymarket 历史概率曲线">
-        <div class="polymarket-fed-panel__chart-head">
-          <div>
-            <h6 :title="selectedEvent?.originalLabel || undefined">{{ selectedEvent?.label }}</h6>
-            <span>市场隐含概率（%）</span>
-          </div>
-          <span v-if="selectedEvent?.expiryAt">到期 {{ formatDate(selectedEvent.expiryAt) }}</span>
-        </div>
-        <svg viewBox="0 0 640 220" preserveAspectRatio="none">
-          <line
-            v-for="value in gridValues"
-            :key="value"
-            x1="38"
-            :y1="yFor(value)"
-            x2="630"
-            :y2="yFor(value)"
-          />
-          <text v-for="value in gridValues" :key="`label-${value}`" x="2" :y="yFor(value) + 4">
-            {{ value }}
+          <g v-for="value in [0, 25, 50, 75, 100]" :key="value">
+            <line
+              x1="10"
+              :x2="chartWidth - 60"
+              :y1="y(value)"
+              :y2="y(value)"
+              stroke="#e0e4ea"
+              stroke-dasharray="2 5"
+            />
+            <text :x="chartWidth - 49" :y="y(value) + 4">{{ value }}%</text>
+          </g>
+          <g v-for="line in lines" :key="line.id">
+            <polyline
+              v-if="!hidden.has(line.id)"
+              :points="points(line.history)"
+              fill="none"
+              :stroke="line.color"
+              stroke-width="2"
+              vector-effect="non-scaling-stroke"
+            />
+            <circle
+              v-if="!hidden.has(line.id) && line.history.length"
+              :cx="x(new Date(line.history[line.history.length - 1].observedAt).getTime())"
+              :cy="y(Number(line.history[line.history.length - 1].probability))"
+              r="4"
+              :fill="line.color"
+            />
+          </g>
+          <text
+            v-for="(time, index) in ticks"
+            :key="index"
+            :x="x(time)"
+            :y="chartHeight - 7"
+            :text-anchor="index === 0 ? 'start' : index === 4 ? 'end' : 'middle'"
+          >
+            {{ new Date(time).toISOString().slice(0, 10) }}
           </text>
-          <polyline :points="chartPoints" />
-        </svg>
-        <div class="polymarket-fed-panel__axis">
-          <span>{{ chartStart }}</span>
-          <span>{{ chartEnd }}</span>
-        </div>
-      </section>
-
-      <footer class="polymarket-fed-panel__footnote">
-        数据按 5 分钟周期从 Polymarket CLOB 历史价格接口抓取并存入平台，页面只读取本地历史快照。
-      </footer>
-    </div>
+        </svg></div
+      >
+      <p v-else>该会议暂无所选范围的历史数据。</p>
+      <footer
+        >来源：Polymarket · 更新 {{ new Date(meeting.updatedAt).toLocaleString('zh-CN') }}</footer
+      >
+    </template>
   </div>
 </template>
-
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import { getMacroExpectations, type MacroExpectationEvent } from '@/api/hedgeResearch';
+  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+  import {
+    getMacroExpectations,
+    type MacroExpectationResponse,
+    type MacroProbabilityPoint,
+  } from '@/api/hedgeResearch';
 
-  type RangeKey = '1D' | '7D' | '30D' | 'ALL';
-  const rangeOptions: ReadonlyArray<{ value: RangeKey; label: string }> = [
-    { value: '1D', label: '1日' },
-    { value: '7D', label: '7日' },
-    { value: '30D', label: '30日' },
-    { value: 'ALL', label: '全部' },
-  ];
-
+  const chartHost = ref<HTMLElement | null>(null);
+  const chartWidth = ref(1000);
+  const chartHeight = ref(320);
+  let observer: ResizeObserver | undefined;
+  watch(
+    chartHost,
+    (element) => {
+      observer?.disconnect();
+      if (!element) return;
+      observer = new ResizeObserver((entries: ResizeObserverEntry[]) => {
+        const entry = entries[0];
+        if (!entry) return;
+        chartWidth.value = Math.max(360, entry.contentRect.width);
+        chartHeight.value = Math.max(240, entry.contentRect.height);
+      });
+      observer.observe(element);
+    },
+    { flush: 'post' },
+  );
+  onBeforeUnmount(() => observer?.disconnect());
   const loading = ref(true);
   const error = ref('');
-  const response = ref<{ events: MacroExpectationEvent[] } | null>(null);
-  const selectedRange = ref<RangeKey>('7D');
-  const selectedEventId = ref('');
-  const events = computed(() =>
-    (response.value?.events ?? []).filter((event) => event.category === 'monetary_policy'),
+  const feed = ref<MacroExpectationResponse | null>(null);
+  const selectedId = ref('');
+  const selectedYears = ref(5);
+  const hidden = ref(new Set<string>());
+  const orderedMeetings = computed(() =>
+    [...(feed.value?.fomcMeetings ?? [])].sort((a, b) =>
+      a.meetingDate.localeCompare(b.meetingDate),
+    ),
   );
-  const selectedEvent = computed(() => {
+  const meeting = computed(
+    () =>
+      orderedMeetings.value.find((m) => m.id === selectedId.value) ??
+      orderedMeetings.value.find((m) => !m.closed && new Date(m.expiryAt).getTime() > Date.now()) ??
+      orderedMeetings.value[orderedMeetings.value.length - 1],
+  );
+  function color(label: string) {
+    return label === 'No change'
+      ? '#82b8ff'
+      : label === '25 bps increase'
+      ? '#426bff'
+      : label.includes('increase')
+      ? '#edc500'
+      : label === '25 bps decrease'
+      ? '#ff8000'
+      : '#de4d65';
+  }
+  function label(value: string) {
     return (
-      events.value.find((event) => event.id === selectedEventId.value) ?? events.value[0] ?? null
+      (
+        {
+          'No change': '无变化',
+          '25 bps increase': '加息25个基点',
+          '50+ bps increase': '加息50个基点以上',
+          '25 bps decrease': '降息25个基点',
+          '50+ bps decrease': '降息50个基点以上',
+        } as Record<string, string>
+      )[value] ?? value
     );
-  });
-  const history = computed(() => {
-    const values = (selectedEvent.value?.history ?? [])
-      .map((point) => ({
-        time: new Date(point.observedAt).getTime(),
-        value: Number(point.probability),
+  }
+  const lines = computed(() =>
+    (meeting.value?.outcomes ?? [])
+      .map((v) => ({
+        ...v,
+        color: color(v.label),
+        history: v.history.filter(
+          (p) =>
+            !selectedYears.value ||
+            new Date(p.observedAt).getTime() >=
+              Date.now() - selectedYears.value * 365.25 * 86400000,
+        ),
       }))
-      .filter((point) => Number.isFinite(point.time) && Number.isFinite(point.value))
-      .sort((a, b) => a.time - b.time);
-    if (!values.length || selectedRange.value === 'ALL') return values;
-    const days = Number(selectedRange.value.slice(0, -1));
-    const cutoff = values[values.length - 1].time - days * 86_400_000;
-    return values.filter((point) => point.time >= cutoff);
-  });
-  const chartPoints = computed(() => {
-    if (!history.value.length) return '38,180 630,180';
-    if (history.value.length === 1) {
-      return `38,${yFor(history.value[0].value)} 630,${yFor(history.value[0].value)}`;
-    }
-    return history.value
-      .map((point, index) => {
-        const x = 38 + (index / (history.value.length - 1)) * 592;
-        return `${x.toFixed(2)},${yFor(point.value).toFixed(2)}`;
-      })
+      .sort((a, b) => b.probability - a.probability),
+  );
+  const times = computed(() =>
+    lines.value
+      .flatMap((v) => v.history.map((p) => new Date(p.observedAt).getTime()))
+      .filter(Number.isFinite),
+  );
+  const extent = computed(() =>
+    times.value.reduce(
+      (result, time) => [Math.min(result[0], time), Math.max(result[1], time)],
+      [Infinity, -Infinity],
+    ),
+  );
+  const ticks = computed(() =>
+    Array.from(
+      { length: 5 },
+      (_, i) => extent.value[0] + ((extent.value[1] - extent.value[0]) * i) / 4,
+    ),
+  );
+  function x(time: number) {
+    return (
+      10 +
+      ((time - extent.value[0]) / Math.max(1, extent.value[1] - extent.value[0])) *
+        (chartWidth.value - 70)
+    );
+  }
+  function y(value: number) {
+    return chartHeight.value - 35 - (value * (chartHeight.value - 57)) / 100;
+  }
+  function points(history: MacroProbabilityPoint[]) {
+    return history
+      .map((p) => `${x(new Date(p.observedAt).getTime())},${y(Number(p.probability))}`)
       .join(' ');
-  });
-  const chartStart = computed(() => formatDate(history.value[0]?.time));
-  const chartEnd = computed(() => formatDate(history.value[history.value.length - 1]?.time));
-  const gridValues = [100, 75, 50, 25, 0];
-
-  function yFor(value: number) {
-    return 20 + (1 - Math.min(100, Math.max(0, value)) / 100) * 160;
   }
-
-  function formatProbability(value: string | number | null | undefined) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? `${parsed.toFixed(1)}%` : '—';
+  function pct(v: number) {
+    return v > 0 && v < 1 ? '<1%' : `${v.toFixed(1)}%`;
   }
-
-  function formatDate(value: string | number | null | undefined) {
-    if (value == null) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+  function toggle(id: string) {
+    const next = new Set(hidden.value);
+    next.has(id) ? next.delete(id) : next.add(id);
+    hidden.value = next;
   }
-
   onMounted(async () => {
     try {
-      response.value = await getMacroExpectations();
-      selectedEventId.value = events.value[0]?.id ?? '';
-    } catch (reason) {
-      error.value = reason instanceof Error ? reason.message : 'Polymarket 历史概率加载失败';
+      feed.value = await getMacroExpectations();
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '会议数据加载失败';
     } finally {
       loading.value = false;
     }
   });
 </script>
-
-<style scoped lang="less">
-  .polymarket-fed-panel {
-    min-height: 250px;
-    color: var(--strategy-text-1, #13243d);
+<style scoped>
+  .fomc-panel {
+    padding: 8px 4px;
+    color: var(--strategy-text-1, #172233);
   }
 
-  .polymarket-fed-panel__state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 220px;
-    color: var(--strategy-text-faint, #667085);
-    font-size: 13px;
-  }
-
-  .polymarket-fed-panel__state--error {
-    color: var(--strategy-danger, #df4d4d);
-  }
-
-  .polymarket-fed-panel__body {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .polymarket-fed-panel__toolbar,
-  .polymarket-fed-panel__chart-head,
-  .polymarket-fed-panel__axis {
+  header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
   }
 
-  .polymarket-fed-panel__toolbar strong {
-    display: block;
-    font-size: 14px;
+  h3 {
+    margin: 0 0 12px;
+    font-size: 20px;
   }
 
-  .polymarket-fed-panel__toolbar span,
-  .polymarket-fed-panel__chart-head span,
-  .polymarket-fed-panel__axis,
-  .polymarket-fed-panel__footnote {
-    color: var(--strategy-text-faint, #667085);
-    font-size: 11px;
-  }
-
-  .polymarket-fed-panel__ranges {
-    display: inline-flex;
-    gap: 4px;
-    padding: 3px;
-    border: 1px solid var(--strategy-border, #e2e8f0);
-    border-radius: 8px;
-    background: #f8fafc;
-  }
-
-  .polymarket-fed-panel__ranges button {
-    padding: 4px 8px;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--strategy-text-3, #64748b);
-    font-size: 11px;
-    cursor: pointer;
-  }
-
-  .polymarket-fed-panel__ranges button.is-active {
-    background: #fff;
-    box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
-    color: #4338ca;
-    font-weight: 700;
-  }
-
-  .polymarket-fed-panel__contracts {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 7px;
-  }
-
-  .polymarket-fed-panel__contract {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding: 8px 10px;
-    border: 1px solid var(--strategy-border, #e2e8f0);
-    border-radius: 8px;
-    background: #fff;
-    color: var(--strategy-text-2, #334155);
-    text-align: left;
-    cursor: pointer;
-    gap: 4px 8px;
-  }
-
-  .polymarket-fed-panel__contract span {
-    grid-column: 1 / -1;
-    overflow: hidden;
-    font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .polymarket-fed-panel__contract strong {
-    color: #4338ca;
-    font-size: 17px;
-  }
-
-  .polymarket-fed-panel__contract small {
-    align-self: end;
-    color: var(--strategy-text-4, #94a3b8);
-    font-size: 10px;
-  }
-
-  .polymarket-fed-panel__contract.is-active {
-    border-color: #818cf8;
-    background: #eef2ff;
-  }
-
-  .polymarket-fed-panel__chart {
-    padding: 10px 10px 4px;
-    border: 1px solid var(--strategy-border, #e2e8f0);
-    border-radius: 10px;
-    background: #fff;
-  }
-
-  .polymarket-fed-panel__chart-head {
-    align-items: flex-start;
-    margin-bottom: 4px;
-  }
-
-  .polymarket-fed-panel__chart-head h6 {
-    max-width: 70%;
-    margin: 0 0 3px;
-    overflow: hidden;
+  a,
+  footer {
+    color: #6d7988;
     font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
-  .polymarket-fed-panel__chart svg {
-    display: block;
+  nav,
+  .outcomes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin: 12px 0;
+  }
+
+  button {
+    padding: 7px 12px;
+    border: 0;
+    border-radius: 22px;
+    background: #f3f4f6;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  button.active {
+    background: #272b32;
+    color: white;
+  }
+
+  .outcomes button {
+    padding: 3px 0;
+    background: transparent;
+    font-size: 12px;
+  }
+
+  .outcomes i {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 5px;
+    border-radius: 50%;
+  }
+
+  .muted {
+    opacity: 0.35;
+  }
+
+  .fomc-chart {
     width: 100%;
-    height: 190px;
+    height: 320px;
   }
 
-  .polymarket-fed-panel__chart line {
-    stroke-width: 1;
-    stroke: #e2e8f0;
+  svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
   }
 
-  .polymarket-fed-panel__chart text {
-    fill: #94a3b8;
-    font-size: 10px;
+  svg text {
+    fill: #6d7988;
+    font-size: 11px;
   }
 
-  .polymarket-fed-panel__chart polyline {
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke: #4338ca;
-    fill: none;
-    stroke-linejoin: round;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .polymarket-fed-panel__axis {
-    padding: 0 2px 2px 38px;
-  }
-
-  .polymarket-fed-panel__footnote {
-    margin: 0;
-    line-height: 1.5;
-  }
-
-  @media (max-width: 780px) {
-    .polymarket-fed-panel__toolbar {
-      flex-direction: column;
-      align-items: flex-start;
-    }
+  footer {
+    margin-top: 8px;
   }
 </style>

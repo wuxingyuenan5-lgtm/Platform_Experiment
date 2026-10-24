@@ -139,7 +139,9 @@ def parse_multpl(content):
         text = cells[0].get_text(" ", strip=True)
         estimated = "†" in tr.get_text()
         day = datetime.strptime(text.replace("†", "").strip(), "%b %d, %Y").date().isoformat()
-        pe = number(cells[1].get_text(strip=True).replace(",", "").replace("†", "").strip())
+        pe = number(
+            cells[1].get_text(strip=True).replace(",", "").replace("†", "").replace("%", "").strip()
+        )
         if pe is not None and pe > 0:
             rows.append({"date": day, "pe": pe, "estimated": estimated})
     return rows
@@ -290,6 +292,9 @@ def source_specs():
                 "series": series,
             }
         )
+    from app.research_equity_valuation import valuation_specs
+
+    specs.extend(valuation_specs())
     return specs
 
 
@@ -332,7 +337,19 @@ async def collect_one(client, spec, *, force=False):
         response.raise_for_status()
         digest = await asyncio.to_thread(archive, spec["id"], response.content, stamp)
         kind = spec.get("kind")
-        if kind == "pbc_tsf":
+        if kind == "index_metric":
+            from app.research_equity_valuation import parse_index_metric
+
+            rows = parse_index_metric(response.content, spec["ticker"])
+        elif kind == "ssga_index":
+            from app.research_equity_valuation import parse_ssga
+
+            rows = parse_ssga(response.content)
+        elif kind == "siblis_table":
+            from app.research_equity_valuation import parse_russell
+
+            rows = parse_russell(response.content, spec.get("ticker", "Russell 2000"))
+        elif kind == "pbc_tsf":
             rows, manifest = await collect_pbc_tsf(client, response, stamp)
             doc["rawDocuments"] = [{"url": spec["url"], "sha256": digest}, *manifest]
         elif kind == "csi_history":
@@ -431,7 +448,7 @@ async def collect_one(client, spec, *, force=False):
                     }
                     for r in payload["result"]["data"]
                 ]
-        field = "pe" if kind in {"csi", "csi_history", "multpl"} else "value"
+        field = "pe" if kind in {"csi", "csi_history", "multpl", "ssga_index"} else "value"
 
         def valid_date(value):
             try:
@@ -490,7 +507,7 @@ async def collect_sources(*, force=False):
         results = await asyncio.gather(
             *(bounded(s) for s in source_specs()), return_exceptions=True
         )
-    return {
+    documents = {
         s["id"]: (
             r
             if isinstance(r, dict)
@@ -498,3 +515,7 @@ async def collect_sources(*, force=False):
         )
         for s, r in zip(source_specs(), results, strict=True)
     }
+
+    from app.research_equity_valuation import collect_choice_indices
+
+    return {**documents, **(await asyncio.to_thread(collect_choice_indices))}

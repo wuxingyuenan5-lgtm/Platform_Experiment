@@ -21,7 +21,7 @@
         </button>
       </div>
     </header>
-    <div v-show="expanded" id="macro-calendar-content">
+    <div v-if="expanded" id="macro-calendar-content">
       <TradingViewEconomicCalendarPanel />
     </div>
   </section>
@@ -31,7 +31,8 @@
   import { ref } from 'vue';
   import TradingViewEconomicCalendarPanel from '../tradingTools/components/TradingViewEconomicCalendarPanel.vue';
 
-  const expanded = ref(false);
+  const props = defineProps<{ initiallyExpanded?: boolean }>();
+  const expanded = ref(props.initiallyExpanded ?? true);
 </script>
 
 <style scoped lang="less">

@@ -1,14 +1,6 @@
 <template>
   <div class="cftc-panel">
     <div class="cftc-toolbar">
-      <div>
-        <p class="cftc-eyebrow">COT REPORT · WEEKLY</p>
-        <p class="cftc-note">{{
-          selectedKey === 'gold'
-            ? '黄金支持分项、传统及期货与期权口径；周度持仓不代表实时资金流。'
-            : 'CFTC PRE Disaggregated Futures Only；报告日通常滞后一周，不代表实时资金流。'
-        }}</p>
-      </div>
       <div class="cftc-tabs" role="tablist" aria-label="CFTC 合约市场">
         <button
           v-for="market in markets"

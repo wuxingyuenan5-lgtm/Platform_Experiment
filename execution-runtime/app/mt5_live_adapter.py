@@ -362,6 +362,10 @@ class Mt5LiveAdapter:
             )
         return snapshots
 
+    def get_research_daily_rates(self, **kwargs):
+        from app.research_mt5_rates import read_daily_rates
+        return read_daily_rates(self, **kwargs)
+
     def get_research_ticks(self, **kwargs):
         from app.research_mt5_ticks import read_ticks
         return read_ticks(self, **kwargs)

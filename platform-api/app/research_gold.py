@@ -58,13 +58,13 @@ def analyst_page(*, author="", stance="", query="", page=1, page_size=12):
             rows=db.execute('SELECT payload_json FROM articles'+where+' ORDER BY published_at DESC,id LIMIT ? OFFSET ?',
                             [*args,page_size,(page-1)*page_size]).fetchall()
             analysts=[json.loads(r[0]) for r in db.execute('SELECT payload_json FROM analysts ORDER BY rowid')]
-            sources=[dict(r) for r in db.execute('SELECT analyst_id,last_success,last_attempt,error FROM sources')]
+            sources=[dict(r) for r in db.execute('SELECT analyst_id,last_success,last_attempt,error FROM sources WHERE active=1')]
             successful=[r['last_success'] for r in sources if r['last_success']]
             retrieved=max(successful,default=None)
             stale=not retrieved or (datetime.now(UTC)-datetime.fromisoformat(retrieved)).total_seconds()>36*3600
             return dict(schemaVersion='1.0',source='平台独立采集整理',retrievedAt=retrieved,
                 status='stale' if stale else 'partial' if any(r['error'] for r in sources) else 'ready',
-                methodology='independent_public_author_v1',analysts=analysts,
+                methodology='independent_public_author_v2',analysts=analysts,
                 articles=[json.loads(r[0]) for r in rows],total=total,page=page,pageSize=page_size)
     except (sqlite3.Error,ValueError,TypeError) as exc:
         raise ResearchProviderError('analyst_views_unavailable') from exc

@@ -147,8 +147,14 @@ def test_production_collects_once_preserves_missing_values_and_correct_periods(r
     missing = next(row for row in pool["stocks"] if row["code"] == "300750")
     assert missing["change"] is None
     assert pool["summary"]["breadth"]["flat"] == 0
-    assert pool["summary"]["breadth"]["missing"] == 1
-    expected = sorted(pool["stocks"], key=lambda row: row["change_5d"], reverse=True)
+    # CN production no longer collects the separately scheduled HK member.
+    assert pool["summary"]["breadth"]["missing"] == 2
+    assert next(row for row in pool["stocks"] if row["code"] == "00700")["status"] == "no_data"
+    expected = sorted(
+        [row for row in pool["stocks"] if len(row["code"]) == 6],
+        key=lambda row: row["change_5d"],
+        reverse=True,
+    )
     assert [row["code"] for row in pool["leaders"]["5d"]["up"]] == [row["code"] for row in expected]
     assert pool["leaders"]["today"]["up"] != pool["leaders"]["20d"]["up"]
     assert repository.read_hot_stock_history()["counts"] == [2]
@@ -287,31 +293,51 @@ def test_full_market_turnover_history_includes_backend_day_change_and_source(res
 def test_market_width_normalizes_both_archive_units_without_changing_raw_evidence(research_db):
     asyncio.run(refresh.refresh_a_share_research(force=True))
     cases = [
-        ('2030-01-02', 2989, 2108, 113, '0.17284677261134002', 'B_001004'),
-        ('2030-01-03', 2713, 2166, 137, '10.90510366826156299840510367', 'platform-daily-v1'),
-        ('2030-01-04', 10, 10, 50, '0', 'B_001004'),
-        ('2030-01-05', 0, 0, 50, '0', 'platform-daily-v1'),
+        ("2030-01-02", 2989, 2108, 113, "0.17284677261134002", "B_001004"),
+        ("2030-01-03", 2713, 2166, 137, "10.90510366826156299840510367", "platform-daily-v1"),
+        ("2030-01-04", 10, 10, 50, "0", "B_001004"),
+        ("2030-01-05", 0, 0, 50, "0", "platform-daily-v1"),
     ]
     for day, up, down, flat, native, definition in cases:
-        assert repository.write_market_archive(dict(
-            universe_key='sh_sz_a', trade_date=day, up=up, down=down, flat=flat,
-            market_breadth_pct=native, source_name='fixture', definition_version=definition,
-            payload={'native_width': native},
-        )) == 'inserted'
-    repository.start_refresh('missing-counts', '2030-01-06')
-    repository.finish_refresh('missing-counts', 'ready')
-    repository.write_history_points('missing-counts', 'market', [
-        ('2030-01-06', 'market', {'marketBreadthPct': 99}),
-    ], source='fixture')
+        assert (
+            repository.write_market_archive(
+                dict(
+                    universe_key="sh_sz_a",
+                    trade_date=day,
+                    up=up,
+                    down=down,
+                    flat=flat,
+                    market_breadth_pct=native,
+                    source_name="fixture",
+                    definition_version=definition,
+                    payload={"native_width": native},
+                )
+            )
+            == "inserted"
+        )
+    repository.start_refresh("missing-counts", "2030-01-06")
+    repository.finish_refresh("missing-counts", "ready")
+    repository.write_history_points(
+        "missing-counts",
+        "market",
+        [
+            ("2030-01-06", "market", {"marketBreadthPct": 99}),
+        ],
+        source="fixture",
+    )
     rows = {row.observed_at.isoformat(): row for row in repository.read_dashboard().market_history}
     for day, up, down, flat, native, definition in cases:
-        expected = Decimal(100) * (up-down) / (up+down) if up+down else None
+        expected = Decimal(100) * (up - down) / (up + down) if up + down else None
         assert rows[day].market_breadth_pct == expected
-    assert rows['2030-01-06'].market_breadth_pct is None
+    assert rows["2030-01-06"].market_breadth_pct is None
     with connection() as db:
-        stored = db.execute("SELECT trade_date,market_breadth_pct,payload_json FROM research_a_share_market_archive WHERE trade_date >= '2030-01-02' ORDER BY trade_date").fetchall()
-    assert [row['market_breadth_pct'] for row in stored] == [case[4] for case in cases]
-    assert [json.loads(row['payload_json']) for row in stored] == [{'native_width': case[4]} for case in cases]
+        stored = db.execute(
+            "SELECT trade_date,market_breadth_pct,payload_json FROM research_a_share_market_archive WHERE trade_date >= '2030-01-02' ORDER BY trade_date"
+        ).fetchall()
+    assert [row["market_breadth_pct"] for row in stored] == [case[4] for case in cases]
+    assert [json.loads(row["payload_json"]) for row in stored] == [
+        {"native_width": case[4]} for case in cases
+    ]
 
 
 def test_revision_replaces_daily_qualifiers_and_persists_a_zero_day(research_db, monkeypatch):
@@ -561,15 +587,17 @@ def test_hot_history_all_dates_keeps_ninety_day_totals(research_db):
     repository.start_refresh(run_id, None)
     start = datetime(2025, 1, 1, tzinfo=UTC)
     points = [
-        ((start + timedelta(days=index)).date().isoformat(), '600519',
-         {'securityCode': '600519', 'industry': '食品饮料'})
+        (
+            (start + timedelta(days=index)).date().isoformat(),
+            "600519",
+            {"securityCode": "600519", "industry": "食品饮料"},
+        )
         for index in range(105)
     ]
-    repository.write_history_points(run_id, 'hot_stock', points, source='test')
+    repository.write_history_points(run_id, "hot_stock", points, source="test")
     history = repository.read_hot_stock_history(days=None, matrix_days=None)
-    assert len(history['dates']) == 105
-    assert history['counts'] == [1] * 105
-    assert history['industries'][0]['counts'] == [1] * 105
-    assert history['industries'][0]['historyTotal'] == 90
-    assert len(repository.read_hot_stock_history()['dates']) == 10
-
+    assert len(history["dates"]) == 105
+    assert history["counts"] == [1] * 105
+    assert history["industries"][0]["counts"] == [1] * 105
+    assert history["industries"][0]["historyTotal"] == 90
+    assert len(repository.read_hot_stock_history()["dates"]) == 10

@@ -13,49 +13,6 @@
           >
             {{ item.label }}
           </button>
-          <button
-            type="button"
-            :class="{ active: customRangeApplied }"
-            :aria-pressed="customRangeApplied"
-            @click="openCustomRange"
-          >
-            自定义
-          </button>
-        </div>
-        <div v-if="customRangeOpen" class="cumulative-volatility__custom-range">
-          <label>
-            起始
-            <input
-              v-model="customStartDate"
-              type="date"
-              :min="availableStartDate"
-              :max="availableEndDate"
-            />
-          </label>
-          <span>至</span>
-          <label>
-            结束
-            <input
-              v-model="customEndDate"
-              type="date"
-              :min="availableStartDate"
-              :max="availableEndDate"
-            />
-          </label>
-          <button
-            type="button"
-            class="cumulative-volatility__custom-apply"
-            @click="applyCustomRange"
-          >
-            应用
-          </button>
-          <button
-            type="button"
-            class="cumulative-volatility__custom-cancel"
-            @click="customRangeOpen = false"
-          >
-            取消
-          </button>
         </div>
         <div class="cumulative-volatility__control-group" role="group" aria-label="采样精度">
           <button
@@ -106,7 +63,7 @@
           :aria-pressed="priceVisible"
           @click="togglePrice"
         >
-          <i></i>{{ title }}价格（美洲盘首个有效价格）
+          <i></i>{{ title }}价格
         </button>
       </div>
       <svg
@@ -179,7 +136,7 @@
           :d="series.path"
           fill="none"
           :stroke="series.color"
-          stroke-width="2.2"
+          stroke-width="1.2"
           stroke-linecap="round"
           stroke-linejoin="round"
         />
@@ -187,8 +144,8 @@
           v-if="priceVisible && pricePath"
           :d="pricePath"
           fill="none"
-          stroke="#18313c"
-          stroke-width="2.5"
+          stroke="#111111"
+          stroke-width="3"
           stroke-linecap="round"
           stroke-linejoin="round"
         />
@@ -287,6 +244,7 @@
     { value: 30, label: '近30日' },
     { value: 90, label: '近90日' },
     { value: 365, label: '近1年' },
+    { value: 0, label: '全部' },
   ] as const;
   const precisionOptions: Array<{ value: CumulativeVolatilityInterval; label: string }> = [
     { value: '15m', label: '15分钟' },
@@ -301,10 +259,7 @@
   const hoverIndex = ref<number | null>(null);
   const hiddenSessions = ref<Set<string>>(new Set());
   const priceVisible = ref(true);
-  const customRangeOpen = ref(false);
   const customRangeApplied = ref(false);
-  const customStartDate = ref('');
-  const customEndDate = ref('');
   let loadSerial = 0;
   let windowSerial = 0;
   const loadingFull = ref(false);
@@ -321,8 +276,6 @@
   const allDates = computed(() =>
     [...new Set((fullResponse.value?.points ?? []).map((point) => point.timestamp))].sort(),
   );
-  const availableStartDate = computed(() => allDates.value[0]?.slice(0, 10) ?? '');
-  const availableEndDate = computed(() => allDates.value.at(-1)?.slice(0, 10) ?? '');
   const startIndex = ref(0);
   const endIndex = ref(0);
   const minWindowSize = computed(() => Math.min(4, allDates.value.length));
@@ -612,7 +565,6 @@
   }
 
   function selectPresetRange(value: number) {
-    customRangeOpen.value = false;
     customRangeApplied.value = false;
     days.value = value;
     if (!allDates.value.length && !loadingFull.value) {
@@ -620,30 +572,6 @@
       return;
     }
     applyPresetIndices();
-  }
-
-  function openCustomRange() {
-    if (!allDates.value.length) return;
-    customStartDate.value = customStartDate.value || availableStartDate.value;
-    customEndDate.value = customEndDate.value || availableEndDate.value;
-    customRangeOpen.value = true;
-  }
-
-  function applyCustomRange() {
-    if (!allDates.value.length || !customStartDate.value || !customEndDate.value) return;
-    if (customStartDate.value > customEndDate.value) return;
-    const start = allDates.value.findIndex(
-      (timestamp) => timestamp.slice(0, 10) >= customStartDate.value,
-    );
-    const end = [...allDates.value]
-      .map((timestamp, index) => ({ timestamp, index }))
-      .reverse()
-      .find(({ timestamp }) => timestamp.slice(0, 10) <= customEndDate.value)?.index;
-    if (start < 0 || end == null || end < start) return;
-    startIndex.value = start;
-    endIndex.value = Math.max(start, end);
-    customRangeApplied.value = true;
-    customRangeOpen.value = false;
   }
 
   async function load() {
@@ -654,7 +582,7 @@
     status.value = 'loading';
     hoverIndex.value = null;
     try {
-      const result = await getCumulativeVolatility(props.asset, 365, precision.value);
+      const result = await getCumulativeVolatility(props.asset, 0, precision.value);
       if (serial !== loadSerial) return;
       const previousWindow = customRangeApplied.value
         ? {
@@ -677,7 +605,6 @@
         applyPresetIndices();
         customRangeApplied.value = false;
       }
-      customRangeOpen.value = false;
       await nextTick();
       if (serial !== loadSerial) return;
       loadingFull.value = false;
@@ -696,7 +623,7 @@
   function applyPresetIndices() {
     const last = allDates.value.at(-1);
     if (!last) return;
-    const cutoff = Date.parse(last) - days.value * 86_400_000;
+    const cutoff = days.value === 0 ? -Infinity : Date.parse(last) - days.value * 86_400_000;
     startIndex.value = Math.max(
       0,
       allDates.value.findIndex((date) => Date.parse(date) >= cutoff),
@@ -717,7 +644,7 @@
     const interval = precision.value;
     rangeTimer = setTimeout(async () => {
       try {
-        const result = await getCumulativeVolatility(asset, 365, interval, window);
+        const result = await getCumulativeVolatility(asset, 0, interval, window);
         if (serial !== windowSerial) return;
         response.value = result.data;
         status.value = 'ready';
@@ -742,7 +669,7 @@
   .cumulative-volatility {
     min-width: 0;
     padding: 4px 18px 18px;
-    color: var(--hedge-cool-text, #18313c);
+    color: var(--hedge-cool-text, #111);
   }
 
   .cumulative-volatility__toolbar,
@@ -786,7 +713,7 @@
     border: 1px solid #cfdbe8;
     border-radius: 5px;
     background: #fff;
-    color: #18313c;
+    color: #111;
     font: inherit;
   }
 
@@ -821,7 +748,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--hedge-cool-text, #18313c);
+    color: var(--hedge-cool-text, #111);
     font-weight: 700;
     cursor: pointer;
   }
@@ -830,7 +757,7 @@
     width: 16px;
     height: 3px;
     border-radius: 0;
-    background: #18313c;
+    background: #111;
   }
 
   .cumulative-volatility__controls {
@@ -893,7 +820,7 @@
   }
 
   .cumulative-volatility__price-tick {
-    fill: #18313c !important;
+    fill: #111 !important;
     font-weight: 700;
   }
 
@@ -920,7 +847,7 @@
   }
 
   .cumulative-volatility__tooltip strong {
-    color: var(--hedge-cool-text, #18313c);
+    color: var(--hedge-cool-text, #111);
   }
 
   .cumulative-volatility__tooltip span {
@@ -973,7 +900,7 @@
   }
 
   .cumulative-volatility__tooltip-price-dot {
-    background: #18313c;
+    background: #111;
   }
 
   .cumulative-volatility__legend-note {

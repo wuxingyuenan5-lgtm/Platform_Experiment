@@ -1,6 +1,5 @@
 <template>
   <p role="status">{{ statusText }}</p>
-  <MarketBreadthSummary :config="config" :rows="snapshot?.rows ?? []" />
   <TerminalDetailPanel
     class="terminal-detail-panel--embedded"
     title="市场明细 · 90日曲线仅使用真实历史"
@@ -22,7 +21,6 @@
   } from '../nativeData/marketDetailAdapter';
   import { marketTerminalConfigs, type TerminalTableGroup } from '../nativeData/marketTerminal';
   import TerminalDetailPanel from './TerminalDetailPanel.vue';
-  import MarketBreadthSummary from './MarketBreadthSummary.vue';
 
   const config = marketTerminalConfigs.gold;
   const groups = ref<TerminalTableGroup[]>(prepareCommodityMarketDetail(config.detailGroups));

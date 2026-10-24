@@ -19,6 +19,9 @@
           <button type="button" :class="{ active: preset === 365 }" @click="setPreset(365)"
             >近1年</button
           >
+          <button type="button" :class="{ active: preset === 1095 }" @click="setPreset(1095)"
+            >3年</button
+          >
           <button type="button" :class="{ active: preset === null }" @click="setPreset(null)"
             >全部</button
           >
@@ -52,9 +55,20 @@
         <svg
           class="etf-flow-panel__chart"
           :viewBox="`0 0 ${chart.width} ${chart.height}`"
+          @mousemove="onChartMove"
+          @mouseleave="hoverIndex = null"
           role="img"
           :aria-label="`${assetLabel} ETF 日资金流与价格图`"
         >
+          <line
+            v-if="hoverIndex != null && chart.bars[hoverIndex]"
+            :x1="chart.bars[hoverIndex].x + chart.bars[hoverIndex].width / 2"
+            :x2="chart.bars[hoverIndex].x + chart.bars[hoverIndex].width / 2"
+            :y1="chart.pad.top"
+            :y2="chart.height - chart.pad.bottom"
+            stroke="#758497"
+            stroke-dasharray="4 3"
+          />
           <g v-for="tick in chart.priceTicks" :key="tick.value">
             <line
               :x1="chart.pad.left"
@@ -103,7 +117,7 @@
               :cx="point.x"
               :cy="point.y"
               r="2.5"
-              fill="#7c3aed"
+              fill="#111111"
             >
               <title>{{ point.date }}：{{ assetLabel }} {{ formatPrice(point.price) }}</title>
             </circle>
@@ -128,6 +142,20 @@
             {{ assetLabel }} {{ formatPrice(chart.lastPrice) }}
           </text>
         </svg>
+        <div
+          v-if="hoverDay"
+          role="status"
+          class="etf-flow-panel__hover"
+          :style="{
+            left: `${Math.min(
+              70,
+              Math.max(5, ((hoverIndex ?? 0) / Math.max(1, visibleDays.length - 1)) * 100),
+            )}%`,
+          }"
+          >{{ hoverDay.date }} · {{ assetLabel }}
+          {{ hoverDay.price == null ? '—' : formatPrice(Number(hoverDay.price)) }} · 净流量
+          {{ formatFlow(hoverDay.totalFlow ?? hoverDay.flows.Total) }} {{ flowUnit }}</div
+        >
         <div class="etf-flow-panel__chart-legend">
           <span><i class="is-flow"></i>日净流入 / 流出（{{ flowUnit }}）</span>
           <button
@@ -137,9 +165,6 @@
             :class="{ 'is-hidden': !showPrice }"
             @click="showPrice = !showPrice"
             ><i class="is-price"></i>{{ assetLabel }} 价格（左轴）</button
-          >
-          <span v-if="chart.pricedCount < visibleDays.length"
-            >价格覆盖 {{ chart.pricedCount }}/{{ visibleDays.length }} 个日期 · 缺口不连线</span
           >
         </div>
         <div v-if="days.length > 1" class="etf-flow-panel__range">
@@ -234,6 +259,21 @@
   const loading = ref(true);
   const error = ref('');
   const data = ref<CryptoEtfFlowData | null>(null);
+  const hoverIndex = ref<number | null>(null);
+  const hoverDay = computed(() =>
+    hoverIndex.value == null ? null : visibleDays.value[hoverIndex.value],
+  );
+  function onChartMove(event: MouseEvent) {
+    const box = (event.currentTarget as SVGElement).getBoundingClientRect();
+    const axisX = ((event.clientX - box.left) / box.width) * chart.value.width;
+    const fraction =
+      (axisX - chart.value.pad.left) /
+      (chart.value.width - chart.value.pad.left - chart.value.pad.right);
+    hoverIndex.value = Math.max(
+      0,
+      Math.min(visibleDays.value.length - 1, Math.round(fraction * (visibleDays.value.length - 1))),
+    );
+  }
   const mode = ref<'chart' | 'table'>('chart');
   const showPrice = ref(true);
 
@@ -244,7 +284,7 @@
   const flowUnit = computed(() => data.value?.flowUnit || assetLabel.value);
   const startIndex = ref(0);
   const endIndex = ref(0);
-  const preset = ref<number | null>(null);
+  const preset = ref<number | null>(90);
   const maxIndex = computed(() => Math.max(0, days.value.length - 1));
   const rangeStartPercent = computed(() =>
     maxIndex.value ? (startIndex.value / maxIndex.value) * 100 : 0,
@@ -273,7 +313,7 @@
       const max = maxIndex.value;
       if (preset.value != null) {
         endIndex.value = max;
-        startIndex.value = Math.max(0, max - preset.value + 1);
+        startIndex.value = presetStart(preset.value);
       } else {
         endIndex.value = max;
         startIndex.value = 0;
@@ -406,7 +446,17 @@
   function setPreset(size: number | null) {
     preset.value = size;
     endIndex.value = maxIndex.value;
-    startIndex.value = size == null ? 0 : Math.max(0, maxIndex.value - size + 1);
+    startIndex.value = size == null ? 0 : presetStart(size);
+  }
+
+  function presetStart(size: number) {
+    if (size !== 1095) return Math.max(0, maxIndex.value - size + 1);
+    const latest = days.value.at(-1)?.date;
+    if (!latest) return 0;
+    const cutoff = new Date(`${latest}T00:00:00Z`);
+    cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 3);
+    const index = days.value.findIndex((day) => day.date >= cutoff.toISOString().slice(0, 10));
+    return Math.max(0, index);
   }
 
   function onStartInput(event: Event) {
@@ -457,6 +507,28 @@
 </script>
 
 <style scoped lang="less">
+  .etf-flow-panel__chart-wrap {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--strategy-border, #e5ebf3);
+    border-radius: 10px;
+    background: var(--strategy-surface, #fff);
+  }
+
+  .etf-flow-panel__hover {
+    position: absolute;
+    z-index: 2;
+    top: 35px;
+    max-width: 260px;
+    padding: 12px;
+    border: 1px solid #dbe4ec;
+    background: white;
+    box-shadow: 0 3px 12px #0002;
+    font-size: 12px;
+    white-space: normal;
+    pointer-events: none;
+  }
+
   .etf-flow-panel {
     min-height: 180px;
     padding: 6px 2px;
@@ -532,13 +604,6 @@
     stroke-linejoin: round;
   }
 
-  .etf-flow-panel__chart-wrap {
-    overflow: hidden;
-    border: 1px solid var(--strategy-border, #e5ebf3);
-    border-radius: 10px;
-    background: var(--strategy-surface, #fff);
-  }
-
   .etf-flow-panel__chart {
     display: block;
     width: 100%;
@@ -563,29 +628,29 @@
   }
 
   .etf-flow-panel__axis--price {
-    fill: #7c3aed;
+    fill: #111;
   }
 
   .etf-flow-panel__bar {
     opacity: 0.72;
-    fill: var(--strategy-accent, #3b82c4);
+    fill: #f97980;
   }
 
   .etf-flow-panel__bar.is-outflow {
-    fill: var(--strategy-success, #189b50);
+    fill: #53b987;
   }
 
   .etf-flow-panel__price-line {
     stroke-width: 2.2;
     stroke-linecap: round;
-    stroke: #7c3aed;
+    stroke: #111;
     fill: none;
     stroke-linejoin: round;
     vector-effect: non-scaling-stroke;
   }
 
   .etf-flow-panel__price-label {
-    fill: #7c3aed;
+    fill: #111;
     font-size: 11px;
     font-weight: 700;
   }
@@ -620,7 +685,7 @@
   }
 
   .etf-flow-panel__chart-legend button:focus-visible {
-    outline: 2px solid #7c3aed;
+    outline: 2px solid #111;
     outline-offset: 4px;
   }
 
@@ -636,7 +701,7 @@
 
   .etf-flow-panel__chart-legend i.is-price {
     border-radius: 50%;
-    background: #7c3aed;
+    background: #111;
   }
 
   .etf-flow-panel__range {

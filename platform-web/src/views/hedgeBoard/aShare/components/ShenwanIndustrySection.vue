@@ -240,7 +240,7 @@
   }>();
 
   const data = computed(() => props.module?.data || null);
-  const fullExpanded = ref(false);
+  const fullExpanded = ref(true);
   const l1Filter = ref('');
   const searchText = ref('');
   const sortKey = ref<'turnover' | 'return' | 'share'>('turnover');

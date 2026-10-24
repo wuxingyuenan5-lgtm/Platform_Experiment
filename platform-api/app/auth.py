@@ -312,6 +312,7 @@ def permission_for_request(method: str, path: str) -> str:
         return "profile.update_self"
     if (normalized_method, path) in {
         ("POST", "/api/v1/research/a-share/refresh"),
+        ("POST", "/api/v1/research/hk-share/refresh"),
         ("POST", "/api/v1/research/a-share/stock-pool/add-batch"),
         ("DELETE", "/api/v1/research/a-share/stock-pool/remove"),
     }:

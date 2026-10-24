@@ -420,7 +420,7 @@ def read_cumulative_volatility(
         raise ValueError("start and end must include a timezone")
     if start is not None and end is not None and start > end:
         raise ValueError("start must not be after end")
-    cutoff = now - timedelta(days=max(1, min(days, _MAX_RANGE_DAYS)))
+    cutoff = datetime(1970, 1, 1, tzinfo=UTC) if days == 0 else now - timedelta(days=max(1, min(days, _MAX_RANGE_DAYS)))
     cutoff = max(cutoff, start.astimezone(UTC)) if start else cutoff
     upper = min(now, end.astimezone(UTC)) if end else now
     entities = tuple(f"{asset}:{session}:{interval}" for session in _SESSION_LABELS)

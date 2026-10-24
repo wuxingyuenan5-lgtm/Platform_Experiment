@@ -62,13 +62,15 @@ Account health is per account. During this incident `account_mt5_short_term_a` s
 
 ### Reversible local web publication
 
+The local Caddy template serves content-hashed `/assets/` files from `.codex/releases/web/shared/assets/` with a one-year immutable browser cache. Publication seeds this shared store once from retained timestamped releases, then adds each build's hashed assets before updating the release marker; conflicting content under an existing immutable filename fails publication. Keep these assets available across release switches: an already open page can request an older lazy chart chunk later, and serving assets only from the latest release causes 404 errors and failed chart modules. HTML, runtime brand configuration and other mutable files still come from the selected release with `no-cache`. Missing hashed assets return 404 rather than the SPA index. API responses retain their existing cache policy. Verify old and current chunk responses and the served headers after publication; never apply immutable caching to the SPA index or `_app.config.js`. Run `powershell -NoProfile -File scripts/test-static-web-assets.ps1` for the retention and immutable-content regression checks.
+
 To build a validated, timestamped local release under `.codex/releases/web/`:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\publish-local-web.ps1
 ```
 
-The script requires a verified portable Caddy at `.codex/tools/caddy/caddy.exe`, validates the candidate `deploy/Caddyfile.windows` configuration, and only then updates the local release marker. It preserves the previous marker as `previous.json`. It does not enable trading, change accounts or databases, register a service, or stop an existing web process. Activate the prepared release with `scripts/dev-platform.ps1 -Action restart-web`; this restarts only Web and refreshes the watchdog, retaining the API/Runtime processes and existing verified trading mode. `restart-api` similarly replaces only Platform API for backend maintenance, subject to the live maintenance checks in the acceptance runbook.
+The script requires a verified portable Caddy at `.codex/tools/caddy/caddy.exe`, validates the candidate `deploy/Caddyfile.windows` configuration, and only then updates the local release marker. It preserves the previous marker as `previous.json`. It does not enable trading, change accounts or databases, register a service, or stop an existing web process. Activate the prepared release with `scripts/dev-platform.ps1 -Action restart-web`; this restarts only Web and refreshes the watchdog, retaining the API/Runtime processes and existing verified trading mode. `restart-api` similarly replaces only Platform API for backend maintenance, subject to the live maintenance checks in the acceptance runbook. `restart-runtime` replaces only Execution Runtime, preserving API/Web and the verified trading mode; it remains subject to the same live maintenance checks.
 
 The published Web serves copied build artifacts on `127.0.0.1:4373`; source edits have no effect until the next publication. API routes are proxied before SPA fallback; GET `/login` is the frontend login page. When a release marker exists but its files are invalid, startup fails explicitly instead of reverting to development mode. Without a release marker, the original Vite development path remains available. For source development alongside the published Web, run `corepack pnpm dev --port 5173` in `platform-web`.
 
@@ -243,6 +245,19 @@ The cross-spread snapshot endpoint and execution preflights do not write market 
 MT5 worker window maintenance filters process names before reading and resolving executable paths, then hides only windows belonging to the exact configured Terminal path. Do not resolve every host executable on each IPC loop: that synchronous maintenance competes with quote/account reads and consumes CPU even while idle. Process exit/access-denied races are skipped; matching another Terminal by name alone is forbidden. SDK identity verification, periodic window hiding and trading permissions remain unchanged.
 
 Backup verification compares every sealed raw/derived shard and experiment-result artifact against the backed-up SQLite catalog before checking file checksums. A missing experiment entry in the manifest fails verification even when all listed files are intact. Native Bybit source health advances only for accepted raw callbacks; MT5 empty intervals are reported as `empty_range`, not as new tick coverage.
+
+If a candle serving projection has internal holes but the sealed Parquet catalog
+contains the missing candles, restore from that catalog before requesting another
+venue backfill. `platform-api/scripts/restore_candle_projection.py` takes explicit
+timezone-aware candle `--start/--end` and archive receipt `--received-start/--received-end`
+bounds. Run from `platform-api` so the configured archive path resolves correctly.
+It verifies each selected shard checksum, accepts only unflagged one-minute BTC/XAUT
+linear trade candles, and inserts absent natural keys only. Existing observations,
+archive files and collector/projection cursors remain untouched; repeat execution is
+idempotent. Keep the emitted counts with the local maintenance evidence. The normal
+cumulative-movement worker detects recoverable missing days and rebuilds its derived
+series after the shared projection is restored; verify its API and actual chart too.
+This repair does not resolve Runtime spool capacity pauses or establish retention.
 
 Historical catch-up is owned by the same Runtime lifecycle. `price-<category>-<symbol>-<type>-1m.json` in the existing spool stores the configured retention-window one-minute scan cursor (365 days by default via `VG_RUNTIME_RESEARCH_PRICE_HISTORY_DAYS`), rows returned and empty windows; five core streams take turns with at least 500ms between requests and five seconds between catch-up rounds. When the configured floor moves backwards, the cursor status becomes `backfilling` and requests the missing older windows before returning to the live tail. Once caught up, the loop checks for newly closed bars every minute. Funding and public borrowing use the separate five-minute rates loop. `mt5-history-cursor.json` resumes the initial three-day fixed-account scan; it does not change account login or native clock. Cursor publication follows spool fsync. Preserve old resolution cursors/raw shards; do not rename them to claim finer coverage. `history:*` source status distinguishes backfilling, caught-up and MT5 range-scanned; none establishes completeness across missing broker sessions. MT5 raw batches retain every Tick while the historical overview samples by minute. The browser history refresh reads only the local archive and cannot restart catch-up. Full historical hashing state must not grow with the warehouse: the derivation checkpoint keeps only a bounded recent-candle overlap, with raw revisions retained in immutable shards.
 

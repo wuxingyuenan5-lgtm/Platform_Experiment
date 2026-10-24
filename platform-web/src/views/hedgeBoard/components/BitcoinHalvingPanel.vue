@@ -6,12 +6,12 @@
       <div class="halving-controls">
         <div role="group" aria-label="减半周期范围">
           <button
-            v-for="days in [365, 730, 0]"
+            v-for="days in [365, 730, 1095, 0]"
             :key="days"
             :aria-pressed="windowDays === days"
             @click="windowDays = days"
           >
-            {{ days ? `${days}天` : '全部' }}
+            {{ days === 1095 ? '3年' : days ? `${days}天` : '全部' }}
           </button>
         </div>
         <button :aria-pressed="logScale" @click="logScale = !logScale">{{
@@ -171,7 +171,7 @@
   const cycles = shallowRef<Cycle[]>([]);
   const loading = ref(true),
     error = ref(''),
-    windowDays = ref(0),
+    windowDays = ref(1095),
     cursorDay = ref(365),
     logScale = ref(true);
   const colors = ['#20a5a5', '#369dc3', '#a14fba', '#cf8adb'];

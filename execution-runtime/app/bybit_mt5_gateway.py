@@ -506,6 +506,11 @@ class BybitMt5Gateway:
             category=category,
         )
 
+    def get_research_daily_rates(self, *, account_id, count=1500):
+        return self._mt5_adapter(account_id).get_research_daily_rates(
+            account_id=account_id, count=count
+        )
+
     def get_research_ticks(self, *, account_id, symbol, start, end, historical=False):
         return self._mt5_adapter(account_id).get_research_ticks(
             account_id=account_id, symbol=symbol, start=start, end=end, historical=historical

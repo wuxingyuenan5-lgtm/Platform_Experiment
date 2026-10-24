@@ -290,7 +290,27 @@ export interface MacroExpectationEvent {
   history: MacroProbabilityPoint[];
 }
 
+export interface FomcMeeting {
+  id: string;
+  slug: string;
+  label: string;
+  meetingDate: string;
+  expiryAt: string;
+  updatedAt: string;
+  closed: boolean;
+  status: string;
+  sourceUrl: string;
+  outcomes: Array<{
+    id: string;
+    label: string;
+    probability: number;
+    history: MacroProbabilityPoint[];
+  }>;
+}
+
 export interface MacroExpectationResponse {
+  fomcStatus?: MacroExpectationStatus;
+  fomcMeetings?: FomcMeeting[];
   status: MacroExpectationStatus;
   source: string;
   updatedAt: string;
@@ -404,6 +424,19 @@ export interface MacroDashboardResponse {
   status: string;
   asOf: string;
   groups: Record<string, MacroDashboardSeries[]>;
+  optionDistribution?: {
+    asOf?: string;
+    status?: string;
+    rows?: Array<{
+      instrument: string;
+      expiry: string;
+      strike: number;
+      side: string;
+      openInterest: number;
+      volume: number;
+      underlyingPrice: number | null;
+    }>;
+  };
   optionExposure?: Record<string, OptionExposureSnapshot>;
 }
 
@@ -496,28 +529,32 @@ export const saveMarketLayout = (
     data: { groups, expectedVersion },
   });
 
-export const getAShareDashboard = () =>
+export const getAShareDashboard = (signal?: AbortSignal) =>
   researchRequest<AShareDashboardResponse>({
     method: 'GET',
     url: '/research/a-share/dashboard',
+    signal,
   });
 
-export const getAShareLiveSectorFundFlow = () =>
+export const getAShareLiveSectorFundFlow = (signal?: AbortSignal) =>
   researchRequest<AShareLiveSectorFundFlowResponse>({
     method: 'GET',
     url: '/research/a-share/live-sector-flow',
+    signal,
   });
 
-export const getAShareLiveMarketTurnover = () =>
+export const getAShareLiveMarketTurnover = (signal?: AbortSignal) =>
   researchRequest<AShareMarketTurnoverResponse>({
     method: 'GET',
     url: '/research/a-share/live-market-turnover',
+    signal,
   });
 
-export const getAShareMarketHistory = (page = 1, pageSize = 100) =>
+export const getAShareMarketHistory = (page = 1, pageSize = 100, signal?: AbortSignal) =>
   researchRequest<AShareMarketHistoryResponse>({
     method: 'GET',
     url: '/research/a-share/market-history',
+    signal,
     params: { page, page_size: pageSize },
   });
 
@@ -534,16 +571,21 @@ export const getStockSnapshot = (code: string) =>
     url: `/research/a-share/stocks/${code}/snapshot`,
   });
 
-export const getMacroExpectations = () =>
+export const getMacroExpectations = (signal?: AbortSignal) =>
   researchRequest<MacroExpectationResponse>({
     method: 'GET',
     url: '/research/macro/expectations',
+    signal,
   });
 
-export const getMarketDetail = (marketId: 'macro' | 'gold' | 'crypto' | 'us' | 'global') =>
+export const getMarketDetail = (
+  marketId: 'macro' | 'gold' | 'crypto' | 'us' | 'global',
+  signal?: AbortSignal,
+) =>
   researchRequest<MarketDetailResponse>({
     method: 'GET',
     url: `/research/market-detail/${marketId}`,
+    signal,
   });
 
 export interface CrossAssetComparison {
@@ -595,6 +637,10 @@ export interface FedWatchZqPricing {
 }
 
 export interface FedWatchData {
+  methodology?: string | null;
+  probabilityUnit?: 'percent' | null;
+  quoteAsOf?: string | null;
+  missingMeetings?: string[] | null;
   effr: number | null;
   currentTarget: string | null;
   observedAt: string | null;
@@ -762,3 +808,11 @@ export const getCumulativeVolatility = (
     url: '/research/cumulative-volatility',
     params: { asset, days, interval, ...window },
   });
+
+export const getTreasuryWeeklySnapshot = () =>
+  researchRequest<{
+    status: string;
+    observedAt: string | null;
+    sourceUrl: string;
+    dataPath: string | null;
+  }>({ method: 'GET', url: '/research/crypto/treasury-weekly-snapshot' });

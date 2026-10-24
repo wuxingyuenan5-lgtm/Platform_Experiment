@@ -15,7 +15,11 @@
       loading ? '正在读取市场观察…' : '暂无已发布的市场观察数据'
     }}</p>
     <template v-else>
-      <section :id="`${market}-equity-themes`" class="observation-section">
+      <section
+        v-if="!view || view === 'themes'"
+        :id="`${market}-equity-themes`"
+        class="observation-section"
+      >
         <header
           ><div
             ><h2>主题与产业链</h2><p>代表观察池 · {{ data.themes.date }} · 主题间可重叠</p></div
@@ -75,127 +79,16 @@
         </div>
       </section>
 
-      <section :id="`${market}-equity-valuation`" class="observation-section">
-        <header
-          ><div
-            ><h2>估值与市场分布</h2
-            ><p>{{ market === 'cn' ? '宽基定价 · 横截面分布' : '标普500定价 · 历史位置' }}</p></div
-          ></header
-        >
-        <div v-if="data.structure" class="metric-grid">
-          <article
-            ><span>破净占比</span
-            ><strong>{{ format(data.structure.market.belowBookPct, '%') }}</strong
-            ><small
-              >{{ data.structure.market.belowBookCount }} /
-              {{ data.structure.market.pbCount }} 只有效正PB样本</small
-            ></article
-          >
-          <article
-            ><span>PE TTM 中位数</span
-            ><strong>{{ format(data.structure.market.medianPe, '倍') }}</strong
-            ><small>{{ data.structure.market.peCount }} 只正PE样本</small></article
-          >
-          <article
-            ><span>PB 中位数</span
-            ><strong>{{ format(data.structure.market.medianPb, '倍') }}</strong
-            ><small
-              >非正PB {{ data.structure.market.nonpositivePbCount }} 只，单列排除</small
-            ></article
-          >
-          <article
-            ><span>个股涨跌中位数</span
-            ><strong :class="tone(data.structure.market.medianReturn)">{{
-              format(data.structure.market.medianReturn, '%')
-            }}</strong
-            ><small>{{ data.structure.market.count }} 只同日行情样本</small></article
-          >
-        </div>
-        <div class="table-scroll" tabindex="0" role="region" aria-label="宽基估值">
-          <table
-            ><thead
-              ><tr
-                ><th>指数</th><th>PE</th><th>PE历史分位</th><th>股息率</th><th>样本数</th
-                ><th>观测日</th><th>口径</th></tr
-              ></thead
-            >
-            <tbody
-              ><tr v-for="row in data.valuations" :key="row.id"
-                ><th
-                  ><button type="button" class="text-button" @click="valuationId = row.id">{{
-                    row.name
-                  }}</button></th
-                ><td>{{ format(row.pe) }}{{ row.estimated ? ' *' : '' }}</td
-                ><td>{{ format(row.peRank.value, '%') }}</td
-                ><td>{{ format(row.dividend, '%') }}</td
-                ><td>{{ row.peRank.count }}{{ market === 'us' ? '期' : '日' }}</td
-                ><td>{{ row.date || '—' }}{{ row.status !== 'ready' ? ' · 待更新' : '' }}</td
-                ><td
-                  ><a :href="row.sourceUrl" target="_blank" rel="noopener noreferrer">{{
-                    row.method
-                  }}</a></td
-                ></tr
-              ></tbody
-            >
-          </table>
-        </div>
-        <p class="definition"
-          >分位只用截至观测日的最近五年有效数据；日频至少252个样本，月频至少36期。空值表示样本或来源不足。不同估值口径不拼接。{{
-            market === 'us'
-              ? '* 为来源估计值；月度估值记录不等同于每日估值。'
-              : '中证官方近期文件不含PB；不以个股PB中位数替代指数PB。'
-          }}</p
-        >
-        <template v-if="market === 'cn' && data.reference?.rows?.length">
-          <div class="reference-head"
-            ><h3>沪深300 · 长期估值观察</h3
-            ><label
-              >口径
-              <select v-model="referenceMetric"
-                ><option value="pe">PE TTM</option
-                ><option value="pb">PB</option
-                ><option value="ps">PS</option
-                ><option value="pcf">PCF</option
-                ><option value="erp">股债收益率差</option></select
-              ></label
-            ></div
-          >
-          <p class="definition"
-            >{{ data.reference.source }} · 截至 {{ data.reference.rows.at(-1)?.date }} ·
-            最近五年分位 {{ format(data.reference.ranks?.[referenceMetric]?.value, '%') }} ·
-            {{ data.reference.ranks?.[referenceMetric]?.count || 0 }}
-            个有效样本。历史财务版本未作时点验证，不作为无前视偏差回测。</p
-          >
-          <VibeTimeChart
-            :key="referenceMetric"
-            title="沪深300价格与估值"
-            y-label="指数收盘"
-            :right-label="
-              referenceMetric === 'erp' ? '股债收益率差（%）' : referenceMetric.toUpperCase()
-            "
-            :dates="referenceDates"
-            :series="referenceSeries"
-          />
-        </template>
-        <VibeTimeChart
-          v-if="selectedValuation?.history.length"
-          :key="valuationId"
-          :title="`${selectedValuation.name} · ${selectedValuation.method}`"
-          :frequency="market === 'us' ? 'monthly' : undefined"
-          y-label="PE（倍）"
-          :dates="selectedValuation.history.map((p) => p.date)"
-          :series="[
-            {
-              name: 'PE',
-              type: 'line',
-              color: '#3366a3',
-              values: selectedValuation.history.map((p) => numeric(p.pe)),
-            },
-          ]"
-        />
-      </section>
+      <IndexValuationPanel
+        v-if="!view || view === 'valuation'"
+        :charts="data.valuationCharts || []"
+      />
 
-      <section :id="`${market}-equity-structure`" class="observation-section">
+      <section
+        v-if="!view || view === 'structure' || (market === 'cn' && view === 'crowding')"
+        :id="`${market}-equity-structure`"
+        class="observation-section"
+      >
         <header
           ><div
             ><h2>{{ market === 'cn' ? '拥挤度与参与度' : '市场结构与风险环境' }}</h2
@@ -378,32 +271,14 @@
               },
             ]"
           />
-          <div class="risk-grid"
-            ><article v-for="row in data.risk" :key="row.name"
-              ><h3>{{ row.name }}</h3
-              ><strong>{{ format(row.value, '%') }}</strong
-              ><p>{{ row.date || '—' }}{{ row.status !== 'ready' ? ' · 待更新' : '' }}</p
-              ><a :href="row.sourceUrl" target="_blank" rel="noopener noreferrer">{{
-                row.source
-              }}</a
-              ><VibeTimeChart
-                v-if="row.history.length"
-                :title="row.name"
-                y-label="%"
-                :dates="row.history.map((p) => p.date)"
-                :series="[
-                  {
-                    name: row.name,
-                    type: 'line',
-                    color: '#8563af',
-                    values: row.history.map((p) => numeric(p.value)),
-                  },
-                ]" /></article
-          ></div>
         </template>
       </section>
 
-      <section v-if="data.hongKong" id="cn-equity-hk" class="observation-section">
+      <section
+        v-if="data.hongKong && (!view || view === 'hk')"
+        id="cn-equity-hk"
+        class="observation-section"
+      >
         <header
           ><div><h2>港股观察</h2><p>月度宏观四因子 · 各25%权重</p></div></header
         >
@@ -414,6 +289,23 @@
             ><small>{{ row.date }} · {{ format(row.returnPct, '%') }}</small></article
           ></div
         >
+        <VibeTimeChart
+          v-for="row in (data.hongKong.indices || []).filter((i) =>
+            /恒生科技|恒生互联网/.test(i.name),
+          )"
+          :key="row.name"
+          :title="row.name + ' · 价格走势'"
+          y-label="指数点位"
+          :dates="row.history.map((p) => p.date)"
+          :series="[
+            {
+              name: row.name,
+              type: 'line',
+              color: '#111111',
+              values: row.history.map((p) => numeric(p.value)),
+            },
+          ]"
+        />
         <div class="composite"
           ><span>港股领航指标</span><strong>{{ format(data.hongKong.value) }}</strong
           ><span
@@ -464,6 +356,7 @@
           ]"
         />
       </section>
+      <p v-if="view === 'hk' && !data.hongKong" role="status">暂无已发布的港股观察数据</p>
       <details class="source-details"
         ><summary>数据来源与更新日期</summary
         ><div class="table-scroll"
@@ -491,24 +384,27 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, ref, watch } from 'vue';
+  import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
   import {
     getEquityObservatory,
     type EquityObservatory,
     type EquityValue,
   } from '@/api/equityObservatory';
   import VibeTimeChart from '../aShare/components/VibeTimeChart.vue';
+  import IndexValuationPanel from './IndexValuationPanel.vue';
 
-  const props = defineProps<{ market: 'cn' | 'us'; refreshKey?: number }>();
-  const data = ref<EquityObservatory | null>(null);
+  import { useResearchViewState, useResearchSnapshots } from '../composables/researchWorkspace';
+
+  const props = defineProps<{ market: 'cn' | 'us'; refreshKey?: number; view?: string }>();
+  const emit = defineEmits<{ ready: [] }>();
+  const snapshots = useResearchSnapshots();
+  const data = shallowRef<EquityObservatory | null>(null);
   const loading = ref(false);
   const error = ref(false);
-  const selectedTheme = ref('');
-  const themeOrder = ref('catalog');
-  const allIndustries = ref(false);
-  const valuationId = ref('');
-  const referenceMetric = ref<'pe' | 'pb' | 'ps' | 'pcf' | 'erp'>('pe');
-  const ratioName = ref('');
+  const selectedTheme = useResearchViewState('selectedTheme', '');
+  const themeOrder = useResearchViewState('themeOrder', 'catalog');
+  const allIndustries = useResearchViewState('allIndustries', false);
+  const ratioName = useResearchViewState('ratioName', '');
   let controller: AbortController | null = null;
   let sequence = 0;
   const numeric = (v: EquityValue | undefined) =>
@@ -531,30 +427,9 @@
   const shownIndustries = computed(() =>
     (data.value?.structure?.industries || []).slice(0, allIndustries.value ? undefined : 12),
   );
-  const selectedValuation = computed(
-    () =>
-      data.value?.valuations?.find((v) => v.id === valuationId.value) ||
-      data.value?.valuations?.[0],
-  );
   const selectedRatio = computed(
     () => data.value?.ratios?.find((r) => r.name === ratioName.value) || data.value?.ratios?.[0],
   );
-  const referenceDates = computed(() => data.value?.reference?.rows?.map((p) => p.date) || []);
-  const referenceSeries = computed(() => [
-    {
-      name: '沪深300收盘',
-      type: 'line' as const,
-      color: '#3366a3',
-      values: data.value?.reference?.rows?.map((p) => numeric(p.close)) || [],
-    },
-    {
-      name: referenceMetric.value.toUpperCase(),
-      type: 'line' as const,
-      axis: 'right' as const,
-      color: '#bc8042',
-      values: data.value?.reference?.rows?.map((p) => numeric(p[referenceMetric.value])) || [],
-    },
-  ]);
   async function load() {
     controller?.abort();
     controller = new AbortController();
@@ -563,17 +438,27 @@
     error.value = false;
     try {
       const result = await getEquityObservatory(props.market, controller.signal);
-      if (current === sequence) data.value = result;
+      if (current === sequence) {
+        data.value = result;
+        snapshots.set(`equity:${props.market}`, result);
+      }
     } catch {
       if (current === sequence) error.value = true;
     } finally {
-      if (current === sequence) loading.value = false;
+      if (current === sequence) {
+        loading.value = false;
+        emit('ready');
+      }
     }
   }
   watch(
     () => [props.market, props.refreshKey],
-    () => {
-      void load();
+    (_value, previous) => {
+      const cached = !previous && snapshots.get<EquityObservatory>(`equity:${props.market}`);
+      if (cached) {
+        data.value = cached;
+        emit('ready');
+      } else void load();
     },
     { immediate: true },
   );
@@ -730,8 +615,7 @@
     gap: 6px;
   }
 
-  .metric-grid strong,
-  .risk-grid > article > strong {
+  .metric-grid strong {
     font-size: 24px;
     font-variant-numeric: tabular-nums;
   }
@@ -794,16 +678,6 @@
     color: #98651e;
   }
 
-  .risk-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 20px;
-  }
-
-  .risk-grid article {
-    min-width: 0;
-  }
-
   .composite {
     display: flex;
     flex-wrap: wrap;
@@ -840,10 +714,6 @@
 
     .metric-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .risk-grid {
-      grid-template-columns: 1fr;
     }
   }
 

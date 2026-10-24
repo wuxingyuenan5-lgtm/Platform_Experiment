@@ -21,6 +21,43 @@ function setup() {
   return load('src/store/modules/user.ts').useUserStore(pinia);
 }
 
+test('fresh server verification preserves unchanged UI state and applies changed permissions', async () => {
+  const original = axios.defaults.adapter;
+  let requests = 0;
+  let role = 'ceo';
+  axios.defaults.adapter = async (config) => {
+    requests++;
+    return {
+      config, status: 200, statusText: 'OK', headers: {},
+      data: {
+        user: { userId: 'owner', username: 'owner', role },
+        permissions: role === 'ceo' ? ['research.write'] : ['profile.read_self'],
+        session: { sessionId: 'original' }, csrfToken: 'isolated-csrf',
+      },
+    };
+  };
+  try {
+    const store = setup();
+    await store.hydrateSession(true);
+    const info = store.getUserInfo;
+    const roles = store.getRoleList;
+    const authentication = store.getAuthentication;
+    await store.hydrateSession(true);
+    assert.equal(requests, 2);
+    assert.equal(store.getUserInfo, info);
+    assert.equal(store.getRoleList, roles);
+    assert.equal(store.getAuthentication, authentication);
+    role = 'member';
+    await store.hydrateSession(true);
+    assert.equal(requests, 3);
+    assert.notEqual(store.getUserInfo, info);
+    assert.deepEqual(store.getAuthentication.permissions, ['profile.read_self']);
+    assert.deepEqual(store.getRoleList, ['member']);
+  } finally {
+    axios.defaults.adapter = original;
+  }
+});
+
 for (const loaded of [true, false]) {
   test(`guard retains a loaded page or exposes cold-start retry: loaded=${loaded}`, async () => {
     const notifications = [];

@@ -9,18 +9,18 @@
   不硬编码本机端口。直连优先保证默认行为可预期，同时让受限网络中的公开
   数据 worker 能真正完成生产刷新。TLS 校验在两条路径上都保持开启。
 - 这些源均为只读公开行情，不携带任何凭据；请求只走 HTTPS。
-- FedWatch 计算使用链式期望利率 + 月末改用下月合约，避免原版 calc 对
-  月末会议（n_post 过小）的放大失真，使区间连续单调、贴近 CME 官方形态。
+- FedWatch 使用 CME Aggregated 口径：无会议月锚定、反向传播会前/会后 EFFR，
+  相对首场会前利率计算累计变动，不使用目标区间中点递推。
 """
 
 from __future__ import annotations
 
-import calendar
 import math
 import re
 import ssl
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 import truststore
@@ -126,12 +126,12 @@ def _fetch_fred_series(series_id: str) -> float:
     raise ResearchProviderError(f"fred_series_empty:{series_id}")
 
 
-def _fetch_cme_settlements() -> dict[str, float]:
+def _fetch_cme_settlements() -> tuple[dict[str, float], dict[str, Any]]:
     """拉取 CME 30 天联邦基金期货结算价，返回 {month_key: settle_price}。
 
     month_key 形如 "SEP 26"。失败时向前回退一个工作日重试一次。
     """
-    trade_date = _recent_business_day(date.today() - timedelta(days=1))
+    trade_date = _recent_business_day(_fedwatch_today() - timedelta(days=1))
     data: dict[str, Any] | None = None
     for _ in range(2):
         date_str = trade_date.strftime("%m/%d/%Y")
@@ -157,10 +157,10 @@ def _fetch_cme_settlements() -> dict[str, float]:
             continue
     if not settle_map:
         raise ResearchProviderError("cme_settlements_unparsable")
-    return settle_map
+    return settle_map, {"quoteAsOf": trade_date.isoformat()}
 
 
-def _fetch_yahoo_zq_settlements() -> dict[str, float]:
+def _fetch_yahoo_zq_settlements() -> tuple[dict[str, float], dict[str, Any]]:
     """Fetch the same ZQ curve from Yahoo's public delayed quote endpoint.
 
     CME's browser settlement endpoint blocks automated requests from some
@@ -169,10 +169,10 @@ def _fetch_yahoo_zq_settlements() -> dict[str, float]:
     usable without inventing probabilities or requiring credentials. Values
     are the latest delayed quote, not CME's official settlement print.
     """
-    today = date.today()
+    today = _fedwatch_today()
     symbols: list[str] = []
     year, month = today.year, today.month
-    for _ in range(13):
+    for _ in range(14):
         symbols.append(f"ZQ{_MONTH_CODES[month]}{year % 100:02d}.CBT")
         if month == 12:
             year, month = year + 1, 1
@@ -190,6 +190,7 @@ def _fetch_yahoo_zq_settlements() -> dict[str, float]:
     payload = response.json()
     results = ((payload.get("spark") or {}).get("result") or [])
     settle_map: dict[str, float] = {}
+    quote_times = {}
     for result in results:
         if not isinstance(result, dict):
             continue
@@ -208,25 +209,35 @@ def _fetch_yahoo_zq_settlements() -> dict[str, float]:
         value = meta.get("regularMarketPrice")
         try:
             if value is not None:
+                stamp = meta.get("regularMarketTime")
+                if not stamp:
+                    continue
+                quote_times[key] = datetime.fromtimestamp(int(stamp), UTC).isoformat()
                 settle_map[key] = float(value)
         except (TypeError, ValueError):
             continue
     if not settle_map:
         raise ResearchProviderError("yahoo_zq_quotes_unavailable")
-    return settle_map
+    return settle_map, {"quoteAsOf": min(quote_times.values()), "contractQuoteTimes": quote_times}
 
 
-def _fetch_fed_fund_settlements() -> tuple[dict[str, float], str]:
+def _fetch_fed_fund_settlements() -> tuple[dict[str, float], str, dict[str, Any]]:
     """Use CME settlement first, then a public delayed ZQ quote fallback."""
     try:
-        return _fetch_cme_settlements(), "CME official settlements"
+        prices, metadata = _fetch_cme_settlements()
+        return prices, "CME official settlements", metadata
     except Exception as cme_error:
         try:
-            return _fetch_yahoo_zq_settlements(), "Yahoo Finance delayed ZQ quotes"
+            prices, metadata = _fetch_yahoo_zq_settlements()
+            return prices, "Yahoo Finance delayed ZQ quotes", metadata
         except Exception as yahoo_error:
             raise ResearchProviderError(
                 f"fed_funds_curve_unavailable:cme={type(cme_error).__name__}:yahoo={type(yahoo_error).__name__}"
             ) from yahoo_error
+
+
+def _fedwatch_today() -> date:
+    return datetime.now(ZoneInfo("America/New_York")).date()
 
 
 def _month_key(year: int, month: int) -> str:
@@ -246,63 +257,13 @@ def _improved_fedwatch(
     meetings: list[date],
     effr: float,
 ) -> list[dict[str, Any]]:
-    """链式期望利率 + 月末改用下月合约的 FedWatch 概率计算。
+    from app.research_fedwatch import aggregated_probabilities
 
-    对每场会议用「上一场会议的期望利率」作为 pre_rate（而非前月合约
-    implied，后者是月平均而非月末利率），月末会议（n_post <= 5）改用
-    下月合约以避免分母过小放大误差。结果区间连续单调、贴近 CME 官方。
-    """
-    results: list[dict[str, Any]] = []
-    pre_rate = effr
-    for meeting in meetings:
-        year, month, day = meeting.year, meeting.month, meeting.day
-        mk = _month_key(year, month)
-        if mk not in settle_map:
-            continue
-        implied = 100.0 - settle_map[mk]
-        days_in_m = calendar.monthrange(year, month)[1]
-        n_post = days_in_m - day + 1
-
-        ny, nm = _next_month(year, month)
-        next_key = _month_key(ny, nm)
-        if n_post <= 5 and next_key in settle_map:
-            post_rate = 100.0 - settle_map[next_key]
-        else:
-            n_pre = day - 1
-            post_rate = (
-                (implied * days_in_m - pre_rate * n_pre) / n_post if n_post > 0 else implied
-            )
-
-        moves = (post_rate - pre_rate) / 0.25
-        floor_moves = math.floor(moves)
-        p_ceil = max(0.0, min(1.0, moves - floor_moves))
-        p_floor = 1.0 - p_ceil
-
-        pre_bps = pre_rate * 100
-        pre_lower = int(math.floor(pre_bps / 25.0)) * 25
-        target_floor = pre_lower + int(floor_moves) * 25
-        target_ceil = pre_lower + int(floor_moves + 1) * 25
-
-        probabilities: dict[str, float] = {}
-        if p_floor > 0.001:
-            probabilities[_target_range_label(target_floor)] = round(p_floor * 100, 1)
-        if p_ceil > 0.001:
-            probabilities[_target_range_label(target_ceil)] = round(p_ceil * 100, 1)
-
-        results.append({
-            "date": meeting.isoformat(),
-            "probabilities": probabilities,
-        })
-
-        # 链式：本场期望利率 = 各区间中点加权
-        mid_floor = (target_floor + target_floor + 25) / 2 / 100
-        mid_ceil = (target_ceil + target_ceil + 25) / 2 / 100
-        pre_rate = p_floor * mid_floor + p_ceil * mid_ceil
-
-    return results
+    return aggregated_probabilities(settle_map, meetings, effr)
 
 
 _ZQ_QUARTERLY_CODES = ("U", "V", "X", "Z")  # 季月合约代码（CME IMM 月）
+
 
 def _current_target_range(effr: float) -> str:
     lower_bps = int(math.floor(effr * 100 / 25.0)) * 25
@@ -317,7 +278,7 @@ def _build_zq_pricing_table(settle_map: dict[str, float]) -> list[dict[str, Any]
     """
     used_keys: set[str] = set()
     rows: list[dict[str, Any]] = []
-    today = date.today()
+    today = _fedwatch_today()
     cur_year, cur_month = today.year, today.month
     yy, mm = cur_year, cur_month
     for _ in range(13):
@@ -325,12 +286,14 @@ def _build_zq_pricing_table(settle_map: dict[str, float]) -> list[dict[str, Any]
         # ZQ 月代码
         code = "ZQ" + _MONTH_CODES[mm] + f"{yy % 100:02d}"
         settle = settle_map.get(mk)
-        rows.append({
-            "code": code,
-            "month": _MONTH_NAMES[mm] + f" {yy % 100:02d}",
-            "monthISO": f"{yy:04d}-{mm:02d}",
-            "settle": round(float(settle), 4) if settle is not None else None,
-        })
+        rows.append(
+            {
+                "code": code,
+                "month": _MONTH_NAMES[mm] + f" {yy % 100:02d}",
+                "monthISO": f"{yy:04d}-{mm:02d}",
+                "settle": round(float(settle), 4) if settle is not None else None,
+            }
+        )
         used_keys.add(mk)
         # 推进 1 个月
         if mm == 12:
@@ -354,28 +317,64 @@ def fetch_fedwatch() -> dict[str, Any]:
         "meetings":  [{date, probabilities, contract}, ...]
     }
     """
-    settle_map, settlement_source = _fetch_fed_fund_settlements()
+    from app.research_fedwatch import METHODOLOGY
+    from app.research_local_data import write_local_json
+
+    settle_map, settlement_source, pricing_meta = _fetch_fed_fund_settlements()
     effr = _fetch_fred_series("EFFR")
-    meetings_all = [m for m in _FOMC_MEETINGS if m >= date.today()]
+    meetings_all = [m for m in _FOMC_MEETINGS if m >= _fedwatch_today()]
     meetings_probs = _improved_fedwatch(settle_map, meetings_all, effr)
+
+    pricing_table = _build_zq_pricing_table(settle_map)
+    visible_months = {row["month"] for row in pricing_table}
+    meetings_probs = [
+        m
+        for m in meetings_probs
+        if _month_key(date.fromisoformat(m["date"]).year, date.fromisoformat(m["date"]).month)
+        in visible_months
+    ]
+    expected = [
+        m.isoformat() for m in meetings_all if _month_key(m.year, m.month) in visible_months
+    ]
+    missing = [day for day in expected if day not in {m["date"] for m in meetings_probs}]
+    now = datetime.now(UTC)
+    write_local_json(
+        f"history/research/fedwatch/{now.strftime('%Y%m%dT%H%M%S%fZ')}.json",
+        dict(
+            methodology=METHODOLOGY,
+            probabilityUnit="percent",
+            retrievedAt=now.isoformat(),
+            settlementSource=settlement_source,
+            prices=settle_map,
+            effr=effr,
+            meetings=[day.isoformat() for day in meetings_all],
+            pricing=pricing_meta,
+        ),
+    )
 
     # 给每场会议配对 contract code (e.g. ZQU6)
     meetings: list[dict[str, Any]] = []
     for m in meetings_probs:
         meeting_date = date.fromisoformat(m["date"])
         contract = "ZQ" + _MONTH_CODES[meeting_date.month] + f"{meeting_date.year % 100:02d}"
-        meetings.append({
-            "date": m["date"],
-            "contract": contract,
-            "probabilities": m["probabilities"],
-        })
+        meetings.append(
+            {
+                "date": m["date"],
+                "contract": contract,
+                "probabilities": m["probabilities"],
+            }
+        )
 
     return {
         "effr": effr,
         "currentTarget": _current_target_range(effr),
-        "observedAt": _recent_business_day(date.today()).isoformat(),
+        "observedAt": _recent_business_day(_fedwatch_today()).isoformat(),
+        "methodology": METHODOLOGY,
+        "probabilityUnit": "percent",
+        "missingMeetings": missing,
+        **pricing_meta,
         "settlementSource": settlement_source,
-        "zqPricing": _build_zq_pricing_table(settle_map),
+        "zqPricing": pricing_table,
         "meetings": meetings,
     }
 

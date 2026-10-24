@@ -1,13 +1,11 @@
 <template>
   <div class="macro-board-page">
     <LegacyHedgeBoard />
-    <MacroExpectationPanel />
   </div>
 </template>
 
 <script setup lang="ts">
   import LegacyHedgeBoard from '../index.vue';
-  import MacroExpectationPanel from './MacroExpectationPanel.vue';
 </script>
 
 <style scoped lang="less">

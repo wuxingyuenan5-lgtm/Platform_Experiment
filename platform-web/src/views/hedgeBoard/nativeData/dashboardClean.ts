@@ -39,12 +39,38 @@ export type LocalWidgetKey =
   | 'macro-global-m2'
   | 'macro-global-m2-yoy'
   | 'macro-fed-balance-structure'
+  | 'macro-fed-assets'
+  | 'macro-cn-rates'
+  | 'macro-cn-treasury'
+  | 'macro-cn-growth'
+  | 'macro-cn-pmi'
+  | 'macro-cn-credit'
+  | 'macro-cn-inflation'
+  | 'macro-cn-risk-leverage'
+  | 'macro-cn-risk-volatility'
+  | 'macro-cn-policy-rates'
+  | 'macro-cn-money-stock'
+  | 'macro-cn-reserves'
+  | 'macro-cn-rrr'
+  | 'macro-cn-investment'
+  | 'macro-cn-property'
+  | 'macro-cn-trade'
+  | 'macro-cn-fiscal'
+  | 'macro-cn-profits'
+  | 'macro-cn-labor'
+  | 'macro-cn-youth-labor'
+  | 'macro-cn-price-details'
+  | 'macro-cn-ppi-details'
+  | 'macro-cn-confidence'
+  | 'macro-cn-fx'
   | 'macro-fedwatch'
   | 'macro-polymarket-fed'
+  | 'macro-corporate-yields'
   | 'macro-inflation-nowcast'
   | 'macro-inflation-expectations'
   | 'macro-gdp-now'
   | 'macro-lending-standards'
+  | 'macro-us-pmi'
   | 'macro-growth-production'
   | 'macro-growth-labor'
   | 'macro-growth-activity'
@@ -52,6 +78,7 @@ export type LocalWidgetKey =
   | 'macro-upstream-inflation'
   | 'macro-market-inflation'
   | 'macro-rate-corridor'
+  | 'macro-real-yield'
   | 'macro-risk-hy-oas'
   | 'macro-risk-credit-ratio'
   | 'gold-market-detail-table'
@@ -60,6 +87,8 @@ export type LocalWidgetKey =
   | 'crypto-atm-iv-term'
   | 'btc-treasury-flow'
   | 'crypto-binance-open-interest'
+  | 'crypto-binance-eth-combined'
+  | 'crypto-options-distribution'
   | 'crypto-eth-etf-flow'
   | 'crypto-intraday-cumulative-volatility'
   | 'gold-intraday-cumulative-volatility'
@@ -100,6 +129,7 @@ export type LocalWidgetKey =
   | 'eia-products-stocks';
 
 export interface WidgetConfig {
+  region?: '美国' | '中国';
   kind: WidgetKind;
   title: string;
   subtitle: string;
@@ -275,12 +305,9 @@ export const researchModules: ResearchModule[] = [
           }),
           withReferenceLinks(
             {
-              ...localChart(
-                '美元净流动性',
-                'WALCL − WDTGAL − RRPONTSYD × 1000 · USD million · 同日观测代理',
-                'macro-net-liquidity',
-                { height: 420 },
-              ),
+              ...localChart('美元净流动性', '美元净流动性=资产-TGA-RRP', 'macro-net-liquidity', {
+                height: 420,
+              }),
               sourceUrl: undefined,
             },
             [
@@ -300,11 +327,11 @@ export const researchModules: ResearchModule[] = [
             'macro-treasury-issuance',
           ),
           localChart(
-            '美联储资产负债结构',
-            'Fed 总资产（周三值）与准备金、TGA、流通货币（周均值）；不作会计分项求和',
+            '美联储负债端结构',
+            '流通货币 / ON RRP / TGA / 准备金 · 百万美元',
             'macro-fed-balance-structure',
             {
-              height: 300,
+              height: 420,
               sourceNote: 'Federal Reserve / FRED',
               referenceLinks: [
                 {
@@ -312,6 +339,15 @@ export const researchModules: ResearchModule[] = [
                   href: 'https://cn.tradingview.com/chart/EUMNyM4l/',
                 },
               ],
+            },
+          ),
+          localChart(
+            '美联储资产端结构',
+            '国债剩余期限：1年以内 / 1至5年 / 5至10年 / 10年以上及 MBS · 百万美元',
+            'macro-fed-assets',
+            {
+              height: 420,
+              sourceUrl: 'https://www.federalreserve.gov/releases/h41/',
             },
           ),
         ],
@@ -366,6 +402,7 @@ export const researchModules: ResearchModule[] = [
               ],
             },
           ),
+          localChart('美国 PMI', 'ISM 制造业 / 服务业 · 50为荣枯线', 'macro-us-pmi'),
           localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
           localChart('广义经济活动', 'CFNAI / CFNAIMA3', 'macro-growth-activity'),
           localChart(
@@ -414,7 +451,8 @@ export const researchModules: ResearchModule[] = [
         id: 'macro-rates',
         eyebrow: 'Rates',
         title: '利率',
-        description: '同时观察美债期限曲线、短端政策走廊与市场对下一次 FOMC 的概率定价。',
+        description:
+          '美国关注美债曲线、政策走廊和FOMC定价；中国关注LPR、银行间资金利率与国债曲线。',
         layout: 'two',
         widgets: [
           withReferenceLinks(treasuryYieldOverview(), [
@@ -443,13 +481,39 @@ export const researchModules: ResearchModule[] = [
             'macro-polymarket-fed',
             { height: 360, sourceNote: 'Polymarket 公开市场历史快照 · 本地落库' },
           ),
+          localChart(
+            '美国公司债收益率 · AAA / BBB / CCC 及以下',
+            'ICE BofA 公司债指数有效收益率 · 日收盘 · %',
+            'macro-corporate-yields',
+            {
+              referenceLinks: [
+                { label: 'AAA · FRED', href: 'https://fred.stlouisfed.org/series/BAMLC0A1CAAAEY' },
+                { label: 'BBB · FRED', href: 'https://fred.stlouisfed.org/series/BAMLC0A4CBBBEY' },
+                {
+                  label: 'CCC 及以下 · FRED',
+                  href: 'https://fred.stlouisfed.org/series/BAMLH0A3HYCEY',
+                },
+              ],
+              sourceNote: 'ICE Data Indices, LLC via FRED · 日收盘 · 非季调',
+            },
+          ),
+          localChart(
+            '美国高收益债信用利差（OAS）',
+            'ICE BofA US High Yield OAS via FRED',
+            'macro-risk-hy-oas',
+          ),
+          localChart(
+            '美国10年实际利率',
+            '10年期通胀保值国债实际收益率 · FRED DFII10',
+            'macro-real-yield',
+          ),
         ],
       },
       {
         id: 'macro-risk-appetite',
         eyebrow: 'Risk Appetite',
         title: '信用风险偏好',
-        description: '分别观察高收益信用利差与 HYG/LQD 相对表现，避免混用纵轴。',
+        description: '观察波动率、信用资产相对表现与金融状况。',
         layout: 'two',
         widgets: [
           withReferenceLinks(
@@ -465,11 +529,6 @@ export const researchModules: ResearchModule[] = [
                 href: 'https://cn.tradingview.com/chart/qGloFInw/',
               },
             ],
-          ),
-          localChart(
-            '美国高收益债 OAS',
-            'ICE BofA US High Yield OAS via FRED',
-            'macro-risk-hy-oas',
           ),
           localChart('HYG / LQD', '同日 adjusted close ratio', 'macro-risk-credit-ratio'),
           localChart('美国金融状况指数', 'Chicago Fed NFCI', 'macro-nfci', { height: 360 }),
@@ -487,9 +546,9 @@ export const researchModules: ResearchModule[] = [
     sourceLinks: [],
     sections: [
       {
-        id: 'gold-main',
-        eyebrow: 'Price',
-        title: '黄金主图',
+        id: 'gold-market',
+        eyebrow: 'Market',
+        title: '商品市场明细',
         description: '',
         layout: 'hero',
         widgets: [
@@ -500,15 +559,10 @@ export const researchModules: ResearchModule[] = [
           localChart('Gold IV (GVZCLS)', 'Cboe 黄金 ETF 波动率指数', 'gold-gvz', {
             height: 320,
           }),
-        ],
-      },
-      {
-        id: 'gold-market',
-        eyebrow: 'Market',
-        title: '商品市场明细',
-        description: '沿用统一市场明细结构，补齐商品横截面与相对比价。',
-        layout: 'hero',
-        widgets: [
+
+          localChart('黄金分时累计波动', '', 'gold-intraday-cumulative-volatility', {
+            height: 420,
+          }),
           localChart('Commodity Market Detail', '', 'gold-market-detail-table', {
             height: 620,
             sourceNote: '',
@@ -526,20 +580,20 @@ export const researchModules: ResearchModule[] = [
         layout: 'two',
         widgets: [
           localChart(
-            '金价 vs SPDR 持仓日变化',
-            '持仓变化单位为吨，不是美元现金流；金价采用 COMEX 近月期货',
+            'SPDR GLD资金流',
+            'SPDR 持仓日变化（吨） / XAUUSD（USD/oz）',
             'spdr-daily-flow',
             {
               height: 420,
-              sourceNote: 'SPDR Gold Shares / Yahoo Finance',
+              sourceNote: 'SPDR Gold Shares / MT5 XAUUSD',
               referenceLinks: macroMicroReference(
                 'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
               ),
             },
           ),
           localChart(
-            '中国黄金 ETF 资金流 vs 金价',
-            '中国大陆月度净资金流（USD） / COMEX 近月黄金期货（USD/oz）',
+            '中国黄金 ETF 资金流',
+            '中国大陆月度净资金流（USD） / XAUUSD（USD/oz）',
             'china-gold-etf-flow',
             {
               height: 420,
@@ -554,12 +608,12 @@ export const researchModules: ResearchModule[] = [
             ),
           }),
           localChart(
-            'SPDR 持仓量 vs 黄金期货价格',
-            'SPDR 官方持仓（吨） / COMEX 近月期货（USD/oz）',
+            'SPDR 持仓量',
+            'SPDR 官方持仓（吨） / XAUUSD（USD/oz）',
             'spdr-holdings-vs-price',
             {
               height: 420,
-              sourceNote: 'SPDR Gold Shares / Yahoo Finance',
+              sourceNote: 'SPDR Gold Shares / MT5 XAUUSD',
               referenceLinks: macroMicroReference(
                 'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
               ),
@@ -585,7 +639,7 @@ export const researchModules: ResearchModule[] = [
             'CME · 注册 / 合格 / 合计 · 金衡盎司 · 按活动日归档，历史从接入日积累',
             'gold-comex-inventory',
           ),
-          localChart('央行黄金净购买 · 主要国家', '', 'central-bank-buyers', {
+          localChart('央行购金', '', 'central-bank-buyers', {
             height: 420,
             sourceNote: 'World Gold Council · 月报披露',
             referenceLinks: macroMicroReference(
@@ -690,19 +744,6 @@ export const researchModules: ResearchModule[] = [
         ],
       },
       {
-        id: 'gold-intraday-cumulative-volatility',
-        eyebrow: 'Intraday Volatility',
-        title: '黄金分时累计波动',
-        description:
-          '后端从共享 Bybit 高精度归档采样，按 UTC 亚洲、欧洲、美洲盘口展示累计波动，并叠加以美洲盘首个有效收盘价为基准的黄金价格线。',
-        layout: 'hero',
-        widgets: [
-          localChart('黄金分时累计波动', '', 'gold-intraday-cumulative-volatility', {
-            height: 420,
-          }),
-        ],
-      },
-      {
         id: 'gold-research-analysts',
         eyebrow: 'Analyst Views',
         title: '金属分析师跟踪',
@@ -723,9 +764,9 @@ export const researchModules: ResearchModule[] = [
     sourceLinks: [],
     sections: [
       {
-        id: 'crypto-main',
-        eyebrow: 'BTC',
-        title: 'BTC 主图',
+        id: 'crypto-market',
+        eyebrow: 'Market',
+        title: '加密市场明细',
         description: '',
         layout: 'hero',
         widgets: [
@@ -737,15 +778,10 @@ export const researchModules: ResearchModule[] = [
             height: 320,
             sourceUrl: 'https://www.deribit.com/statistics/BTC/volatility-index',
           }),
-        ],
-      },
-      {
-        id: 'crypto-market',
-        eyebrow: 'Market',
-        title: '加密市场明细',
-        description: '沿用统一市场明细结构，补齐主流资产、代理资产与相对比价。',
-        layout: 'hero',
-        widgets: [
+
+          localChart('BTC 分时累计波动', '', 'crypto-intraday-cumulative-volatility', {
+            height: 420,
+          }),
           localChart('Crypto Market Detail', '', 'crypto-market-detail-table', {
             height: 620,
             sourceNote: '',
@@ -758,11 +794,11 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'crypto-etf',
         eyebrow: 'ETF Flow',
-        title: 'BTC ETF 与价格',
+        title: 'ETF 与资金面',
         description: '',
         layout: 'two',
         widgets: [
-          localChart('BTC ETF 日流量 vs BTC 价格', '', 'btc-etf-flow', {
+          localChart('BTC ETF 日流量', '', 'btc-etf-flow', {
             height: 420,
             sourceNote: '',
             referenceLinks: [
@@ -776,7 +812,7 @@ export const researchModules: ResearchModule[] = [
               },
             ],
           }),
-          localChart('ETH ETF 日流量 vs ETH 价格', 'SoSoValue', 'crypto-eth-etf-flow', {
+          localChart('ETH ETF 日流量', 'SoSoValue', 'crypto-eth-etf-flow', {
             height: 420,
           }),
           localChart(
@@ -839,7 +875,7 @@ export const researchModules: ResearchModule[] = [
         layout: 'two',
         widgets: [
           localChart(
-            'Binance BTC / ETH 未平仓量',
+            'Binance BTC · 价格 / 未平仓量 / 资金费率',
             'USD-M 日末名义价值 · not Aggregate',
             'crypto-binance-open-interest',
             {
@@ -853,7 +889,7 @@ export const researchModules: ResearchModule[] = [
             '暂无已接通数据 · CoinGlass · 跨交易所 OI',
             'https://www.coinglass.com/zh/pro/futures/OpenInterest',
           ),
-          localChart('资费详情', 'Binance BTC / ETH · 单一交易所历史资金费率', 'crypto-funding'),
+          localChart('Binance ETH · 价格 / 未平仓量 / 资金费率', '', 'crypto-binance-eth-combined'),
           externalReference(
             'CoinGlass 加密衍生品风险指数',
             '暂无已接通数据 · CoinGlass · 衍生品市场风险指标',
@@ -884,6 +920,10 @@ export const researchModules: ResearchModule[] = [
         description: '期权隐波、持仓与 Gamma 敞口估算。',
         layout: 'two',
         widgets: [
+          localChart('期权分布', 'Deribit · BTC', 'crypto-options-distribution', {
+            height: 680,
+            sourceUrl: 'https://www.deribit.com/statistics/BTC/metrics/options',
+          }),
           localChart('BTC 期权隐含波动率', 'Deribit 期权数据实验室', 'crypto-atm-iv-term', {
             height: 420,
             sourceUrl: 'https://www.greeks.live/deribit/tools/datalab/BTC',
@@ -990,19 +1030,85 @@ export const researchModules: ResearchModule[] = [
           ),
         ],
       },
-      {
-        id: 'crypto-intraday-cumulative-volatility',
-        eyebrow: 'Intraday Volatility',
-        title: 'BTC 分时累计波动',
-        description:
-          '后端从共享 Bybit 高精度归档采样，按 UTC 亚洲、欧洲、美洲盘口展示累计波动，并叠加以美洲盘首个有效收盘价为基准的 BTC 价格线。',
-        layout: 'hero',
-        widgets: [
-          localChart('BTC 分时累计波动', '', 'crypto-intraday-cumulative-volatility', {
-            height: 420,
-          }),
-        ],
-      },
     ],
   },
 ];
+
+const chinaMacroSections: Record<string, Array<[string, string, LocalWidgetKey]>> = {
+  'macro-liquidity': [
+    [
+      '中国货币存量',
+      'M2 / M1余额、同比、环比与社融存量同比；M1自2025年调整统计口径',
+      'macro-cn-money-stock',
+    ],
+    ['中国存款准备金率', '大型 / 中小金融机构调整后水平 · 按生效日记录的政策事件', 'macro-cn-rrr'],
+    ['中国外汇储备', '国家外汇储备 · 亿美元', 'macro-cn-reserves'],
+  ],
+  'macro-rates': [
+    ['中国政策利率与回购资金面', '央行7天逆回购中标利率 / DR001 / DR007', 'macro-cn-policy-rates'],
+    [
+      '中国政策定价与银行间利率',
+      'LPR 1年 / 5年以上；Shibor 隔夜 / 1周 / 3月（无担保拆借）',
+      'macro-cn-rates',
+    ],
+    ['中国国债收益率', '财政部中国国债收益率曲线 · 2年 / 10年 / 30年', 'macro-cn-treasury'],
+  ],
+  'macro-growth': [
+    ['中国增长与内需', 'GDP累计同比 / 规上工业增加值同比 / 社会消费品零售同比', 'macro-cn-growth'],
+    ['中国景气调查', '制造业 PMI / 非制造业商务活动指数 · 50为荣枯线', 'macro-cn-pmi'],
+    ['中国新增信贷', '当月新增人民币贷款 / 社会融资规模增量 · 亿元', 'macro-cn-credit'],
+    ['中国投资结构', '固定资产 / 制造业 / 基建 / 民间投资累计同比', 'macro-cn-investment'],
+    ['中国房地产周期', '开发投资 / 商品房销售面积与金额 / 新开工面积累计同比', 'macro-cn-property'],
+    ['中国进出口', '出口 / 进口金额同比 · 美元口径', 'macro-cn-trade'],
+    ['中国财政收支', '财政收入 / 预算支出累计同比', 'macro-cn-fiscal'],
+    ['中国工业企业利润', '规模以上工业企业利润总额累计同比', 'macro-cn-profits'],
+    ['中国城镇就业', '全国 / 31个大城市城镇调查失业率', 'macro-cn-labor'],
+    [
+      '中国分年龄就业',
+      '16–24 / 25–29 / 30–59岁，不含在校生；新口径自2023年12月起',
+      'macro-cn-youth-labor',
+    ],
+  ],
+  'macro-inflation': [
+    [
+      '中国居民与工业价格',
+      'CPI / PPI 同比 · 关注内需价格、工业出厂价格及通缩压力',
+      'macro-cn-inflation',
+    ],
+    ['中国消费价格分项', '核心 / 食品 / 非食品CPI同比', 'macro-cn-price-details'],
+    ['中国工业价格分项', 'PPI生产资料 / 生活资料同比', 'macro-cn-ppi-details'],
+  ],
+  'macro-risk-appetite': [
+    [
+      '中国杠杆交易与风险偏好',
+      '融资余额 / 融资融券成交额占比 · 观察杠杆需求',
+      'macro-cn-risk-leverage',
+    ],
+    [
+      '中国股票市场波动',
+      '上证综指20交易日已实现波动率（年化），不是隐含波动率',
+      'macro-cn-risk-volatility',
+    ],
+    ['中国消费者信心', '消费者信心 / 预期指数', 'macro-cn-confidence'],
+    [
+      '人民币汇率与风险偏好',
+      '离岸人民币兑美元 · 每美元折合人民币，升高表示人民币走弱',
+      'macro-cn-fx',
+    ],
+  ],
+};
+for (const section of researchModules.find((module) => module.id === 'macro')!.sections) {
+  const charts = chinaMacroSections[section.id];
+  if (!charts) continue;
+  if (section.id !== 'macro-liquidity') {
+    section.widgets.forEach((widget) => {
+      widget.region = '美国';
+    });
+  }
+  section.widgets.push(
+    ...charts.map(([title, subtitle, key]) => ({
+      ...localChart(title, subtitle, key, { height: 420 }),
+      region: '中国' as const,
+    })),
+  );
+}

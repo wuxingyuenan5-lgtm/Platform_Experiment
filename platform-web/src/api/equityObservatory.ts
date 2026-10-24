@@ -80,7 +80,22 @@ export interface EquityValuation {
   estimated: boolean;
   history: EquityPoint[];
 }
+export interface IndexValuationChart {
+  id: string;
+  name: string;
+  prices: Array<{ date: string; value: EquityValue }>;
+  metrics: Array<{
+    id: string;
+    label: string;
+    unit: string;
+    source?: string;
+    sourceUrl?: string;
+    status: string;
+    history: Array<{ date: string; value: EquityValue }>;
+  }>;
+}
 export interface EquityObservatory {
+  valuationCharts?: IndexValuationChart[];
   indexCrowding?: Array<
     EquityDistribution & {
       code: string;

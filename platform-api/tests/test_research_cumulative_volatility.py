@@ -233,3 +233,17 @@ def test_internal_gap_rebuild_requires_valid_shared_source_and_does_not_loop_on_
         'timestamp':stamp,'session':'europe','sessionDate':stamp[:10],'interval':'15m','value':'1','price':'100'
     })],source=cumulative.SOURCE)
     assert not cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))
+
+
+def test_all_range_reads_stored_points_before_one_year():
+    from app.research_a_share_repository import start_refresh, write_history_points
+    initialize_database()
+    start_refresh("all-range-test", None)
+    day = (datetime.now(UTC) - timedelta(days=500)).date().isoformat()
+    stamp = day + "T08:00:00Z"
+    write_history_points("all-range-test", cumulative.DATASET, [(stamp, "btc:europe:15m", {
+        "timestamp": stamp, "session": "europe", "sessionDate": day,
+        "interval": "15m", "value": "1", "price": "100"
+    })], source=cumulative.SOURCE)
+    assert read_cumulative_volatility("btc", 365, "15m")["points"] == []
+    assert read_cumulative_volatility("btc", 0, "15m")["points"][0]["timestamp"] == stamp

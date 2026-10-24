@@ -38,10 +38,27 @@
         </div>
       </section>
 
+      <div v-if="data?.zqPricing?.length" class="fedwatch-panel__table-wrap">
+        <table class="fedwatch-panel__table"
+          ><caption>FED FUND FUTURES</caption
+          ><thead
+            ><tr
+              ><th v-for="quote in data.zqPricing" :key="quote.code">{{ quote.code }}</th></tr
+            ></thead
+          ><tbody
+            ><tr
+              ><td v-for="quote in data.zqPricing" :key="quote.code">{{
+                quote.settle == null ? '—' : quote.settle.toFixed(5).replace(/0$/, '')
+              }}</td></tr
+            ></tbody
+          ></table
+        >
+      </div>
       <!-- 矩阵：行=会议日期，列=8 个目标利率区间，单元格高亮每行 maxProb -->
       <section class="fedwatch-panel__matrix">
         <div class="fedwatch-panel__table-wrap">
           <table class="fedwatch-panel__table">
+            <caption>CME FEDWATCH TOOL · AGGREGATED MEETING PROBABILITIES</caption>
             <thead>
               <tr>
                 <th class="fedwatch-panel__corner">会议日期</th>
@@ -58,7 +75,7 @@
               >
                 <th class="fedwatch-panel__meeting-cell">
                   {{ formatMeetingDate(meeting.date) }}
-                  <span v-if="idx === 0" class="fedwatch-panel__today">今天</span>
+                  <span v-if="idx === 0" class="fedwatch-panel__today">下次</span>
                 </th>
                 <td
                   v-for="range in ranges"
@@ -76,8 +93,16 @@
 
       <!-- 底部说明 -->
       <p class="fedwatch-panel__footnote">
-        概率由 30 天联邦基金期货曲线计算；当前行情源：{{ settlementSource ?? '—' }}。
+        {{
+          data?.methodology === 'cme_aggregated_v1'
+            ? '按 CME Aggregated 口径估算，非 CME 官方实时概率'
+            : '历史口径结果，待重新计算'
+        }}；行情源：{{ settlementSource ?? '—' }}。
+        <template v-if="data?.quoteAsOf"> 行情截至 {{ data.quoteAsOf }}。 </template>
         <template v-if="observedAt"> 数据抓取于 {{ observedAt }}。 </template>
+        <template v-if="data?.missingMeetings?.length">
+          部分远期会议缺少定价锚点，暂未计算。
+        </template>
       </p>
     </div>
   </div>
@@ -183,20 +208,19 @@
   }
 
   function formatProbability(value: number | undefined): string {
-    if (value == null) return '0.0%';
-    return `${normalizeProbability(value).toFixed(1)}%`;
+    if (value == null) return '0.00%';
+    return `${normalizeProbability(value).toFixed(2)}%`;
   }
 
   function formatPct(value: number): string {
-    return `${normalizeProbability(value).toFixed(1)}%`;
+    return `${normalizeProbability(value).toFixed(2)}%`;
   }
 
   function normalizeProbability(value: number | undefined): number {
     const parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-    // Accept both the persisted percentage contract (42.0) and a legacy
-    // fractional payload (0.42), but never multiply an already-percent value.
-    return parsed <= 1 ? parsed * 100 : Math.min(parsed, 100);
+    // The API contract is percentage points, including values below 1%.
+    return Math.min(parsed, 100);
   }
 
   /**
@@ -214,7 +238,7 @@
     if (probs.length === 0) return '';
     const max = Math.max(...probs);
     if (normalizeProbability(v) >= max && max >= 0.5) return 'fedwatch-panel__cell--max';
-    return '';
+    return 'fedwatch-panel__cell--positive';
   }
 
   onMounted(async () => {
@@ -230,8 +254,6 @@
 </script>
 
 <style scoped lang="less">
-
-
   @media (max-width: 640px) {
     .fedwatch-panel__summary {
       grid-template-columns: 1fr;
@@ -393,6 +415,14 @@
     border-right: none;
   }
 
+  .fedwatch-panel__table caption {
+    padding: 10px;
+    background: #f8f8f8;
+    color: #000;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
   .fedwatch-panel__table thead th {
     background: var(--strategy-table-head-bg, #f7f9fc);
     color: var(--strategy-text-2, #2f3e52);
@@ -438,14 +468,19 @@
   }
 
   .fedwatch-panel__cell--zero {
-    color: var(--strategy-text-faint, #9aa7b6);
+    color: #000;
     font-weight: 400;
   }
 
+  .fedwatch-panel__cell--positive {
+    background: #fffed1;
+    color: #000;
+  }
+
   .fedwatch-panel__cell--max {
-    border: 1px solid #e7c87e;
-    background: #fff2c8;
-    color: #7a5b00;
+    border: 1px solid #d8d8df;
+    background: #b6effa;
+    color: #000;
   }
 
   .fedwatch-panel__row--official .fedwatch-panel__meeting-cell {

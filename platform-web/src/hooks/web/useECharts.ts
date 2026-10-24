@@ -39,6 +39,8 @@ export function useECharts(
   let resizeObserver: ResizeObserver | undefined;
   let viewportObserver: IntersectionObserver | undefined;
   let nearViewport = typeof IntersectionObserver === 'undefined';
+  let renderedWidth = 0;
+  let renderedHeight = 0;
 
   resizeFn = useDebounceFn(resize, 200);
 
@@ -77,6 +79,8 @@ export function useECharts(
     }
 
     chartInstance = echarts.init(el, t);
+    renderedWidth = el.offsetWidth;
+    renderedHeight = el.offsetHeight;
     const { removeEvent } = useEventListener({
       el: window,
       name: 'resize',
@@ -116,12 +120,11 @@ export function useECharts(
     const el = unref(elRef);
     if (disposed || !active || !nearViewport || !el?.offsetWidth || !el.offsetHeight) return;
     applyPending();
-    chartInstance?.resize({
-      animation: {
-        duration: 300,
-        easing: 'quadraticIn',
-      },
-    });
+    if (!chartInstance || (renderedWidth === el.offsetWidth && renderedHeight === el.offsetHeight))
+      return;
+    renderedWidth = el.offsetWidth;
+    renderedHeight = el.offsetHeight;
+    chartInstance.resize({ animation: { duration: 0 } });
   }
 
   watch(

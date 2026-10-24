@@ -163,6 +163,15 @@
     min-height: 360px;
   }
 
+  .chart-expand__surface:modal :deep(.source-series-plot--binance) {
+    min-height: 580px;
+  }
+
+  .chart-expand__surface:modal :deep(.fomc-chart) {
+    height: calc(100vh - 355px);
+    min-height: 300px;
+  }
+
   .chart-expand__surface:modal :deep(.etf-flow-panel__chart) {
     max-height: none;
   }

@@ -148,7 +148,8 @@ def test_gold_provider_builds_real_90_day_series_and_ratio(monkeypatch: pytest.M
     contract = asyncio.run(provider._get_live_market_detail("gold"))
 
     assert contract.status == "partial"
-    assert len(contract.rows) == 17
+    assert {'gold-xau-row', 'gold-ratio-row', 'gold-zijin', 'gold-tongling'} <= {row.id for row in contract.rows}
+    assert not any(row.id.endswith('-source') for row in contract.rows)
     assert all(len(row.spark_90d) == 90 for row in contract.rows if row.sample_size is None)
     ratio = next(row for row in contract.rows if row.id == "gold-ratio-row")
     assert ratio.spark_90d[-1] == Decimal("1")
@@ -177,7 +178,7 @@ def test_live_provider_fails_closed_when_every_symbol_is_unavailable(
 
 
 def test_crypto_provider_includes_hype_series():
-    assert market_detail.CRYPTO_YAHOO_SYMBOLS["crypto-hype-row"] == "HYPE-USD"
+    assert market_detail.CRYPTO_YAHOO_SYMBOLS["crypto-hype-row"] == "HYPE32196-USD"
 
 
 def test_breadth_excludes_wrong_date_and_insufficient_history():

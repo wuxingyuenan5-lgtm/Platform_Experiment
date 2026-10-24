@@ -81,6 +81,10 @@ const UNITS: Record<string, string> = {
   tonnes: '吨',
   'troy oz': '金衡盎司',
   usd_million: '百万美元',
+  cny_100million: '亿元',
+  usd_100million: '亿美元',
+  hours: '小时',
+  fx_rate: '汇率',
   'USD million': '百万美元',
   usd_billion: '十亿美元',
   usd_trillion: '万亿美元',
@@ -100,6 +104,7 @@ export const frequencyText = (frequency: string) =>
     quarterly: '季度',
     hourly: '小时',
     intraday: '日内',
+    event: '政策调整',
   }[frequency] ?? frequency);
 
 export function buildSourceSeriesOptions(
@@ -188,7 +193,7 @@ export function buildSourceSeriesOptions(
         height: 24,
         start: 0,
         end: 100,
-        filterMode: 'none',
+        filterMode: 'filter',
         borderColor: '#dce5ee',
         fillerColor: 'rgba(22,93,255,0.1)',
         backgroundColor: '#f5f8fb',
@@ -201,6 +206,7 @@ export function buildSourceSeriesOptions(
       id: item.seriesId,
       name: item.label,
       type: barSeriesIds.includes(item.seriesId) ? 'bar' : 'line',
+      step: item.frequency === 'event' ? 'end' : false,
       barMaxWidth: 24,
       barMinWidth: item.frequency === 'monthly' ? 5 : 1,
       yAxisIndex: units.indexOf(item.unit),
@@ -213,14 +219,33 @@ export function buildSourceSeriesOptions(
       showSymbol: item.observations.filter((r) => r.value != null).length <= 1,
       symbol: 'circle',
       symbolSize: 6,
-      lineStyle: { width: 1.8, color: colors[index] },
-      itemStyle: { color: colors[index] },
+      lineStyle: {
+        width: item.seriesId === 'xauusd_daily_close' ? 2.2 : 1.6,
+        color: item.seriesId === 'xauusd_daily_close' ? '#111111' : colors[index],
+      },
+      itemStyle: {
+        color: barSeriesIds.includes(item.seriesId)
+          ? (point: { value: [number, number | null] }) =>
+              item.seriesId === 'wgc_central_bank_quarterly_purchases'
+                ? '#32aed4'
+                : Number(point.value[1]) >= 0
+                ? item.seriesId.includes('funding')
+                  ? '#089981'
+                  : '#f97980'
+                : item.seriesId.includes('funding')
+                ? '#f23645'
+                : '#53b987'
+          : item.seriesId === 'xauusd_daily_close'
+          ? '#111111'
+          : colors[index],
+      },
       emphasis: { focus: 'series' },
     })),
   };
 }
 
 export function regionalFlowColor(seriesId: string): string {
+  if (seriesId === 'xauusd_daily_close') return '#111111';
   const palette: Record<string, string> = {
     global: '#165dff',
     north_america: '#0f8b6d',
@@ -234,10 +259,13 @@ export function regionalFlowColor(seriesId: string): string {
 }
 
 export function buildRegionalStackOptions(series: MacroDashboardSeries[]) {
-  const regions = series.filter((item) => !item.seriesId.endsWith('_global'));
+  const plotted = series.filter((item) => !item.seriesId.endsWith('_global'));
+  const regions = plotted.filter((item) => item.seriesId.startsWith('wgc_etf_'));
   const base = buildSourceSeriesOptions(
-    regions,
-    regions.map((item) => regionalFlowColor(item.seriesId)),
+    plotted,
+    plotted.map((item) => regionalFlowColor(item.seriesId)),
+    undefined,
+    regions.map((item) => item.seriesId),
   );
   const dates = [
     ...new Set(regions.flatMap((item) => item.observations.map((row) => row.date))),
@@ -247,12 +275,18 @@ export function buildRegionalStackOptions(series: MacroDashboardSeries[]) {
     xAxis: { ...base.xAxis, boundaryGap: ['2%', '2%'] },
     tooltip: { ...base.tooltip, axisPointer: { type: 'shadow' } },
     series: base.series.map((item, index) => {
-      const values = new Map(regions[index].observations.map((row) => [row.date, row.value]));
+      if (!plotted[index].seriesId.startsWith('wgc_etf_')) {
+        return { ...item, emphasis: { disabled: true, focus: 'none' } };
+      }
+      const values = new Map(plotted[index].observations.map((row) => [row.date, row.value]));
       return {
         ...item,
         type: 'bar',
+        itemStyle: { color: regionalFlowColor(plotted[index].seriesId) },
         stack: 'regional-flow',
         stackStrategy: 'samesign',
+        // Keep regional colours stable as the axis tooltip crosses stacked bars.
+        emphasis: { disabled: true, focus: 'none' },
         barMaxWidth: 24,
         lineStyle: undefined,
         showSymbol: false,
@@ -269,9 +303,6 @@ export function buildGoldDriversOptions(series: MacroDashboardSeries[], colors: 
   const base = buildSourceSeriesOptions(series, colors);
   const lowerIds = new Set(['us_treasury_10y', 'us_10y_breakeven', 'us_10y_real_yield']);
   const hasDxy = series.some((s) => s.seriesId === 'dxy');
-  const goldValues = (
-    series.find((s) => s.seriesId === 'gold_futures_close')?.observations ?? []
-  ).flatMap((row) => (row.value != null && Number(row.value) > 0 ? [Number(row.value)] : []));
   const times = series
     .flatMap((s) => s.observations.map((r) => Date.parse(r.date)))
     .filter(Number.isFinite);
@@ -303,8 +334,8 @@ export function buildGoldDriversOptions(series: MacroDashboardSeries[], colors: 
       {
         ...axis('USD/oz', 0, 'left'),
         type: 'log',
-        min: goldValues.length ? Math.min(...goldValues) * 0.97 : undefined,
-        max: goldValues.length ? Math.max(...goldValues) * 1.03 : undefined,
+        min: (extent: { min: number }) => extent.min * 0.97,
+        max: (extent: { max: number }) => extent.max * 1.03,
         axisLabel: { ...base.yAxis[0]?.axisLabel, showMinLabel: true, showMaxLabel: true },
       },
       axis('利差（百分点）', 0, 'right'),
@@ -322,6 +353,103 @@ export function buildGoldDriversOptions(series: MacroDashboardSeries[], colors: 
         : series[index].seriesId === 'us_treasury_30y_10y_spread'
         ? 1
         : 0,
+    })),
+  };
+}
+export function buildDistributionOptions(series: MacroDashboardSeries[]) {
+  const rows = [...series]
+    .filter((s) => s.latestValue != null)
+    .sort((a, b) => Number(b.latestValue) - Number(a.latestValue));
+  return {
+    animation: false,
+    grid: { left: 16, right: 16, top: 30, bottom: 90, containLabel: true },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true },
+    xAxis: {
+      type: 'category',
+      data: rows.map((s) => s.label),
+      axisLabel: { rotate: 40, hideOverlap: true },
+    },
+    yAxis: { type: 'value', name: unitText(rows[0]?.unit ?? 'tonnes'), scale: false },
+    dataZoom: [
+      {
+        type: 'slider',
+        start: 0,
+        end: rows.length > 30 ? Math.min(100, (30 / rows.length) * 100) : 100,
+        filterMode: 'filter',
+      },
+    ],
+    series: [
+      {
+        type: 'bar',
+        name: '数量',
+        data: rows.map((s) => Number(s.latestValue)),
+        itemStyle: { color: '#32aed4' },
+      },
+    ],
+  };
+}
+
+export function buildBinanceOptions(series: MacroDashboardSeries[], colors: string[]) {
+  const base = buildSourceSeriesOptions(
+    series,
+    colors,
+    undefined,
+    series.filter((s) => s.seriesId.includes('funding')).map((s) => s.seriesId),
+  );
+  const dates = series
+    .flatMap((s) => s.observations.map((r) => Date.parse(r.date)))
+    .filter(Number.isFinite);
+  const gridFor = (id: string) =>
+    id.includes('funding') ? 2 : id.includes('open_interest') ? 1 : 0;
+  return {
+    ...base,
+    grid: [
+      { left: 16, right: 20, top: 28, height: '32%', containLabel: true },
+      { left: 16, right: 20, top: '48%', height: '18%', containLabel: true },
+      { left: 16, right: 20, top: '72%', bottom: 80, containLabel: true },
+    ],
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    xAxis: [0, 1, 2].map((gridIndex) => ({
+      ...base.xAxis,
+      min: dates.length ? Math.min(...dates) : undefined,
+      max: dates.length ? Math.max(...dates) : undefined,
+      gridIndex,
+      axisLabel: { ...base.xAxis.axisLabel, show: gridIndex === 2 },
+    })),
+    yAxis: [0, 1, 2].map((gridIndex) => ({
+      ...base.yAxis[0],
+      gridIndex,
+      scale: gridIndex !== 2,
+      splitNumber: 3,
+      name: ['价格 · USDT', '未平仓量 · USD', '资金费率 · %'][gridIndex],
+    })),
+    dataZoom: base.dataZoom.map((z) => ({ ...z, xAxisIndex: [0, 1, 2] })),
+    series: base.series.map((item, i) => ({
+      ...item,
+      xAxisIndex: gridFor(series[i].seriesId),
+      yAxisIndex: gridFor(series[i].seriesId),
+      lineStyle: {
+        ...item.lineStyle,
+        color: gridFor(series[i].seriesId) === 0 ? '#111111' : colors[i],
+      },
+    })),
+  };
+}
+
+export function buildStablecoinOptions(series: MacroDashboardSeries[], colors: string[]) {
+  const dates = [...new Set(series.flatMap((s) => s.observations.map((r) => r.date)))].sort();
+  const aligned = series.map((s) => {
+    const values = new Map(s.observations.map((r) => [r.date, r.value]));
+    return { ...s, observations: dates.map((date) => ({ date, value: values.get(date) ?? null })) };
+  });
+  const base = buildSourceSeriesOptions(aligned, colors);
+  return {
+    ...base,
+    series: base.series.map((s) => ({
+      ...s,
+      stack: 'market-cap',
+      areaStyle: { opacity: 0.5 },
+      showSymbol: false,
     })),
   };
 }

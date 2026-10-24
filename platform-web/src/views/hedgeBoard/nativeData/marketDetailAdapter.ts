@@ -102,6 +102,7 @@ function prepareLiveMarketDetail(groups: TerminalTableGroup[]): TerminalTableGro
 // canonical series identifiers. Keep this mapping at the display boundary so
 // neither identifier leaks into the other contract.
 const LIVE_ROW_ID_BY_CATALOG_ID: Record<string, string> = {
+  'gold-xau': 'gold-xau-row',
   'gold-gld': 'gold-gld-row',
   'gold-gdx': 'gold-gdx-row',
   'gold-gdxj': 'gold-gdxj-row',

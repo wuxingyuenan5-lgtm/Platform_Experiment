@@ -1,17 +1,9 @@
 <script setup lang="ts">
+  import { useResearchViewState } from '../../composables/researchWorkspace';
   import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
   type ImportanceFilterId = 'all' | 'focus' | 'high';
-  type CountryOptionId =
-    | 'us'
-    | 'cn'
-    | 'eu'
-    | 'jp'
-    | 'gb'
-    | 'au'
-    | 'nz'
-    | 'ca'
-    | 'ch';
+  type CountryOptionId = 'us' | 'cn' | 'eu' | 'jp' | 'gb' | 'au' | 'nz' | 'ca' | 'ch';
 
   interface CountryOption {
     id: CountryOptionId;
@@ -20,8 +12,14 @@
   }
 
   const widgetHostRef = ref<HTMLDivElement | null>(null);
-  const selectedCountries = ref<CountryOptionId[]>(['us', 'cn']);
-  const selectedImportance = ref<ImportanceFilterId>('focus');
+  const selectedCountries = useResearchViewState<CountryOptionId[]>('calendar-countries', [
+    'us',
+    'cn',
+  ]);
+  const selectedImportance = useResearchViewState<ImportanceFilterId>(
+    'calendar-importance',
+    'focus',
+  );
   let widgetScript: HTMLScriptElement | null = null;
 
   const countryOptions: CountryOption[] = [
@@ -90,9 +88,7 @@
       current.add(countryId);
     }
 
-    selectedCountries.value = countryOptions
-      .map((item) => item.id)
-      .filter((id) => current.has(id));
+    selectedCountries.value = countryOptions.map((item) => item.id).filter((id) => current.has(id));
     renderWidget();
   }
 
@@ -174,14 +170,13 @@
   .macro-calendar-panel {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    border: 1px solid rgba(193, 207, 220, 0.9);
-    border-radius: 28px;
-    background:
-      radial-gradient(circle at top right, rgba(226, 237, 247, 0.82), transparent 36%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(245, 249, 252, 0.98));
     padding: 22px 22px 24px;
-    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.045);
+    border: 1px solid rgb(193 207 220 / 90%);
+    border-radius: 28px;
+    background: radial-gradient(circle at top right, rgb(226 237 247 / 82%), transparent 36%),
+      linear-gradient(180deg, rgb(255 255 255 / 99%), rgb(245 249 252 / 98%));
+    box-shadow: 0 18px 42px rgb(15 23 42 / 4.5%);
+    gap: 20px;
   }
 
   .macro-calendar-panel__header {
@@ -193,17 +188,17 @@
 
   .macro-calendar-panel__eyebrow {
     margin: 0 0 8px;
+    color: #8298a8;
     font-size: 13px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: #8298a8;
   }
 
   .macro-calendar-panel__header h3 {
     margin: 4px 0 0;
+    color: #18313c;
     font-size: 32px;
     line-height: 1.1;
-    color: #18313c;
   }
 
   .macro-calendar-panel__actions {
@@ -219,25 +214,22 @@
     justify-content: center;
     min-width: 82px;
     min-height: 38px;
-    border: 1px solid rgba(191, 203, 214, 0.92);
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.92);
     padding: 0 14px;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid rgb(191 203 214 / 92%);
+    border-radius: 4px;
+    background: rgb(255 255 255 / 92%);
+    color: #35576d;
     font-size: 14px;
     font-weight: 600;
-    color: #35576d;
     cursor: pointer;
-    transition:
-      transform 0.2s ease,
-      border-color 0.2s ease,
-      box-shadow 0.2s ease;
   }
 
   .macro-calendar-panel__action:hover,
   .macro-calendar-panel__chip:hover {
     transform: translateY(-1px);
-    border-color: rgba(87, 118, 142, 0.42);
-    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+    border-color: rgb(87 118 142 / 42%);
+    box-shadow: 0 12px 24px rgb(15 23 42 / 5%);
   }
 
   .macro-calendar-panel__filters {
@@ -245,9 +237,9 @@
     flex-direction: column;
     gap: 14px;
     padding: 16px 18px;
-    border: 1px solid rgba(209, 220, 229, 0.88);
+    border: 1px solid rgb(209 220 229 / 88%);
     border-radius: 20px;
-    background: rgba(250, 252, 254, 0.9);
+    background: rgb(250 252 254 / 90%);
   }
 
   .macro-calendar-panel__filter-group {
@@ -257,13 +249,13 @@
   }
 
   .macro-calendar-panel__filter-label {
+    flex: 0 0 auto;
     width: 72px;
     padding-top: 8px;
     color: #6d8495;
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.08em;
-    flex: 0 0 auto;
   }
 
   .macro-calendar-panel__chips {
@@ -277,35 +269,31 @@
     align-items: center;
     justify-content: center;
     min-height: 36px;
-    border: 1px solid rgba(197, 209, 219, 0.92);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.95);
     padding: 0 14px;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease,
+      background-color 0.2s ease, color 0.2s ease;
+    border: 1px solid rgb(197 209 219 / 92%);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 95%);
     color: #4a6679;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition:
-      transform 0.2s ease,
-      border-color 0.2s ease,
-      box-shadow 0.2s ease,
-      background-color 0.2s ease,
-      color 0.2s ease;
   }
 
   .macro-calendar-panel__chip.is-active {
-    border-color: rgba(76, 113, 141, 0.72);
-    background: linear-gradient(180deg, rgba(231, 239, 246, 0.98), rgba(242, 247, 251, 0.98));
+    border-color: rgb(76 113 141 / 72%);
+    background: linear-gradient(180deg, rgb(231 239 246 / 98%), rgb(242 247 251 / 98%));
+    box-shadow: 0 10px 24px rgb(15 23 42 / 5%);
     color: #18313c;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
   }
 
   .macro-calendar-panel__widget-shell {
-    overflow: hidden;
-    border: 1px solid rgba(201, 213, 223, 0.92);
-    border-radius: 22px;
-    background: rgba(255, 255, 255, 0.92);
     padding: 8px;
+    overflow: hidden;
+    border: 1px solid rgb(201 213 223 / 92%);
+    border-radius: 22px;
+    background: rgb(255 255 255 / 92%);
   }
 
   .macro-calendar-panel__widget-host {
@@ -328,8 +316,8 @@
 
     .macro-calendar-panel__actions,
     .macro-calendar-panel__filter-label {
-      width: 100%;
       justify-content: flex-start;
+      width: 100%;
     }
 
     .macro-calendar-panel__filter-label {

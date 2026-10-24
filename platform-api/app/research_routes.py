@@ -29,7 +29,9 @@ from app.research_data_schemas import (
     StockSnapshotResponse,
 )
 from app.research_equity_observatory import read_equity_observatory
+from app.research_etf_tracking import catalog as etf_catalog, detail as etf_detail
 from app.research_gold import analyst_page, read_gold
+from app.research_hk_share_refresh import refresh_hk_share_research
 from app.research_overseas_refresh import refresh_overseas
 from app.research_overseas_repository import (
     read_dataset_health,
@@ -131,6 +133,23 @@ def equity_observatory(market: str, _: ResearchPrincipal, response: Response):
         raise HTTPException(422, detail="Unsupported equity market")
     response.headers["Cache-Control"] = "no-store"
     return jsonable_encoder(read_equity_observatory(market), custom_encoder={Decimal: str})
+
+
+@router.get("/a-share/etf-tracking")
+def a_share_etf_catalog(_: ResearchPrincipal, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return etf_catalog()
+
+
+@router.get("/a-share/etf-tracking/{code}")
+def a_share_etf_detail(code: str, _: ResearchPrincipal, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return etf_detail(code)
+    except ValueError as exc:
+        raise HTTPException(422, detail="Invalid ETF code") from exc
+    except KeyError as exc:
+        raise HTTPException(404, detail="ETF not in tracking universe") from exc
 
 
 @router.get("/a-share/dashboard", response_model=AShareDashboardResponse)
@@ -238,6 +257,27 @@ async def trigger_a_share_refresh(
             detail={"code": "research_refresh_failed", "message": "更新未完成，已保留上次有效数据"},
         )
     return {"data": {"status": status, "run": await asyncio.to_thread(read_refresh_status)}}
+
+
+@router.get("/hk-share/refresh-status", tags=["research"])
+async def hk_share_refresh_status(_: ResearchPrincipal) -> dict[str, object]:
+    return {"data": await asyncio.to_thread(read_refresh_status, "HK")}
+
+
+@router.post("/hk-share/refresh", tags=["research"])
+async def trigger_hk_share_refresh(
+    _: Annotated[Principal, Depends(require_permission("research.write"))],
+) -> dict[str, object]:
+    status = await refresh_hk_share_research(force=True)
+    if status == "error":
+        raise HTTPException(
+            503,
+            detail={
+                "code": "hk_research_refresh_failed",
+                "message": "港股更新未完成，已保留上次有效数据",
+            },
+        )
+    return {"data": {"status": status, "run": await asyncio.to_thread(read_refresh_status, "HK")}}
 
 
 @router.get("/a-share/stock-pool/focus", tags=["research"])
@@ -431,6 +471,16 @@ async def macro_fedwatch(response: Response, _: ResearchPrincipal) -> dict[str, 
             or await asyncio.to_thread(read_latest_observed_at, "macro_fedwatch"),
             "settlementSource": meta.get("settlementSource"),
             "zqPricing": meta.get("zqPricing", []),
+            **{
+                key: meta.get(key)
+                for key in (
+                    "methodology",
+                    "probabilityUnit",
+                    "quoteAsOf",
+                    "contractQuoteTimes",
+                    "missingMeetings",
+                )
+            },
             "meetings": meetings,
             "status": health["status"],
             "lastError": health["lastError"],
@@ -459,7 +509,7 @@ async def cumulative_volatility(
     response: Response,
     _: ResearchPrincipal,
     asset: str = Query("btc", pattern="^(btc|gold)$"),
-    days: int = Query(365, ge=1, le=365),
+    days: int = Query(365, ge=0, le=365),
     interval: str = Query("15m", pattern="^(15m|1h|4h)$"),
     start: datetime | None = Query(None),
     end: datetime | None = Query(None),
@@ -597,3 +647,22 @@ async def trigger_overseas_refresh(
             },
         )
     return {"data": {"status": status, "sources": health}}
+
+
+@router.get('/crypto/treasury-weekly-snapshot')
+async def treasury_weekly_snapshot(_: ResearchPrincipal):
+    from app.research_local_data import read_local_json
+    try:
+        document=read_local_json('public/v1/crypto/treasury-weekly-snapshot.json')
+        return {key:document.get(key) for key in ('status','observedAt','sourceUrl','dataPath')}
+    except ResearchProviderError:
+        return {'status':'no_data','observedAt':None,'sourceUrl':'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow','dataPath':None}
+
+
+@router.get('/crypto/treasury-weekly-snapshot/image')
+async def treasury_weekly_snapshot_image(_: ResearchPrincipal):
+    from fastapi.responses import FileResponse
+    from app.research_local_data import hedge_board_data_root
+    target=hedge_board_data_root()/'public/v1/crypto/treasury-weekly-latest.png'
+    if not target.is_file():raise HTTPException(404,detail='snapshot_not_available')
+    return FileResponse(target,media_type='image/png')

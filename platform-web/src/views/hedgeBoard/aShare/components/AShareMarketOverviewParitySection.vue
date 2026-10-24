@@ -1,396 +1,407 @@
 <template>
   <section id="a-share-market-overview" class="overview-card">
-    <header class="overview-header">
-      <div><p class="eyebrow">MARKET OVERVIEW</p><h2>A股市场总览</h2></div>
-      <span v-if="updatedAt" class="updated">更新于 {{ formatDate(updatedAt) }}</span>
-    </header>
-    <div class="overview-grid">
-      <article class="metric-panel">
-        <div class="panel-title"
-          ><h3>市场情绪</h3
-          ><ResearchSourceState v-if="dashboard?.breadth" :meta="dashboard.breadth.meta"
-        /></div>
-        <div v-if="breadth" class="metric-grid"
-          ><div v-for="item in breadthMetrics" :key="item.label" class="metric-cell"
-            ><span>{{ item.label }}</span
-            ><strong :class="item.tone">{{ item.value }}</strong
-            ><small>{{ item.note }}</small></div
-          ></div
-        >
-        <div v-if="latestHistory || turnoverData" class="overview-meta-grid">
-          <button
-            type="button"
-            class="meta-action"
-            :disabled="!marketAmountRows.length"
-            title="点击查看全A成交额历史统计"
-            @click="marketAmountHistoryOpen = true"
-            ><span>全A成交额 · 点击查看历史</span
-            ><strong>{{ formatHundredMillion(latestHistory?.total_amount_100m) }}</strong></button
+    <template v-if="mode !== 'crowding'">
+      <header class="overview-header">
+        <div><p class="eyebrow">MARKET OVERVIEW</p><h2>市场情绪与资金</h2></div>
+        <span v-if="updatedAt" class="updated">更新于 {{ formatDate(updatedAt) }}</span>
+      </header>
+      <div class="overview-grid">
+        <article class="metric-panel">
+          <div class="panel-title"
+            ><h3>市场情绪</h3
+            ><ResearchSourceState v-if="dashboard?.breadth" :meta="dashboard.breadth.meta"
+          /></div>
+          <div v-if="breadth" class="metric-grid"
+            ><div v-for="item in breadthMetrics" :key="item.label" class="metric-cell"
+              ><span>{{ item.label }}</span
+              ><strong :class="item.tone">{{ item.value }}</strong
+              ><small>{{ item.note }}</small></div
+            ></div
           >
-          <button
-            type="button"
-            class="meta-action"
-            :disabled="hotStockCount == null"
-            @click="hotMatrixOpen = true"
-            ><span>百亿成交股</span
-            ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></button
-          >
-          <div title="沪深A；（上涨家数－下跌家数）/（上涨家数＋下跌家数），不含平盘"
-            ><span>沪深A市场宽度</span
-            ><strong>{{ formatPct(latestHistory?.market_breadth, true) }}</strong></div
-          >
-        </div>
-        <div v-if="!breadth" class="empty">暂无市场情绪数据</div>
-      </article>
-      <article class="metric-panel">
-        <div class="panel-title"
-          ><h3>短线情绪</h3
-          ><ResearchSourceState v-if="dashboard?.emotion" :meta="dashboard.emotion.meta"
-        /></div>
-        <div v-if="emotion" class="metric-grid"
-          ><div v-for="item in emotionMetrics" :key="item.label" class="metric-cell"
-            ><span>{{ item.label }}</span
-            ><strong :class="item.tone">{{ item.value }}</strong
-            ><small>{{ item.note }}</small></div
-          ></div
-        >
-        <div v-else class="empty">暂无短线情绪数据</div>
-        <div v-if="emotion" class="emotion-detail">
-          <button
-            type="button"
-            class="emotion-subpanel ladder-trigger"
-            :disabled="!ladderRows.length"
-            @click="ladderOpen = true"
-          >
-            <span class="subpanel-heading"
-              ><strong>连板梯队</strong
-              ><span>{{
-                ladderRows.length ? '点击查看连板股明细' : '暂无二板及以上个股'
-              }}</span></span
+          <div v-if="latestHistory || turnoverData" class="overview-meta-grid">
+            <button
+              type="button"
+              class="meta-action"
+              :disabled="!marketAmountRows.length"
+              title="点击查看全A成交额历史统计"
+              @click="marketAmountHistoryOpen = true"
+              ><span>全A成交额 · 点击查看历史</span
+              ><strong>{{ formatHundredMillion(latestHistory?.total_amount_100m) }}</strong></button
             >
-            <span v-if="ladderRows.length" class="ladder-list">
-              <span v-for="row in ladderRows" :key="row.boardCount" class="ladder-row"
-                ><span>{{ row.boardCount }}</span
-                ><i class="ladder-track"
-                  ><b :style="{ width: `${ladderWidth(row.stockCount)}%` }"></b></i
-                ><strong>{{ row.stockCount }}</strong></span
+            <button
+              type="button"
+              class="meta-action"
+              :disabled="hotStockCount == null"
+              @click="hotMatrixOpen = true"
+              ><span>百亿成交股</span
+              ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></button
+            >
+            <div title="沪深A；（上涨家数－下跌家数）/（上涨家数＋下跌家数），不含平盘"
+              ><span>沪深A市场宽度</span
+              ><strong>{{ formatPct(latestHistory?.market_breadth, true) }}</strong></div
+            >
+          </div>
+          <div v-if="!breadth" class="empty">暂无市场情绪数据</div>
+        </article>
+        <article class="metric-panel">
+          <div class="panel-title"
+            ><h3>短线情绪</h3
+            ><ResearchSourceState v-if="dashboard?.emotion" :meta="dashboard.emotion.meta"
+          /></div>
+          <div v-if="emotion" class="metric-grid"
+            ><div v-for="item in emotionMetrics" :key="item.label" class="metric-cell"
+              ><span>{{ item.label }}</span
+              ><strong :class="item.tone">{{ item.value }}</strong
+              ><small>{{ item.note }}</small></div
+            ></div
+          >
+          <div v-else class="empty">暂无短线情绪数据</div>
+          <div v-if="emotion" class="emotion-detail">
+            <button
+              type="button"
+              class="emotion-subpanel ladder-trigger"
+              :disabled="!ladderRows.length"
+              @click="ladderOpen = true"
+            >
+              <span class="subpanel-heading"
+                ><strong>连板梯队</strong
+                ><span>{{
+                  ladderRows.length ? '点击查看连板股明细' : '暂无二板及以上个股'
+                }}</span></span
               >
-            </span>
-          </button>
-        </div>
-      </article>
-    </div>
+              <span v-if="ladderRows.length" class="ladder-list">
+                <span v-for="row in ladderRows" :key="row.boardCount" class="ladder-row"
+                  ><span>{{ row.boardCount }}</span
+                  ><i class="ladder-track"
+                    ><b :style="{ width: `${ladderWidth(row.stockCount)}%` }"></b></i
+                  ><strong>{{ row.stockCount }}</strong></span
+                >
+              </span>
+            </button>
+          </div>
+        </article>
+      </div>
+    </template>
     <VibeTrendCharts
       v-if="allHistoryRows.length > 1"
+      :mode="mode || 'overview'"
       :rows="allHistoryRows"
       :crowding-rows="dashboard?.crowding?.data?.history"
       :innovation-rows="dashboard?.crowding?.data?.innovationHistory"
     />
 
-    <div class="overview-grid">
-      <article class="panel">
-        <div class="panel-title"
-          ><div><h3>一级行业资金榜</h3></div
-          ><ResearchSourceState :meta="sectorFlowMeta"
-        /></div>
-        <button
-          v-if="sectorRows.length > 7"
-          type="button"
-          class="link-button"
-          @click="sectorsExpanded = !sectorsExpanded"
-          >{{ sectorsExpanded ? '收起' : '查看完整' }} →</button
-        >
-        <div v-if="sectorRows.length" class="table-shell"
-          ><table
-            ><thead
-              ><tr
-                ><th class="is-left">行业</th><th>涨跌%</th><th>今日主力净流入</th><th>家数</th></tr
-              ></thead
-            ><tbody
-              ><tr v-for="row in visibleSectorRows" :key="row.name"
-                ><td class="is-left"
-                  ><strong>{{ row.name }}</strong></td
-                ><td :class="tone(row.pct)">{{ formatPct(row.pct) }}</td
-                ><td :class="tone(row.net)">{{ formatYi(row.netYi) }}</td
-                ><td>{{ row.firms ?? '—' }}</td></tr
-              ></tbody
-            ></table
-          ></div
-        ><div v-else class="empty">暂无板块资金数据</div>
-      </article>
-      <article class="panel"
-        ><div class="panel-title"
-          ><div><h3>资金轮动</h3></div></div
-        ><div v-if="rotationRows.length" class="rotation-grid"
-          ><div class="rotation-column"
-            ><h4 class="is-positive">↑ 流入 Top</h4
-            ><div v-for="row in rotationInflow" :key="`in-${row.name}`" class="rotation-row"
-              ><span>{{ row.name }}</span
-              ><b :class="tone(row.pct)">{{ formatPct(row.pct) }}</b
-              ><em class="is-positive">{{ formatYi(row.netYi) }}</em></div
-            ><p v-if="!rotationInflow.length" class="empty-inline">暂无净流入数据</p></div
-          ><div class="rotation-column"
-            ><h4 class="is-negative">↓ 流出 Top</h4
-            ><div v-for="row in rotationOutflow" :key="`out-${row.name}`" class="rotation-row"
-              ><span>{{ row.name }}</span
-              ><b :class="tone(row.pct)">{{ formatPct(row.pct) }}</b
-              ><em class="is-negative">{{ formatYi(row.netYi) }}</em></div
-            ><p v-if="!rotationOutflow.length" class="empty-inline">暂无净流出数据</p></div
-          ></div
-        ><div v-else class="empty">暂无资金轮动数据</div></article
-      >
-    </div>
-    <article class="panel wide-panel"
-      ><div class="panel-title"
-        ><div><h3>全市场成交额榜</h3><ResearchSourceState :meta="turnoverMeta" /></div
-        ><div class="turnover-actions"
-          ><button
-            v-for="n in [10, 20]"
-            :key="n"
-            type="button"
-            :class="{ active: topN === n }"
-            @click="topN = n as 10 | 20"
-            >T{{ n }}</button
-          ></div
-        ></div
-      ><div v-if="turnoverRows.length" class="table-shell"
-        ><table
-          ><thead
-            ><tr
-              ><th>#</th><th class="is-left">名称 / 代码</th><th>现价</th><th>涨跌%</th
-              ><th>成交额</th><th>总市值</th><th>行业</th></tr
-            ></thead
-          ><tbody
-            ><tr v-for="(row, index) in turnoverRows.slice(0, topN)" :key="row.securityCode"
-              ><td>{{ index + 1 }}</td
-              ><td class="is-left"
-                ><button
-                  type="button"
-                  class="stock-name-button"
-                  @click="emit('query', row.securityCode)"
-                  >{{ row.securityName }}</button
-                ><small>{{ row.securityCode }}</small></td
-              ><td>{{ row.price ?? '—' }}</td
-              ><td :class="tone(row.returnPct)">{{ formatPct(row.returnPct) }}</td
-              ><td>{{ formatYi(row.turnoverYi) }}</td
-              ><td>{{ formatYi(row.marketCapYi) }}</td
-              ><td>{{ row.industry || '—' }}</td></tr
-            ></tbody
-          ></table
-        ></div
-      ><div v-else class="empty"
-        >{{ turnoverError || '暂无成交额榜数据'
-        }}<button
-          type="button"
-          class="link-button"
-          :disabled="turnoverLoading"
-          @click="loadLiveTurnover"
-          >重试</button
-        ></div
-      ></article
-    >
-    <Modal
-      v-model:open="hotMatrixOpen"
-      title="百亿成交股"
-      :footer="null"
-      width="min(1000px, calc(100vw - 32px))"
-      :get-container="false"
-    >
-      <article class="panel matrix-panel">
-        <div class="panel-title"
-          ><h3>百亿成交股 · 最近收盘明细</h3
-          ><button type="button" class="modal-close" @click="hotMatrixOpen = false"
-            >关闭</button
-          ></div
-        >
-        <div class="hot-stock-summary" v-if="turnoverData">
-          <strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong>
-          <span
-            >成交额严格大于 100 亿元 ·
-            {{ turnoverData.dailyObservedAt?.slice(0, 10) || '交易日待确认' }}</span
-          >
-        </div>
-        <div
-          v-if="highTurnoverRows.length"
-          class="hot-stock-bars"
-          aria-label="百亿成交股成交额对比图"
-        >
+    <template v-if="mode !== 'crowding'">
+      <div class="overview-grid">
+        <article class="panel">
+          <div class="panel-title"
+            ><div><h3>一级行业资金榜</h3></div
+            ><ResearchSourceState :meta="sectorFlowMeta"
+          /></div>
           <button
-            v-for="row in highTurnoverRows"
-            :key="`bar-${row.securityCode}`"
+            v-if="sectorRows.length > 7"
             type="button"
-            class="hot-stock-bar"
-            @click="emit('query', row.securityCode)"
+            class="link-button"
+            @click="sectorsExpanded = !sectorsExpanded"
+            >{{ sectorsExpanded ? '收起' : '查看完整' }} →</button
           >
-            <span>{{ row.securityName }}</span
-            ><i><b :style="{ width: `${hotStockBarWidth(row.turnoverYi)}%` }"></b></i
-            ><strong>{{ formatYi(row.turnoverYi) }}</strong>
-          </button>
-        </div>
-        <section v-if="turnoverData?.historyDates?.length" class="hot-history-panel">
-          <div class="hot-history-head"
-            ><div><h4>百亿成交 · 历史统计</h4><span>点击日期查看当日百亿成交股</span></div
-            ><label
-              >时间范围
-              <select v-model="hotHistoryRange" aria-label="百亿成交历史时间范围"
-                ><option :value="10">近10</option
-                ><option :value="30">近30</option
-                ><option value="all">全部</option></select
-              ></label
-            ></div
-          >
-          <div class="hot-history-dates"
-            ><button
-              v-for="{ date, index } in visibleHotDates"
-              :key="date"
-              type="button"
-              :class="{ active: selectedHotDate === date }"
-              @click="selectedHotDate = date"
-              ><span>{{ date.slice(5) }}</span
-              ><strong>{{ turnoverData.historyCounts?.[index] || 0 }}</strong></button
-            ></div
-          >
-          <div class="table-shell hot-history-matrix"
+          <div v-if="sectorRows.length" class="table-shell"
             ><table
               ><thead
                 ><tr
-                  ><th class="is-left">行业</th
-                  ><th v-for="{ date } in visibleHotDates" :key="date">{{ date.slice(5) }}</th
-                  ><th>近90日累计</th></tr
+                  ><th class="is-left">行业</th><th>涨跌%</th><th>今日主力净流入</th
+                  ><th>家数</th></tr
                 ></thead
               ><tbody
-                ><tr v-for="row in turnoverData.historyIndustries" :key="row.industry"
+                ><tr v-for="row in visibleSectorRows" :key="row.name"
                   ><td class="is-left"
-                    ><strong>{{ row.industry }}</strong></td
-                  ><td v-for="{ date, index } in visibleHotDates" :key="date">{{
-                    row.counts[index] || ''
-                  }}</td
-                  ><td>{{ row.historyTotal }}</td></tr
+                    ><strong>{{ row.name }}</strong></td
+                  ><td :class="tone(row.pct)">{{ formatPct(row.pct) }}</td
+                  ><td :class="tone(row.net)">{{ formatYi(row.netYi) }}</td
+                  ><td>{{ row.firms ?? '—' }}</td></tr
                 ></tbody
               ></table
             ></div
-          >
-          <div v-if="selectedHistoricalHotRows.length" class="hot-history-day"
-            ><strong>{{ selectedHotDate }} · {{ selectedHistoricalHotRows.length }}只</strong
-            ><button
-              v-for="row in selectedHistoricalHotRows"
-              :key="`${row.observedAt}-${row.securityCode}`"
-              type="button"
-              @click="emit('query', row.securityCode)"
-              >{{ row.securityName }}
-              <span>{{
-                formatYi(row.turnoverYuan == null ? null : Number(row.turnoverYuan) / 1e8)
-              }}</span></button
+          ><div v-else class="empty">暂无板块资金数据</div>
+        </article>
+        <article class="panel"
+          ><div class="panel-title"
+            ><div><h3>资金轮动</h3></div></div
+          ><div v-if="rotationRows.length" class="rotation-grid"
+            ><div class="rotation-column"
+              ><h4 class="is-positive">↑ 流入 Top</h4
+              ><div v-for="row in rotationInflow" :key="`in-${row.name}`" class="rotation-row"
+                ><span>{{ row.name }}</span
+                ><b :class="tone(row.pct)">{{ formatPct(row.pct) }}</b
+                ><em class="is-positive">{{ formatYi(row.netYi) }}</em></div
+              ><p v-if="!rotationInflow.length" class="empty-inline">暂无净流入数据</p></div
+            ><div class="rotation-column"
+              ><h4 class="is-negative">↓ 流出 Top</h4
+              ><div v-for="row in rotationOutflow" :key="`out-${row.name}`" class="rotation-row"
+                ><span>{{ row.name }}</span
+                ><b :class="tone(row.pct)">{{ formatPct(row.pct) }}</b
+                ><em class="is-negative">{{ formatYi(row.netYi) }}</em></div
+              ><p v-if="!rotationOutflow.length" class="empty-inline">暂无净流出数据</p></div
             ></div
-          >
-        </section>
-      </article>
-    </Modal>
-    <Modal
-      v-model:open="marketAmountHistoryOpen"
-      title="全A成交额 · 历史统计"
-      :footer="null"
-      width="min(960px, calc(100vw - 32px))"
-      :get-container="false"
-    >
-      <article class="panel">
-        <div class="market-amount-summary">
-          <strong>{{ marketAmountData?.tradingDays ?? marketAmountRows.length }} 个交易日</strong>
-          <span>
-            {{ marketAmountData?.coverageStart || marketAmountRows.at(-1)?.observedAt || '—' }} 至
-            {{ marketAmountData?.coverageEnd || marketAmountRows[0]?.observedAt || '—' }} ·
-            单位：亿元 · 最新日期在最上方
-          </span>
-        </div>
-        <div v-if="marketAmountRows.length" class="table-shell market-amount-table">
-          <table>
-            <thead>
-              <tr>
-                <th class="is-left">交易日</th>
-                <th class="is-right">全A成交额（亿元）</th>
-                <th class="is-right">较前一归档日</th>
-                <th class="is-left">数据来源</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in pagedMarketAmountRows" :key="row.observedAt">
-                <td class="is-left">{{ row.observedAt }}</td>
-                <td class="is-right">{{
-                  formatHundredMillion(
-                    row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
-                  )
-                }}</td>
-                <td class="is-right" :class="tone(row.amountChangePct)">
-                  {{ formatPct(row.amountChangePct) }}
-                </td>
-                <td class="is-left source-cell" :title="row.source || '来源未记录'">
-                  {{ row.source || '来源缺失' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div
-          v-if="marketAmountPageCount > 1"
-          class="market-amount-pagination"
-          aria-label="全A成交额历史分页"
+          ><div v-else class="empty">暂无资金轮动数据</div></article
         >
-          <button type="button" :disabled="marketAmountPage <= 1" @click="marketAmountPage -= 1"
-            >上一页</button
-          >
-          <span>第 {{ marketAmountPage }} / {{ marketAmountPageCount }} 页</span>
-          <button
-            type="button"
-            :disabled="marketAmountPage >= marketAmountPageCount"
-            @click="marketAmountPage += 1"
-            >下一页</button
-          >
-        </div>
-        <div v-if="!marketAmountRows.length" class="empty">{{
-          marketAmountError ||
-          (marketAmountLoading ? '正在加载全A成交额历史' : '暂无全A成交额历史数据')
-        }}</div>
-      </article>
-    </Modal>
-    <Modal
-      v-model:open="ladderOpen"
-      title="连板股清单"
-      :footer="null"
-      width="min(900px, calc(100vw - 32px))"
-      :get-container="false"
-    >
-      <article class="panel">
-        <div class="panel-title"
-          ><h3>连板股清单</h3
-          ><button type="button" class="modal-close" @click="ladderOpen = false">关闭</button></div
-        >
-        <div class="table-shell">
-          <table
+      </div>
+      <article class="panel wide-panel"
+        ><div class="panel-title"
+          ><div><h3>全市场成交额榜</h3><ResearchSourceState :meta="turnoverMeta" /></div
+          ><div class="turnover-actions"
+            ><button
+              v-for="n in [10, 20]"
+              :key="n"
+              type="button"
+              :class="{ active: topN === n }"
+              @click="topN = n as 10 | 20"
+              >T{{ n }}</button
+            ></div
+          ></div
+        ><div v-if="turnoverRows.length" class="table-shell"
+          ><table
             ><thead
               ><tr
-                ><th class="is-left">名称 / 代码</th><th>连板</th><th>现价</th><th>涨跌%</th
-                ><th class="is-right">成交额</th><th>流通市值</th><th>行业</th></tr
+                ><th>#</th><th class="is-left">名称 / 代码</th><th>现价</th><th>涨跌%</th
+                ><th>成交额</th><th>总市值</th><th>行业</th></tr
               ></thead
-            >
-            <tbody
-              ><tr v-for="row in emotionLeaders" :key="row.code"
+            ><tbody
+              ><tr v-for="(row, index) in turnoverRows.slice(0, topN)" :key="row.securityCode"
+                ><td>{{ index + 1 }}</td
                 ><td class="is-left"
-                  ><strong>{{ row.name }}</strong
-                  ><small>{{ row.code }}</small></td
-                ><td>{{ row.boards }}板</td><td>{{ row.price ?? '—' }}</td
-                ><td :class="tone(row.pct)">{{ formatPct(row.pct) }}</td
-                ><td class="is-right">{{ formatYi(row.amountYi) }}</td
-                ><td>{{ formatYi(row.floatCapYi) }}</td
+                  ><button
+                    type="button"
+                    class="stock-name-button"
+                    @click="emit('query', row.securityCode)"
+                    >{{ row.securityName }}</button
+                  ><small>{{ row.securityCode }}</small></td
+                ><td>{{ row.price ?? '—' }}</td
+                ><td :class="tone(row.returnPct)">{{ formatPct(row.returnPct) }}</td
+                ><td>{{ formatYi(row.turnoverYi) }}</td
+                ><td>{{ formatYi(row.marketCapYi) }}</td
                 ><td>{{ row.industry || '—' }}</td></tr
-              >
-              <tr v-if="!emotionLeaders.length"
-                ><td colspan="7" class="empty-cell">暂无二板及以上个股</td></tr
               ></tbody
+            ></table
+          ></div
+        ><div v-else class="empty"
+          >{{ turnoverError || '暂无成交额榜数据'
+          }}<button
+            type="button"
+            class="link-button"
+            :disabled="turnoverLoading"
+            @click="loadLiveTurnover"
+            >重试</button
+          ></div
+        ></article
+      >
+      <Modal
+        v-if="hotMatrixOpen"
+        v-model:open="hotMatrixOpen"
+        title="百亿成交股"
+        :footer="null"
+        width="min(1000px, calc(100vw - 32px))"
+        :get-container="false"
+      >
+        <article class="panel matrix-panel">
+          <div class="panel-title"
+            ><h3>百亿成交股 · 最近收盘明细</h3
+            ><button type="button" class="modal-close" @click="hotMatrixOpen = false"
+              >关闭</button
+            ></div
+          >
+          <div class="hot-stock-summary" v-if="turnoverData">
+            <strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong>
+            <span
+              >成交额严格大于 100 亿元 ·
+              {{ turnoverData.dailyObservedAt?.slice(0, 10) || '交易日待确认' }}</span
             >
-          </table>
-        </div>
-      </article>
-    </Modal>
+          </div>
+          <div
+            v-if="highTurnoverRows.length"
+            class="hot-stock-bars"
+            aria-label="百亿成交股成交额对比图"
+          >
+            <button
+              v-for="row in highTurnoverRows"
+              :key="`bar-${row.securityCode}`"
+              type="button"
+              class="hot-stock-bar"
+              @click="emit('query', row.securityCode)"
+            >
+              <span>{{ row.securityName }}</span
+              ><i><b :style="{ width: `${hotStockBarWidth(row.turnoverYi)}%` }"></b></i
+              ><strong>{{ formatYi(row.turnoverYi) }}</strong>
+            </button>
+          </div>
+          <section v-if="turnoverData?.historyDates?.length" class="hot-history-panel">
+            <div class="hot-history-head"
+              ><div><h4>百亿成交 · 历史统计</h4><span>点击日期查看当日百亿成交股</span></div
+              ><label
+                >时间范围
+                <select v-model="hotHistoryRange" aria-label="百亿成交历史时间范围"
+                  ><option :value="10">近10</option
+                  ><option :value="30">近30</option
+                  ><option value="all">全部</option></select
+                ></label
+              ></div
+            >
+            <div class="hot-history-dates"
+              ><button
+                v-for="{ date, index } in visibleHotDates"
+                :key="date"
+                type="button"
+                :class="{ active: selectedHotDate === date }"
+                @click="selectedHotDate = date"
+                ><span>{{ date.slice(5) }}</span
+                ><strong>{{ turnoverData.historyCounts?.[index] || 0 }}</strong></button
+              ></div
+            >
+            <div class="table-shell hot-history-matrix"
+              ><table
+                ><thead
+                  ><tr
+                    ><th class="is-left">行业</th
+                    ><th v-for="{ date } in visibleHotDates" :key="date">{{ date.slice(5) }}</th
+                    ><th>近90日累计</th></tr
+                  ></thead
+                ><tbody
+                  ><tr v-for="row in turnoverData.historyIndustries" :key="row.industry"
+                    ><td class="is-left"
+                      ><strong>{{ row.industry }}</strong></td
+                    ><td v-for="{ date, index } in visibleHotDates" :key="date">{{
+                      row.counts[index] || ''
+                    }}</td
+                    ><td>{{ row.historyTotal }}</td></tr
+                  ></tbody
+                ></table
+              ></div
+            >
+            <div v-if="selectedHistoricalHotRows.length" class="hot-history-day"
+              ><strong>{{ selectedHotDate }} · {{ selectedHistoricalHotRows.length }}只</strong
+              ><button
+                v-for="row in selectedHistoricalHotRows"
+                :key="`${row.observedAt}-${row.securityCode}`"
+                type="button"
+                @click="emit('query', row.securityCode)"
+                >{{ row.securityName }}
+                <span>{{
+                  formatYi(row.turnoverYuan == null ? null : Number(row.turnoverYuan) / 1e8)
+                }}</span></button
+              ></div
+            >
+          </section>
+        </article>
+      </Modal>
+      <Modal
+        v-if="marketAmountHistoryOpen"
+        v-model:open="marketAmountHistoryOpen"
+        title="全A成交额 · 历史统计"
+        :footer="null"
+        width="min(960px, calc(100vw - 32px))"
+        :get-container="false"
+      >
+        <article class="panel">
+          <div class="market-amount-summary">
+            <strong>{{ marketAmountData?.tradingDays ?? marketAmountRows.length }} 个交易日</strong>
+            <span>
+              {{ marketAmountData?.coverageStart || marketAmountRows.at(-1)?.observedAt || '—' }} 至
+              {{ marketAmountData?.coverageEnd || marketAmountRows[0]?.observedAt || '—' }} ·
+              单位：亿元 · 最新日期在最上方
+            </span>
+          </div>
+          <div v-if="marketAmountRows.length" class="table-shell market-amount-table">
+            <table>
+              <thead>
+                <tr>
+                  <th class="is-left">交易日</th>
+                  <th class="is-right">全A成交额（亿元）</th>
+                  <th class="is-right">较前一归档日</th>
+                  <th class="is-left">数据来源</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in pagedMarketAmountRows" :key="row.observedAt">
+                  <td class="is-left">{{ row.observedAt }}</td>
+                  <td class="is-right">{{
+                    formatHundredMillion(
+                      row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
+                    )
+                  }}</td>
+                  <td class="is-right" :class="tone(row.amountChangePct)">
+                    {{ formatPct(row.amountChangePct) }}
+                  </td>
+                  <td class="is-left source-cell" :title="row.source || '来源未记录'">
+                    {{ row.source || '来源缺失' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            v-if="marketAmountPageCount > 1"
+            class="market-amount-pagination"
+            aria-label="全A成交额历史分页"
+          >
+            <button type="button" :disabled="marketAmountPage <= 1" @click="marketAmountPage -= 1"
+              >上一页</button
+            >
+            <span>第 {{ marketAmountPage }} / {{ marketAmountPageCount }} 页</span>
+            <button
+              type="button"
+              :disabled="marketAmountPage >= marketAmountPageCount"
+              @click="marketAmountPage += 1"
+              >下一页</button
+            >
+          </div>
+          <div v-if="!marketAmountRows.length" class="empty">{{
+            marketAmountError ||
+            (marketAmountLoading ? '正在加载全A成交额历史' : '暂无全A成交额历史数据')
+          }}</div>
+        </article>
+      </Modal>
+      <Modal
+        v-if="ladderOpen"
+        v-model:open="ladderOpen"
+        title="连板股清单"
+        :footer="null"
+        width="min(900px, calc(100vw - 32px))"
+        :get-container="false"
+      >
+        <article class="panel">
+          <div class="panel-title"
+            ><h3>连板股清单</h3
+            ><button type="button" class="modal-close" @click="ladderOpen = false"
+              >关闭</button
+            ></div
+          >
+          <div class="table-shell">
+            <table
+              ><thead
+                ><tr
+                  ><th class="is-left">名称 / 代码</th><th>连板</th><th>现价</th><th>涨跌%</th
+                  ><th class="is-right">成交额</th><th>流通市值</th><th>行业</th></tr
+                ></thead
+              >
+              <tbody
+                ><tr v-for="row in emotionLeaders" :key="row.code"
+                  ><td class="is-left"
+                    ><strong>{{ row.name }}</strong
+                    ><small>{{ row.code }}</small></td
+                  ><td>{{ row.boards }}板</td><td>{{ row.price ?? '—' }}</td
+                  ><td :class="tone(row.pct)">{{ formatPct(row.pct) }}</td
+                  ><td class="is-right">{{ formatYi(row.amountYi) }}</td
+                  ><td>{{ formatYi(row.floatCapYi) }}</td
+                  ><td>{{ row.industry || '—' }}</td></tr
+                >
+                <tr v-if="!emotionLeaders.length"
+                  ><td colspan="7" class="empty-cell">暂无二板及以上个股</td></tr
+                ></tbody
+              >
+            </table>
+          </div>
+        </article>
+      </Modal>
+    </template>
   </section>
 </template>
 
@@ -410,8 +421,16 @@
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
   import VibeTrendCharts from './VibeTrendCharts.vue';
 
-  const props = defineProps<{ dashboard: AShareDashboardResponse | null; refreshKey?: number }>();
-  const emit = defineEmits<{ (event: 'query', code: string): void }>();
+  import { useResearchViewState, useResearchSnapshots } from '../../composables/researchWorkspace';
+
+  const snapshots = useResearchSnapshots();
+  const controller = new AbortController();
+  const props = defineProps<{
+    mode?: 'overview' | 'crowding';
+    dashboard: AShareDashboardResponse | null;
+    refreshKey?: number;
+  }>();
+  const emit = defineEmits<{ (event: 'query', code: string): void; (event: 'ready'): void }>();
   type EmotionLeader = {
     code: string;
     name: string;
@@ -440,7 +459,7 @@
     marketCapYi: number | null;
     industry?: string | null;
   };
-  const sectorsExpanded = ref(false);
+  const sectorsExpanded = useResearchViewState('sectorsExpanded', true);
   const liveSectorFlow = shallowRef<AShareLiveSectorFundFlowResponse | null>(null);
   const turnoverData = shallowRef<AShareMarketTurnoverResponse | null>(null);
   const liveSectorFlowError = ref('');
@@ -449,16 +468,16 @@
   let lastLiveLoad = 0;
   const turnoverLoading = ref(false);
   const turnoverError = ref('');
-  const topN = ref<10 | 20>(10);
+  const topN = useResearchViewState<10 | 20>('topN', 10);
   const ladderOpen = ref(false);
   const hotMatrixOpen = ref(false);
   const marketAmountHistoryOpen = ref(false);
-  const marketAmountPage = ref(1);
+  const marketAmountPage = useResearchViewState('marketAmountPage', 1);
   const marketAmountData = shallowRef<AShareMarketHistoryResponse | null>(null);
   const marketAmountLoading = ref(false);
   const marketAmountError = ref('');
-  const selectedHotDate = ref('');
-  const hotHistoryRange = ref<10 | 30 | 'all'>(10);
+  const selectedHotDate = useResearchViewState('selectedHotDate', '');
+  const hotHistoryRange = useResearchViewState<10 | 30 | 'all'>('hotHistoryRange', 10);
   const visibleHotDates = computed(() => {
     const dates = (turnoverData.value?.historyDates || [])
       .map((date, index) => ({ date, index }))
@@ -502,22 +521,40 @@
     return rows;
   });
   const marketAmountPageCount = computed(() =>
-    marketAmountData.value ? Math.max(1, Math.ceil(marketAmountData.value.total / 100)) : 1,
+    Math.max(1, Math.ceil((marketAmountData.value?.total ?? marketAmountRows.value.length) / 100)),
   );
-  const pagedMarketAmountRows = computed(() => marketAmountRows.value);
+  const pagedMarketAmountRows = computed(() =>
+    marketAmountData.value
+      ? marketAmountRows.value
+      : marketAmountRows.value.slice(
+          (marketAmountPage.value - 1) * 100,
+          marketAmountPage.value * 100,
+        ),
+  );
+  let historyController: AbortController | undefined;
   async function loadMarketAmountHistory() {
+    historyController?.abort();
+    const requestController = (historyController = new AbortController());
     marketAmountLoading.value = true;
     try {
-      marketAmountData.value = await getAShareMarketHistory(marketAmountPage.value, 100);
+      const result = await getAShareMarketHistory(
+        marketAmountPage.value,
+        100,
+        requestController.signal,
+      );
+      if (requestController.signal.aborted) return;
+      marketAmountData.value = result;
       marketAmountError.value = '';
     } catch (error) {
+      if (requestController.signal.aborted) return;
       marketAmountError.value = error instanceof Error ? error.message : '全A成交额历史加载失败';
     } finally {
-      marketAmountLoading.value = false;
+      if (!requestController.signal.aborted) marketAmountLoading.value = false;
     }
   }
   watch(marketAmountHistoryOpen, (open) => {
     if (open) void loadMarketAmountHistory();
+    else historyController?.abort();
   });
   watch(marketAmountPage, () => {
     if (marketAmountHistoryOpen.value) void loadMarketAmountHistory();
@@ -606,7 +643,8 @@
     if (liveSectorFlowLoading.value) return;
     liveSectorFlowLoading.value = true;
     try {
-      liveSectorFlow.value = await getAShareLiveSectorFundFlow();
+      liveSectorFlow.value = await getAShareLiveSectorFundFlow(controller.signal);
+      if (!controller.signal.aborted) snapshots.set('sector-flow', liveSectorFlow.value);
       liveSectorFlowError.value = '';
     } catch (error) {
       liveSectorFlowError.value = error instanceof Error ? error.message : '实时板块资金流加载失败';
@@ -618,7 +656,8 @@
     if (turnoverLoading.value) return;
     turnoverLoading.value = true;
     try {
-      turnoverData.value = await getAShareLiveMarketTurnover();
+      turnoverData.value = await getAShareLiveMarketTurnover(controller.signal);
+      if (!controller.signal.aborted) snapshots.set('turnover', turnoverData.value);
       turnoverError.value = '';
       if (!turnoverData.value.historyDates?.includes(selectedHotDate.value))
         selectedHotDate.value = turnoverData.value.historyDates?.at(-1) || '';
@@ -628,10 +667,22 @@
       turnoverLoading.value = false;
     }
   }
-  async function loadLive() {
+  async function loadLive(reuse = false) {
+    if (props.mode === 'crowding') {
+      emit('ready');
+      return;
+    }
     if (document.visibilityState === 'hidden') return;
     lastLiveLoad = Date.now();
-    await Promise.allSettled([loadLiveSectorFlow(), loadLiveTurnover()]);
+    const flow = reuse && snapshots.get<AShareLiveSectorFundFlowResponse>('sector-flow');
+    const turnover = reuse && snapshots.get<AShareMarketTurnoverResponse>('turnover');
+    if (flow) liveSectorFlow.value = flow;
+    if (turnover) turnoverData.value = turnover;
+    await Promise.allSettled([
+      flow ? undefined : loadLiveSectorFlow(),
+      turnover ? undefined : loadLiveTurnover(),
+    ]);
+    if (!controller.signal.aborted) emit('ready');
   }
   function resumeLive() {
     if (Date.now() - lastLiveLoad >= 5 * 60 * 1000) void loadLive();
@@ -641,11 +692,13 @@
     () => void loadLive(),
   );
   onMounted(() => {
-    void loadLive();
+    void loadLive(true);
     liveTimer = window.setInterval(resumeLive, 5 * 60 * 1000);
     document.addEventListener('visibilitychange', resumeLive);
   });
   onBeforeUnmount(() => {
+    controller.abort();
+    historyController?.abort();
     if (liveTimer != null) window.clearInterval(liveTimer);
     document.removeEventListener('visibilitychange', resumeLive);
   });

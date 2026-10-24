@@ -97,16 +97,23 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, reactive, ref } from 'vue';
+  import { computed, ref } from 'vue';
+  import { useResearchViewState } from '../composables/researchWorkspace';
   import type { WealthCampaign, WealthFrequency, WealthLock } from '@/data/sample/news';
 
   const wealthCampaigns: WealthCampaign[] = [];
 
   type SortOrder = 'desc' | 'asc';
 
-  const sortOrder = ref<SortOrder>('desc');
-  const expanded = ref(false);
-  const filters = reactive({ exchange: 'all', frequency: 'all', lock: 'all', keyword: '' });
+  const sortOrder = useResearchViewState<SortOrder>('wealth-sort', 'desc');
+  const props = defineProps<{ initiallyExpanded?: boolean }>();
+  const expanded = ref(props.initiallyExpanded ?? true);
+  const filters = useResearchViewState('wealth-filters', {
+    exchange: 'all',
+    frequency: 'all',
+    lock: 'all',
+    keyword: '',
+  }).value;
   const exchangeOptions = [
     { value: 'gate', label: 'Gate' },
     { value: 'aave', label: 'Aave' },

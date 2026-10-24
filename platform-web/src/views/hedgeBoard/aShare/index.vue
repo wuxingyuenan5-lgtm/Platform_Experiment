@@ -1,5 +1,5 @@
 <template>
-  <PageWrapper title="对冲基金看板">
+  <PageWrapper title="对冲基金看板" content-class="a-share-page-content">
     <div class="a-share-board">
       <section class="board-toolbar strategy-top-toolbar">
         <CompactSegmentTabs
@@ -11,10 +11,10 @@
           <button
             type="button"
             class="refresh-button"
-            :disabled="dashboardLoading || producing"
+            :disabled="dashboardLoading || pageLoading || producing"
             @click="refreshAll"
           >
-            {{ dashboardLoading ? '刷新中…' : '刷新看板' }}
+            {{ dashboardLoading || pageLoading ? '读取中…' : '刷新当前页' }}
           </button>
           <button
             v-if="canProduce"
@@ -27,56 +27,155 @@
           </button>
         </div>
       </section>
-      <HedgeBoardSubnav
-        :sections="[
-          { id: 'a-share-index-overview', title: '大盘指数' },
-          { id: 'a-share-market-overview', title: '情绪与资金' },
-          { id: 'cn-equity-themes', title: '主题产业链' },
-          { id: 'cn-equity-valuation', title: '估值分布' },
-          { id: 'cn-equity-structure', title: '拥挤与参与' },
-          { id: 'cn-equity-hk', title: '港股观察' },
-          { id: 'a-share-watchlist-pool', title: '股票池' },
-        ]"
-        module-label="A股"
-        unified
-        :resolve-title="(_id, title) => title"
-        @jump="scrollTo"
-      />
       <div v-if="productionMessage" role="status">{{ productionMessage }}</div>
-      <div v-if="dashboardError" class="dashboard-error" role="alert"
-        >{{ dashboardError }}<button type="button" @click="refreshAll">重试</button></div
-      >
-      <div id="a-share-index-overview"><AShareLegacyTerminalSection :dashboard="dashboard" /></div>
-      <AShareMarketOverviewSection
-        :dashboard="dashboard"
-        :refresh-key="refreshKey"
-        @query="selectedCode = $event"
-      />
-      <VibeStockPoolSection :refresh-key="refreshKey" @query="selectedCode = $event" />
-      <EquityObservatoryPanel market="cn" :refresh-key="refreshKey" />
+      <div class="research-workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+        <ResearchSidebar
+          :items="pages"
+          :active="activePage"
+          :collapsed="sidebarCollapsed"
+          @toggle="sidebarCollapsed = !sidebarCollapsed"
+        />
+        <main
+          ref="viewport"
+          class="research-viewport"
+          tabindex="0"
+          :aria-label="pageTitle"
+          @scroll.passive="saveScroll"
+        >
+          <div class="research-page" :key="`${account}:${activePage}`">
+            <div v-if="needsDashboard && dashboardError" class="dashboard-error" role="alert">
+              {{ dashboardError }}<button type="button" @click="refreshAll">重试</button>
+            </div>
+            <p v-if="needsDashboard && !dashboard && dashboardLoading" role="status"
+              >正在读取{{ pageTitle }}…</p
+            >
+            <template v-if="activePage === 'overview'">
+              <AShareLegacyTerminalSection :dashboard="dashboard" />
+              <AShareMarketOverviewSection
+                :dashboard="dashboard"
+                :refresh-key="refreshKey"
+                @query="selectedCode = $event"
+                @ready="restoreScroll"
+              />
+            </template>
+            <template v-else-if="activePage === 'crowding'">
+              <EquityObservatoryPanel
+                market="cn"
+                view="crowding"
+                :refresh-key="refreshKey"
+                @ready="restoreScroll"
+              />
+              <AShareMarketOverviewSection
+                mode="crowding"
+                :dashboard="dashboard"
+                :refresh-key="refreshKey"
+                @ready="restoreScroll"
+              />
+            </template>
+            <VibeStockPoolSection
+              v-else-if="activePage === 'stocks'"
+              :refresh-key="refreshKey"
+              @query="selectedCode = $event"
+              @ready="restoreScroll"
+            />
+            <EtfTrackingPanel
+              v-else-if="activePage === 'etf'"
+              :refresh-key="refreshKey"
+              @ready="restoreScroll"
+            />
+            <EquityObservatoryPanel
+              v-else
+              market="cn"
+              :view="activePage"
+              :refresh-key="refreshKey"
+              @ready="restoreScroll"
+            />
+          </div>
+        </main>
+      </div>
       <StockResearchDrawer :code="selectedCode" @close="selectedCode = ''" />
     </div>
   </PageWrapper>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
-  import { useRouter } from 'vue-router';
+  import { computed, ref, watch, nextTick, defineAsyncComponent } from 'vue';
+  import { useRoute, useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import { hasPermission } from '@/access/userAccess';
   import { useUserStore } from '@/store/modules/user';
   import { refreshAShareResearch } from '@/api/hedgeResearch';
-  import HedgeBoardSubnav from '../components/HedgeBoardSubnav.vue';
+  import ResearchSidebar from '../components/ResearchSidebar.vue';
+  import { provideResearchWorkspace } from '../composables/researchWorkspace';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
-  import AShareLegacyTerminalSection from './components/AShareLegacyTerminalSection.vue';
-  import AShareMarketOverviewSection from './components/AShareMarketOverviewParitySection.vue';
-  import VibeStockPoolSection from './components/VibeStockPoolSection.vue';
   import StockResearchDrawer from './components/StockResearchDrawer.vue';
-  import EquityObservatoryPanel from '../components/EquityObservatoryPanel.vue';
   import { useAShareResearch } from './useAShareResearch';
 
+  const AShareLegacyTerminalSection = defineAsyncComponent(
+    () => import('./components/AShareLegacyTerminalSection.vue'),
+  );
+  const AShareMarketOverviewSection = defineAsyncComponent(
+    () => import('./components/AShareMarketOverviewParitySection.vue'),
+  );
+  const VibeStockPoolSection = defineAsyncComponent(
+    () => import('./components/VibeStockPoolSection.vue'),
+  );
+  const EquityObservatoryPanel = defineAsyncComponent(
+    () => import('../components/EquityObservatoryPanel.vue'),
+  );
+  const EtfTrackingPanel = defineAsyncComponent(() => import('./components/EtfTrackingPanel.vue'));
+
   const router = useRouter();
+  const route = useRoute();
+  const sidebarCollapsed = ref(false);
+  const pages = [
+    { key: 'overview', label: '市场总览', short: '总览' },
+    { key: 'themes', label: '主题与行业', short: '主题' },
+    { key: 'valuation', label: '估值', short: '估值' },
+    { key: 'crowding', label: '拥挤度', short: '拥挤' },
+    { key: 'etf', label: 'ETF跟踪', short: 'ETF' },
+    { key: 'stocks', label: '股票池', short: '股票' },
+    { key: 'hk', label: '港股观察', short: '港股' },
+  ];
+  const activePage = computed(
+    () => pages.find((p) => p.key === route.query.view)?.key || 'overview',
+  );
+  const pageTitle = computed(() => pages.find((p) => p.key === activePage.value)!.label);
+  const needsDashboard = computed(() => ['overview', 'crowding'].includes(activePage.value));
+  const workspace = provideResearchWorkspace(() => activePage.value);
+  const viewport = ref<HTMLElement>();
+  const positions = new Map<string, number>();
+  const pageLoading = ref(true);
+  let restoring = true;
+  function saveScroll() {
+    if (!restoring && viewport.value) positions.set(activePage.value, viewport.value.scrollTop);
+  }
+  async function restoreScroll() {
+    pageLoading.value = false;
+    if (!restoring) return;
+    await nextTick();
+    requestAnimationFrame(() => {
+      if (viewport.value) viewport.value.scrollTop = positions.get(activePage.value) || 0;
+      restoring = false;
+    });
+  }
+  watch(
+    activePage,
+    () => {
+      restoring = true;
+      pageLoading.value = true;
+      selectedCode.value = '';
+      if (viewport.value) viewport.value.scrollTop = 0;
+    },
+    { flush: 'sync' },
+  );
   const user = useUserStore();
+  const account = computed(() => String(user.getUserInfo.userId || 'anonymous'));
+  watch(account, () => {
+    workspace.states.clear();
+    workspace.snapshots.clear();
+    positions.clear();
+  });
   const canProduce = computed(() =>
     hasPermission(user.getAuthentication?.permissions || [], 'research.write'),
   );
@@ -102,10 +201,21 @@
     global: '/hedge-board/global',
     tradingTools: '/hedge-board/trading-tools/macro',
   };
-  const { dashboard, dashboardLoading, dashboardError, loadDashboard } = useAShareResearch();
+  const { dashboard, dashboardLoading, dashboardError, loadDashboard, ensureDashboard } =
+    useAShareResearch(needsDashboard);
+  watch(activePage, () => void ensureDashboard());
+  watch(
+    [dashboardLoading, activePage],
+    () => {
+      if (activePage.value === 'overview' && !dashboardLoading.value) void restoreScroll();
+    },
+    { flush: 'post' },
+  );
   async function refreshAll() {
+    pageLoading.value = true;
     refreshKey.value += 1;
-    await loadDashboard();
+    workspace.snapshots.clear();
+    if (needsDashboard.value) await loadDashboard();
   }
   async function produce() {
     if (producing.value || !canProduce.value) return;
@@ -129,9 +239,6 @@
   function navigateMarket(value: string) {
     const path = routeByMarket[value];
     if (path) void router.push(path);
-  }
-  function scrollTo(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 </script>
 
@@ -173,6 +280,47 @@
     color: var(--strategy-text-2);
     gap: 18px;
     font-variant-numeric: tabular-nums;
+  }
+
+  .research-workspace {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .research-workspace.sidebar-collapsed {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .research-viewport {
+    min-width: 0;
+    height: calc(100dvh - 270px);
+    min-height: 420px;
+    overflow: auto;
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+  }
+
+  .research-page {
+    min-width: 0;
+    padding: 0 4px 24px;
+  }
+
+  .research-page > :deep(:first-child) {
+    margin-top: 0;
+  }
+
+  @media (max-width: 900px) {
+    .research-workspace,
+    .research-workspace.sidebar-collapsed {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
+
+    .research-viewport {
+      height: calc(100dvh - 320px);
+    }
   }
 
   .board-toolbar,

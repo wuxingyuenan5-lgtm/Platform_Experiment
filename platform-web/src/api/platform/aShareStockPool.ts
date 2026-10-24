@@ -25,6 +25,16 @@ export interface Stock {
 export type Period = 'change' | 'change_5d' | 'change_20d' | 'ytd';
 export interface PoolPayload {
   meta?: { report_date?: string | null; generated_at?: string; status?: string };
+  marketStatus?: Partial<
+    Record<
+      'CN' | 'HK',
+      {
+        report_date?: string | null;
+        status?: string;
+        is_trading_day?: boolean | null;
+      }
+    >
+  >;
   summary: {
     tracked_count: number;
     breadth: { up: number; down: number; flat: number; median?: number | null };
@@ -59,10 +69,10 @@ export interface StockDetail {
   }>;
 }
 const root = '/research/a-share';
-export const getStockPool = async () =>
-  (await researchRequest<{ data: PoolPayload }>({ url: `${root}/stock-pool` })).data;
-export const getPoolFocus = async () =>
-  (await researchRequest<{ data: PoolFocus }>({ url: `${root}/stock-pool/focus` })).data;
+export const getStockPool = async (signal?: AbortSignal) =>
+  (await researchRequest<{ data: PoolPayload }>({ url: `${root}/stock-pool`, signal })).data;
+export const getPoolFocus = async (signal?: AbortSignal) =>
+  (await researchRequest<{ data: PoolFocus }>({ url: `${root}/stock-pool/focus`, signal })).data;
 export const savePoolFocus = async (codes: string[], expectedVersion: number) =>
   (
     await researchRequest<{ data: PoolFocus }>({

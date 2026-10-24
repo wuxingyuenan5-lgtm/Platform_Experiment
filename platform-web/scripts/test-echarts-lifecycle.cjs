@@ -90,7 +90,26 @@ test('cached page pauses updates and resize; reactivation applies queued data', 
     await vue.nextTick();
     assert.equal(f.calls.set.length, 2);
     assert.equal(f.calls.init, 1);
+    assert.equal(f.calls.resize, 0);
+  } finally {
+    f.close();
+  }
+});
+
+test('observer and visibility notifications resize only when dimensions change', async () => {
+  const f = fixture();
+  try {
+    f.element.offsetHeight = 300;
+    await f.chart.setOptions({ series: [] });
+    for (let i = 0; i < 10; i++) f.chart.resize();
+    assert.equal(f.calls.resize, 0);
+    f.element.offsetWidth = 800;
+    f.chart.resize();
+    f.chart.resize();
     assert.equal(f.calls.resize, 1);
+    f.element.offsetHeight = 400;
+    f.chart.resize();
+    assert.equal(f.calls.resize, 2);
   } finally {
     f.close();
   }

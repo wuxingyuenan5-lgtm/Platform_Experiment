@@ -1,3 +1,4 @@
+import { useResearchViewState } from '../composables/researchWorkspace';
 import { useDashboardRefresh } from '../useDashboardRefresh';
 import { defineComponent, h, type PropType, ref, shallowRef } from 'vue';
 
@@ -9,9 +10,10 @@ import {
 } from '@/api/hedgeResearch';
 
 import SourceSeriesPlot from './SourceSeriesPlot.vue';
+import { curveAtDate, curveDates } from './curveHistory';
 import { unitText, frequencyText, regionalFlowColor } from './sourceSeriesOptions';
 
-const COLORS = ['#165dff', '#0f8b6d', '#c7931a', '#7c3aed', '#dc2626', '#64748b'];
+const COLORS = ['#165dff', '#0f8b6d', '#c7931a', '#7c3aed', '#dc2626', '#64748b', '#0891b2'];
 const controlStyle = {
   border: '1px solid #dbe4ea',
   borderRadius: '7px',
@@ -63,12 +65,26 @@ export default defineComponent({
     dataDomain: { type: String as PropType<'macro' | 'commodity' | 'crypto'>, default: 'macro' },
   },
   setup(props) {
-    const selectedYears = ref(props.presentation === 'gold-drivers' ? 1 : 0);
-    const hidden = ref(new Set<string>(props.initiallyHiddenSeriesIds));
-    const search = ref('');
-    const tableView = ref(false);
-    const tablePage = ref(0);
+    const selectedYears = useResearchViewState(
+      `macro:${props.groupId}:selectedYears`,
+      props.dataDomain === 'macro'
+        ? 5
+        : props.presentation === 'gold-drivers'
+        ? 1
+        : props.groupId === 'coinbasePremium' || props.groupId.startsWith('binanceCombined')
+        ? 0.25
+        : 3,
+    );
+    const hidden = useResearchViewState(
+      `macro:${props.groupId}:hidden`,
+      new Set<string>(props.initiallyHiddenSeriesIds),
+    );
+    const search = useResearchViewState(`macro:${props.groupId}:search`, '');
+    const tableView = useResearchViewState(`macro:${props.groupId}:tableView`, false);
+    const tablePage = useResearchViewState(`macro:${props.groupId}:tablePage`, 0);
     const series = shallowRef<MacroDashboardSeries[]>([]);
+    const curveHistory = shallowRef<MacroDashboardSeries[]>([]);
+    const selectedCurveDate = useResearchViewState(`macro:${props.groupId}:selectedCurveDate`, '');
     const status = ref<'loading' | 'ready' | 'error'>('loading');
 
     useDashboardRefresh(async () => {
@@ -81,6 +97,8 @@ export default defineComponent({
             : getMacroDashboardV1;
         const dashboard = await loader();
         const group = dashboard.groups[props.groupId] ?? [];
+        curveHistory.value =
+          props.groupId === 'shfeGoldCurve' ? dashboard.groups.shfeGoldCurveHistory ?? group : [];
         series.value = props.preferredSeriesIds.length
           ? props.preferredSeriesIds
               .map((id) => group.find((item) => item.seriesId === id))
@@ -97,30 +115,72 @@ export default defineComponent({
       if (status.value === 'loading') return h('div', { class: 'local-empty' }, '正在加载数据…');
       if (status.value === 'error') return h('div', { class: 'local-empty' }, '该组数据暂不可用。');
       if (props.presentation === 'curve') {
-        const rows = series.value;
+        const latestDate = series.value[0]?.observationDate ?? '';
+        const dates = curveDates(curveHistory.value, latestDate);
+        const selectedDate = dates.includes(selectedCurveDate.value)
+          ? selectedCurveDate.value
+          : latestDate;
+        const rows = dates.length
+          ? curveAtDate(curveHistory.value, series.value, selectedDate, latestDate)
+          : series.value;
         const values = rows.map((item) =>
           item.latestValue === null ? NaN : Number(item.latestValue),
         );
-        if (
-          values.some((value) => !Number.isFinite(value)) ||
-          values.length < 2 ||
-          rows.some((row) => !/^AU\d{4}$/.test(row.label))
-        )
-          return h('div', { class: 'local-empty' }, '当前期限结构数据不完整。');
+        const complete =
+          values.every((value) => Number.isFinite(value)) &&
+          values.length >= 2 &&
+          rows.every((row) => /^AU\d{4}$/.test(row.label));
         return h('div', { class: 'local-widget-stack' }, [
           h(
             'div',
             { class: 'chart-legend' },
-            `${rows[0].observationDate} · 上期所${props.curveValueLabel} · ${
-              props.unitLabel || '元/克'
-            }${rows.some((item) => item.isStale) ? ' · 待更新' : ''}`,
+            `${selectedDate} · 上期所${props.curveValueLabel} · ${props.unitLabel || '元/克'}${
+              selectedDate === latestDate && rows.some((item) => item.isStale) ? ' · 待更新' : ''
+            }`,
           ),
-          h(SourceSeriesPlot, {
-            mode: 'curve',
-            series: rows,
-            colors: [props.unitLabel === '%' ? '#a14fba' : '#1689a4'],
-            unitLabel: props.unitLabel || '元/克',
-          }),
+          complete
+            ? h(SourceSeriesPlot, {
+                stateKey: props.groupId,
+                mode: 'curve',
+                series: rows,
+                colors: [props.unitLabel === '%' ? '#a14fba' : '#1689a4'],
+                unitLabel: props.unitLabel || '元/克',
+              })
+            : h('div', { class: 'local-empty' }, '该日期的期限结构数据不完整。'),
+          dates.length
+            ? h('div', { class: 'curve-history', style: { display: 'grid', gap: '6px' } }, [
+                h('label', { style: { fontSize: '12px', color: '#627488' } }, [
+                  `观测日期：${selectedDate}`,
+                  h('input', {
+                    type: 'range',
+                    min: 0,
+                    max: dates.length - 1,
+                    step: 1,
+                    value: dates.indexOf(selectedDate),
+                    disabled: dates.length < 2,
+                    'aria-label': '沪金期限结构观测日期',
+                    'aria-valuetext': selectedDate,
+                    style: { display: 'block', width: '100%' },
+                    onInput: (event: Event) => {
+                      selectedCurveDate.value =
+                        dates[Number((event.target as HTMLInputElement).value)];
+                    },
+                  }),
+                ]),
+                h(
+                  'div',
+                  {
+                    style: {
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '11px',
+                      color: '#627488',
+                    },
+                  },
+                  [h('span', dates[0]), h('span', dates[dates.length - 1])],
+                ),
+              ])
+            : null,
           h('details', [
             h('summary', { style: { cursor: 'pointer', fontSize: '12px' } }, '查看合约数据'),
             h('table', { style: { width: '100%', fontSize: '12px', textAlign: 'left' } }, [
@@ -148,10 +208,20 @@ export default defineComponent({
           ]),
         ]);
       }
-      if (props.presentation === 'distribution') {
+      if (
+        props.presentation === 'distribution' &&
+        (tableView.value || !['wgcPurchases', 'wgcReserves'].includes(props.groupId))
+      ) {
         const rows = series.value.filter((item) =>
           item.label.toLowerCase().includes(search.value.toLowerCase()),
         );
+        if (props.groupId === 'wgcReserves' || props.groupId === 'wgcPurchases') {
+          const quantity = (item: MacroDashboardSeries) =>
+            item.latestValue === null || !Number.isFinite(Number(item.latestValue))
+              ? -Infinity
+              : Number(item.latestValue);
+          rows.sort((a, b) => quantity(b) - quantity(a));
+        }
         const maxValue = Math.max(1, ...series.value.map((item) => Number(item.latestValue ?? 0)));
         return h('div', { class: 'local-widget-stack' }, [
           h('div', { class: 'chart-legend' }, [
@@ -248,7 +318,7 @@ export default defineComponent({
               : props.groupId === 'wgcReserves'
               ? 'WGC 最新公开季度截面；各国申报存在时滞，— 表示源站尚无数值。国家记录不等于全球储备总量。'
               : props.groupId === 'wgcPurchases'
-              ? 'WGC 月报中明确披露的主要国家当月净购买，单位按报告取整；负值为净售出。不含近似值及未披露购买，不代表完整国家覆盖。'
+              ? ''
               : '按 UTXO 最后移动时价格分桶，不等同于投资者实际买入成本。',
           ),
         ]);
@@ -262,8 +332,8 @@ export default defineComponent({
         .filter((point): point is ChartPoint & { value: number } => point.value !== null);
 
       const controls = h('div', { class: 'chart-legend', style: { gap: '12px' } }, [
-        ...[0.25, 1, 3, 0]
-          .filter((years) => years <= props.years)
+        ...(props.dataDomain === 'macro' ? [0.25, 1, 3, 5, 10, 0] : [0.25, 1, 3, 0])
+          .filter((years) => props.dataDomain === 'macro' || years === 3 || years <= props.years)
           .map((years) =>
             h(
               'button',
@@ -364,7 +434,10 @@ export default defineComponent({
       const isAggregate = (item: MacroDashboardSeries) =>
         props.presentation === 'regional-stack' && item.seriesId.endsWith('_global');
       const colorFor = (item: MacroDashboardSeries, index: number) =>
-        props.presentation === 'regional-stack'
+        item.seriesId === 'xauusd_daily_close' ||
+        (props.groupId === 'fearGreed' && item.seriesId === 'binance_btc_spot')
+          ? '#111111'
+          : props.presentation === 'regional-stack'
           ? regionalFlowColor(item.seriesId)
           : COLORS[index % COLORS.length];
       const visible = plotted.filter(
@@ -372,7 +445,9 @@ export default defineComponent({
       );
       const format = (value: number) =>
         new Intl.NumberFormat('en-US', {
-          maximumFractionDigits: Math.abs(value) < 0.01 ? 8 : 4,
+          maximumFractionDigits:
+            props.groupId === 'stablecoinComposition' ? 2 : Math.abs(value) < 0.01 ? 8 : 4,
+          notation: props.groupId === 'stablecoinComposition' ? 'compact' : 'standard',
         }).format(value);
 
       return h('div', { class: 'local-widget-stack' }, [
@@ -417,6 +492,7 @@ export default defineComponent({
         ),
         allPoints.length
           ? h(SourceSeriesPlot, {
+              stateKey: props.groupId,
               series: visible.map(({ item, points }) => {
                 const dates = new Set(points.map((point) => point.date));
                 return {
@@ -424,10 +500,18 @@ export default defineComponent({
                   observations: item.observations.filter((row) => dates.has(row.date)),
                 };
               }),
-              barSeriesIds: props.barSeriesIds,
+              barSeriesIds: ['wgcPurchases', 'wgcReserves'].includes(props.groupId)
+                ? visible.map(({ item }) => item.seriesId)
+                : props.barSeriesIds,
               colors: visible.map(({ item }) => colorFor(item, series.value.indexOf(item))),
               mode:
-                props.presentation === 'gold-drivers'
+                props.presentation === 'distribution'
+                  ? 'distribution'
+                  : props.groupId.startsWith('binanceCombined')
+                  ? 'binance'
+                  : props.groupId === 'stablecoinComposition'
+                  ? 'stablecoins'
+                  : props.presentation === 'gold-drivers'
                   ? 'gold-drivers'
                   : props.presentation === 'regional-stack'
                   ? 'regional-stack'

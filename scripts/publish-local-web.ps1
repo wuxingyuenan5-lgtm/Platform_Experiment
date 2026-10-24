@@ -5,6 +5,8 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $WebRoot = Join-Path $RepoRoot 'platform-web'
 $ReleaseRoot = Join-Path $RepoRoot '.codex\releases\web'
+$AssetRoot = Join-Path $ReleaseRoot 'shared'
+. (Join-Path $PSScriptRoot 'static-web-assets.ps1')
 $Caddy = Join-Path $RepoRoot '.codex\tools\caddy\caddy.exe'
 $Template = Join-Path $RepoRoot 'deploy\Caddyfile.windows'
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ')
@@ -48,6 +50,7 @@ foreach ($entry in $manifest.PSObject.Properties.Value) {
   }
 }
 if ($manifestFiles.Count -eq 0) { throw 'Built Platform Web manifest contains no output files.' }
+Initialize-RetainedWebAssets -ReleaseRoot $ReleaseRoot -AssetRoot $AssetRoot
 foreach ($relativePath in $manifestFiles) {
   $sourcePath = Join-Path $BuildDist $relativePath
   Assert-File $sourcePath 'Manifest-listed Platform Web output'
@@ -55,11 +58,13 @@ foreach ($relativePath in $manifestFiles) {
   $destinationDirectory = Split-Path -Parent $destinationPath
   New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
   Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+  Copy-VersionedWebAsset -SourceRoot $BuildDist -AssetRoot $AssetRoot -RelativePath $relativePath
 }
 Get-ChildItem -LiteralPath $BuildDist -Force | Where-Object { $_.Name -notin @('assets', 'manifest.json') } | Copy-Item -Destination $ReleaseDir -Recurse -Force
 $caddyConfig = Join-Path $ReleaseRoot "$stamp.Caddyfile"
 $releaseForCaddy = $ReleaseDir.Replace('\', '/')
 $caddyText = (Get-Content -LiteralPath $Template -Raw).Replace('{$PLATFORM_WEB_RELEASE_DIR}', ('"' + $releaseForCaddy + '"'))
+$caddyText = $caddyText.Replace('{$PLATFORM_WEB_ASSET_DIR}', ('"' + $AssetRoot.Replace('\', '/') + '"'))
 Set-Content -LiteralPath $caddyConfig -Value $caddyText -Encoding UTF8
 & $Caddy validate --config $caddyConfig --adapter caddyfile
 if ($LASTEXITCODE -ne 0) { throw 'Caddy rejected the candidate local release configuration.' }

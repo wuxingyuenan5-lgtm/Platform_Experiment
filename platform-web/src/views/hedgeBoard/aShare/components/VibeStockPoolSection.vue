@@ -2,7 +2,7 @@
   <section id="a-share-watchlist-pool" ref="poolRoot" class="pool-card">
     <header class="pool-head"
       ><div><h2>自选股与核心股票池</h2></div
-      ><button type="button" class="toolbar" :disabled="loading || pending" @click="load">{{
+      ><button type="button" class="toolbar" :disabled="loading || pending" @click="load()">{{
         loading ? '刷新中…' : '刷新股票池'
       }}</button></header
     >
@@ -14,6 +14,15 @@
       ><span v-if="data.meta?.status === 'stale'"> · 最近更新失败，当前为旧数据</span> ·
       港股价格与金额以港币计</p
     >
+    <p v-if="data?.marketStatus" class="pool-caption">
+      A股 {{ data.marketStatus.CN?.report_date || '行情待更新' }}
+      <span v-if="data.marketStatus.CN?.status === 'partial'"> · 数据待补齐</span>
+      <span v-if="data.marketStatus.CN?.status === 'stale'"> · 更新失败，保留旧数据</span>
+      · 港股 {{ data.marketStatus.HK?.report_date || '行情待更新' }}
+      <span v-if="data.marketStatus.HK?.is_trading_day === false"> · 今日休市</span>
+      <span v-else-if="data.marketStatus.HK?.status === 'partial'"> · 数据待补齐</span>
+      <span v-if="data.marketStatus.HK?.status === 'stale'"> · 更新失败，保留旧数据</span>
+    </p>
     <template v-if="data">
       <div class="pool-grid">
         <section class="sub-panel"
@@ -285,9 +294,13 @@
             ><template v-else
               ><button type="button" v-if="canEditPool" class="toolbar" @click="editOpen = true"
                 >管理核心池</button
-              ><button type="button" class="toolbar" :disabled="loading || pending" @click="load">{{
-                loading ? '刷新中…' : '刷新'
-              }}</button></template
+              ><button
+                type="button"
+                class="toolbar"
+                :disabled="loading || pending"
+                @click="load()"
+                >{{ loading ? '刷新中…' : '刷新' }}</button
+              ></template
             ></div
           >
         </div>
@@ -584,13 +597,14 @@
 </template>
 
 <script setup lang="ts">
+  import { useResearchViewState } from '../../composables/researchWorkspace';
   import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
   import { Modal, Input, Button } from 'ant-design-vue';
   import type { Stock, Period } from '@/api/platform/aShareStockPool';
   import { useStockPool } from '../useStockPool';
 
-  const emit = defineEmits<{ (event: 'query', code: string): void }>();
+  const emit = defineEmits<{ (event: 'query', code: string): void; (event: 'ready'): void }>();
   const props = defineProps<{ refreshKey?: number }>();
   const {
     data,
@@ -611,12 +625,12 @@
     addBatch,
     removePool,
   } = useStockPool();
-  const query = ref('');
-  const stockTableOpen = ref(false);
-  const filter = ref('');
-  const basketFilter = ref('');
-  const sortKey = ref<keyof Stock | null>(null);
-  const sortDirection = ref<'asc' | 'desc' | null>(null);
+  const query = useResearchViewState('query', '');
+  const stockTableOpen = useResearchViewState('stockTableOpen', false);
+  const filter = useResearchViewState('filter', '');
+  const basketFilter = useResearchViewState('basketFilter', '');
+  const sortKey = useResearchViewState<keyof Stock | null>('sortKey', null);
+  const sortDirection = useResearchViewState<'asc' | 'desc' | null>('sortDirection', null);
   const poolRoot = ref<HTMLElement | null>(null);
   const heavyVisualsRoot = ref<HTMLElement | null>(null);
 
@@ -637,10 +651,10 @@
     visualsObserver.observe(element);
   });
   onBeforeUnmount(() => visualsObserver?.disconnect());
-  const visibleLimit = ref(50);
+  const visibleLimit = useResearchViewState('visibleLimit', 50);
   const matrixHoverId = ref<string | null>(null);
-  const rankingPeriod = ref<Period>('change');
-  const heatPeriod = ref<Period>('change');
+  const rankingPeriod = useResearchViewState<Period>('rankingPeriod', 'change');
+  const heatPeriod = useResearchViewState<Period>('heatPeriod', 'change');
   const baskets = computed(() => data.value?.definitions?.research_baskets || []);
   const selectedBasketName = computed(
     () => baskets.value.find((basket) => basket.key === basketFilter.value)?.name || '',
@@ -838,13 +852,13 @@
   }
   watch(
     () => props.refreshKey,
-    () => void load(),
+    () => void load().finally(() => emit('ready')),
   );
   watch([query, filter, basketFilter], () => {
     visibleLimit.value = 50;
   });
   onMounted(() => {
-    void load();
+    void load(false).finally(() => emit('ready'));
   });
 </script>
 

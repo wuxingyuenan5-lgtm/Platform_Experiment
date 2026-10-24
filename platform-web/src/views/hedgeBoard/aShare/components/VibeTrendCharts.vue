@@ -1,6 +1,7 @@
 <template>
   <div class="vibe-trend-charts">
     <VibeTimeChart
+      v-if="mode !== 'crowding'"
       title="市场涨跌结构"
       y-label="上涨/下跌家数（家）"
       right-label="涨停/跌停家数（家）"
@@ -8,12 +9,13 @@
       :series="marketSeries"
     />
     <VibeTimeChart
+      v-if="mode !== 'crowding'"
       title="市场宽度"
       y-label="（上涨－下跌）/（上涨＋下跌）× 100%"
       :dates="dates"
       :series="breadthSeries"
     />
-    <template v-if="crowdingRows.length">
+    <template v-if="mode !== 'overview' && crowdingRows.length">
       <VibeTimeChart
         title="通信设备 | 成交额占全A与换手率"
         y-label="成交额占全A（%）"
@@ -30,7 +32,7 @@
       />
     </template>
     <VibeTimeChart
-      v-if="innovationRows.length"
+      v-if="mode !== 'overview' && innovationRows.length"
       title="创新药 | 成交额占全A与换手率"
       y-label="成交额占全A（%）"
       right-label="换手率（%）"
@@ -73,6 +75,7 @@
     price?: number | null;
   };
   const props = defineProps<{
+    mode?: 'overview' | 'crowding';
     rows: HistoryRow[];
     crowdingRows?: CrowdingRow[];
     innovationRows?: InnovationRow[];

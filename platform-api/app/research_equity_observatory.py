@@ -390,7 +390,7 @@ def build_hk(today, sources):
     }
     result = hk_composite(components, today)
     result["indices"] = []
-    for key in ("hk_hsi", "hk_hscei", "hk_hstech"):
+    for key in ("hk_hsi", "hk_hscei", "hk_hstech", "hk_hsiii"):
         doc = sources.get(key, {})
         points = doc.get("rows", [])
         latest = points[-1] if points else {}
@@ -429,6 +429,9 @@ def produce_local(sources):
     for market, build in [("cn", build_cn), ("us", build_us)]:
         try:
             payload = build(stamp[:10], sources)
+            from app.research_equity_valuation import build_valuation_charts
+
+            payload["valuationCharts"] = build_valuation_charts(sources, market)
             payload["generatedAt"] = stamp
             payload["schemaVersion"] = "1.0"
             if market == "cn":

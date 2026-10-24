@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-[ValidateSet('start', 'status', 'stop', 'restart', 'restart-web', 'restart-api', 'watch', 'supervisor')][string]$Action = 'start',
+[ValidateSet('start', 'status', 'stop', 'restart', 'restart-web', 'restart-api', 'restart-runtime', 'watch', 'supervisor')][string]$Action = 'start',
   [ValidateRange(1, 180)][int]$HealthTimeoutSeconds = 90,
   [switch]$EnableLiveWrite
 )
@@ -632,13 +632,13 @@ function Start-ManagedServices {
 . (Join-Path $PSScriptRoot 'platform-watchdog.ps1')
 
 $lifecycleLock = $null
-if ($Action -in @('start','stop','restart','restart-web','restart-api')) {
+if ($Action -in @('start','stop','restart','restart-web','restart-api','restart-runtime')) {
   $lifecycleLock = New-LifecycleLock
   try { $acquired = $lifecycleLock.WaitOne(180000) } catch [Threading.AbandonedMutexException] { $acquired = $true }
   if (-not $acquired) { throw 'Lifecycle operation already running' }
 }
 try {
-if ($Action -in @('start', 'restart', 'restart-web', 'restart-api', 'status') -and -not $PSBoundParameters.ContainsKey('EnableLiveWrite')) {
+if ($Action -in @('start', 'restart', 'restart-web', 'restart-api', 'restart-runtime', 'status') -and -not $PSBoundParameters.ContainsKey('EnableLiveWrite')) {
   $EnableLiveWrite = Get-ExistingLiveWrite
 }
 foreach ($service in $Services) {
@@ -668,8 +668,8 @@ switch ($Action) {
     Write-Host 'Managed Platform services stopped.' -ForegroundColor Yellow
     break
   }
-  { $_ -in @('restart-web', 'restart-api') } {
-    $serviceKey = if ($Action -eq 'restart-web') { 'web' } else { 'api' }
+  { $_ -in @('restart-web', 'restart-api', 'restart-runtime') } {
+    $serviceKey = $Action.Substring('restart-'.Length)
     $restartDefinition = @($Services | Where-Object { $_.Key -eq $serviceKey })[0]
     Assert-Dependencies $restartDefinition
     $existingState = Read-State

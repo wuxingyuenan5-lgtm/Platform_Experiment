@@ -18,10 +18,6 @@
       unit-label="手"
       :years="5"
     />
-    <p class="gold-oi-gap"
-      >已覆盖 COMEX GC 与上期所
-      AU。参考图为美元名义持仓；当前按各市场合约手数展示，全球金额总量暂缺。</p
-    >
   </div>
 </template>
 

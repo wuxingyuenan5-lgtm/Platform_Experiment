@@ -362,6 +362,75 @@ def _crowding(
     )
 
 
+def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, trade_date):
+    histories = histories if isinstance(histories, dict) else {}
+    stored_histories = read_stored_stock_histories(
+        [code for code in codes if code not in histories]
+    )
+    stock_rows, stock_history = [], []
+    for code in codes:
+        quote, prior = (
+            quotes.get(code),
+            prior_by_code.get(code, {"code": code, "name": code}),
+        )
+        history = sorted(
+            histories.get(code, stored_histories.get(code, [])),
+            key=lambda point: point.observed_at,
+        )
+        stock_history.extend(
+            (
+                str(point.observed_at),
+                code,
+                {"close": point.close, "turnoverYuan": point.turnover_yuan},
+            )
+            for point in history
+            if code in histories
+        )
+        if quote is None:
+            stock_rows.append(
+                {
+                    **prior,
+                    "status": "stale" if prior.get("change") is not None else "no_data",
+                }
+            )
+            continue
+        member = member_by_code.get(code)
+        observed = _quote_date(quote)
+        aligned = bool(history and observed and str(history[-1].observed_at) == observed)
+        status = (
+            "ready" if aligned and quote.return_pct is not None and code in histories else "partial"
+        )
+        if observed and trade_date and observed < trade_date:
+            status = "stale"
+        stock_rows.append(
+            {
+                "instrument_id": code,
+                "code": code,
+                "name": quote.security_name,
+                "industry": member.sw_l2_name if member else prior.get("industry"),
+                "price": float(quote.price) if quote.price is not None else None,
+                "currency": quote.currency,
+                "status": status,
+                "observed_at": quote.observed_at.isoformat() if quote.observed_at else None,
+                "history_date": str(history[-1].observed_at) if history else None,
+                "history_source": "collected" if code in histories else "stored",
+                "change": float(quote.return_pct / 100) if quote.return_pct is not None else None,
+                "change_5d": _history_return(history, 5) if aligned else None,
+                "change_20d": _history_return(history, 20) if aligned else None,
+                "ytd": _history_ytd(history) if aligned else None,
+                "amount_yi": float(quote.turnover_yuan / Decimal("1e8")),
+                "turnover": float(quote.turnover_pct) if quote.turnover_pct is not None else None,
+                "mcap_yi": float(quote.market_cap_yuan / Decimal("1e8"))
+                if quote.market_cap_yuan is not None
+                else None,
+                "pe_ttm": float(quote.pe_ttm) if quote.pe_ttm is not None else None,
+                "pb": float(quote.pb) if quote.pb is not None else None,
+                "research_baskets": prior.get("research_baskets", []),
+            }
+        )
+    return stock_rows, stock_history
+
+
 async def refresh_a_share_research(*, force: bool = False) -> str:
     """Collect once, then atomically publish snapshots, histories and run status."""
     if not force and not _scheduled_refresh_due():
@@ -376,7 +445,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
         run_id = f"a-share-{uuid4().hex}"
         await _start_refresh_locked(run_id, None)
         try:
-            codes = read_tracked_codes()
+            codes = [code for code in read_tracked_codes() if len(code) == 6]
             previous = read_stock_pool(codes)
             prior_by_code = {row["code"]: row for row in previous["focusStocks"]}
             # Keep heterogeneous gather groups within its typed tuple overloads.
@@ -589,77 +658,15 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             )
             if isinstance(supplement[0], list):
                 quotes.update({row.security_code: row for row in supplement[0]})
-            histories = histories if isinstance(histories, dict) else {}
-            stored_histories = read_stored_stock_histories(
-                [code for code in codes if code not in histories]
+            stock_rows, stock_history = await asyncio.to_thread(
+                _build_stock_rows,
+                codes,
+                quotes,
+                histories,
+                prior_by_code,
+                member_by_code,
+                trade_date,
             )
-            stock_rows, stock_history = [], []
-            for code in codes:
-                quote, prior = (
-                    quotes.get(code),
-                    prior_by_code.get(code, {"code": code, "name": code}),
-                )
-                history = sorted(
-                    histories.get(code, stored_histories.get(code, [])),
-                    key=lambda point: point.observed_at,
-                )
-                stock_history.extend(
-                    (
-                        str(point.observed_at),
-                        code,
-                        {"close": point.close, "turnoverYuan": point.turnover_yuan},
-                    )
-                    for point in history
-                    if code in histories
-                )
-                if quote is None:
-                    stock_rows.append(
-                        {
-                            **prior,
-                            "status": "stale" if prior.get("change") is not None else "no_data",
-                        }
-                    )
-                    continue
-                member = member_by_code.get(code)
-                observed = _quote_date(quote)
-                aligned = bool(history and observed and str(history[-1].observed_at) == observed)
-                status = (
-                    "ready"
-                    if aligned and quote.return_pct is not None and code in histories
-                    else "partial"
-                )
-                if observed and trade_date and observed < trade_date:
-                    status = "stale"
-                stock_rows.append(
-                    {
-                        "instrument_id": code,
-                        "code": code,
-                        "name": quote.security_name,
-                        "industry": member.sw_l2_name if member else prior.get("industry"),
-                        "price": float(quote.price) if quote.price is not None else None,
-                        "currency": quote.currency,
-                        "status": status,
-                        "observed_at": quote.observed_at.isoformat() if quote.observed_at else None,
-                        "history_date": str(history[-1].observed_at) if history else None,
-                        "history_source": "collected" if code in histories else "stored",
-                        "change": float(quote.return_pct / 100)
-                        if quote.return_pct is not None
-                        else None,
-                        "change_5d": _history_return(history, 5) if aligned else None,
-                        "change_20d": _history_return(history, 20) if aligned else None,
-                        "ytd": _history_ytd(history) if aligned else None,
-                        "amount_yi": float(quote.turnover_yuan / Decimal("1e8")),
-                        "turnover": float(quote.turnover_pct)
-                        if quote.turnover_pct is not None
-                        else None,
-                        "mcap_yi": float(quote.market_cap_yuan / Decimal("1e8"))
-                        if quote.market_cap_yuan is not None
-                        else None,
-                        "pe_ttm": float(quote.pe_ttm) if quote.pe_ttm is not None else None,
-                        "pb": float(quote.pb) if quote.pb is not None else None,
-                        "research_baskets": prior.get("research_baskets", []),
-                    }
-                )
             pool_ready = spots_closed and all(row["status"] == "ready" for row in stock_rows)
             pool = summarize_stock_pool(
                 {

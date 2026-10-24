@@ -1,24 +1,60 @@
-import { defineComponent, h, type PropType } from 'vue';
+import {
+  defineAsyncComponent,
+  defineComponent,
+  h,
+  type AsyncComponentLoader,
+  type PropType,
+} from 'vue';
 
-import CryptoMarketDetailPanel from '../components/CryptoMarketDetailPanel.vue';
-import BtcEtfFlowPanel from '../components/BtcEtfFlowPanel.vue';
-import CryptoIvTermPanel from '../components/CryptoIvTermPanel.vue';
-import CftcPositioningPanel from '../components/CftcPositioningPanel.vue';
-import GoldPositioningPanel from '../components/GoldPositioningPanel.vue';
-import GoldReportPanel from '../components/GoldReportPanel.vue';
-import GoldAnalystsPanel from '../components/GoldAnalystsPanel.vue';
-import CumulativeVolatilityPanel from '../components/CumulativeVolatilityPanel.vue';
-import GoldMarketDetailPanel from '../components/GoldMarketDetailPanel.vue';
-import MacroMarketDetailPanel from '../components/MacroMarketDetailPanel.vue';
-import FedWatchPanel from '../components/FedWatchPanel.vue';
-import PolymarketFedPanel from '../components/PolymarketFedPanel.vue';
 import { type LocalWidgetKey, type WidgetConfig } from '../nativeData/dashboardClean';
-import MacroSeriesChart from './MacroSeriesChart';
-import BitcoinHalvingPanel from '../components/BitcoinHalvingPanel.vue';
-import GoldOpenInterestPanel from '../components/GoldOpenInterestPanel.vue';
-import UrpdPanel from '../components/UrpdPanel.vue';
-import OptionExposurePanel from '../components/OptionExposurePanel.vue';
-import WgcEtfFlowPanel from '../components/WgcEtfFlowPanel.vue';
+
+const PanelLoading = defineComponent({
+  render: () =>
+    h(
+      'div',
+      { class: 'local-empty', style: { height: '360px' }, 'aria-busy': 'true' },
+      '正在加载图表…',
+    ),
+});
+
+// Component code follows the same viewport boundary as its data and rendering.
+const lazyPanel = (loader: AsyncComponentLoader) =>
+  defineAsyncComponent({
+    loader,
+    loadingComponent: PanelLoading,
+    delay: 0,
+  });
+
+const CryptoMarketDetailPanel = lazyPanel(
+  () => import('../components/CryptoMarketDetailPanel.vue'),
+);
+const BtcEtfFlowPanel = lazyPanel(() => import('../components/BtcEtfFlowPanel.vue'));
+const CryptoIvTermPanel = lazyPanel(() => import('../components/CryptoIvTermPanel.vue'));
+const CftcPositioningPanel = lazyPanel(() => import('../components/CftcPositioningPanel.vue'));
+const GoldPositioningPanel = lazyPanel(() => import('../components/GoldPositioningPanel.vue'));
+const GoldReportPanel = lazyPanel(() => import('../components/GoldReportPanel.vue'));
+const GoldAnalystsPanel = lazyPanel(() => import('../components/GoldAnalystsPanel.vue'));
+const CumulativeVolatilityPanel = lazyPanel(
+  () => import('../components/CumulativeVolatilityPanel.vue'),
+);
+const GoldMarketDetailPanel = lazyPanel(() => import('../components/GoldMarketDetailPanel.vue'));
+const MacroMarketDetailPanel = lazyPanel(() => import('../components/MacroMarketDetailPanel.vue'));
+const FedWatchPanel = lazyPanel(() => import('../components/FedWatchPanel.vue'));
+const PolymarketFedPanel = lazyPanel(() => import('../components/PolymarketFedPanel.vue'));
+const MacroSeriesChart = lazyPanel(() => import('./MacroSeriesChart'));
+const BitcoinHalvingPanel = lazyPanel(() => import('../components/BitcoinHalvingPanel.vue'));
+const GoldOpenInterestPanel = lazyPanel(() => import('../components/GoldOpenInterestPanel.vue'));
+const UrpdPanel = lazyPanel(() => import('../components/UrpdPanel.vue'));
+const OptionExposurePanel = lazyPanel(() => import('../components/OptionExposurePanel.vue'));
+const TreasuryWeeklySnapshotPanel = lazyPanel(
+  () => import('../components/TreasuryWeeklySnapshotPanel.vue'),
+);
+const CentralBankGoldPanel = lazyPanel(() => import('../components/CentralBankGoldPanel.vue'));
+const OptionsDistributionPanel = lazyPanel(
+  () => import('../components/OptionsDistributionPanel.vue'),
+);
+const StablecoinPanel = lazyPanel(() => import('../components/StablecoinPanel.vue'));
+const WgcEtfFlowPanel = lazyPanel(() => import('../components/WgcEtfFlowPanel.vue'));
 
 const externalGoldResearch = {
   'etf-weekly-flows': {
@@ -113,14 +149,6 @@ const externalGoldResearch = {
   },
 } as const;
 
-const externalCryptoResearch = {
-  'btc-treasury-flow': {
-    provider: 'SoSoValue',
-    description: '上市公司买入 BTC 周度资金净流入',
-    href: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
-  },
-} as const;
-
 const externalMacroResearch = {
   'macro-fed-balance-structure': {
     provider: 'MacroMicro',
@@ -153,7 +181,6 @@ const externalMacroResearch = {
 } as const;
 
 type ExternalGoldResearchKey = keyof typeof externalGoldResearch;
-type ExternalCryptoResearchKey = keyof typeof externalCryptoResearch;
 type ExternalMacroResearchKey = keyof typeof externalMacroResearch;
 
 function renderExternalMacroResearch(key: ExternalMacroResearchKey) {
@@ -227,37 +254,6 @@ function renderExternalGoldResearch(key: ExternalGoldResearchKey) {
   );
 }
 
-function renderExternalCryptoResearch(key: ExternalCryptoResearchKey) {
-  const item = externalCryptoResearch[key];
-  return h(
-    'div',
-    {
-      style: {
-        minHeight: '260px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '14px',
-        padding: '32px',
-        textAlign: 'center',
-        color: 'var(--color-text-2)',
-      },
-    },
-    [
-      h('span', '暂无可用数据'),
-      h('strong', { style: { color: 'var(--color-text-1)', fontSize: '16px' } }, item.provider),
-      h('span', item.description),
-      h(
-        'small',
-        key === 'btc-treasury-flow'
-          ? '暂未取得可核验的周度数据。'
-          : '当前尚未取得可核验的数据，可访问参考网页查看原始指标。',
-      ),
-    ],
-  );
-}
-
 export default defineComponent({
   name: 'LocalChartWidget',
   props: {
@@ -269,9 +265,67 @@ export default defineComponent({
         const key = props.widget.localKey as LocalWidgetKey;
         switch (key) {
           case 'macro-fed-balance-structure':
-            return h(MacroSeriesChart, { groupId: 'fedBalance', unitLabel: 'USD million' });
+            return h(MacroSeriesChart, { groupId: 'fedBalance', years: 30 });
+          case 'macro-fed-assets':
+            return h(MacroSeriesChart, { groupId: 'fedAssets', years: 30 });
+          case 'macro-cn-rates':
+            return h(MacroSeriesChart, { groupId: 'cnRates', years: 20 });
+          case 'macro-cn-policy-rates':
+            return h(MacroSeriesChart, { groupId: 'cnPolicyRates', years: 20 });
+          case 'macro-cn-money-stock':
+            return h(MacroSeriesChart, {
+              groupId: 'cnMoneyStock',
+              years: 20,
+              initiallyHiddenSeriesIds: ['cn_m2_mom', 'cn_m1_mom'],
+            });
+          case 'macro-cn-reserves':
+            return h(MacroSeriesChart, { groupId: 'cnReserves', years: 20 });
+          case 'macro-cn-rrr':
+            return h(MacroSeriesChart, { groupId: 'cnRrr', years: 30 });
+          case 'macro-cn-investment':
+            return h(MacroSeriesChart, { groupId: 'cnInvestment', years: 20 });
+          case 'macro-cn-property':
+            return h(MacroSeriesChart, { groupId: 'cnProperty', years: 20 });
+          case 'macro-cn-trade':
+            return h(MacroSeriesChart, { groupId: 'cnTrade', years: 20 });
+          case 'macro-cn-fiscal':
+            return h(MacroSeriesChart, { groupId: 'cnFiscal', years: 20 });
+          case 'macro-cn-profits':
+            return h(MacroSeriesChart, { groupId: 'cnIndustrialProfits', years: 20 });
+          case 'macro-cn-labor':
+            return h(MacroSeriesChart, { groupId: 'cnLabor', years: 20 });
+          case 'macro-cn-youth-labor':
+            return h(MacroSeriesChart, { groupId: 'cnYouthLabor', years: 20 });
+          case 'macro-cn-price-details':
+            return h(MacroSeriesChart, { groupId: 'cnPriceDetails', years: 20 });
+          case 'macro-cn-ppi-details':
+            return h(MacroSeriesChart, { groupId: 'cnPpiDetails', years: 20 });
+          case 'macro-cn-confidence':
+            return h(MacroSeriesChart, { groupId: 'cnConfidence', years: 20 });
+          case 'macro-cn-fx':
+            return h(MacroSeriesChart, { groupId: 'cnFx', years: 20 });
+          case 'macro-cn-treasury':
+            return h(MacroSeriesChart, { groupId: 'cnTreasury', years: 20 });
+          case 'macro-cn-growth':
+            return h(MacroSeriesChart, { groupId: 'cnGrowth', years: 20 });
+          case 'macro-cn-pmi':
+            return h(MacroSeriesChart, { groupId: 'cnPmi', years: 20 });
+          case 'macro-cn-credit':
+            return h(MacroSeriesChart, {
+              groupId: 'cnCredit',
+              years: 20,
+              barSeriesIds: ['cn_new_rmb_loans', 'cn_tsf_flow'],
+            });
+          case 'macro-cn-inflation':
+            return h(MacroSeriesChart, { groupId: 'cnInflation', years: 20 });
+          case 'macro-cn-risk-leverage':
+            return h(MacroSeriesChart, { groupId: 'cnRiskLeverage', years: 20 });
+          case 'macro-cn-risk-volatility':
+            return h(MacroSeriesChart, { groupId: 'cnRiskVolatility', years: 20 });
           case 'macro-polymarket-fed':
             return h(PolymarketFedPanel);
+          case 'macro-corporate-yields':
+            return h(MacroSeriesChart, { groupId: 'corporateYields', unitLabel: '%' });
           case 'macro-inflation-nowcast':
             return h(MacroSeriesChart, { groupId: 'inflationNowcast', years: 1, unitLabel: '%' });
           case 'macro-inflation-expectations':
@@ -309,11 +363,7 @@ export default defineComponent({
               presentation: 'distribution',
             });
           case 'central-bank-buyers':
-            return h(MacroSeriesChart, {
-              dataDomain: 'commodity',
-              groupId: 'wgcPurchases',
-              presentation: 'distribution',
-            });
+            return h(CentralBankGoldPanel);
           case 'commodity-wti-curve':
           case 'commodity-brent-curve':
           case 'commodity-copper-curve':
@@ -440,11 +490,7 @@ export default defineComponent({
               unitLabel: 'troy oz',
             });
           case 'crypto-stablecoins':
-            return h(MacroSeriesChart, {
-              dataDomain: 'crypto',
-              groupId: 'stablecoins',
-              unitLabel: 'USD',
-            });
+            return h(StablecoinPanel);
           case 'crypto-fear-greed':
             return h(MacroSeriesChart, {
               dataDomain: 'crypto',
@@ -455,6 +501,7 @@ export default defineComponent({
             return h(MacroSeriesChart, {
               dataDomain: 'crypto',
               groupId: 'binanceFunding',
+              barSeriesIds: ['binance_btc_funding'],
               unitLabel: '%',
             });
           case 'gold-market-detail-table':
@@ -471,6 +518,8 @@ export default defineComponent({
             });
           case 'macro-global-m2-yoy':
             return h(MacroSeriesChart, { groupId: 'globalM2YoY', years: 10, unitLabel: '%' });
+          case 'macro-us-pmi':
+            return h(MacroSeriesChart, { groupId: 'usPmi', years: 30, unitLabel: 'index' });
           case 'macro-growth-production':
             return h(MacroSeriesChart, { groupId: 'growthProduction', years: 10, unitLabel: '%' });
           case 'macro-growth-labor':
@@ -487,6 +536,8 @@ export default defineComponent({
             return h(MacroSeriesChart, { groupId: 'rateCorridor', years: 10, unitLabel: '%' });
           case 'macro-risk-hy-oas':
             return h(MacroSeriesChart, { groupId: 'riskHighYieldOas', years: 5, unitLabel: '%' });
+          case 'macro-real-yield':
+            return h(MacroSeriesChart, { groupId: 'realYield', years: 5, unitLabel: '%' });
           case 'macro-risk-credit-ratio':
             return h(MacroSeriesChart, {
               groupId: 'riskCreditRatio',
@@ -590,13 +641,20 @@ export default defineComponent({
           case 'crypto-atm-iv-term':
             return h(CryptoIvTermPanel);
           case 'btc-treasury-flow':
-            return renderExternalCryptoResearch(key);
+            return h(TreasuryWeeklySnapshotPanel);
+          case 'crypto-options-distribution':
+            return h(OptionsDistributionPanel);
+          case 'crypto-binance-eth-combined':
+            return h(MacroSeriesChart, {
+              dataDomain: 'crypto',
+              groupId: 'binanceCombinedEth',
+              years: 3,
+            });
           case 'crypto-binance-open-interest':
             return h(MacroSeriesChart, {
               dataDomain: 'crypto',
-              groupId: 'binanceOpenInterest',
-              years: 1,
-              unitLabel: 'USD',
+              groupId: 'binanceCombinedBtc',
+              years: 3,
             });
           default:
             return h('div', { class: 'local-empty' }, '该图表配置尚未接入。');

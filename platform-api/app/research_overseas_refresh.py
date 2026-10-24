@@ -22,11 +22,14 @@ from app.config import get_settings
 from app.research_a_share_repository import finish_refresh, start_refresh
 from app.research_cumulative_volatility import refresh_cumulative_volatility
 from app.research_equity_observatory import run_periodic as run_equity_periodic
+from app.research_etf_tracking import run_periodic as run_etf_periodic
+from app.research_fedwatch import METHODOLOGY
 from app.research_macro_expectations_refresh import refresh_macro_expectations
 from app.research_market_detail_refresh import refresh_market_details
 from app.research_overseas_repository import (
     _read_shared_daily_prices,
     read_latest_fetched_at,
+    read_latest_series,
     write_iv_snapshot,
     write_overseas_points,
     write_overseas_series,
@@ -98,7 +101,11 @@ def _hourly_observed_at() -> str:
 async def _collect_fedwatch(force: bool) -> tuple[str, str]:
     """抓取并落库 FedWatch，返回 (status, message)。"""
     dataset = "macro_fedwatch"
-    if not force and _already_refreshed_within(dataset, timedelta(hours=1)):
+    if (
+        not force
+        and _already_refreshed_within(dataset, timedelta(hours=1))
+        and read_latest_series(dataset).get("__meta__", {}).get("methodology") == METHODOLOGY
+    ):
         return "up_to_date", ""
     run_id = uuid4().hex
     observed_at = _hourly_observed_at()
@@ -113,6 +120,16 @@ async def _collect_fedwatch(force: bool) -> tuple[str, str]:
                 "observedAt": observed_at,
                 "settlementSource": fedwatch.get("settlementSource"),
                 "zqPricing": fedwatch["zqPricing"],
+                **{
+                    key: fedwatch.get(key)
+                    for key in (
+                        "methodology",
+                        "probabilityUnit",
+                        "quoteAsOf",
+                        "contractQuoteTimes",
+                        "missingMeetings",
+                    )
+                },
             }
         }
         for meeting in fedwatch["meetings"]:
@@ -124,8 +141,9 @@ async def _collect_fedwatch(force: bool) -> tuple[str, str]:
             await asyncio.to_thread(
                 write_overseas_series, run_id, dataset, observed_at, series, source=_SOURCE_FEDWATCH
             )
-            await asyncio.to_thread(finish_refresh, run_id, "ready")
-        return "ready", ""
+            status = "partial" if fedwatch.get("missingMeetings") else "ready"
+            await asyncio.to_thread(finish_refresh, run_id, status)
+        return status, ""
     except BaseException as exc:
         async with RESEARCH_DB_WRITE_LOCK:
             await asyncio.to_thread(
@@ -297,13 +315,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     task = asyncio.create_task(_run_periodic(max(60.0, settings.research_refresh_interval_seconds)))
     market_task = asyncio.create_task(_run_market_periodic())
     equity_task = asyncio.create_task(run_equity_periodic())
+    etf_task = asyncio.create_task(run_etf_periodic())
     try:
         yield
     finally:
         task.cancel()
         market_task.cancel()
         equity_task.cancel()
-        await asyncio.gather(task, market_task, equity_task, return_exceptions=True)
+        etf_task.cancel()
+        await asyncio.gather(task, market_task, equity_task, etf_task, return_exceptions=True)
 
 
 async def _run_market_periodic() -> None:
@@ -325,6 +345,11 @@ async def _run_periodic(interval_seconds: float) -> None:
             await asyncio.to_thread(refresh_macro_expectations)
         except Exception:
             pass
+        try:
+            from app.research_polymarket_fomc import refresh_fomc
+            await asyncio.to_thread(refresh_fomc)
+        except Exception:
+            logging.getLogger(__name__).exception("FOMC refresh failed")
         # Intraday candles are a separate five-minute production cadence. The
         # daily overseas sources still remain gated/idempotent inside
         # refresh_overseas(), so this does not refetch them on every tick.

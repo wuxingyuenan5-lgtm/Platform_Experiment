@@ -1,12 +1,21 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue';
-  import { useRoute, RouterLink } from 'vue-router';
+  import { useRoute, useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
+  import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
+  import ResearchWorkspace from '../components/ResearchWorkspace.vue';
+  import { hedgeBoardNav } from '../composables/useHedgeBoardPage';
   import ToolGroupSection from './components/ToolGroupSection.vue';
   import { loadTradingToolCategory, type TradingToolCategoryId } from './data/catalog';
   import type { TradingToolCategory, TradingToolGroup } from './data/marketTools';
 
   const route = useRoute();
+  const router = useRouter();
+  const boardTabs = hedgeBoardNav.map((item) => ({ key: item.id, label: item.label }));
+  function selectBoard(key: string) {
+    const destination = hedgeBoardNav.find((item) => item.id === key);
+    if (destination) void router.push(destination.path);
+  }
 
   const categoryTabs: Array<{
     id: TradingToolCategoryId;
@@ -94,41 +103,49 @@
 <template>
   <PageWrapper :title="pageTitle">
     <div class="trading-tools-page">
-      <nav class="trading-tools-page__category-nav">
-        <RouterLink
-          v-for="item in categoryTabs"
-          :key="item.id"
-          :to="item.path"
-          class="trading-tools-page__category-pill"
-          :class="{ 'is-active': item.id === activeCategoryId }"
-        >
-          {{ item.title }}
-        </RouterLink>
-      </nav>
+      <section class="strategy-top-toolbar"
+        ><div class="strategy-top-toolbar__left"
+          ><CompactSegmentTabs
+            :items="boardTabs"
+            model-value="tradingTools"
+            @update:model-value="selectBoard" /></div
+      ></section>
+      <ResearchWorkspace
+        :pages="categoryTabs.map((item) => ({ key: item.id, label: item.title, path: item.path }))"
+        :active="activeCategoryId"
+        label="交易工具"
+      >
+        <div class="trading-tools-page__search">
+          <input
+            v-model="query"
+            type="search"
+            aria-label="搜索当前分类工具"
+            placeholder="搜索工具名称、网站或用途"
+          />
+          <button v-if="query" type="button" @click="query = ''">清空</button>
+          <span role="status">{{
+            loading ? '正在加载工具…' : `${filteredCount} / ${totalCount} 个工具`
+          }}</span>
+        </div>
 
-      <div class="trading-tools-page__search">
-        <input
-          v-model="query"
-          type="search"
-          aria-label="搜索当前分类工具"
-          placeholder="搜索工具名称、网站或用途"
-        />
-        <button v-if="query" type="button" @click="query = ''">清空</button>
-        <span role="status">{{
-          loading ? '正在加载工具…' : `${filteredCount} / ${totalCount} 个工具`
-        }}</span>
-      </div>
-
-      <section class="trading-tools-page__catalog">
-        <p v-if="loadError" role="alert">工具目录加载失败，请刷新页面重试。</p>
-        <p v-else-if="!loading && !filteredCount">没有匹配的工具，可修改关键词或切换分类。</p>
-        <ToolGroupSection v-for="group in filteredGroups" :key="group.id" :group="group" />
-      </section>
+        <section class="trading-tools-page__catalog">
+          <p v-if="loadError" role="alert">工具目录加载失败，请刷新页面重试。</p>
+          <p v-else-if="!loading && !filteredCount">没有匹配的工具，可修改关键词或切换分类。</p>
+          <ToolGroupSection v-for="group in filteredGroups" :key="group.id" :group="group" />
+        </section>
+      </ResearchWorkspace>
     </div>
   </PageWrapper>
 </template>
 
 <style scoped lang="less">
+  .strategy-top-toolbar {
+    padding: 10px 12px;
+    border: 1px solid #edf0f4;
+    border-radius: 16px;
+    background: #fff;
+  }
+
   :global(#app:has(.trading-tools-page)) {
     min-width: 0;
   }

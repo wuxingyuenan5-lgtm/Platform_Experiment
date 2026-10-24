@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, Any
 
 from pydantic import Field, field_validator
 
@@ -52,6 +52,7 @@ class MacroDashboardResponse(ResearchApiModel):
     status: str
     as_of: str
     groups: dict[str, list[MacroDashboardSeries]]
+    option_distribution: dict[str, Any] = Field(default_factory=dict)
     option_exposure: dict[str, OptionExposureSnapshot] = Field(default_factory=dict)
 
     def apply_freshness(self, now: datetime | None = None) -> None:
@@ -71,7 +72,9 @@ class MacroDashboardResponse(ResearchApiModel):
             "quarterly": 200,
             "daily_last_collected_snapshot": 2,
         }
-        for group in self.groups.values():
+        for group_id, group in self.groups.items():
+            if group_id == "shfeGoldCurveHistory":
+                continue  # Expired contracts are historical observations, not a current feed.
             for series in group:
                 if series.status in {"error", "no_data"}:
                     continue
@@ -97,7 +100,8 @@ class MacroDashboardResponse(ResearchApiModel):
                         series.quality_flags.append("stale_latest_observation")
         for snapshot in self.option_exposure.values():
             snapshot.apply_freshness(now)
-        if any(s.status != "ready" for group in self.groups.values() for s in group) or any(
+        if any(s.status != "ready" for group_id, group in self.groups.items()
+               if group_id != "shfeGoldCurveHistory" for s in group) or any(
             s.status != "ready" for s in self.option_exposure.values()
         ):
             if self.status == "ready":

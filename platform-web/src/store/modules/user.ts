@@ -148,16 +148,28 @@ export const useUserStore = defineStore({
           getUserSystemCsrfToken(),
         ]),
       );
-      clearAuthCache();
-      this.authentication = authentication;
+      if (!this.authenticated) clearAuthCache();
+      if (JSON.stringify(this.authentication) !== JSON.stringify(authentication)) {
+        this.authentication = authentication;
+      }
       this.authenticated = true;
       this.sessionUnavailable = false;
       this.hydrationAttempted = true;
       this.sessionTimeout = false;
-      this.setRoleList([authentication.user.role]);
-      this.setUserInfo(toLegacyUserInfo(authentication));
+      if (this.roleList.length !== 1 || this.roleList[0] !== authentication.user.role) {
+        this.setRoleList([authentication.user.role]);
+      }
+      const info = toLegacyUserInfo(authentication);
+      // Verification still runs on every navigation. Keep unchanged UI projections
+      // stable so a renewed session does not invalidate the whole application.
+      if (JSON.stringify(this.userInfo) !== JSON.stringify(info)) this.setUserInfo(info);
       const permissionStore = usePermissionStore();
-      permissionStore.setPermCodeList(authentication.permissions);
+      if (
+        JSON.stringify(permissionStore.getPermCodeList) !==
+        JSON.stringify(authentication.permissions)
+      ) {
+        permissionStore.setPermCodeList(authentication.permissions);
+      }
     },
     resetState() {
       setStrategyQuerySession();

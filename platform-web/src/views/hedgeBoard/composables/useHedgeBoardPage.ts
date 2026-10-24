@@ -27,7 +27,7 @@ const moduleRoutes: Record<HedgeBoardNavKey, string> = {
   tradingTools: '/hedge-board/trading-tools/macro',
 };
 
-const hedgeBoardNav: ReadonlyArray<{
+export const hedgeBoardNav: ReadonlyArray<{
   id: HedgeBoardNavKey;
   label: string;
   path: string;
@@ -49,7 +49,6 @@ const sectionLabelOverrides: Record<string, { title?: string }> = {
   'macro-growth': { title: '经济' },
   'macro-risk-appetite': { title: '风险偏好' },
   'gold-flows': { title: 'ETF与资金面' },
-  'gold-main': { title: '黄金主图' },
   'gold-rates': { title: '金价驱动分析' },
   'crypto-etf': { title: '加密资金面' },
 };
@@ -67,17 +66,14 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
   macro: macroSectionOrder,
   gold: [
     'gold-market',
-    'gold-main',
     'gold-flows',
     'gold-cftc',
     'gold-rates',
     'gold-browser-toolbox',
-    'gold-intraday-cumulative-volatility',
     'gold-research-analysts',
   ],
   crypto: [
     'crypto-market',
-    'crypto-main',
     'crypto-etf',
     'crypto-native-venue',
     'crypto-external-research',
@@ -88,7 +84,7 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
 const widgetTextOverrides: Record<string, { title?: string }> = {
   'etf-weekly-flows': { title: '全球黄金 ETF 资金流' },
   'central-bank-holders': { title: '官方黄金储备 · 分国家' },
-  'central-bank-buyers': { title: '央行黄金净购买 · 主要国家' },
+  'central-bank-buyers': { title: '央行购金' },
 };
 
 const ETF_REFERENCE_URL = 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows';
@@ -98,7 +94,6 @@ const widgetSourceLinks: Partial<Record<string, string>> = {
   'macro-fed-balance-structure':
     'https://sc.macromicro.me/collections/4238/us-federal/1320/us-fed-liabilities-structure',
   'macro-fedwatch': 'https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html',
-  'macro-polymarket-fed': 'https://polymarket.com/zh/event/another-fed-rate-hike-in-2026',
   'macro-inflation-nowcast':
     'https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting',
   'macro-inflation-expectations': 'https://www.newyorkfed.org/microeconomics/sce#/inflexp-1',
@@ -110,6 +105,7 @@ const widgetSourceLinks: Partial<Record<string, string>> = {
   'macro-upstream-inflation': 'https://fred.stlouisfed.org/series/PPIFIS',
   'macro-market-inflation': 'https://fred.stlouisfed.org/series/T10YIE',
   'macro-risk-hy-oas': 'https://fred.stlouisfed.org/series/BAMLH0A0HYM2',
+  'macro-real-yield': 'https://fred.stlouisfed.org/series/DFII10',
   'macro-risk-credit-ratio': 'https://finance.yahoo.com/quote/HYG/history/',
   'btc-etf-flow': 'https://sosovalue.com/zh/assets/etf/Total_Crypto_Spot_ETF_Fund_Flow?page=usBTC',
   'crypto-eth-etf-flow':
@@ -271,7 +267,7 @@ export function useHedgeBoardPage() {
 
   function shouldHideWidgetHeader(sectionId: string, widget: WidgetConfig) {
     const localKey = widget.localKey;
-    if (['macro-liquidity', 'gold-main', 'crypto-main'].includes(sectionId)) {
+    if (['macro-liquidity', 'gold-market', 'crypto-market'].includes(sectionId)) {
       return widget.kind !== 'local-chart' && !getWidgetSourceLink(widget);
     }
     if (!localKey) return false;

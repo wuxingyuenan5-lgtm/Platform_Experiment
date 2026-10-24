@@ -6,9 +6,10 @@ from contextlib import nullcontext
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from app.database import connection
 from app.a_share_research_policy import market_breadth_pct
+from app.database import connection
 from app.research_data_schemas import (
     AShareDashboardResponse,
     AShareIndexHistoryPoint,
@@ -569,12 +570,18 @@ def finish_refresh(
         )
 
 
-def read_refresh_status() -> dict[str, Any] | None:
+def read_refresh_status(market: str = "CN") -> dict[str, Any] | None:
+    scope = (
+        "run_id LIKE 'hk-share-%'"
+        if market == "HK"
+        else "(run_id LIKE 'a-share-%' OR (target_trade_date IS NOT NULL "
+        "AND run_id NOT LIKE 'hk-share-%'))"
+    )
     with connection() as db:
         row = db.execute(
             "SELECT run_id,target_trade_date,started_at,finished_at,status,error_code,mes"
             "sage FROM research_a_share_refresh_runs "
-            "WHERE run_id LIKE 'a-share-%' OR target_trade_date IS NOT NULL "
+            f"WHERE {scope} "
             "ORDER BY started_at DESC LIMIT 1"
         ).fetchone()
     if row is None:
@@ -912,10 +919,44 @@ def read_dashboard() -> AShareDashboardResponse | None:
 
 
 def write_stock_pool(
-    run_id: str, payload: dict[str, Any], *, db: sqlite3.Connection | None = None
+    run_id: str,
+    payload: dict[str, Any],
+    *,
+    db: sqlite3.Connection | None = None,
+    market: str | None = None,
 ) -> None:
     now = _now()
     with nullcontext(db) if db is not None else connection() as db:
+        previous = None
+        if market:
+            previous = db.execute(
+                "SELECT * FROM research_a_share_dataset_snapshots WHERE dataset='stock_pool'"
+            ).fetchone()
+            old = (
+                json.loads(previous["payload_json"])
+                if previous
+                else {"meta": {"status": "no_data"}}
+            )
+            # Both producers merge under their publication transaction/write lock.
+            # A late response may replace only its own market's rows and metadata.
+            retained = [
+                row
+                for row in old.get("stocks", [])
+                if (len(str(row.get("code", ""))) == 5) != (market == "HK")
+            ]
+            incoming = [
+                row
+                for row in payload.get("stocks", [])
+                if (len(str(row.get("code", ""))) == 5) == (market == "HK")
+            ]
+            market_status = {**old.get("marketStatus", {}), market: payload.get("meta", {})}
+            payload = {
+                **(old if market == "HK" else payload),
+                "stocks": retained + incoming,
+                "marketStatus": market_status,
+            }
+            payload = summarize_stock_pool(payload)
+        preserve_cn_metadata = market == "HK" and previous is not None
         db.execute(
             """INSERT INTO research_a_share_dataset_snapshots
             (dataset,observed_at,fetched_at,status,source,payload_json,refresh_run_id)
@@ -925,12 +966,16 @@ def write_stock_pool(
             refresh_run_id=excluded.refresh_run_id""",
             (
                 "stock_pool",
-                payload.get("meta", {}).get("report_date"),
-                now,
-                payload.get("meta", {}).get("status", "ready"),
+                previous["observed_at"]
+                if preserve_cn_metadata
+                else payload.get("meta", {}).get("report_date"),
+                previous["fetched_at"] if preserve_cn_metadata else now,
+                previous["status"]
+                if preserve_cn_metadata
+                else payload.get("meta", {}).get("status", "ready"),
                 "platform-research-derived",
                 json.dumps(_jsonable(payload), ensure_ascii=False),
-                run_id,
+                previous["refresh_run_id"] if preserve_cn_metadata else run_id,
             ),
         )
 
@@ -1055,8 +1100,34 @@ def read_stock_pool(extra_codes: list[str] | None = None) -> dict[str, Any]:
     if latest_run and latest_run["status"] == "error" and by_code:
         payload.setdefault("meta", {})["status"] = "stale"
         for stock in by_code.values():
-            if stock.get("status") != "no_data":
+            if len(str(stock.get("code", ""))) == 6 and stock.get("status") != "no_data":
                 stock["status"] = "stale"
+    hk_run = read_refresh_status("HK")
+    if hk_run and hk_run["status"] == "error":
+        payload.setdefault("marketStatus", {}).setdefault("HK", {})["status"] = "stale"
+        for stock in by_code.values():
+            if len(str(stock.get("code", ""))) == 5 and stock.get("status") != "no_data":
+                stock["status"] = "stale"
+    from app.research_hk_calendar import hk_last_session
+
+    today = datetime.now(ZoneInfo("Asia/Hong_Kong")).date()
+    hk_session = hk_last_session(today)
+    market_status = payload.setdefault("marketStatus", {})
+    market_status.setdefault("CN", dict(payload.get("meta", {})))
+    if latest_run and latest_run["status"] == "error":
+        market_status["CN"]["status"] = "stale"
+    hk_rows = [row for code, row in by_code.items() if len(code) == 5]
+    hk_meta = market_status.setdefault(
+        "HK",
+        {
+            "report_date": max(
+                (str(row.get("observed_at") or "")[:10] for row in hk_rows), default=None
+            ),
+            "status": "partial" if hk_rows else "no_data",
+        },
+    )
+    hk_meta["is_trading_day"] = hk_session == today if hk_session else None
+    hk_meta["expected_trade_date"] = hk_session.isoformat() if hk_session else None
     payload["stocks"] = [
         by_code.get(code, {"code": code, "instrument_id": code, "name": code, "status": "no_data"})
         for code in codes
@@ -1219,7 +1290,7 @@ def publish_refresh(
     with connection() as db:
         db.execute("BEGIN IMMEDIATE")
         write_dashboard(run_id, dashboard, db=db)
-        write_stock_pool(run_id, pool, db=db)
+        write_stock_pool(run_id, pool, db=db, market="CN")
         for dataset, payload, source in datasets:
             write_dataset(
                 dataset, payload, source=source, run_id=run_id, observed_at=trade_date, db=db

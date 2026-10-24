@@ -367,6 +367,7 @@
 </template>
 
 <script setup lang="ts">
+  import { useResearchViewState } from '../composables/researchWorkspace';
   import { getMarketLayout, saveMarketLayout, type MarketLayoutGroup } from '@/api/hedgeResearch';
   import { useUserStore } from '@/store/modules/user';
 
@@ -438,10 +439,19 @@
   ] as const;
 
   const editableGroups = ref<TerminalTableGroup[]>([]);
-  const expandedGroups = ref<Record<string, boolean>>({});
-  const tableSortState = ref<SortState | null>(null);
+  const expandedGroups = useResearchViewState<Record<string, boolean>>(
+    `terminal:${props.marketId}:expandedGroups`,
+    {},
+  );
+  const tableSortState = useResearchViewState<SortState | null>(
+    `terminal:${props.marketId}:tableSortState`,
+    null,
+  );
   const rotationExpanded = ref(true);
-  const rotationSortState = ref<SortState | null>(null);
+  const rotationSortState = useResearchViewState<SortState | null>(
+    `terminal:${props.marketId}:rotationSortState`,
+    null,
+  );
   const editMode = ref(false);
   const addFormVisible = ref(false);
   const chartContainerRef = ref<HTMLDivElement | null>(null);
@@ -520,7 +530,7 @@
       ? reconcileSavedGroups(fallbackGroups, savedGroups)
       : fallbackGroups;
     expandedGroups.value = Object.fromEntries(
-      editableGroups.value.map((group) => [group.label, true]),
+      editableGroups.value.map((group) => [group.label, expandedGroups.value[group.label] ?? true]),
     );
     if (!addForm.value.groupLabel) {
       addForm.value.groupLabel = editableGroups.value[0]?.label || '';
@@ -1319,6 +1329,7 @@
   }
 
   .market-terminal__sparkline polyline {
+    vector-effect: non-scaling-stroke;
     stroke-width: 1.5;
     stroke-linecap: round;
     fill: none;

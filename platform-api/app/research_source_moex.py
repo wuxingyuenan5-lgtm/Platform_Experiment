@@ -15,7 +15,9 @@ HISTORY_URL = (
 )
 QUOTE_URL = "https://iss.moex.com/iss/engines/stock/markets/index/securities/IMOEX.json"
 SOURCE_URL = "https://www.moex.com/ru/index/IMOEX"
-CACHE_PATH = "public/v1/global/series/imoex.json"
+# Incremental source cache is not a canonical serving-series document. Keep it
+# outside public/v1/*/series, which the scheduled DuckDB mirror imports.
+CACHE_PATH = "history/market-detail/moex/imoex.json"
 
 
 def records(payload, key):
