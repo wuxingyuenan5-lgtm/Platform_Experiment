@@ -228,20 +228,22 @@ export function buildSourceSeriesOptions(
         color: item.seriesId === 'xauusd_daily_close' ? '#111111' : colors[index],
       },
       itemStyle: {
-        color: barSeriesIds.includes(item.seriesId)
-          ? (point: { value: [number, number | null] }) =>
-              item.seriesId === 'wgc_central_bank_quarterly_purchases'
-                ? '#32aed4'
-                : Number(point.value[1]) >= 0
-                ? item.seriesId.includes('funding')
-                  ? '#089981'
-                  : '#f97980'
-                : item.seriesId.includes('funding')
-                ? '#f23645'
-                : '#53b987'
-          : item.seriesId === 'xauusd_daily_close'
-          ? '#111111'
-          : colors[index],
+        color:
+          barSeriesIds.includes(item.seriesId) &&
+          !['us_nonfarm_change', 'us_adp_change'].includes(item.seriesId)
+            ? (point: { value: [number, number | null] }) =>
+                item.seriesId === 'wgc_central_bank_quarterly_purchases'
+                  ? '#32aed4'
+                  : Number(point.value[1]) >= 0
+                  ? item.seriesId.includes('funding')
+                    ? '#089981'
+                    : '#f97980'
+                  : item.seriesId.includes('funding')
+                  ? '#f23645'
+                  : '#53b987'
+            : item.seriesId === 'xauusd_daily_close'
+            ? '#111111'
+            : colors[index],
       },
       emphasis: { focus: 'series' },
     })),
@@ -252,9 +254,9 @@ export function regionalFlowColor(seriesId: string): string {
   if (seriesId === 'xauusd_daily_close') return '#111111';
   const palette: Record<string, string> = {
     global: '#165dff',
-    north_america: '#0f8b6d',
-    europe: '#c7931a',
-    asia: '#7c3aed',
+    north_america: '#165dff',
+    europe: '#0f8b6d',
+    asia: '#e6b422',
     other: '#dc2626',
   };
   return (

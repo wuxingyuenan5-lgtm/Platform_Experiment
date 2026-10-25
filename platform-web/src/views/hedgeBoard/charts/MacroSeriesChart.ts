@@ -11,6 +11,7 @@ import {
 
 import SourceSeriesPlot from './SourceSeriesPlot.vue';
 import { curveAtDate, curveDates } from './curveHistory';
+import { initialChartYears, macroDisplayLabel } from './macroChartDefaults';
 import { unitText, frequencyText, regionalFlowColor } from './sourceSeriesOptions';
 
 const COLORS = ['#165dff', '#0f8b6d', '#c7931a', '#7c3aed', '#dc2626', '#64748b', '#0891b2'];
@@ -67,15 +68,7 @@ export default defineComponent({
   setup(props) {
     const selectedYears = useResearchViewState(
       `macro:${props.groupId}:selectedYears`,
-      props.dataDomain === 'macro'
-        ? 5
-        : props.presentation === 'gold-drivers'
-        ? 1
-        : props.groupId === 'coinbasePremium' ||
-          props.groupId === 'cnyUsdt' ||
-          props.groupId.startsWith('binanceCombined')
-        ? 0.25
-        : 3,
+      initialChartYears(props.groupId, props.dataDomain, props.presentation),
     );
     const hidden = useResearchViewState(
       `macro:${props.groupId}:hidden`,
@@ -106,6 +99,18 @@ export default defineComponent({
               .map((id) => group.find((item) => item.seriesId === id))
               .filter((item): item is MacroDashboardSeries => Boolean(item))
           : group;
+        series.value = series.value.map((item) => ({
+          ...item,
+          label: macroDisplayLabel(props.groupId, item.seriesId, item.label),
+        }));
+        if (props.presentation === 'regional-stack') {
+          series.value = series.value.map((item) => ({
+            ...item,
+            label: item.label
+              .replace(/\s*·\s*黄金\s*ETF\s*资金流\s*$/i, '')
+              .replace('（区域合计）', '(区域合计)'),
+          }));
+        }
         if (props.groupId === 'majorFx' || props.groupId === 'rmbFx') {
           const unit = props.groupId === 'majorFx' ? '美元/单位外币' : '人民币/美元';
           series.value = series.value.map((item) => ({ ...item, unit }));

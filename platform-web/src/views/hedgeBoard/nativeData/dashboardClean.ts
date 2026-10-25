@@ -446,6 +446,12 @@ export const researchModules: ResearchModule[] = [
             },
           ),
           localChart('美国 PMI', 'ISM 制造业 / 服务业 · 50为荣枯线', 'macro-us-pmi'),
+          localChart(
+            '非农新增就业与 ADP',
+            'BLS 非农 / ADP 私营就业 · 季调 · 千人',
+            'macro-us-employment',
+          ),
+          localChart('美国失业率', 'BLS · 月度 · 季调 · %', 'macro-us-unemployment'),
           localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
           localChart('广义经济活动', 'CFNAI / CFNAIMA3', 'macro-growth-activity'),
           localChart(
@@ -463,12 +469,6 @@ export const researchModules: ResearchModule[] = [
             '相邻月份环比 · %',
             'macro-us-consumption-momentum',
           ),
-          localChart(
-            '非农新增就业与 ADP',
-            'BLS 非农 / ADP 私营就业 · 季调 · 千人',
-            'macro-us-employment',
-          ),
-          localChart('美国失业率', 'BLS · 月度 · 季调 · %', 'macro-us-unemployment'),
           localChart(
             '美国企业盈利预期 · SPF',
             '企业税后利润预测中位数：当季 / 4季度后 · 季调年率',
