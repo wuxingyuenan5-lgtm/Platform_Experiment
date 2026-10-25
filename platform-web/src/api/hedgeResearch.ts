@@ -809,10 +809,34 @@ export const getCumulativeVolatility = (
     params: { asset, days, interval, ...window },
   });
 
+export interface TreasuryWeeklyRow {
+  weekDate: string;
+  observedAt: string;
+  netFlowUsd: string;
+  netFlowDisplay: string;
+  netFlowUsdPrecision: string;
+  netBtc: string | null;
+  netBtcDisplay: string;
+  netBtcPrecision: string | null;
+  btcPriceUsd: string;
+  btcPriceDisplay: string;
+  btcPriceUsdPrecision: string;
+  companies: Array<{ name: string; value: string; display: string; precision: string }>;
+}
 export const getTreasuryWeeklySnapshot = () =>
   researchRequest<{
     status: string;
     observedAt: string | null;
     sourceUrl: string;
     dataPath: string | null;
+    dataStatus: string;
+    weeks: TreasuryWeeklyRow[];
   }>({ method: 'GET', url: '/research/crypto/treasury-weekly-snapshot' });
+
+export const getTreasuryWeeklyHistory = () =>
+  researchRequest<{
+    status: string;
+    observedAt: string | null;
+    sourceUrl: string;
+    weeks: TreasuryWeeklyRow[];
+  }>({ method: 'GET', url: '/research/crypto/treasury-weekly-history' });

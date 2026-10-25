@@ -72,6 +72,8 @@ export function buildSourceCurveOptions(
 }
 
 const UNITS: Record<string, string> = {
+  basis_points: 'bp',
+  thousand_persons: '千人',
   percent: '%',
   percentage_points: '百分点',
   index: '指数',
@@ -85,6 +87,7 @@ const UNITS: Record<string, string> = {
   usd_100million: '亿美元',
   hours: '小时',
   fx_rate: '汇率',
+  cny_per_unit: '元',
   'USD million': '百万美元',
   usd_billion: '十亿美元',
   usd_trillion: '万亿美元',
@@ -98,6 +101,7 @@ export const frequencyText = (frequency: string) =>
   ({
     daily: '日度',
     daily_business_day: '交易日',
+    daily_weekly_release: '日度（周度发布）',
     daily_last_collected_snapshot: '每日最新快照',
     weekly: '周度',
     monthly: '月度',

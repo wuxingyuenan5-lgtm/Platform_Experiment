@@ -17,22 +17,111 @@ export interface EquityRank {
   start: string | null;
   end: string | null;
 }
-export interface EquityTheme {
-  name: string;
-  segments: string[];
+export interface ThemeMetrics {
   expected: number;
   covered: number;
   medianReturn: EquityValue;
   advancingPct: EquityValue;
-  members: Array<{
+  return5?: EquityValue;
+  return20?: EquityValue;
+  relative20?: EquityValue;
+  returnPctCount?: number;
+  return5Count?: number;
+  return20Count?: number;
+  relative20Count?: number;
+  returnPctRankable?: boolean;
+  return5Rankable?: boolean;
+  return20Rankable?: boolean;
+  relative20Rankable?: boolean;
+  above20Pct?: EquityValue;
+  above20Count?: number;
+}
+export interface ThemeMember {
+  code: string;
+  name: string;
+  segment: string;
+  returnPct: EquityValue;
+  return5?: EquityValue;
+  return20?: EquityValue;
+  relative20?: EquityValue;
+  date: string | null;
+  themeCount: number;
+  themes?: string[];
+  industry?: string | null;
+  region?: string | null;
+  source?: string;
+  sourceUrl?: string;
+  status: string;
+  history?: EquityPoint[];
+}
+export interface EquityTheme extends ThemeMetrics {
+  name: string;
+  kind?: 'theme' | 'style' | 'satellite';
+  segments: string[];
+  segmentMetrics?: Array<ThemeMetrics & { name: string }>;
+  members: ThemeMember[];
+  overlaps?: Array<{ name: string; count: number }>;
+  related?: string[];
+  references?: Array<{
     code: string;
     name: string;
-    segment: string;
-    returnPct: EquityValue;
+    coverage: string;
+    scope: string;
+    url: string;
     date: string | null;
-    themeCount: number;
-    status: string;
+    return1: EquityValue;
+    return5: EquityValue;
+    return20: EquityValue;
   }>;
+}
+export interface EquityThemes {
+  styles?: {
+    items: EquityStyle[];
+    pairs: EquityStylePair[];
+  };
+  date: string;
+  version?: string;
+  effectiveFrom?: string;
+  uniqueStocks?: number;
+  benchmark?: {
+    code: string;
+    name: string;
+    date: string | null;
+    return5: EquityValue;
+    return20: EquityValue;
+  };
+  sectors?: Array<{
+    code: string;
+    name: string;
+    date: string | null;
+    return1: EquityValue;
+    return5: EquityValue;
+    return20: EquityValue;
+  }>;
+  items: EquityTheme[];
+}
+export interface EquityStyle {
+  code: string;
+  name: string;
+  scope: string;
+  url: string;
+  date: string | null;
+  status: string;
+  return1: EquityValue;
+  return5: EquityValue;
+  return20: EquityValue;
+  relative20: EquityValue;
+  history: EquityPoint[];
+}
+export interface EquityStylePair {
+  name: string;
+  numerator: string;
+  denominator: string;
+  date: string | null;
+  spread1: EquityValue;
+  spread5: EquityValue;
+  spread20: EquityValue;
+  history: EquityPoint[];
 }
 export interface EquityDistribution {
   count: number;
@@ -112,7 +201,7 @@ export interface EquityObservatory {
   date?: string;
   generatedAt: string | null;
   sourceFetchedAt?: string;
-  themes?: { date: string; items: EquityTheme[] };
+  themes?: EquityThemes;
   structure?: {
     date: string;
     closed: boolean;

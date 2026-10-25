@@ -71,7 +71,9 @@ export default defineComponent({
         ? 5
         : props.presentation === 'gold-drivers'
         ? 1
-        : props.groupId === 'coinbasePremium' || props.groupId.startsWith('binanceCombined')
+        : props.groupId === 'coinbasePremium' ||
+          props.groupId === 'cnyUsdt' ||
+          props.groupId.startsWith('binanceCombined')
         ? 0.25
         : 3,
     );
@@ -104,6 +106,10 @@ export default defineComponent({
               .map((id) => group.find((item) => item.seriesId === id))
               .filter((item): item is MacroDashboardSeries => Boolean(item))
           : group;
+        if (props.groupId === 'majorFx' || props.groupId === 'rmbFx') {
+          const unit = props.groupId === 'majorFx' ? '美元/单位外币' : '人民币/美元';
+          series.value = series.value.map((item) => ({ ...item, unit }));
+        }
         status.value = series.value.length ? 'ready' : 'error';
       } catch (error) {
         console.warn('[hedgeBoard] dashboard group unavailable', props.groupId, error);
@@ -244,7 +250,11 @@ export default defineComponent({
               h('thead', [
                 h(
                   'tr',
-                  ['项目', '数量', '观测日期'].map((label) =>
+                  [
+                    '项目',
+                    props.groupId === 'treasuryYields' ? '年化收益率' : '数量',
+                    '观测日期',
+                  ].map((label) =>
                     h('th', { style: { textAlign: 'left', padding: '6px' } }, label),
                   ),
                 ),
@@ -317,7 +327,7 @@ export default defineComponent({
               ? '日期为来源最后更新日期，各机构披露与核验方式不同；过期数据保留待更新提示。'
               : props.groupId === 'wgcReserves'
               ? 'WGC 最新公开季度截面；各国申报存在时滞，— 表示源站尚无数值。国家记录不等于全球储备总量。'
-              : props.groupId === 'wgcPurchases'
+              : ['wgcPurchases', 'treasuryYields'].includes(props.groupId)
               ? ''
               : '按 UTXO 最后移动时价格分桶，不等同于投资者实际买入成本。',
           ),
@@ -434,6 +444,7 @@ export default defineComponent({
       const isAggregate = (item: MacroDashboardSeries) =>
         props.presentation === 'regional-stack' && item.seriesId.endsWith('_global');
       const colorFor = (item: MacroDashboardSeries, index: number) =>
+        (props.groupId === 'cnyUsdt' && item.seriesId === 'cn_usdcnh_choice') ||
         item.seriesId === 'xauusd_daily_close' ||
         (props.groupId === 'fearGreed' && item.seriesId === 'binance_btc_spot')
           ? '#111111'
@@ -484,7 +495,21 @@ export default defineComponent({
                 h(
                   'small',
                   {},
-                  `${item.observationDate ?? '—'}${item.isStale ? ' · 数据待更新' : ''}`,
+                  `${item.observationDate ?? '—'}${
+                    props.groupId === 'cnyUsdt' &&
+                    item.seriesId.startsWith('okx_') &&
+                    item.retrievedAt
+                      ? ' · 采集 ' +
+                        new Date(item.retrievedAt).toLocaleString('zh-CN', {
+                          timeZone: 'Asia/Shanghai',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false,
+                        })
+                      : ''
+                  }${item.isStale ? ' · 数据待更新' : ''}`,
                 ),
               ],
             ),

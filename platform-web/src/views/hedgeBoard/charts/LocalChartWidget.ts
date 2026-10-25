@@ -32,6 +32,9 @@ const BtcEtfFlowPanel = lazyPanel(() => import('../components/BtcEtfFlowPanel.vu
 const CryptoIvTermPanel = lazyPanel(() => import('../components/CryptoIvTermPanel.vue'));
 const CftcPositioningPanel = lazyPanel(() => import('../components/CftcPositioningPanel.vue'));
 const GoldPositioningPanel = lazyPanel(() => import('../components/GoldPositioningPanel.vue'));
+const GoldCotDriversPanel = lazyPanel(() => import('../components/GoldCotDriversPanel.vue'));
+const GoldFactorPanel = lazyPanel(() => import('../components/GoldFactorPanel.vue'));
+const GoldOptionsPanel = lazyPanel(() => import('../components/GoldOptionsPanel.vue'));
 const GoldReportPanel = lazyPanel(() => import('../components/GoldReportPanel.vue'));
 const GoldAnalystsPanel = lazyPanel(() => import('../components/GoldAnalystsPanel.vue'));
 const CumulativeVolatilityPanel = lazyPanel(
@@ -46,8 +49,8 @@ const BitcoinHalvingPanel = lazyPanel(() => import('../components/BitcoinHalving
 const GoldOpenInterestPanel = lazyPanel(() => import('../components/GoldOpenInterestPanel.vue'));
 const UrpdPanel = lazyPanel(() => import('../components/UrpdPanel.vue'));
 const OptionExposurePanel = lazyPanel(() => import('../components/OptionExposurePanel.vue'));
-const TreasuryWeeklySnapshotPanel = lazyPanel(
-  () => import('../components/TreasuryWeeklySnapshotPanel.vue'),
+const TreasuryWeeklyChartPanel = lazyPanel(
+  () => import('../components/TreasuryWeeklyChartPanel.vue'),
 );
 const CentralBankGoldPanel = lazyPanel(() => import('../components/CentralBankGoldPanel.vue'));
 const OptionsDistributionPanel = lazyPanel(
@@ -385,6 +388,12 @@ export default defineComponent({
               presentation: 'gold-drivers',
               initiallyHiddenSeriesIds: ['dxy'],
             });
+          case 'gold-cot-drivers':
+            return h(GoldCotDriversPanel);
+          case 'gold-factor-model':
+            return h(GoldFactorPanel);
+          case 'gold-options':
+            return h(GoldOptionsPanel);
           case 'macro-treasury-issuance':
             return h(MacroSeriesChart, { groupId: 'treasuryIssuance', unitLabel: 'USD' });
           case 'macro-net-liquidity':
@@ -393,6 +402,83 @@ export default defineComponent({
             return h(MacroSeriesChart, { groupId: 'financialConditions', unitLabel: 'index' });
           case 'macro-vix':
             return h(MacroSeriesChart, { groupId: 'vix', unitLabel: 'index' });
+          case 'macro-nyfed-repo':
+            return h(MacroSeriesChart, {
+              groupId: 'nyfedRepo',
+              initiallyHiddenSeriesIds: ['nyfed_repo_total'],
+            });
+          case 'macro-discount-window':
+            return h(MacroSeriesChart, {
+              groupId: 'discountWindow',
+              initiallyHiddenSeriesIds: [
+                'discount_primary_credit',
+                'discount_secondary_credit',
+                'discount_seasonal_credit',
+              ],
+            });
+          case 'macro-funding-spreads':
+            return h(MacroSeriesChart, { groupId: 'fundingSpreads' });
+          case 'macro-treasury-details':
+            return h(MacroSeriesChart, { groupId: 'treasuryYields', presentation: 'distribution' });
+          case 'macro-treasury-spreads':
+            return h(MacroSeriesChart, { groupId: 'treasuryTermSpreads' });
+          case 'macro-dxy':
+            return h(MacroSeriesChart, { groupId: 'dxy' });
+          case 'macro-major-fx':
+            return h(MacroSeriesChart, { groupId: 'majorFx' });
+          case 'macro-yen-fx':
+            return h(MacroSeriesChart, { groupId: 'yenFx' });
+          case 'macro-rmb-fx':
+            return h(MacroSeriesChart, { groupId: 'rmbFx' });
+          case 'macro-other-fx':
+            return h(MacroSeriesChart, { groupId: 'otherFx' });
+          case 'macro-europe-yields':
+            return h(MacroSeriesChart, { groupId: 'europeYields' });
+          case 'macro-europe-spreads':
+            return h(MacroSeriesChart, { groupId: 'europeSpreads' });
+          case 'macro-move':
+            return h(MacroSeriesChart, { groupId: 'move' });
+          case 'macro-vxeem':
+            return h(MacroSeriesChart, { groupId: 'vxeem' });
+          case 'macro-us-consumption':
+            return h(MacroSeriesChart, { groupId: 'usConsumption' });
+          case 'macro-cn-retail':
+            return h(MacroSeriesChart, { groupId: 'cnRetail', barSeriesIds: ['cn_retail_total'] });
+          case 'macro-us-real-retail':
+            return h(MacroSeriesChart, { groupId: 'usRealRetail' });
+          case 'macro-us-consumption-momentum':
+            return h(MacroSeriesChart, { groupId: 'usConsumptionMomentum' });
+          case 'macro-us-employment':
+            return h(MacroSeriesChart, {
+              groupId: 'usEmployment',
+              barSeriesIds: ['us_nonfarm_change', 'us_adp_change'],
+            });
+          case 'macro-us-unemployment':
+            return h(MacroSeriesChart, { groupId: 'usUnemployment' });
+          case 'macro-us-profit-expectations':
+            return h(MacroSeriesChart, { groupId: 'usProfitExpectations' });
+          case 'macro-sofr-ois':
+            return h('div', { class: 'local-empty' }, '暂无可核验的同期限 SOFR 与 OIS 报价。');
+          case 'macro-treasury-liquidity':
+            return h('div', { class: 'local-widget-stack' }, [
+              h(
+                'p',
+                '反映剩余期限至少一年的美国国债收益率相对拟合曲线的平均偏离。数值越高，通常表示定价紊乱越大、流动性越差；数值下降表示改善。',
+              ),
+              h(
+                'p',
+                { class: 'local-empty', role: 'status' },
+                'GVLQUSD 历史数据尚未接通，暂无可展示的曲线。',
+              ),
+            ]);
+          case 'macro-cross-currency-basis':
+            return h(
+              'div',
+              { class: 'local-empty' },
+              'USD/JPY、EUR/USD 基差暂无可核验的同期限报价。',
+            );
+          case 'macro-fx-swap-points':
+            return h('div', { class: 'local-empty' }, '暂无可核验的期限外汇掉期点报价。');
           case 'gold-gvz':
             return h(MacroSeriesChart, { groupId: 'goldVolatility', unitLabel: 'index' });
           case 'crypto-strc':
@@ -489,6 +575,19 @@ export default defineComponent({
               groupId: 'comexGoldInventory',
               unitLabel: 'troy oz',
             });
+          case 'crypto-cny-usdt':
+            return h('div', [
+              h(MacroSeriesChart, {
+                dataDomain: 'crypto',
+                groupId: 'cnyUsdt',
+                unitLabel: '人民币 / 美元或USDT',
+              }),
+              h(
+                'p',
+                { style: { fontSize: '12px', color: '#64748b', padding: '0 12px' } },
+                'USD/CNH 为离岸汇率；OKX 为用户买入/卖出 USDT 的人民币广告价，按1万元档位、全部支付方式、前5个有效广告中位价统计，非成交价。每日保留最新快照，历史自接入日起积累。',
+              ),
+            ]);
           case 'crypto-stablecoins':
             return h(StablecoinPanel);
           case 'crypto-fear-greed':
@@ -641,7 +740,7 @@ export default defineComponent({
           case 'crypto-atm-iv-term':
             return h(CryptoIvTermPanel);
           case 'btc-treasury-flow':
-            return h(TreasuryWeeklySnapshotPanel);
+            return h(TreasuryWeeklyChartPanel);
           case 'crypto-options-distribution':
             return h(OptionsDistributionPanel);
           case 'crypto-binance-eth-combined':

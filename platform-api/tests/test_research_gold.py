@@ -5,6 +5,18 @@ from app.research_gold import analyst_page, read_gold
 from app.research_provider_errors import ResearchProviderError
 
 
+@pytest.mark.parametrize('name', ['gold-factor-model', 'gold-options'])
+def test_gold_driver_artifacts_preserve_unavailable_and_age(tmp_path, monkeypatch, name):
+    monkeypatch.setenv('HEDGE_BOARD_DATA_ROOT', str(tmp_path))
+    folder=tmp_path/'public/v1/commodity'; folder.mkdir(parents=True)
+    path=folder/f'{name}.json'
+    path.write_text(json.dumps(dict(schemaVersion='1.0',status='unavailable',error='upstream timeout')))
+    assert read_gold(name)['status']=='unavailable'
+    path.write_text(json.dumps(dict(schemaVersion='1.0',status='ready',retrievedAt='2020-01-01T00:00:00Z',rows=[{'date':'2019-12-31'}])))
+    result=read_gold(name)
+    assert result['status']=='stale' and result['rows'][0]['date']=='2019-12-31'
+
+
 def make_store(tmp_path, monkeypatch):
     monkeypatch.setenv('HEDGE_BOARD_DATA_ROOT', str(tmp_path))
     folder = tmp_path / 'research'; folder.mkdir()

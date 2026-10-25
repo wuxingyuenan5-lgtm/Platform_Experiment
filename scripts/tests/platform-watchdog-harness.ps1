@@ -59,6 +59,7 @@ function Invoke-RestMethod($Uri, $TimeoutSec) {
   throw "unexpected URL: $Uri"
 }
 function Get-PortListener($Port) {
+  if ($script:HarnessNoListeners) { return $null }
   $service = @($Services | Where-Object { $_.Port -eq $Port })[0]
   if ($script:HarnessOwnershipMatches) {
     return [pscustomobject]@{ OwningProcess = (@($script:HarnessState.services | Where-Object { $_.key -eq $service.Key })[0].pid) }
@@ -67,6 +68,7 @@ function Get-PortListener($Port) {
 }
 function Test-ServiceSignature($service, $processId) { return $script:HarnessOwnershipMatches }
 function Get-Process($Id, $ErrorAction) {
+  if ($script:HarnessReusedPids) { return [pscustomobject]@{ StartTime = [datetime]::Parse('2026-01-02T00:00:00Z') } }
   $record = @($script:HarnessState.services | Where-Object { [int]$_.pid -eq [int]$Id })[0]
   return [pscustomobject]@{ StartTime = [datetime]::Parse($record.processStartedAt).ToUniversalTime() }
 }
@@ -99,6 +101,8 @@ function Write-WatchdogStatus($status, $reason, $recoveries) {
 }
 
 function Reset-Harness {
+  $script:HarnessNoListeners = $false
+  $script:HarnessReusedPids = $false
   $script:HarnessNow = [DateTimeOffset]::Parse('2026-01-01T00:00:00Z')
   $script:HarnessCycle = 0
   $script:HarnessMaxCycles = 4
@@ -170,3 +174,11 @@ Invoke-HarnessCase 'recovery limit blocks fourth recovery' {
   $script:HarnessMaxCycles = 12
   $script:HarnessSleepAdvanceSeconds = 301
 } @('web', 'web', 'web') @('web', 'web', 'web') 'blocked' 3
+
+Invoke-HarnessCase 'reboot reused PIDs are not stopped and missing services recover' {
+  $global:EnableLiveWrite = $false
+  $script:HarnessModeMatches = $false
+  $script:HarnessNoListeners = $true
+  $script:HarnessReusedPids = $true
+  $global:HarnessHealthFailures = @('web', 'api', 'runtime')
+} @() @('web', 'api', 'runtime') 'degraded' 1

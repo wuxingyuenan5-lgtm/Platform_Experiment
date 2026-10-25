@@ -27,7 +27,7 @@
       :sections="[
         { id: 'us-market-overview', title: '大盘表现' },
         ...(detailSectionId ? [{ id: detailSectionId, title: '美股市场明细' }] : []),
-        { id: 'us-equity-themes', title: '主题产业链' },
+        { id: 'us-equity-themes', title: '主题与行业' },
         { id: 'us-equity-valuation', title: '估值' },
         { id: 'us-equity-structure', title: '结构与风险' },
         ...(displayConfig.rotationButtonLabel

@@ -91,12 +91,12 @@ def test_hk_missing_component_never_reweights_remaining_three():
 def test_theme_cross_membership_is_explicit_and_old_quotes_excluded():
     result = theme_observations(
         "us",
-        {"MSFT": {"name": "Microsoft", "date": "2026-10-14", "status": "ready", "returnPct": 3}},
+        {"AMZN": {"name": "Amazon", "date": "2026-10-14", "status": "ready", "returnPct": 3}},
         "2026-10-15",
     )
     assert all(t["covered"] == 0 for t in result["items"])
-    msft = [r for t in result["items"] for r in t["members"] if r["code"] == "MSFT"]
-    assert all(r["themeCount"] == 2 for r in msft)
+    amazon = [r for t in result["items"] for r in t["members"] if r["code"] == "AMZN"]
+    assert all(r["themeCount"] == 2 for r in amazon)
 
 
 def test_trend_minimum_and_null_values():

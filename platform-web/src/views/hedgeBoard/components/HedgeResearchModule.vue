@@ -77,7 +77,8 @@
                 widget.localKey === 'macro-fed-balance-structure' ||
                 widget.localKey === 'macro-fed-assets' ||
                 widget.localKey === 'macro-corporate-yields' ||
-                widget.localKey === 'etf-weekly-flows',
+                widget.localKey === 'etf-weekly-flows' ||
+                widget.localKey === 'crypto-cny-usdt',
               'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
               'widget-card--macro-polymarket-fed': widget.localKey === 'macro-polymarket-fed',
               'widget-card--halving': widget.localKey === 'crypto-halving-cycles',

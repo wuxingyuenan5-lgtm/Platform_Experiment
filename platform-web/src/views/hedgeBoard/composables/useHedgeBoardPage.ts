@@ -44,6 +44,7 @@ export const hedgeBoardNav: ReadonlyArray<{
 const sectionLabelOverrides: Record<string, { title?: string }> = {
   'macro-market': { title: '宏观市场明细' },
   'macro-rates': { title: '利率' },
+  'macro-fx': { title: '汇率与海外利差' },
   'macro-liquidity': { title: '流动性' },
   'macro-inflation': { title: '通胀' },
   'macro-growth': { title: '经济' },
@@ -57,6 +58,7 @@ const macroSectionOrder = [
   'macro-market',
   'macro-liquidity',
   'macro-rates',
+  'macro-fx',
   'macro-growth',
   'macro-inflation',
   'macro-risk-appetite',

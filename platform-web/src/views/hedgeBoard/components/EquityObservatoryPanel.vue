@@ -15,69 +15,12 @@
       loading ? '正在读取市场观察…' : '暂无已发布的市场观察数据'
     }}</p>
     <template v-else>
-      <section
+      <EquityThemePanel
         v-if="!view || view === 'themes'"
-        :id="`${market}-equity-themes`"
-        class="observation-section"
-      >
-        <header
-          ><div
-            ><h2>主题与产业链</h2><p>代表观察池 · {{ data.themes.date }} · 主题间可重叠</p></div
-          >
-          <label
-            >排列
-            <select v-model="themeOrder"
-              ><option value="catalog">产业链目录</option
-              ><option value="strength">当日强弱</option></select
-            ></label
-          >
-        </header>
-        <div class="theme-grid">
-          <button
-            v-for="theme in themes"
-            :key="theme.name"
-            type="button"
-            :aria-pressed="selectedTheme === theme.name"
-            @click="selectedTheme = theme.name"
-          >
-            <strong>{{ theme.name }}</strong
-            ><span>{{ theme.segments.join(' · ') }}</span>
-            <b :class="tone(theme.medianReturn)">{{ format(theme.medianReturn, '%') }}</b
-            ><small>样本涨跌中位数 · {{ theme.covered }}/{{ theme.expected }} 只</small>
-          </button>
-        </div>
-        <div v-if="activeTheme" class="theme-detail">
-          <h3
-            >{{ activeTheme.name }}
-            <small>上涨占比 {{ format(activeTheme.advancingPct, '%') }}</small></h3
-          >
-          <div class="table-scroll" tabindex="0" role="region" aria-label="主题观察池明细">
-            <table
-              ><thead
-                ><tr
-                  ><th>产业链环节</th><th>证券 / ETF</th><th>当日涨跌</th><th>主题归属数</th
-                  ><th>观测日</th></tr
-                ></thead
-              >
-              <tbody
-                ><tr v-for="row in activeTheme.members" :key="`${row.segment}-${row.code}`"
-                  ><td>{{ row.segment }}</td
-                  ><th
-                    >{{ row.name }} <small v-if="row.name !== row.code">{{ row.code }}</small></th
-                  ><td :class="tone(row.returnPct)">{{ format(row.returnPct, '%') }}</td
-                  ><td>{{ row.themeCount }}</td
-                  ><td
-                    >{{ row.date || '—' }}{{ row.status !== 'ready' ? ' · 缺失或待更新' : '' }}</td
-                  ></tr
-                ></tbody
-              >
-            </table>
-          </div>
-          <p class="definition"
-            >代表观察池不是完整主题指数；不将跨主题成交额相加。主题归属不改变原行业分类，涨跌不代表景气或盈利预期。</p
-          >
-        </div>
-      </section>
+        :market="market"
+        :data="data.themes"
+        :industries="data.structure?.industries || []"
+      />
 
       <IndexValuationPanel
         v-if="!view || view === 'valuation'"
@@ -392,6 +335,7 @@
   } from '@/api/equityObservatory';
   import VibeTimeChart from '../aShare/components/VibeTimeChart.vue';
   import IndexValuationPanel from './IndexValuationPanel.vue';
+  import EquityThemePanel from './EquityThemePanel.vue';
 
   import { useResearchViewState, useResearchSnapshots } from '../composables/researchWorkspace';
 
@@ -401,8 +345,6 @@
   const data = shallowRef<EquityObservatory | null>(null);
   const loading = ref(false);
   const error = ref(false);
-  const selectedTheme = useResearchViewState('selectedTheme', '');
-  const themeOrder = useResearchViewState('themeOrder', 'catalog');
   const allIndustries = useResearchViewState('allIndustries', false);
   const ratioName = useResearchViewState('ratioName', '');
   let controller: AbortController | null = null;
@@ -413,17 +355,6 @@
     numeric(v) == null ? '—' : `${numeric(v)!.toFixed(2)}${suffix}`;
   const tone = (v: EquityValue | undefined) =>
     numeric(v) == null || numeric(v) === 0 ? '' : numeric(v)! > 0 ? 'positive' : 'negative';
-  const themes = computed(() => {
-    const rows = [...(data.value?.themes?.items || [])];
-    return themeOrder.value === 'strength'
-      ? rows.sort(
-          (a, b) => (numeric(b.medianReturn) ?? -Infinity) - (numeric(a.medianReturn) ?? -Infinity),
-        )
-      : rows;
-  });
-  const activeTheme = computed(
-    () => themes.value.find((t) => t.name === selectedTheme.value) || themes.value[0],
-  );
   const shownIndustries = computed(() =>
     (data.value?.structure?.industries || []).slice(0, allIndustries.value ? undefined : 12),
   );

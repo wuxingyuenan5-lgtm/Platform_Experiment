@@ -40,12 +40,12 @@
 - Strategic ETH Reserve：只纳入 ACTIVE 实体，排除未审/停用记录；保留原始更新时间与 PUBLIC_REPORT / SELF_REPORTED / WALLET_TRACKING 标识。旧披露仍可 stale，抓取成功不代表所有实体当日披露。
 - BGeometrics URPD：UTXO 最后移动价格分桶及 BTC 数量；这是链上价格分布，非已证实的投资者成本。生产端校验全部区间后发布，priceLower / priceUpper 原生数值边界贯穿 JSON、DuckDB 和 API；页面按价格比例绘制柱状图，保留键盘查看与数据表，缺失量不画作零。
 - STRC：Yahoo 交易所日线价格，不冒充实时 ATM 发行额或收益率；最新交易日可能未收盘。
-- 加密资金面先展示 BTC/ETH ETF 两图，随后是独立的 BTC 财库公司每周变动卡，再依次排列上市公司 BTC 持仓分布、ETH 储备分布、稳定币和 STRC 历史；Strategy 单公司 BTC 持仓历史占整行。财库周变动参考 SoSoValue weekly-net-inflow，右上角提供放大与原页链接；当前未取得可核验的原页周度数据或快照，按 Owner 要求保留空态，不用公司余额差额或样例替代。STRC ATM 保留为股价卡的参考入口。
+- 加密资金面先展示 BTC/ETH ETF 两图，随后是独立的 BTC 财库公司每周变动卡，再依次排列上市公司 BTC 持仓分布、ETH 储备分布、稳定币和 STRC 历史；Strategy 单公司 BTC 持仓与STRC同排。财库周变动参考 SoSoValue weekly-net-inflow，右上角提供放大与原页链接；通过可见前端提示框保存带日期及显示精度的总额、BTC数量、价格和公司明细，并保留裁剪到图表面板的快照。不调用原站API，不用公司余额差额或柱高推算。2026-10-25已通过前端逐周回填当前图中全部93周（2025-01-13至2026-10-19）、316条公司周记录，共29个公司名；2026-05-04源站BTC数量为空，仍为NULL。历史提示框单独留原文，不伪造逐点截图；最新快照只含图表区域。STRC ATM 保留为股价卡的参考入口。
 - Coinbase/Binance 日线溢价：闭合 UTC 日线精确日期相交，并用 Coinbase USDT/USD 调整计价币，公式和输入版本由生产端保留。
 - 保证金借贷：Bybit USDT 公开 VIP 0 小时费率；非用户账户实际成本。Binance 资金费率单独接入原有历史组，不冒充全市场聚合。
 - 加密明细参与度：BTC/ETH/SOL/BNB/XRP/DOGE/HYPE 固定观察池，排除 UTC 当前日期，用同日且历史足够的币种计算高于 20/50/200 日均线的比例；覆盖数与日期同步展示。HYPE 来源缺失时保留 6/7 partial，不用同名代币替换，也不混入上市公司或 ETF。
 
-财库周净流入、全市场合约 OI/清算热力、CoinGlass CDRI、STRC ATM 实际发行尚未形成可靠的本地数据链；这些缺口与文章、作者、Seasonal Chart 等明确外部研究工具分开对待。
+财库周净流入已接入前端提示框采集与本地修订存储，但多周自动积累尚待运行；全市场合约 OI/清算热力、CoinGlass CDRI、STRC ATM 实际发行尚未形成可靠的本地数据链；这些缺口与文章、作者、Seasonal Chart 等明确外部研究工具分开对待。
 
 - BTC 地址分布：使用 BGeometrics 公开 HTML 日报的六档 Today 地址数，保留原始余额分桶、报表日期和未指定时区；核对分桶合计与 Total，地址不等于人数/实体。原报表历史变化列合计不一致，未纳入；本地历史从接入日积累。
 
@@ -57,3 +57,6 @@
 
 - BITB：Bitwise 公开产品页 premiumDiscount 图表；采用折溢价自身日期，比例与百分数交叉核对。HODL：VanEck 官方 historical-prices XLSX 的 `% Premium/Discount`，保留公布百分数，不以舍入后的 NAV/价格重算；排除上市前及空成交量日期，保留源站零成交量日期。三只基金独立展示，不合成全市场值。
 - GEX：Deribit public instrument/book summary 推导远期 Gamma；Cboe IBIT 公开延迟期权链使用公布 Gamma、标准 100 股乘数。Call 正 / Put 负仅为 OI 敞口代理；显示纳入合约和 OI 覆盖，缺失隐波合约排除，报价/OI 日期未知时明确标识。支持到期日、近价/全行权价和数据表；完整方法、保存路径及刷新时效见 RESEARCH_DATA 合同。
+
+
+- 离岸人民币与 OKX 买卖U价：USD/CNH 复用宏观已有 Choice 日度序列；USDT/CNY 读取 [OKX公开人民币广告](https://www.okx.com/zh-hans/p2p-markets/cny/buy-usdt)及其公开 books 接口，不使用账户、订单或交易权限。1万元CNY档位、全部支付方式，最低5个有效卖出广告的中位价作为用户买U价，最高5个有效买入广告的中位价作为用户卖U价；资格不足不发布替代价。原始广告响应逐次保留，日度最新快照写入既有数据库；前史无法验证，不补造。方向、筛选、失败和时效规则见研究数据合同。

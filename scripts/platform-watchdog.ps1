@@ -159,6 +159,10 @@ function Invoke-PlatformWatchdog {
               if ($listener -and [int]$listener.OwningProcess -ne [int]$record.pid) { throw 'Ownership changed during recovery' }
               $process = Get-Process -Id ([int]$record.pid) -ErrorAction SilentlyContinue
               if ($process -and $process.StartTime.ToUniversalTime().ToString('o') -ne $record.processStartedAt) {
+                # Reboot can reuse a saved PID for an unrelated process. With
+                # no service listener, leave that process alone and start the
+                # missing service; never try to stop the reused PID.
+                if (-not $listener) { continue }
                 throw 'Managed process identity is no longer current'
               }
               Stop-ManagedPid -ProcessId ([int]$record.pid) -WorkingDirectory $service.WorkingDirectory -Service $service

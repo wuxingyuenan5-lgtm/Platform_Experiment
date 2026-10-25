@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from app.data_audit_calendar import calendar_snapshot
 from app.database_connection import read_only_connection
 from app.research_a_share_repository import read_dataset, read_dataset_metadata
-from app.research_equity_catalog import CN_INDICES
+from app.research_equity_catalog import CN_INDICES, CN_REFERENCE_CODES, CN_THEME_CODES
 from app.research_equity_metrics import (
     cn_structure,
     credit_impulse,
@@ -178,19 +178,47 @@ def build_cn(today, sources):
             [s.get("medianTurnover") for s in samples], industry["medianTurnover"]
         )
         industry["sampleCount"] = len(samples)
+    from app.research_a_share_repository import read_index_history, read_stored_stock_histories
+
+    histories = read_stored_stock_histories(list(CN_THEME_CODES + CN_REFERENCE_CODES))
+    history_points = {
+        code: [{"date": str(p.observed_at), "value": p.close} for p in points]
+        for code, points in histories.items()
+    }
+    industries = {
+        m["securityCode"]: m.get("swL2Name") or m.get("swL1Name")
+        for m in memberships
+        if not m.get("effectiveTo") and m.get("effectiveFrom", "") <= (structure["date"] or "")
+    }
+    benchmark_points = [
+        {"date": p["observedAt"], "value": p.get("close")} for p in read_index_history("000300")
+    ]
+    observations = {
+        r["securityCode"]: {
+            "name": r["securityName"],
+            "date": structure["date"],
+            "returnPct": r.get("returnPct") if structure["closed"] else None,
+            "status": "ready" if structure["closed"] else "partial",
+            "industry": industries.get(r["securityCode"]),
+            "region": "A股上市",
+            "history": history_points.get(r["securityCode"], []),
+            "source": "腾讯复权日线 / 全市场收盘快照",
+            "sourceUrl": "https://gu.qq.com/"
+            + ("sh" if r["securityCode"].startswith("6") else "sz")
+            + r["securityCode"],
+        }
+        for r in aligned
+    }
     themes = theme_observations(
         "cn",
-        {
-            r["securityCode"]: {
-                "name": r["securityName"],
-                "date": structure["date"],
-                "returnPct": r.get("returnPct"),
-                "amount": r.get("turnoverYuan"),
-                "status": "ready",
-            }
-            for r in aligned
-        },
+        observations,
         structure["date"],
+        benchmark={"code": "000300", "name": "沪深300", "history": benchmark_points},
+        references={
+            code: {"history": points, "date": points[-1]["date"] if points else None}
+            for code, points in history_points.items()
+            if code in CN_REFERENCE_CODES
+        },
     )
     indices = []
     for row in read_dataset("market_detail") or []:
@@ -289,20 +317,60 @@ def build_us(today, sources):
     snapshot = read_dataset("market_detail_us") or {}
     rows = snapshot.get("rows", [])
     by_symbol = {r["symbol"]: r for r in rows}
-    latest = max((r.get("observationDate") or "" for r in rows), default=None)
+    # A closed SPY session defines every stock/ETF comparison window. An open
+    # quote or a different exchange's newer date cannot advance the whole board.
+    baseline = by_symbol.get("SPY", {}).get("history", [])
+    latest = max((p["date"] for p in baseline), default=None)
+    observations = {}
+    for r in rows:
+        points = [p for p in r.get("history", []) if latest and p["date"] <= latest]
+        day = points[-1]["date"] if points else None
+        observations[r["symbol"]] = {
+            "name": r.get("name") if r.get("name") != r.get("id") else r["symbol"],
+            "date": day,
+            "status": "ready"
+            if day and day == latest and r.get("status") == "ready"
+            else "no_data",
+            "history": points,
+            "source": r.get("source"),
+            "sourceUrl": r.get("sourceUrl"),
+            "region": "美股上市；经营地域未分类",
+            "industry": None,
+        }
     themes = theme_observations(
         "us",
-        {
-            r["symbol"]: {
-                "name": r["symbol"],
-                "date": r.get("observationDate"),
-                "returnPct": r.get("change1d"),
-                "status": r.get("status"),
-            }
-            for r in rows
-        },
+        observations,
         latest,
+        benchmark={"code": "SPY", "name": "SPY（标普500价格）", "history": baseline},
     )
+    from app.research_equity_themes import window_metrics
+
+    sector_names = {
+        "XLB": "材料",
+        "XLC": "通信服务",
+        "XLE": "能源",
+        "XLF": "金融",
+        "XLI": "工业",
+        "XLK": "信息技术",
+        "XLP": "必选消费",
+        "XLRE": "房地产",
+        "XLU": "公用事业",
+        "XLV": "医疗",
+        "XLY": "可选消费",
+    }
+    themes["sectors"] = [
+        {
+            "code": code,
+            "name": name,
+            "date": observations.get(code, {}).get("date"),
+            **window_metrics(
+                observations.get(code, {}).get("history", []),
+                sorted(p["date"] for p in baseline),
+                latest,
+            ),
+        }
+        for code, name in sector_names.items()
+    ]
     trends = {symbol: trend(r.get("history", [])) for symbol, r in by_symbol.items()}
     ratios = []
     for numerator, denominator, name in [

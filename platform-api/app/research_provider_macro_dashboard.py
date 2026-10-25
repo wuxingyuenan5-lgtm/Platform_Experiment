@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Literal, Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -66,6 +66,7 @@ class MacroDashboardResponse(ResearchApiModel):
         limits = {
             "daily": 7,
             "daily_business_day": 7,
+            "daily_weekly_release": 14,
             "exchange_trading_day": 7,
             "weekly": 14,
             "monthly": 75,
@@ -78,6 +79,14 @@ class MacroDashboardResponse(ResearchApiModel):
             for series in group:
                 if series.status in {"error", "no_data"}:
                     continue
+                if series.series_id.startswith("okx_usdt_cny_") and (
+                    series.retrieved_at is None or now - series.retrieved_at > timedelta(hours=12)
+                ):
+                    series.is_stale = True
+                    if series.status == "ready":
+                        series.status = "stale"
+                    if "stale_latest_observation" not in series.quality_flags:
+                        series.quality_flags.append("stale_latest_observation")
                 limit = limits.get(series.frequency)
                 if limit is None:
                     continue
@@ -100,10 +109,12 @@ class MacroDashboardResponse(ResearchApiModel):
                         series.quality_flags.append("stale_latest_observation")
         for snapshot in self.option_exposure.values():
             snapshot.apply_freshness(now)
-        if any(s.status != "ready" for group_id, group in self.groups.items()
-               if group_id != "shfeGoldCurveHistory" for s in group) or any(
-            s.status != "ready" for s in self.option_exposure.values()
-        ):
+        if any(
+            s.status != "ready"
+            for group_id, group in self.groups.items()
+            if group_id != "shfeGoldCurveHistory"
+            for s in group
+        ) or any(s.status != "ready" for s in self.option_exposure.values()):
             if self.status == "ready":
                 self.status = "partial"
 

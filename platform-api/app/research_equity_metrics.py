@@ -1,12 +1,11 @@
 """Pure calculations for equity observations. No fetching, imputation or signals."""
 
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from statistics import median
 from zoneinfo import ZoneInfo
 
-from app.research_equity_catalog import CATALOG_VERSION, CN_THEMES, US_THEMES
 
 
 def number(value):
@@ -150,46 +149,10 @@ def cn_structure(stocks, memberships):
     }, rows
 
 
-def theme_observations(market, observations, date_key):
-    catalog = CN_THEMES if market == "cn" else US_THEMES
-    all_counts = Counter(
-        s for _, parts in catalog for s in set(" ".join(c for _, c in parts).split())
-    )
-    themes = []
-    for name, segments in catalog:
-        members = []
-        for segment, codes in segments:
-            for code in codes.split():
-                raw = observations.get(code, {})
-                valid = bool(raw) and raw.get("date") == date_key and raw.get("status") == "ready"
-                members.append(
-                    {
-                        "code": code,
-                        "segment": segment,
-                        "name": raw.get("name") or code,
-                        "returnPct": raw.get("returnPct") if valid else None,
-                        "amount": raw.get("amount") if valid else None,
-                        "date": raw.get("date"),
-                        "status": "ready" if valid else "no_data",
-                        "themeCount": all_counts[code],
-                    }
-                )
-        unique = {r["code"]: r for r in members}
-        values = [
-            number(r["returnPct"]) for r in unique.values() if number(r["returnPct"]) is not None
-        ]
-        themes.append(
-            {
-                "name": name,
-                "segments": [s for s, _ in segments],
-                "members": members,
-                "expected": len(unique),
-                "covered": len(values),
-                "medianReturn": median(values) if values else None,
-                "advancingPct": percentage(sum(v > 0 for v in values), len(values)),
-            }
-        )
-    return {"version": CATALOG_VERSION, "date": date_key, "items": themes}
+def theme_observations(market, observations, date_key, **kwargs):
+    from app.research_equity_themes import build_themes
+
+    return build_themes(market, observations, date_key, **kwargs)
 
 
 def month_shift(month, count):

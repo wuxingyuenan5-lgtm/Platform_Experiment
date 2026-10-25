@@ -22,7 +22,7 @@ def test_web_recovery_and_backend_protection_scenarios():
         timeout=30,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.count("PASS ") == 10
+    assert result.stdout.count("PASS ") == 11
 
 
 @pytest.mark.parametrize(

@@ -158,6 +158,8 @@ class MarketDetailProvider:
         for row in rows:
             row.timezone = timezones.get(row.id, "UTC")
             metadata = quote_meta.get(row.id, {})
+            if market_id == "us" and row.name == row.id and metadata.get("name"):
+                row.name = metadata["name"]
             row.currency = metadata.get("currency")
             row.price_kind = metadata.get("price_kind", "observation")
             row.as_of = metadata.get("as_of") or row.as_of
@@ -256,6 +258,7 @@ class MarketDetailProvider:
             timezone.key,
             {
                 "currency": meta.get("currency"),
+                "name": meta.get("longName") or meta.get("shortName"),
                 "as_of": as_of,
                 "price_kind": "intraday" if open_bar else "close",
             },

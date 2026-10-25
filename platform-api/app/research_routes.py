@@ -21,6 +21,7 @@ from app.research_a_share_repository import (
     update_stock_pool_membership,
 )
 from app.research_cross_asset import read_cross_asset
+from app.research_macro_narratives import read_macro_narratives
 from app.research_cumulative_volatility import read_cumulative_volatility
 from app.research_data_schemas import (
     AShareDashboardResponse,
@@ -125,6 +126,12 @@ def _cache_header(response: Response, seconds: int) -> None:
 @router.get("/cross-asset")
 def cross_asset(_: ResearchPrincipal, days: int = Query(default=90, ge=30, le=180)):
     return jsonable_encoder(read_cross_asset(days), custom_encoder={Decimal: str})
+
+
+@router.get("/macro/narratives")
+def macro_narratives(_: ResearchPrincipal, response: Response):
+    _cache_header(response, 60)
+    return read_macro_narratives()
 
 
 @router.get("/equity-observatory/{market}")
@@ -419,6 +426,22 @@ def gold_report(_: ResearchPrincipal):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.get("/commodity/gold-factor-model")
+def gold_factor_model(_: ResearchPrincipal):
+    try:
+        return read_gold("gold-factor-model")
+    except ResearchProviderError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/commodity/gold-options")
+def gold_options(_: ResearchPrincipal):
+    try:
+        return read_gold("gold-options")
+    except ResearchProviderError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.get("/commodity/analyst-views")
 def gold_analysts(
     _: ResearchPrincipal,
@@ -649,20 +672,30 @@ async def trigger_overseas_refresh(
     return {"data": {"status": status, "sources": health}}
 
 
+@router.get('/crypto/treasury-weekly-history')
+async def treasury_weekly_history(_: ResearchPrincipal):
+    from app.research_treasury_weekly import get_history
+    return get_history()
+
+
 @router.get('/crypto/treasury-weekly-snapshot')
 async def treasury_weekly_snapshot(_: ResearchPrincipal):
-    from app.research_local_data import read_local_json
-    try:
-        document=read_local_json('public/v1/crypto/treasury-weekly-snapshot.json')
-        return {key:document.get(key) for key in ('status','observedAt','sourceUrl','dataPath')}
-    except ResearchProviderError:
-        return {'status':'no_data','observedAt':None,'sourceUrl':'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow','dataPath':None}
+    from app.research_treasury_weekly import get_snapshot
+    return get_snapshot()
 
 
 @router.get('/crypto/treasury-weekly-snapshot/image')
 async def treasury_weekly_snapshot_image(_: ResearchPrincipal):
     from fastapi.responses import FileResponse
-    from app.research_local_data import hedge_board_data_root
-    target=hedge_board_data_root()/'public/v1/crypto/treasury-weekly-latest.png'
-    if not target.is_file():raise HTTPException(404,detail='snapshot_not_available')
-    return FileResponse(target,media_type='image/png')
+    from app.research_local_data import hedge_board_data_root, read_local_json
+    try:
+        manifest = read_local_json('public/v1/crypto/treasury-weekly-snapshot.json')
+    except ResearchProviderError:
+        manifest = {}
+    mime = manifest.get('imageMimeType', 'image/png')
+    suffix = '.jpg' if mime == 'image/jpeg' else '.png'
+    mime = 'image/jpeg' if suffix == '.jpg' else 'image/png'
+    target = hedge_board_data_root() / ('public/v1/crypto/treasury-weekly-latest' + suffix)
+    if not target.is_file():
+        raise HTTPException(404, detail='snapshot_not_available')
+    return FileResponse(target, media_type=mime)

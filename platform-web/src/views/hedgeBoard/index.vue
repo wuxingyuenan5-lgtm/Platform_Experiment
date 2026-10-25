@@ -25,6 +25,9 @@
           :market-tabs="terminalTabs"
           :view="activeView"
         />
+        <MacroNarrativePanel
+          v-else-if="activeCategory === 'macro' && activeView === 'narratives'"
+        />
         <MacroCalendarPanel v-else-if="activeView === 'calendar'" initially-expanded />
         <MacroExpectationPanel v-else-if="activeView === 'expectations'" initially-expanded />
         <WealthInformationPanel v-else-if="activeView === 'wealth'" initially-expanded />
@@ -104,6 +107,7 @@
   const MacroExpectationPanel = defineAsyncComponent(
     () => import('./macro/MacroExpectationPanel.vue'),
   );
+  const MacroNarrativePanel = defineAsyncComponent(() => import('./macro/MacroNarrativePanel.vue'));
   const EquityObservatoryPanel = defineAsyncComponent(
     () => import('./components/EquityObservatoryPanel.vue'),
   );
@@ -123,7 +127,7 @@
     if (activeCategory.value === 'us')
       return [
         { key: 'overview', label: '大盘表现' },
-        { key: 'themes', label: '主题产业链' },
+        { key: 'themes', label: '主题与行业' },
         { key: 'valuation', label: '估值' },
         { key: 'structure', label: '结构与风险' },
         { key: 'rotation', label: '板块轮动' },
@@ -136,6 +140,7 @@
       })),
       ...(activeCategory.value === 'macro'
         ? [
+            { key: 'narratives', label: '宏观主题与叙事' },
             { key: 'calendar', label: '经济日历' },
             { key: 'expectations', label: 'polymarket' },
           ]

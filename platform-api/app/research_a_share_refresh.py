@@ -34,6 +34,7 @@ from app.research_data_schemas import (
     AShareIndexHistoryPoint,
     AShareIndexSnapshot,
 )
+from app.research_equity_catalog import CN_REFERENCE_CODES, CN_THEME_CODES
 from app.research_provider_a_share import INDEX_DEFINITIONS
 from app.research_provider_choice import choice_csd_close
 from app.research_service import _PROVIDER, collect_a_share_dashboard
@@ -446,6 +447,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
         await _start_refresh_locked(run_id, None)
         try:
             codes = [code for code in read_tracked_codes() if len(code) == 6]
+            history_codes = sorted(set(codes) | set(CN_THEME_CODES) | set(CN_REFERENCE_CODES))
             previous = read_stock_pool(codes)
             prior_by_code = {row["code"]: row for row in previous["focusStocks"]}
             # Keep heterogeneous gather groups within its typed tuple overloads.
@@ -463,7 +465,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 asyncio.gather(
                     _collect(_PROVIDER.sector_crowding_snapshot()),
                     _collect(_PROVIDER.innovation_drug_snapshot()),
-                    _collect(_PROVIDER.stock_daily_histories(codes), 240),
+                    _collect(_PROVIDER.stock_daily_histories(history_codes), 240),
                     return_exceptions=True,
                 ),
             )
@@ -667,6 +669,19 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 member_by_code,
                 trade_date,
             )
+            # Shared history storage also serves research baskets. These symbols
+            # do not become the user's personal stock-pool selections.
+            if isinstance(histories, dict):
+                stock_history.extend(
+                    (
+                        str(point.observed_at),
+                        code,
+                        {"close": point.close, "turnoverYuan": point.turnover_yuan},
+                    )
+                    for code, points in histories.items()
+                    if code not in codes
+                    for point in points
+                )
             pool_ready = spots_closed and all(row["status"] == "ready" for row in stock_rows)
             pool = summarize_stock_pool(
                 {

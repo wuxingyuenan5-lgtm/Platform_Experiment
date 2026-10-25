@@ -19,7 +19,7 @@ def _load(path: str, modified: int):
 
 
 def read_gold(name: str):
-    if name not in ("gold-positioning", "gold-report", "analyst-views"):
+    if name not in ("gold-positioning", "gold-report", "analyst-views", "gold-factor-model", "gold-options"):
         raise ResearchProviderError("unknown_gold_artifact")
     try:
         path = hedge_board_data_root() / "public/v1/commodity" / f"{name}.json"

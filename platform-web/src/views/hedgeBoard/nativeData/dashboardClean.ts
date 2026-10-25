@@ -7,6 +7,31 @@
   | 'external-link';
 
 export type LocalWidgetKey =
+  | 'macro-nyfed-repo'
+  | 'macro-discount-window'
+  | 'macro-funding-spreads'
+  | 'macro-sofr-ois'
+  | 'macro-dxy'
+  | 'macro-major-fx'
+  | 'macro-yen-fx'
+  | 'macro-rmb-fx'
+  | 'macro-other-fx'
+  | 'macro-europe-yields'
+  | 'macro-europe-spreads'
+  | 'macro-cross-currency-basis'
+  | 'macro-fx-swap-points'
+  | 'macro-move'
+  | 'macro-vxeem'
+  | 'macro-us-consumption'
+  | 'macro-cn-retail'
+  | 'macro-us-real-retail'
+  | 'macro-us-consumption-momentum'
+  | 'macro-us-employment'
+  | 'macro-us-unemployment'
+  | 'macro-us-profit-expectations'
+  | 'macro-treasury-details'
+  | 'macro-treasury-spreads'
+  | 'macro-treasury-liquidity'
   | 'macro-treasury-yields'
   | 'crypto-coinbase-premium'
   | 'crypto-margin-rate'
@@ -33,6 +58,7 @@ export type LocalWidgetKey =
   | 'crypto-gex-deribit'
   | 'crypto-gex-ibit'
   | 'crypto-stablecoins'
+  | 'crypto-cny-usdt'
   | 'crypto-fear-greed'
   | 'crypto-funding'
   | 'macro-market-detail-table'
@@ -94,6 +120,9 @@ export type LocalWidgetKey =
   | 'gold-intraday-cumulative-volatility'
   | 'cftc-positioning'
   | 'gold-positioning'
+  | 'gold-cot-drivers'
+  | 'gold-factor-model'
+  | 'gold-options'
   | 'gold-report'
   | 'gold-analysts'
   | 'china-gold-etf-flow'
@@ -327,6 +356,20 @@ export const researchModules: ResearchModule[] = [
             'macro-treasury-issuance',
           ),
           localChart(
+            'SRF 常备回购使用量',
+            '2021年7月起的隔夜正回购当日接受额，含小额测试 · 亿美元；可切换早期回购历史',
+            'macro-nyfed-repo',
+            {
+              sourceUrl: 'https://www.newyorkfed.org/markets/desk-operations/repo',
+            },
+          ),
+          localChart(
+            '贴现窗口贷款余额',
+            '主要、次级及季节性信贷 · 周三余额，非周均值 · 百万美元',
+            'macro-discount-window',
+            { sourceUrl: 'https://www.federalreserve.gov/releases/h41/' },
+          ),
+          localChart(
             '美联储负债端结构',
             '流通货币 / ON RRP / TGA / 准备金 · 百万美元',
             'macro-fed-balance-structure',
@@ -405,6 +448,35 @@ export const researchModules: ResearchModule[] = [
           localChart('美国 PMI', 'ISM 制造业 / 服务业 · 50为荣枯线', 'macro-us-pmi'),
           localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
           localChart('广义经济活动', 'CFNAI / CFNAIMA3', 'macro-growth-activity'),
+          localChart(
+            '实际个人消费支出 · 季调年率',
+            'BEA · 月度 · 季调年率 · 十亿美元',
+            'macro-us-consumption',
+          ),
+          localChart(
+            '实际核心零售销售 · CPI平减',
+            '剔除汽车、汽油、建材、餐饮；CPI平减',
+            'macro-us-real-retail',
+          ),
+          localChart(
+            '实际消费与核心零售 · 环比',
+            '相邻月份环比 · %',
+            'macro-us-consumption-momentum',
+          ),
+          localChart(
+            '非农新增就业与 ADP',
+            'BLS 非农 / ADP 私营就业 · 季调 · 千人',
+            'macro-us-employment',
+          ),
+          localChart('美国失业率', 'BLS · 月度 · 季调 · %', 'macro-us-unemployment'),
+          localChart(
+            '美国企业盈利预期 · SPF',
+            '企业税后利润预测中位数：当季 / 4季度后 · 季调年率',
+            'macro-us-profit-expectations',
+            {
+              sourceUrl: 'https://www.philadelphiafed.org/surveys-and-data/cprof',
+            },
+          ),
           localChart(
             'GDPNow',
             'Atlanta Fed · FRED 每季度最新估计，年化环比；不含季度内历次预测路径',
@@ -507,6 +579,82 @@ export const researchModules: ResearchModule[] = [
             '10年期通胀保值国债实际收益率 · FRED DFII10',
             'macro-real-yield',
           ),
+          localChart(
+            '美元资金面 · SOFR−EFFR / SOFR−IORB',
+            '同日利差 · bp；2021年起准备金利率为IORB',
+            'macro-funding-spreads',
+            {
+              sourceUrl: 'https://www.newyorkfed.org/markets/reference-rates/sofr',
+            },
+          ),
+          localChart('SOFR−OIS · 3M / 6M', '可比期限报价', 'macro-sofr-ois', {
+            sourceUrl: 'https://www.newyorkfed.org/markets/reference-rates/sofr',
+          }),
+          localChart(
+            '美债详情 · 年化收益率',
+            '3M / 2Y / 5Y / 10Y / 30Y',
+            'macro-treasury-details',
+            {
+              referenceLinks: [
+                { label: 'TradingView 参考', href: 'https://cn.tradingview.com/chart/WJhhGPpA/' },
+              ],
+            },
+          ),
+          localChart('美债期限价差', '10Y−3M / 10Y−2Y / 30Y−5Y · bp', 'macro-treasury-spreads', {
+            referenceLinks: [
+              { label: 'TradingView 参考', href: 'https://cn.tradingview.com/chart/WJhhGPpA/' },
+            ],
+          }),
+          localChart(
+            '美国国债市场流动性指数 · GVLQUSD',
+            'Bloomberg US Government Securities Liquidity Index',
+            'macro-treasury-liquidity',
+            {
+              height: 160,
+              referenceLinks: [
+                {
+                  label: 'UBS 指标说明',
+                  href: 'https://www.ubs.com/is/en/assetmanagement/insights/asset-class-perspectives/hedge-funds/articles/q3-2024-hfs-strategy-outlook.html',
+                },
+                {
+                  label: 'ECB 研究参考',
+                  href: 'https://www.ecb.europa.eu/press/economic-bulletin/focus/2024/html/ecb.ebbox202308_01~352236489b.en.html',
+                },
+                {
+                  label: 'Bloomberg 数据',
+                  href: 'https://professional.bloomberg.com/products/data/data-license/',
+                },
+              ],
+            },
+          ),
+        ],
+      },
+      {
+        id: 'macro-fx',
+        eyebrow: 'FX & Europe',
+        title: '汇率与海外利差',
+        description: '',
+        layout: 'two',
+        widgets: [
+          localChart('DXY · 美元指数', '', 'macro-dxy'),
+          localChart('主要货币 · EUR/USD、GBP/USD、AUD/USD', '', 'macro-major-fx'),
+          localChart('USD/JPY · 美元兑日元', '', 'macro-yen-fx'),
+          localChart('人民币 · USD/CNY、USD/CNH', '', 'macro-rmb-fx'),
+          localChart('USD/CHF、USD/CAD', '', 'macro-other-fx'),
+          localChart(
+            '欧洲10年国债收益率 · 月度',
+            '法国 / 德国 / 意大利 · %',
+            'macro-europe-yields',
+          ),
+          localChart(
+            '欧洲主权债利差 · 相对德国（月度）',
+            '法国−德国 / 意大利−德国 · 10年 · bp',
+            'macro-europe-spreads',
+          ),
+          localChart('跨币种基差 · USD/JPY、EUR/USD', '', 'macro-cross-currency-basis', {
+            sourceUrl: 'https://www.bis.org/publ/qtrpdf/r_qt1609e.htm',
+          }),
+          localChart('FX Swap 点', '', 'macro-fx-swap-points'),
         ],
       },
       {
@@ -531,6 +679,10 @@ export const researchModules: ResearchModule[] = [
             ],
           ),
           localChart('HYG / LQD', '同日 adjusted close ratio', 'macro-risk-credit-ratio'),
+          localChart('MOVE · 美债波动率', 'ICE BofA MOVE Index', 'macro-move'),
+          localChart('VXEEM · 新兴市场波动率', 'Cboe · EEM ETF 期权隐含波动率', 'macro-vxeem', {
+            sourceUrl: 'https://www.cboe.com/tradable-products/vix/vix-historical-data',
+          }),
           localChart('美国金融状况指数', 'Chicago Fed NFCI', 'macro-nfci', { height: 360 }),
         ],
       },
@@ -683,6 +835,21 @@ export const researchModules: ResearchModule[] = [
             '黄金、流动性与央行需求集合',
             'https://sc.macromicro.me/commodities/gold',
           ),
+          localChart(
+            '黄金持仓驱动',
+            '资产管理机构持仓占比、金价对照与区间多空变动',
+            'gold-cot-drivers',
+            {
+              sourceNote: 'CFTC / COMEX',
+              sourceUrl: 'https://publicreporting.cftc.gov/',
+            },
+          ),
+          localChart(
+            '金价四因子分解',
+            '货币基准、名义利率、盈亏平衡通胀与剩余溢价',
+            'gold-factor-model',
+          ),
+          localChart('金银期权结构', '成交量趋势、内在价值与最大痛点', 'gold-options'),
         ],
       },
       {
@@ -864,6 +1031,10 @@ export const researchModules: ResearchModule[] = [
               },
             ],
           ),
+          localChart('离岸人民币与 OKX 买卖U价', '', 'crypto-cny-usdt', {
+            height: 460,
+            sourceUrl: 'https://www.okx.com/zh-hans/p2p-markets/cny/buy-usdt',
+          }),
         ],
       },
       {
@@ -1054,7 +1225,12 @@ const chinaMacroSections: Record<string, Array<[string, string, LocalWidgetKey]>
     ['中国国债收益率', '财政部中国国债收益率曲线 · 2年 / 10年 / 30年', 'macro-cn-treasury'],
   ],
   'macro-growth': [
-    ['中国增长与内需', 'GDP累计同比 / 规上工业增加值同比 / 社会消费品零售同比', 'macro-cn-growth'],
+    [
+      '中国增长与内需 · 社会消费品零售',
+      'GDP累计同比 / 规上工业增加值同比 / 社会消费品零售总额同比',
+      'macro-cn-growth',
+    ],
+    ['中国社会消费品零售总额', '当月金额（2月为1—2月合计） / 同比 · 亿元 / %', 'macro-cn-retail'],
     ['中国景气调查', '制造业 PMI / 非制造业商务活动指数 · 50为荣枯线', 'macro-cn-pmi'],
     ['中国新增信贷', '当月新增人民币贷款 / 社会融资规模增量 · 亿元', 'macro-cn-credit'],
     ['中国投资结构', '固定资产 / 制造业 / 基建 / 民间投资累计同比', 'macro-cn-investment'],
