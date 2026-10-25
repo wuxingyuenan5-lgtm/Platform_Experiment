@@ -436,6 +436,10 @@ export default defineComponent({
             return h(MacroSeriesChart, { groupId: 'europeYields' });
           case 'macro-europe-spreads':
             return h(MacroSeriesChart, { groupId: 'europeSpreads' });
+          case 'macro-jp10y':
+            return h(MacroSeriesChart, { groupId: 'jpTreasury', unitLabel: '%' });
+          case 'macro-risk-ig-oas':
+            return h(MacroSeriesChart, { groupId: 'riskInvestmentGradeOas', unitLabel: '%' });
           case 'macro-move':
             return h(MacroSeriesChart, { groupId: 'move' });
           case 'macro-vxeem':

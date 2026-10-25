@@ -307,7 +307,7 @@
   const dateIndex = ref(0),
     selected = ref(''),
     market = ref('us'),
-    years = ref(5);
+    years = ref(1);
   const regions = [
     { id: 'us', label: '美国' },
     { id: 'cn', label: '中国' },

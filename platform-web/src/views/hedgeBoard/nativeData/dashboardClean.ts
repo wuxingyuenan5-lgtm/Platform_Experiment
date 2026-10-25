@@ -18,6 +18,8 @@ export type LocalWidgetKey =
   | 'macro-other-fx'
   | 'macro-europe-yields'
   | 'macro-europe-spreads'
+  | 'macro-jp10y'
+  | 'macro-risk-ig-oas'
   | 'macro-cross-currency-basis'
   | 'macro-fx-swap-points'
   | 'macro-move'
@@ -639,6 +641,15 @@ export const researchModules: ResearchModule[] = [
           localChart('DXY · 美元指数', '', 'macro-dxy'),
           localChart('主要货币 · EUR/USD、GBP/USD、AUD/USD', '', 'macro-major-fx'),
           localChart('USD/JPY · 美元兑日元', '', 'macro-yen-fx'),
+          localChart(
+            'JP10Y · 日本10年国债收益率',
+            '日本财务省10年国债参考收益率 · 日度 · %',
+            'macro-jp10y',
+            {
+              sourceUrl:
+                'https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/index.htm',
+            },
+          ),
           localChart('人民币 · USD/CNY、USD/CNH', '', 'macro-rmb-fx'),
           localChart('USD/CHF、USD/CAD', '', 'macro-other-fx'),
           localChart(
@@ -650,6 +661,22 @@ export const researchModules: ResearchModule[] = [
             '欧洲主权债利差 · 相对德国（月度）',
             '法国−德国 / 意大利−德国 · 10年 · bp',
             'macro-europe-spreads',
+          ),
+          localChart(
+            '美国投资级债信用利差（OAS）',
+            'ICE BofA · BAMLC0A0CM · %',
+            'macro-risk-ig-oas',
+            {
+              sourceUrl: 'https://fred.stlouisfed.org/series/BAMLC0A0CM',
+            },
+          ),
+          localChart(
+            '美国高收益债信用利差（OAS）',
+            'ICE BofA · BAMLH0A0HYM2 · %',
+            'macro-risk-hy-oas',
+            {
+              sourceUrl: 'https://fred.stlouisfed.org/series/BAMLH0A0HYM2',
+            },
           ),
           localChart('跨币种基差 · USD/JPY、EUR/USD', '', 'macro-cross-currency-basis', {
             sourceUrl: 'https://www.bis.org/publ/qtrpdf/r_qt1609e.htm',
