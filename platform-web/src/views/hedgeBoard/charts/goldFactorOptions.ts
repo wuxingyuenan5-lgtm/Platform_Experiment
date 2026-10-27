@@ -86,7 +86,7 @@ export function goldFactorOptions(rows: GoldFactorRow[], contribution: boolean):
       lineStyle: { width: key === 'gold' ? 1.4 : 1.15, color },
       itemStyle: { color },
       areaStyle: area ? { color, opacity: 0.22 } : undefined,
-      data: points,
+      data: points as LineSeriesOption['data'],
     });
   }
   add('gold', '黄金现货', 0, colors.gold, false, true);

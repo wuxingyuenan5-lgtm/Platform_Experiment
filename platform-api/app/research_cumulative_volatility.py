@@ -70,7 +70,9 @@ def _shared_bybit_bars(
         settings = get_settings()
         repair_start = max(
             start,
-            (latest - timedelta(hours=2)) if latest else (end - timedelta(days=2)),
+            (latest - timedelta(hours=2))
+            if latest
+            else _session_start(*_session_for(end - timedelta(days=2))),
         )
         response = runtime_transport.get(
             settings.runtime_base_url.rstrip("/") + "/v1/market-data/price-history",
@@ -276,25 +278,46 @@ def _has_recoverable_gap(asset: str, start: datetime, end: datetime) -> bool:
     """Rebuild internal missing days only when the shared archive can fill them."""
     entities = tuple(f"{asset}:{session}:15m" for session in _SESSION_LABELS)
     with connection() as db:
-        days = [datetime.fromisoformat(row[0]).replace(tzinfo=UTC) for row in db.execute(
-            "SELECT DISTINCT substr(observed_at,1,10) FROM research_a_share_history "
-            "WHERE dataset=? AND entity_code IN (?,?,?) AND observed_at>=? AND observed_at<=? ORDER BY 1",
-            (DATASET, *entities, start.isoformat().replace('+00:00','Z'), end.isoformat().replace('+00:00','Z')))]
-        for previous, following in zip(days, days[1:]):
+        days = [
+            datetime.fromisoformat(row[0]).replace(tzinfo=UTC)
+            for row in db.execute(
+                "SELECT DISTINCT substr(observed_at,1,10) FROM research_a_share_history "
+                "WHERE dataset=? AND entity_code IN (?,?,?) "
+                "AND observed_at>=? AND observed_at<=? ORDER BY 1",
+                (
+                    DATASET,
+                    *entities,
+                    start.isoformat().replace("+00:00", "Z"),
+                    end.isoformat().replace("+00:00", "Z"),
+                ),
+            )
+        ]
+        for previous, following in zip(days, days[1:], strict=False):
             missing_start = previous + timedelta(days=1)
             if missing_start >= following:
                 continue
             rows = db.execute(
-                "SELECT payload_json FROM research_strategy_projection WHERE kind='historical_candle' "
+                "SELECT payload_json FROM research_strategy_projection "
+                "WHERE kind='historical_candle' "
                 "AND entity=? AND at_ms>=? AND at_ms<? ORDER BY at_ms LIMIT 64",
-                (f'{_ASSETS[asset]}:linear:trade', int(missing_start.timestamp()*1000), int(following.timestamp()*1000)))
+                (
+                    f"{_ASSETS[asset]}:linear:trade",
+                    int(missing_start.timestamp() * 1000),
+                    int(following.timestamp() * 1000),
+                ),
+            )
             for row in rows:
                 try:
                     payload = json.loads(row[0])
-                    close = Decimal(str(payload.get('close')))
-                    if (not payload.get('quality') and close.is_finite() and close > 0
-                        and payload.get('symbol') == _ASSETS[asset]
-                        and payload.get('category') == 'linear' and payload.get('priceType') == 'trade'):
+                    close = Decimal(str(payload.get("close")))
+                    if (
+                        not payload.get("quality")
+                        and close.is_finite()
+                        and close > 0
+                        and payload.get("symbol") == _ASSETS[asset]
+                        and payload.get("category") == "linear"
+                        and payload.get("priceType") == "trade"
+                    ):
                         return True
                 except (TypeError, ValueError, InvalidOperation):
                     continue
@@ -403,15 +426,24 @@ def _publish_samples(
                 """DELETE FROM research_a_share_history
                    WHERE dataset=? AND entity_code=? AND observed_at>=? AND observed_at<?
                      AND observed_at<>?""",
-                (DATASET, entity, lower.isoformat().replace("+00:00", "Z"),
-                 upper.isoformat().replace("+00:00", "Z"), timestamp),
+                (
+                    DATASET,
+                    entity,
+                    lower.isoformat().replace("+00:00", "Z"),
+                    upper.isoformat().replace("+00:00", "Z"),
+                    timestamp,
+                ),
             )
         write_history_points(run_id, DATASET, points, source=SOURCE, db=db)
 
 
 def read_cumulative_volatility(
-    asset: str = "btc", days: int = _MAX_RANGE_DAYS, interval: str = "15m",
-    *, start: datetime | None = None, end: datetime | None = None,
+    asset: str = "btc",
+    days: int = _MAX_RANGE_DAYS,
+    interval: str = "15m",
+    *,
+    start: datetime | None = None,
+    end: datetime | None = None,
 ) -> dict[str, Any]:
     if asset not in _ASSETS or interval not in _INTERVALS:
         raise ValueError("asset must be btc|gold and interval must be 15m|1h|4h")
@@ -420,7 +452,11 @@ def read_cumulative_volatility(
         raise ValueError("start and end must include a timezone")
     if start is not None and end is not None and start > end:
         raise ValueError("start must not be after end")
-    cutoff = datetime(1970, 1, 1, tzinfo=UTC) if days == 0 else now - timedelta(days=max(1, min(days, _MAX_RANGE_DAYS)))
+    cutoff = (
+        datetime(1970, 1, 1, tzinfo=UTC)
+        if days == 0
+        else now - timedelta(days=max(1, min(days, _MAX_RANGE_DAYS)))
+    )
     cutoff = max(cutoff, start.astimezone(UTC)) if start else cutoff
     upper = min(now, end.astimezone(UTC)) if end else now
     entities = tuple(f"{asset}:{session}:{interval}" for session in _SESSION_LABELS)
@@ -437,8 +473,12 @@ def read_cumulative_volatility(
                WHERE dataset=? AND entity_code IN (?, ?, ?)
                  AND observed_at>=? AND observed_at<=?
                ORDER BY observed_at ASC""",
-            (DATASET, *entities, cutoff.isoformat().replace("+00:00", "Z"),
-             upper.isoformat().replace("+00:00", "Z")),
+            (
+                DATASET,
+                *entities,
+                cutoff.isoformat().replace("+00:00", "Z"),
+                upper.isoformat().replace("+00:00", "Z"),
+            ),
         ).fetchall()
     points: list[dict[str, Any]] = []
     source = SOURCE
@@ -471,8 +511,7 @@ def read_cumulative_volatility(
     as_of = coverage["last_at"]
     is_stale = bool(
         as_of
-        and datetime.fromisoformat(as_of.replace("Z", "+00:00"))
-        < datetime.now(UTC) - _STALE_AFTER
+        and datetime.fromisoformat(as_of.replace("Z", "+00:00")) < datetime.now(UTC) - _STALE_AFTER
     )
     return {
         "schemaVersion": "1.0",
@@ -508,10 +547,7 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
             and (
                 _needs_price_backfill(asset)
                 or _has_recoverable_gap(asset, full_start, end)
-                or (
-                    earliest
-                    and earliest > full_start + _DERIVED_WINDOW_TOLERANCE
-                )
+                or (earliest and earliest > full_start + _DERIVED_WINDOW_TOLERANCE)
             )
         )
         needs_backfill = rebuild_requested
@@ -521,7 +557,6 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
             start = max(full_start, latest - timedelta(days=2))
         if latest and not needs_backfill:
             start = _session_start(*_session_for(start))
-        write_cutoff = None if needs_backfill or not latest else latest - timedelta(hours=2)
         seeds = _seed_cumulative(asset, start) if latest and not needs_backfill else None
         try:
             candles = _shared_bybit_bars(asset, start, end)
@@ -535,14 +570,12 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
         # historical floor, the next refresh performs the bounded rebuild.
         rebuild_ready = bool(
             rebuild_requested
-            and min(timestamp for timestamp, _ in candles)
-            <= full_start + _DERIVED_WINDOW_TOLERANCE
+            and min(timestamp for timestamp, _ in candles) <= full_start + _DERIVED_WINDOW_TOLERANCE
         )
         if rebuild_requested and not rebuild_ready and latest:
             needs_backfill = False
             start = max(full_start, latest - timedelta(days=2))
             start = _session_start(*_session_for(start))
-            write_cutoff = latest - timedelta(hours=2)
             seeds = _seed_cumulative(asset, start)
             try:
                 candles = _shared_bybit_bars(asset, start, end)
@@ -555,6 +588,9 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
             calculated = calculate_cumulative_volatility(candles, initial_cumulative=seeds)
             if rebuild_ready:
                 successful_backfills.add(asset)
+            # Publish the entire recalculated overlap. A repaired candle or
+            # finalized first bucket changes every later cumulative value;
+            # retaining older values from a different refresh breaks returns.
             points.extend(
                 (
                     point["timestamp"],
@@ -562,8 +598,6 @@ def refresh_cumulative_volatility(*, days: int = _MAX_RANGE_DAYS, force: bool = 
                     _point_payload(point, asset),
                 )
                 for point in calculated["points"]
-                if write_cutoff is None
-                or datetime.fromisoformat(point["timestamp"].replace("Z", "+00:00")) >= write_cutoff
             )
         except (TypeError, ValueError, InvalidOperation) as exc:
             failures.append(f"{asset}:{type(exc).__name__}")

@@ -8,7 +8,7 @@ import { extendSlots } from '@/utils/helper/tsxHelper';
 export default defineComponent({
   name: 'Modal',
   inheritAttrs: false,
-  props: basicProps as any,
+  props: basicProps,
   emits: ['cancel'],
   setup(props, { slots, emit }) {
     const { open, draggable, destroyOnClose } = toRefs(props);

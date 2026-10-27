@@ -2,7 +2,7 @@
   <div>
     <div class="flex justify-between items-center pb-2">
       <CurTabs size="small" :options="curAccountTabOptions" v-model:value="curTabVal">
-        <template #label="{ item }">{{ item?.platform }}-{{ item?.label }}</template>
+        <template #label="{ item }">{{ account?.platform }}-{{ item?.label }}</template>
       </CurTabs>
       <!-- <Button size="small" type="primary" @click="() => handleAdd()">新增</Button> -->
     </div>
@@ -11,11 +11,7 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'action'">
           <div class="flex items-center gap-4">
-            <div
-              @click="handleAdd({ ...record, productId: props.productId })"
-              class="text-#2C97EB cursor-pointer"
-              >编辑</div
-            >
+            <div @click="handleAdd({ ...record })" class="text-#2C97EB cursor-pointer">编辑</div>
             <div
               @click="handleEdit(record)"
               v-if="!record?.isActive"
@@ -66,7 +62,7 @@
 
   const visibleGoogle = ref(false); // google验证码
   const refGoogle = ref();
-  let curParams = {};
+  let curParams: Record<string, unknown> & { isActive?: boolean } = {};
   // 当前产品下账号信息
   // const userStore = useUserStore();
   const curTabVal = ref();

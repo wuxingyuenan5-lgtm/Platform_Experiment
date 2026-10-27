@@ -44,6 +44,9 @@ const GoldMarketDetailPanel = lazyPanel(() => import('../components/GoldMarketDe
 const MacroMarketDetailPanel = lazyPanel(() => import('../components/MacroMarketDetailPanel.vue'));
 const FedWatchPanel = lazyPanel(() => import('../components/FedWatchPanel.vue'));
 const PolymarketFedPanel = lazyPanel(() => import('../components/PolymarketFedPanel.vue'));
+const TreasuryComparisonPanel = lazyPanel(
+  () => import('../components/TreasuryComparisonPanel.vue'),
+);
 const MacroSeriesChart = lazyPanel(() => import('./MacroSeriesChart'));
 const BitcoinHalvingPanel = lazyPanel(() => import('../components/BitcoinHalvingPanel.vue'));
 const GoldOpenInterestPanel = lazyPanel(() => import('../components/GoldOpenInterestPanel.vue'));
@@ -57,6 +60,7 @@ const OptionsDistributionPanel = lazyPanel(
   () => import('../components/OptionsDistributionPanel.vue'),
 );
 const StablecoinPanel = lazyPanel(() => import('../components/StablecoinPanel.vue'));
+const SeasonalityPanel = lazyPanel(() => import('../components/SeasonalityPanel.vue'));
 const WgcEtfFlowPanel = lazyPanel(() => import('../components/WgcEtfFlowPanel.vue'));
 
 const externalGoldResearch = {
@@ -363,6 +367,7 @@ export default defineComponent({
             return h(MacroSeriesChart, {
               dataDomain: 'commodity',
               groupId: 'wgcReserves',
+              defaultTableView: true,
               presentation: 'distribution',
             });
           case 'central-bank-buyers':
@@ -419,7 +424,7 @@ export default defineComponent({
           case 'macro-funding-spreads':
             return h(MacroSeriesChart, { groupId: 'fundingSpreads' });
           case 'macro-treasury-details':
-            return h(MacroSeriesChart, { groupId: 'treasuryYields', presentation: 'distribution' });
+            return h(TreasuryComparisonPanel);
           case 'macro-treasury-spreads':
             return h(MacroSeriesChart, { groupId: 'treasuryTermSpreads' });
           case 'macro-dxy':
@@ -521,22 +526,17 @@ export default defineComponent({
               presentation: 'curve',
             });
           case 'gold-shfe-iv':
-            return h('div', [
-              h(MacroSeriesChart, {
-                dataDomain: 'commodity',
-                groupId: 'shfeGoldIv',
-                presentation: 'curve',
-                curveValueLabel: '隐含波动率',
-                unitLabel: '%',
-              }),
-              h(
-                'p',
-                { style: { color: '#64748b', fontSize: '12px', padding: '0 12px' } },
-                '交易所公布的月份波动率；平值隐波、行权价微笑曲线与历史对比暂缺。',
-              ),
-            ]);
+            return h(MacroSeriesChart, {
+              dataDomain: 'commodity',
+              groupId: 'shfeGoldIv',
+              unitLabel: '%',
+            });
           case 'gold-open-interest':
             return h(GoldOpenInterestPanel);
+          case 'gold-seasonality':
+            return h(SeasonalityPanel, { asset: 'gold' });
+          case 'btc-seasonality':
+            return h(SeasonalityPanel, { asset: 'btc' });
           case 'crypto-halving-cycles':
             return h(BitcoinHalvingPanel);
           case 'gold-borrow-fee':

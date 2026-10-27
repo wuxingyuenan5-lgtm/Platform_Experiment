@@ -78,6 +78,11 @@
               @query="selectedCode = $event"
               @ready="restoreScroll"
             />
+            <DomesticFinancingPanel
+              v-else-if="activePage === 'financing'"
+              :refresh-key="refreshKey"
+              @ready="restoreScroll"
+            />
             <EtfTrackingPanel
               v-else-if="activePage === 'etf'"
               :refresh-key="refreshKey"
@@ -123,6 +128,9 @@
   const EquityObservatoryPanel = defineAsyncComponent(
     () => import('../components/EquityObservatoryPanel.vue'),
   );
+  const DomesticFinancingPanel = defineAsyncComponent(
+    () => import('./components/DomesticFinancingPanel.vue'),
+  );
   const EtfTrackingPanel = defineAsyncComponent(() => import('./components/EtfTrackingPanel.vue'));
 
   const router = useRouter();
@@ -134,6 +142,7 @@
     { key: 'valuation', label: '估值', short: '估值' },
     { key: 'crowding', label: '拥挤度', short: '拥挤' },
     { key: 'etf', label: 'ETF跟踪', short: 'ETF' },
+    { key: 'financing', label: '两融与衍生品', short: '两融' },
     { key: 'stocks', label: '股票池', short: '股票' },
     { key: 'hk', label: '港股观察', short: '港股' },
   ];

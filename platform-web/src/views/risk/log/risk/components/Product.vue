@@ -87,7 +87,7 @@
     immediate: true,
     api: getRiskRecords,
     beforeFetch(params) {
-      const _params = {
+      const _params: typeof searchInfo & { startTime?: string; endTime?: string } = {
         ...params,
         ...searchInfo,
       };
@@ -103,7 +103,7 @@
     showIndexColumn: false,
   });
   function handleClickExport() {
-    const _params = {
+    const _params: typeof searchInfo & { startTime?: string; endTime?: string } = {
       ...searchInfo,
     };
     if (_params.timeRange?.length) {

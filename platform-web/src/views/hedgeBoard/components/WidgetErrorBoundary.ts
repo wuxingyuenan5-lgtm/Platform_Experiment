@@ -24,9 +24,22 @@ export default defineComponent({
           'div',
           {
             class: 'local-empty',
-            style: { minHeight: '360px' },
+            style: { minHeight: '160px' },
+            role: 'alert',
           },
-          `模块 "${props.widgetTitle}" 渲染失败，已自动跳过，不影响其他内容浏览。`,
+          [
+            h('p', `“${props.widgetTitle}”暂不可用。`),
+            h(
+              'button',
+              {
+                type: 'button',
+                onClick: () => {
+                  hasError.value = false;
+                },
+              },
+              '重试',
+            ),
+          ],
         );
       }
 

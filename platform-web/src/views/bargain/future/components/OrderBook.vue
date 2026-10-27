@@ -43,9 +43,11 @@
   };
 
   const searchInfo = {
+    symbol: '',
     // checkCode: props.checkCode,
   };
   const searchInfoDeal = {
+    symbol: '',
     // checkCode: props.checkCode,
   };
   const { send, open, close } = useWebSocket(webSocketUrlMap.Order, {
@@ -143,13 +145,4 @@
     close();
     closeDeal();
   });
-  function findItem(arr: any[]) {
-    if (arr?.length == 0) return null;
-    const _item: any = cascaderOptions.value.find((item: any) => item.value == arr[0]);
-    // cascaderValExchange.value = _item?.label;
-    const _item1 = _item?.children?.find((item: any) => item.value == arr[1]);
-    // console.log('_item1', _item1, cascaderOptions.value);
-
-    return _item1;
-  }
 </script>

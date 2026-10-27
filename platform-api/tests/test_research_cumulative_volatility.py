@@ -129,18 +129,29 @@ def test_custom_window_rebases_in_backend_without_changing_stored_history(interv
     origin = datetime.now(UTC).replace(microsecond=0) - timedelta(days=10)
     stamps = [(origin + timedelta(days=i)).isoformat().replace("+00:00", "Z") for i in range(3)]
     records = [
-        (stamp, f"btc:{session}:{interval}", {
-            "timestamp": stamp, "session": session, "sessionDate": stamp[:10],
-            "interval": interval, "value": str(10 * (n + 1) + i), "price": "100",
-        })
+        (
+            stamp,
+            f"btc:{session}:{interval}",
+            {
+                "timestamp": stamp,
+                "session": session,
+                "sessionDate": stamp[:10],
+                "interval": interval,
+                "value": str(10 * (n + 1) + i),
+                "price": "100",
+            },
+        )
         for i, stamp in enumerate(stamps)
         for n, session in enumerate(("asia", "europe", "americas"))
     ]
     write_history_points("window-test", cumulative.DATASET, records, source=cumulative.SOURCE)
     full = read_cumulative_volatility("btc", 30, interval)
     selected = read_cumulative_volatility(
-        "btc", 30, interval,
-        start=origin + timedelta(days=1), end=origin + timedelta(days=2),
+        "btc",
+        30,
+        interval,
+        start=origin + timedelta(days=1),
+        end=origin + timedelta(days=2),
     )
     assert len(selected["points"]) == 6
     for session in ("asia", "europe", "americas"):
@@ -173,13 +184,26 @@ def test_provisional_refresh_replaces_bucket_and_keeps_other_assets(monkeypatch)
 
     def record(asset, time, value):
         stamp = f"{day}T{time}:00Z"
-        return (stamp, f"{asset}:europe:4h", {
-            "asset": asset, "timestamp": stamp, "session": "europe", "sessionDate": day,
-            "interval": "4h", "value": str(value), "price": "100",
-        })
+        return (
+            stamp,
+            f"{asset}:europe:4h",
+            {
+                "asset": asset,
+                "timestamp": stamp,
+                "session": "europe",
+                "sessionDate": day,
+                "interval": "4h",
+                "value": str(value),
+                "price": "100",
+            },
+        )
 
-    initial = [record("btc", "07:10", 2), record("btc", "07:15", 3),
-               record("gold", "07:10", 9), record("btc", "11:10", 4)]
+    initial = [
+        record("btc", "07:10", 2),
+        record("btc", "07:15", 3),
+        record("gold", "07:10", 9),
+        record("btc", "11:10", 4),
+    ]
     write_history_points("sample-test", cumulative.DATASET, initial, source=cumulative.SOURCE)
     result = read_cumulative_volatility("btc", 30, "4h")
     assert [p["timestamp"][11:16] for p in result["points"]] == ["07:15", "11:10"]
@@ -192,8 +216,11 @@ def test_provisional_refresh_replaces_bucket_and_keeps_other_assets(monkeypatch)
         ).fetchall()
     assert len(rows) == 3
     assert any(r["entity_code"].startswith("gold:") for r in rows)
-    assert "07:20" in next(json.loads(r["payload_json"])["timestamp"] for r in rows
-                           if json.loads(r["payload_json"])["value"] == "3.5")
+    assert "07:20" in next(
+        json.loads(r["payload_json"])["timestamp"]
+        for r in rows
+        if json.loads(r["payload_json"])["value"] == "3.5"
+    )
 
     def fail_write(*args, **kwargs):
         raise RuntimeError("publication failure")
@@ -207,43 +234,166 @@ def test_provisional_refresh_replaces_bucket_and_keeps_other_assets(monkeypatch)
 
 def test_internal_gap_rebuild_requires_valid_shared_source_and_does_not_loop_on_real_gaps():
     import json
+
     from app.database import connection
     from app.research_a_share_repository import start_refresh, write_history_points
+
     initialize_database()
-    start_refresh('gap-test', None)
-    origin = datetime.now(UTC).replace(hour=0,minute=0,second=0,microsecond=0)-timedelta(days=10)
+    start_refresh("gap-test", None)
+    origin = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
+        days=10
+    )
     records = []
-    for offset in (0,4):
-        stamp=(origin+timedelta(days=offset,hours=8)).isoformat().replace('+00:00','Z')
-        records.append((stamp,'gold:europe:15m',{'timestamp':stamp,'session':'europe','sessionDate':stamp[:10],'interval':'15m','value':'0','price':'100'}))
-    write_history_points('gap-test',cumulative.DATASET,records,source=cumulative.SOURCE)
-    assert not cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))
-    time=int((origin+timedelta(days=2,hours=8)).timestamp()*1000)
-    payload={'symbol':'XAUTUSDT','category':'linear','priceType':'trade','close':'100','quality':['invalid']}
+    for offset in (0, 4):
+        stamp = (origin + timedelta(days=offset, hours=8)).isoformat().replace("+00:00", "Z")
+        records.append(
+            (
+                stamp,
+                "gold:europe:15m",
+                {
+                    "timestamp": stamp,
+                    "session": "europe",
+                    "sessionDate": stamp[:10],
+                    "interval": "15m",
+                    "value": "0",
+                    "price": "100",
+                },
+            )
+        )
+    write_history_points("gap-test", cumulative.DATASET, records, source=cumulative.SOURCE)
+    assert not cumulative._has_recoverable_gap("gold", origin, origin + timedelta(days=5))
+    time = int((origin + timedelta(days=2, hours=8)).timestamp() * 1000)
+    payload = {
+        "symbol": "XAUTUSDT",
+        "category": "linear",
+        "priceType": "trade",
+        "close": "100",
+        "quality": ["invalid"],
+    }
     with connection() as db:
-        db.execute("INSERT INTO research_strategy_projection VALUES(?,?,?,?)",('historical_candle','XAUTUSDT:linear:trade',time,json.dumps(payload)))
-    assert not cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))
-    payload['quality']=[]
+        db.execute(
+            "INSERT INTO research_strategy_projection VALUES(?,?,?,?)",
+            ("historical_candle", "XAUTUSDT:linear:trade", time, json.dumps(payload)),
+        )
+    assert not cumulative._has_recoverable_gap("gold", origin, origin + timedelta(days=5))
+    payload["quality"] = []
     with connection() as db:
-        db.execute("UPDATE research_strategy_projection SET payload_json=? WHERE kind='historical_candle' AND entity='XAUTUSDT:linear:trade'",(json.dumps(payload),))
-    assert cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))
-    assert not cumulative._has_recoverable_gap('btc',origin,origin+timedelta(days=5))
-    stamp=(origin+timedelta(days=2,hours=8)).isoformat().replace('+00:00','Z')
-    write_history_points('gap-test',cumulative.DATASET,[(stamp,'gold:europe:15m',{
-        'timestamp':stamp,'session':'europe','sessionDate':stamp[:10],'interval':'15m','value':'1','price':'100'
-    })],source=cumulative.SOURCE)
-    assert not cumulative._has_recoverable_gap('gold',origin,origin+timedelta(days=5))
+        db.execute(
+            "UPDATE research_strategy_projection SET payload_json=? "
+            "WHERE kind='historical_candle' AND entity='XAUTUSDT:linear:trade'",
+            (json.dumps(payload),),
+        )
+    assert cumulative._has_recoverable_gap("gold", origin, origin + timedelta(days=5))
+    assert not cumulative._has_recoverable_gap("btc", origin, origin + timedelta(days=5))
+    stamp = (origin + timedelta(days=2, hours=8)).isoformat().replace("+00:00", "Z")
+    write_history_points(
+        "gap-test",
+        cumulative.DATASET,
+        [
+            (
+                stamp,
+                "gold:europe:15m",
+                {
+                    "timestamp": stamp,
+                    "session": "europe",
+                    "sessionDate": stamp[:10],
+                    "interval": "15m",
+                    "value": "1",
+                    "price": "100",
+                },
+            )
+        ],
+        source=cumulative.SOURCE,
+    )
+    assert not cumulative._has_recoverable_gap("gold", origin, origin + timedelta(days=5))
 
 
 def test_all_range_reads_stored_points_before_one_year():
     from app.research_a_share_repository import start_refresh, write_history_points
+
     initialize_database()
     start_refresh("all-range-test", None)
     day = (datetime.now(UTC) - timedelta(days=500)).date().isoformat()
     stamp = day + "T08:00:00Z"
-    write_history_points("all-range-test", cumulative.DATASET, [(stamp, "btc:europe:15m", {
-        "timestamp": stamp, "session": "europe", "sessionDate": day,
-        "interval": "15m", "value": "1", "price": "100"
-    })], source=cumulative.SOURCE)
+    write_history_points(
+        "all-range-test",
+        cumulative.DATASET,
+        [
+            (
+                stamp,
+                "btc:europe:15m",
+                {
+                    "timestamp": stamp,
+                    "session": "europe",
+                    "sessionDate": day,
+                    "interval": "15m",
+                    "value": "1",
+                    "price": "100",
+                },
+            )
+        ],
+        source=cumulative.SOURCE,
+    )
     assert read_cumulative_volatility("btc", 365, "15m")["points"] == []
     assert read_cumulative_volatility("btc", 0, "15m")["points"][0]["timestamp"] == stamp
+
+
+def test_incremental_refresh_republishes_revised_cumulative_overlap(monkeypatch) -> None:
+    import json
+    from decimal import Decimal
+
+    from app.database import connection
+
+    initialize_database()
+    now = datetime.now(UTC)
+    day = (now - timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+    candles = [
+        (day, Decimal("100")),
+        (day + timedelta(minutes=15), Decimal("110")),
+        (day + timedelta(hours=1), Decimal("105")),
+        (now - timedelta(minutes=1), Decimal("108")),
+    ]
+    monkeypatch.setattr(cumulative, "_shared_bybit_bars", lambda *_: candles)
+    monkeypatch.setattr(cumulative, "_needs_price_backfill", lambda *_: False)
+    monkeypatch.setattr(cumulative, "_has_recoverable_gap", lambda *_: False)
+    monkeypatch.setattr(
+        cumulative, "_earliest_persisted_timestamp", lambda *_: now - timedelta(days=367)
+    )
+    cumulative.refresh_cumulative_volatility()
+    # An archive repair changes an earlier first close, well outside the last
+    # two hours. Its later cumulative values must be replaced together.
+    candles[0] = (day, Decimal("90"))
+    cumulative.refresh_cumulative_volatility()
+    expected = calculate_cumulative_volatility(candles)["points"]
+    with connection() as db:
+        for point in expected:
+            row = db.execute(
+                "SELECT payload_json FROM research_a_share_history "
+                "WHERE dataset=? AND entity_code=? AND observed_at=?",
+                (
+                    cumulative.DATASET,
+                    f"btc:{point['session']}:{point['interval']}",
+                    point["timestamp"],
+                ),
+            ).fetchone()
+            assert json.loads(row[0])["value"] == point["value"]
+
+
+def test_runtime_repair_starts_at_session_boundary_when_archive_is_empty(monkeypatch):
+    from types import SimpleNamespace
+
+    import app.strategy_research_projection as projection
+
+    monkeypatch.setattr(projection, "read_projection", lambda *_: [])
+    requests = []
+    response = SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"rows": []})
+
+    def get(_url, **kwargs):
+        requests.append(kwargs["params"])
+        return response
+
+    monkeypatch.setattr(cumulative.runtime_transport, "get", get)
+    end = datetime(2026, 10, 26, 17, 26, tzinfo=UTC)
+    start = datetime(2026, 10, 24, 15, tzinfo=UTC)
+    assert cumulative._shared_bybit_bars("btc", start, end) == []
+    assert int(requests[0]["startMs"]) == int(start.timestamp() * 1000)

@@ -33,27 +33,36 @@ def _read_shared_daily_prices(asset: str, dates: list[str]) -> dict[str, float]:
 
     result = {}
     entity = asset.upper() + "USDT:spot:trade"
+    now_ms = int(datetime.now(UTC).timestamp() * 1000)
+    stamps = {
+        int(
+            (datetime.fromisoformat(day).replace(tzinfo=UTC) + timedelta(days=1)).timestamp() * 1000
+        ): day
+        for day in dates
+    }
+    closed_stamps = sorted(stamp for stamp in stamps if stamp <= now_ms)
     with read_only_connection() as db:
-        for day in dates:
-            stamp = int(
-                (datetime.fromisoformat(day).replace(tzinfo=UTC) + timedelta(days=1)).timestamp()
-                * 1000
-            )
-            if stamp > int(datetime.now(UTC).timestamp() * 1000):
-                continue
-            for kind in ("historical_candle", "daily_candle"):
-                row = db.execute(
-                    "SELECT payload_json FROM research_strategy_projection "
-                    "WHERE kind=? AND entity=? AND at_ms=?",
-                    (kind, entity, stamp),
-                ).fetchone()
-                if row is None:
-                    continue
-                payload = json.loads(row[0])
-                close = Decimal(str(payload["close"]))
-                if close.is_finite() and close > 0 and not payload.get("quality"):
-                    result[day] = float(close)
-                    break
+        for offset in range(0, len(closed_stamps), 400):
+            batch = closed_stamps[offset : offset + 400]
+            placeholders = ",".join("?" for _ in batch)
+            rows = db.execute(
+                "SELECT kind,at_ms,payload_json FROM research_strategy_projection "
+                "WHERE kind IN ('historical_candle','daily_candle') AND entity=? "
+                f"AND at_ms IN ({placeholders})",
+                (entity, *batch),
+            ).fetchall()
+            by_key = {(row["at_ms"], row["kind"]): row["payload_json"] for row in rows}
+            for stamp in batch:
+                day = stamps[stamp]
+                for kind in ("historical_candle", "daily_candle"):
+                    raw = by_key.get((stamp, kind))
+                    if raw is None:
+                        continue
+                    payload = json.loads(raw)
+                    close = Decimal(str(payload["close"]))
+                    if close.is_finite() and close > 0 and not payload.get("quality"):
+                        result[day] = float(close)
+                        break
     return result
 
 

@@ -35,7 +35,7 @@ def price(value):
 async def fetch_imoex(client, user_agent, *, now=None):
     now = now or datetime.now(UTC)
     today = now.astimezone(ZoneInfo("Europe/Moscow")).date()
-    first = today - timedelta(days=740)
+    first = datetime(1990, 1, 1).date()
     points = {}
     try:
         cache = read_local_json(CACHE_PATH)
@@ -54,7 +54,7 @@ async def fetch_imoex(client, user_agent, *, now=None):
     # Re-read recent closes to capture revisions without fetching two years each tick.
     start_day = (
         max(first, datetime.fromisoformat(max(points)).date() - timedelta(days=7))
-        if points
+        if points and cache.get("historyStartRequested") == first.isoformat()
         else first
     )
 
@@ -79,7 +79,7 @@ async def fetch_imoex(client, user_agent, *, now=None):
 
     offset = 0
     seen = set()
-    for _ in range(20):
+    for _ in range(150):
         payload = await fetch(
             HISTORY_URL,
             {
@@ -141,6 +141,7 @@ async def fetch_imoex(client, user_agent, *, now=None):
         CACHE_PATH,
         dict(
             schemaVersion="1.0",
+            historyStartRequested=first.isoformat(),
             symbol="IMOEX",
             sourceUrl=SOURCE_URL,
             retrievedAt=now.isoformat(),

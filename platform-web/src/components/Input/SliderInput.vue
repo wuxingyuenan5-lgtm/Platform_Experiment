@@ -24,7 +24,7 @@
 <script lang="tsx" setup>
   import type { SliderProps, InputNumberProps } from 'ant-design-vue';
   import { InputNumber, Button, Slider, Popconfirm, message } from 'ant-design-vue';
-  import { reactive, defineProps, PropType, watch } from 'vue';
+  import { reactive, PropType, watch } from 'vue';
   import { watchDebounced } from '@vueuse/shared';
 
   const emit = defineEmits(['submit', 'update:value', 'change']);

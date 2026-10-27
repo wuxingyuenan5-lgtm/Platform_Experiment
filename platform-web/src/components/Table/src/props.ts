@@ -90,6 +90,7 @@ export const basicProps = {
     default: () => [],
   },
   showIndexColumn: { type: Boolean, default: true },
+  showExpandColumn: { type: Boolean, default: undefined },
   indexColumnProps: {
     type: Object as PropType<BasicColumn>,
     default: null,
@@ -134,7 +135,7 @@ export const basicProps = {
     type: Function as PropType<(record: TableCustomRecord<any>, index: number) => string>,
   },
   scroll: {
-    type: Object as PropType<{ x: number | string | true; y: number | string }>,
+    type: Object as PropType<{ x?: number | string | true; y?: number | string }>,
     default: null,
   },
   isScroll: {

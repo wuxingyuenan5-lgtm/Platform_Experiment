@@ -357,8 +357,10 @@ def test_projection_failure_keeps_other_market_and_last_good(tmp_path, monkeypat
     monkeypatch.setattr(module, "build_cn", broken)
     monkeypatch.setattr(module, "build_us", lambda *_: {"market": "us", "status": "ready"})
     result = module.produce_local({})
-    assert result["cn"]["status"] == "error" and result["us"]["status"] == "ready"
-    assert read_artifact("cn") == old
+    assert result["cn"]["status"] == "partial" and result["us"]["status"] == "ready"
+    kept = read_artifact("cn")
+    assert kept["date"] == old["date"]
+    assert kept["sectionStatus"]["market"] == "stale"
 
 
 def test_missing_industry_amount_stays_null():
@@ -534,3 +536,89 @@ def test_equity_route_authentication_and_market_validation(tmp_path, monkeypatch
     assert client.get(url.replace("/cn", "/invalid")).status_code == 422
     app.dependency_overrides[require_principal] = lambda: Principal("test", (), "session")
     assert client.get(url).status_code == 403
+
+
+def test_valuation_projection_failure_does_not_block_market_update(monkeypatch):
+    import app.research_equity_observatory as module
+    import app.research_equity_valuation as valuation
+
+    published = {}
+    old = {"valuationCharts": [{"id": "old-spx"}], "date": "2026-10-23"}
+    monkeypatch.setattr(module, "read_artifact", lambda key: old if key == "us" else {})
+    monkeypatch.setattr(module, "publish_artifact", lambda key, data: published.update({key: data}))
+
+    def market(name):
+        return {
+            "market": name,
+            "status": "ready",
+            "date": "2026-10-26",
+            "themes": {"date": "2026-10-26", "items": []},
+            "valuations": [],
+            "ratios": [],
+        }
+
+    monkeypatch.setattr(module, "build_cn", lambda *_: market("cn"))
+    monkeypatch.setattr(module, "build_us", lambda *_: market("us"))
+    monkeypatch.setattr(module, "build_hk", lambda *_: {"status": "ready"})
+
+    def build(_sources, name):
+        if name == "us":
+            raise ValueError("injected single section failure")
+        return []
+
+    monkeypatch.setattr(valuation, "build_valuation_charts", build)
+    result = module.produce_local({})
+    assert result["us"]["status"] == "partial"
+    assert published["us"]["themes"]["date"] == "2026-10-26"
+    assert published["us"]["valuationCharts"] == old["valuationCharts"]
+    assert published["us"]["sectionStatus"]["valuation"] == "stale"
+
+
+def test_market_projection_failure_still_publishes_independent_valuation(monkeypatch):
+    import app.research_equity_observatory as module
+    import app.research_equity_valuation as valuation
+
+    published = {}
+    monkeypatch.setattr(module, "read_artifact", lambda _: {})
+    monkeypatch.setattr(module, "publish_artifact", lambda key, data: published.update({key: data}))
+    monkeypatch.setattr(module, "build_cn", lambda *_: {"market": "cn", "status": "ready"})
+    monkeypatch.setattr(module, "build_hk", lambda *_: {"status": "ready"})
+
+    def broken(*_):
+        raise ValueError("injected theme/market failure")
+
+    monkeypatch.setattr(module, "build_us", broken)
+    monkeypatch.setattr(valuation, "build_valuation_charts", lambda *_: [{"id": "fresh-spx"}])
+    module.produce_local({})
+    assert published["us"]["themes"] is None
+    assert published["us"]["valuationCharts"] == [{"id": "fresh-spx"}]
+    assert published["us"]["sectionStatus"]["market"] == "error"
+    assert published["us"]["sectionStatus"]["valuation"] == "ready"
+    assert published["cn"]["status"] == "ready"
+
+
+def test_theme_calculation_failure_keeps_us_market_structure(monkeypatch):
+    import app.research_equity_observatory as module
+
+    rows = [
+        {
+            "symbol": symbol,
+            "status": "ready",
+            "history": [
+                {"date": "2026-10-23", "value": str(value)},
+                {"date": "2026-10-26", "value": str(value + 1)},
+            ],
+        }
+        for symbol, value in [("SPY", 100), ("RSP", 50), ("IWM", 80), ("QQQ", 90)]
+    ]
+    monkeypatch.setattr(module, "read_dataset", lambda _: {"status": "ready", "rows": rows})
+
+    def broken(*_args, **_kwargs):
+        raise ValueError("injected theme calculation failure")
+
+    monkeypatch.setattr(module, "theme_observations", broken)
+    payload = module.build_us("2026-10-27", {})
+    assert payload["themes"] is None
+    assert payload["date"] == "2026-10-26"
+    assert payload["ratios"][0]["close"] is not None
+    assert len(payload["participation"]) > 0

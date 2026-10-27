@@ -34,7 +34,7 @@ export function buildTreasuryWeeklyOptions(
   };
   return {
     animation: false,
-    grid: { left: 65, right: 125, top: 65, bottom: 85 },
+    grid: { left: 65, right: 65, top: 65, bottom: 85 },
     legend: {
       type: 'scroll',
       top: 5,
@@ -70,7 +70,8 @@ export function buildTreasuryWeeklyOptions(
     yAxis: [
       {
         type: 'value',
-        name: 'USD',
+        show: false,
+        axisPointer: { show: false },
         position: 'right',
         axisLabel: { formatter: compact },
         splitLine: { lineStyle: { color: '#e5edf5' } },
@@ -87,7 +88,7 @@ export function buildTreasuryWeeklyOptions(
         type: 'value',
         name: 'BTC',
         position: 'right',
-        offset: 65,
+        offset: 0,
         axisLabel: { formatter: compact },
         splitLine: { show: false },
       },
@@ -130,8 +131,8 @@ export function buildTreasuryWeeklyOptions(
         type: 'line',
         yAxisIndex: 1,
         showSymbol: false,
-        lineStyle: { width: 2, color: '#f59e0b' },
-        itemStyle: { color: '#f59e0b' },
+        lineStyle: { width: 2, color: '#111111' },
+        itemStyle: { color: '#111111' },
         data: weeks.map((w) => Number(w.btcPriceUsd)),
       },
     ],

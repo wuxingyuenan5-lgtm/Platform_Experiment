@@ -15,7 +15,7 @@
 </template>
 <script setup lang="ts">
   import { riskLevelOptions } from '@/utils/options/basicOptions';
-  import { computed, watch, ref } from 'vue';
+  import { computed, watch, ref, type CSSProperties } from 'vue';
 
   const props = defineProps({
     value: {
@@ -111,7 +111,7 @@
   // console.log('innerStyle----', innerStyle);
   // console.log('curLevel----', curLevel);
 
-  function gapFn(params: any) {
+  function gapFn(params: any): CSSProperties {
     const _val = params.riskValue - curMin.value;
     let _left = _val / (curMax.value - curMin.value);
     if (props.reverse) {

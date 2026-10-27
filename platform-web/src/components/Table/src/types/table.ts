@@ -198,6 +198,7 @@ export interface BasicTableProps<T = any> {
   columns: BasicColumn[];
   // 是否显示序号列
   showIndexColumn?: boolean;
+  showExpandColumn?: boolean;
   // 序号列配置
   indexColumnProps?: BasicColumn;
   actionColumn?: BasicColumn;

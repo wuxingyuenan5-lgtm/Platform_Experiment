@@ -91,7 +91,7 @@
   const defaultValueRef = ref({});
   const isInitedDefaultRef = ref(false);
   const propsRef = ref<Partial<FormProps>>();
-  const schemaRef = ref<FormSchema[] | null>(null);
+  const schemaRef: Ref<FormSchema[] | null> = ref(null);
   const formElRef = ref<FormActionType | null>(null);
 
   const { prefixCls } = useDesign('basic-form');
@@ -119,7 +119,7 @@
     };
   });
 
-  const getBindValue = computed(() => ({ ...attrs, ...props, ...unref(getProps) }) as AntFormProps);
+  const getBindValue = computed(() => ({ ...attrs, ...props, ...unref(getProps) } as AntFormProps));
 
   const getSchema = computed((): FormSchema[] => {
     const schemas: FormSchema[] = unref(schemaRef) || (unref(getProps).schemas as any);
@@ -307,7 +307,7 @@
   };
 
   const getFormActionBindProps = computed(
-    () => ({ ...getProps.value, ...advanceState }) as InstanceType<typeof FormAction>['$props'],
+    () => ({ ...getProps.value, ...advanceState } as InstanceType<typeof FormAction>['$props']),
   );
 
   defineExpose({

@@ -88,6 +88,7 @@
   </SimpleContainer>
 </template>
 <script lang="tsx" setup>
+  import type { Dayjs } from 'dayjs';
   import { SimpleContainer } from '@/components/Container';
   import { BasicTable, useTable } from '@/components/Table';
   import { getColumns } from './data';
@@ -112,7 +113,7 @@
     transferType: undefined,
     riskLevel: undefined,
     status: undefined,
-    timeRange: [],
+    timeRange: undefined as [Dayjs, Dayjs] | undefined,
   };
   const searchInfo = reactive({ ...searchInfoInit });
   const [registerTable, { reload, getForm }] = useTable({
@@ -122,7 +123,7 @@
     columns: getColumns(),
     showIndexColumn: false,
     beforeFetch: (params) => {
-      const _params = {
+      const _params: typeof searchInfo & { startTime?: string; endTime?: string } = {
         ...params,
         ...searchInfo,
       };
@@ -148,7 +149,7 @@
     editModal.value.openModal(true);
   }
   function handleClickExport() {
-    const _params = {
+    const _params: typeof searchInfo & { startTime?: string; endTime?: string } = {
       ...searchInfo,
     };
     if (_params.timeRange?.length) {

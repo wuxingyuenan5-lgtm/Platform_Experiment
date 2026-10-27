@@ -51,7 +51,7 @@
   </div>
 </template>
 <script lang="ts" setup>
-  import { defineProps, toRefs, ref, unref, computed, type Ref, watch } from 'vue';
+  import { toRefs, ref, unref, computed, type Ref, watch } from 'vue';
   import { Input, Checkbox, FormItem, FormItemRest } from 'ant-design-vue';
   import { propTypes } from '@/utils/propTypes';
   import { type FormProps, type FormSchemaInner as FormSchema } from '../types/form';
@@ -105,8 +105,10 @@
     return schema.value?.fields?.[2] || props.checkField;
   });
   const compAttr = computed(() => {
+    const { size, ...attributes } = unref(formProps);
     return {
-      ...unref(formProps),
+      ...attributes,
+      size: size === 'default' ? ('middle' as const) : size,
       allowClear: true,
     };
   });

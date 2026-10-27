@@ -72,7 +72,7 @@
     imputProps: {
       step: 0,
       precision: 0,
-      size: 'large',
+      size: 'large' as const,
       placeholder: '请输入平仓数量',
     },
   });

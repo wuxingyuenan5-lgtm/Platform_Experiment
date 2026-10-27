@@ -18,10 +18,10 @@
           <!-- <div class="color-secondary">标的：</div> -->
           <RangePicker v-model:value="searchInfo.timeRange" style="width: 250px" />
         </div>
-        <Button type="primary" @click="reload">查询</Button>
+        <Button type="primary" @click="() => reload()">查询</Button>
       </div>
       <!-- <div>
-        <Button type="primary" @click="reload">导出</Button>
+        <Button type="primary" @click="() => reload()">导出</Button>
       </div> -->
     </div>
 

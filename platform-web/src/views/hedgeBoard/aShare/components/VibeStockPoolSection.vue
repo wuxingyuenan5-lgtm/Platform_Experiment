@@ -679,7 +679,7 @@
         (!q || `${x.name} ${x.code} ${x.industry}`.toLowerCase().includes(q)) &&
         (filter.value !== '__focus__' || focusCodes.value.includes(x.code || '')) &&
         (!industry || x.industry === industry) &&
-        (!basketCodes || basketCodes.has(x.code)),
+        (!basketCodes || basketCodes.has(x.code || '')),
     );
     if (sortKey.value && sortDirection.value) {
       const key = sortKey.value;

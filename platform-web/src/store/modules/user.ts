@@ -23,6 +23,21 @@ import { usePermissionStore } from '@/store/modules/permission';
 import { h } from 'vue';
 import { message } from 'ant-design-vue';
 
+interface LegacyAccountOption {
+  id?: string | number;
+  value?: string | number;
+  label?: string;
+  checkCode?: string;
+  platform?: string;
+}
+
+interface LegacyProductOption {
+  id?: string | number;
+  value?: string | number;
+  label?: string;
+  children?: LegacyAccountOption[];
+}
+
 interface UserState {
   userInfo: Nullable<UserInfo>;
   roleList: string[];
@@ -84,8 +99,8 @@ export const useUserStore = defineStore({
     getUserInfoInfo(state): Record<string, unknown> {
       return ((state.userInfo as any)?.data?.userInfo || {}) as Record<string, unknown>;
     },
-    getUserInfoAccount(state): unknown[] {
-      return ((state.userInfo as any)?.data?.product || []) as unknown[];
+    getUserInfoAccount(state): LegacyProductOption[] {
+      return ((state.userInfo as any)?.data?.product || []) as LegacyProductOption[];
     },
     getOptionsMap(state): Record<string, unknown> {
       return state.optionsMap || {};

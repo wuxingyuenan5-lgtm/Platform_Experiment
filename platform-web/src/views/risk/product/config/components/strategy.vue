@@ -29,7 +29,12 @@
       </BasicTable>
     </SimpleContainer>
     <!-- 编辑 -->
-    <EditModal ref="editModal" @success="editSuccess" :record="curCreate" :productId="productId" />
+    <EditModal
+      ref="editModal"
+      @success="editSuccess"
+      :record="curCreate"
+      :productId="String(productId)"
+    />
     <!-- 谷歌验证 -->
     <GoogleCode
       ref="refGoogle"
@@ -59,7 +64,7 @@
   });
   const visibleGoogle = ref(false); // google验证码
   const refGoogle = ref();
-  let curParams = {};
+  let curParams: Record<string, unknown> & { isActive?: boolean } = {};
 
   const curCreate = ref<any>();
   const editModal = ref();

@@ -103,7 +103,7 @@
   const { t } = useI18n();
 
   const userInfo = computed(() => {
-    return userStore.getUserInfo || {};
+    return userStore.getUserInfo;
   });
 
   /**

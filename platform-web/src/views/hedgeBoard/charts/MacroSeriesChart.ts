@@ -59,6 +59,7 @@ export default defineComponent({
       >,
       default: 'time',
     },
+    defaultTableView: { type: Boolean, default: false },
     years: { type: Number, default: 5 },
     unitLabel: { type: String, default: '' },
     curveValueLabel: { type: String, default: '结算价' },
@@ -75,7 +76,10 @@ export default defineComponent({
       new Set<string>(props.initiallyHiddenSeriesIds),
     );
     const search = useResearchViewState(`macro:${props.groupId}:search`, '');
-    const tableView = useResearchViewState(`macro:${props.groupId}:tableView`, false);
+    const tableView = useResearchViewState(
+      `macro:${props.groupId}:tableView`,
+      props.defaultTableView,
+    );
     const tablePage = useResearchViewState(`macro:${props.groupId}:tablePage`, 0);
     const series = shallowRef<MacroDashboardSeries[]>([]);
     const curveHistory = shallowRef<MacroDashboardSeries[]>([]);
@@ -250,71 +254,79 @@ export default defineComponent({
               },
             }),
           ]),
-          h('div', { style: { maxHeight: '330px', overflow: 'auto' } }, [
-            h('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '12px' } }, [
-              h('thead', [
-                h(
-                  'tr',
-                  [
-                    '项目',
-                    props.groupId === 'treasuryYields' ? '年化收益率' : '数量',
-                    '观测日期',
-                  ].map((label) =>
-                    h('th', { style: { textAlign: 'left', padding: '6px' } }, label),
-                  ),
-                ),
-              ]),
+          h(
+            'div',
+            { class: 'distribution-scroll', style: { maxHeight: '330px', overflow: 'auto' } },
+            [
               h(
-                'tbody',
-                rows.map((item) =>
-                  h('tr', [
+                'table',
+                { style: { width: '100%', borderCollapse: 'collapse', fontSize: '12px' } },
+                [
+                  h('thead', [
                     h(
-                      'td',
-                      {
-                        style: {
-                          padding: '6px',
-                          background: `linear-gradient(to right, ${
-                            Number(item.latestValue) < 0 ? '#dc262615' : '#165dff15'
-                          } ${Math.min(
-                            100,
-                            (100 * Math.abs(Number(item.latestValue ?? 0))) / maxValue,
-                          )}%, transparent 0)`,
-                        },
-                      },
+                      'tr',
                       [
-                        h(
-                          'a',
-                          {
-                            href: item.sourceUrl || undefined,
-                            target: '_blank',
-                            rel: 'noopener noreferrer',
-                          },
-                          item.label,
-                        ),
-                      ],
-                    ),
-                    h(
-                      'td',
-                      {
-                        style: { padding: '6px', whiteSpace: 'nowrap' },
-                        title: String(item.latestValue ?? '—'),
-                      },
-                      item.latestValue === null
-                        ? '—'
-                        : `${Number(item.latestValue).toLocaleString('en-US', {
-                            maximumFractionDigits: 8,
-                          })} ${unitText(item.unit)}`,
-                    ),
-                    h(
-                      'td',
-                      { style: { padding: '6px', whiteSpace: 'nowrap' } },
-                      `${item.observationDate ?? '—'}${item.isStale ? ' · 待更新' : ''}`,
+                        '项目',
+                        props.groupId === 'treasuryYields' ? '年化收益率' : '数量',
+                        '观测日期',
+                      ].map((label) =>
+                        h('th', { style: { textAlign: 'left', padding: '6px' } }, label),
+                      ),
                     ),
                   ]),
-                ),
+                  h(
+                    'tbody',
+                    rows.map((item) =>
+                      h('tr', [
+                        h(
+                          'td',
+                          {
+                            style: {
+                              padding: '6px',
+                              background: `linear-gradient(to right, ${
+                                Number(item.latestValue) < 0 ? '#dc262615' : '#165dff15'
+                              } ${Math.min(
+                                100,
+                                (100 * Math.abs(Number(item.latestValue ?? 0))) / maxValue,
+                              )}%, transparent 0)`,
+                            },
+                          },
+                          [
+                            h(
+                              'a',
+                              {
+                                href: item.sourceUrl || undefined,
+                                target: '_blank',
+                                rel: 'noopener noreferrer',
+                              },
+                              item.label,
+                            ),
+                          ],
+                        ),
+                        h(
+                          'td',
+                          {
+                            style: { padding: '6px', whiteSpace: 'nowrap' },
+                            title: String(item.latestValue ?? '—'),
+                          },
+                          item.latestValue === null
+                            ? '—'
+                            : `${Number(item.latestValue).toLocaleString('en-US', {
+                                maximumFractionDigits: 8,
+                              })} ${unitText(item.unit)}`,
+                        ),
+                        h(
+                          'td',
+                          { style: { padding: '6px', whiteSpace: 'nowrap' } },
+                          `${item.observationDate ?? '—'}${item.isStale ? ' · 待更新' : ''}`,
+                        ),
+                      ]),
+                    ),
+                  ),
+                ],
               ),
-            ]),
-          ]),
+            ],
+          ),
           h(
             'small',
             { style: { color: '#64748b' } },

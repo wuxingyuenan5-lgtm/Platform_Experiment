@@ -4,16 +4,26 @@ These are price/rate signals, not news sentiment, positions or causal attributio
 No collection, source substitution, forward filling or historical release simulation.
 """
 
+import json
 from collections import deque
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from math import sqrt
+from threading import Lock
 
 from app.research_a_share_repository import read_dataset
 from app.research_local_data import read_local_json
 from app.research_provider_errors import ResearchProviderError
 
 VERSION = "macro-narrative-proxies-v1"
+_BUILD_LOCK = Lock()
+
+
+@lru_cache(maxsize=1)
+def _cached_build(source_json: str, today: date):
+    # Key includes all actual inputs and the calculation date; no stale TTL.
+    return build(json.loads(source_json), today)
 # Each leg: canonical source ID, direction, transform (price ratio or level change).
 DRIVERS = (
     (
@@ -123,7 +133,7 @@ def points(document, today):
     return dict(sorted(result.items()))
 
 
-def rolling_signal(values, transform):
+def rolling_signal(values, transform, *, since=None):
     """20-observation change vs preceding <=252 changes, minimum126; no lookahead.
 
     A >14-calendar-day gap resets the observation window. Zero historical variance
@@ -147,7 +157,7 @@ def rolling_signal(values, transform):
         if len(window) < 21:
             continue
         change = float(value / window[0] - 1 if transform == "ratio" else value - window[0])
-        if len(history) >= 126:
+        if len(history) >= 126 and (since is None or day >= since):
             mean = sum(history) / len(history)
             variance = sum((x - mean) ** 2 for x in history) / len(history)
             if variance > 1e-18:
@@ -163,7 +173,13 @@ def rolling_signal(values, transform):
 
 def build_driver(definition, sources, today):
     key, label, group, meaning, legs = definition
-    signals = [rolling_signal(points(sources.get(code, {}), today), mode) for code, _, mode in legs]
+    # Retain the full warm-up baseline but calculate only scores that can reach
+    # the five-year view, including the 14-day momentum boundary.
+    since = (today - timedelta(days=366 * 5 + 14)).isoformat()
+    signals = [
+        rolling_signal(points(sources.get(code, {}), today), mode, since=since)
+        for code, _, mode in legs
+    ]
     common = sorted(set.intersection(*(set(signal) for signal in signals))) if signals else []
     rows = []
     for i, day in enumerate(common):
@@ -306,4 +322,6 @@ def read_macro_narratives():
         for row in (read_dataset(f"market_detail_{market}") or {}).get("rows", []):
             if row.get("symbol") in ids:
                 sources[row["symbol"]] = {**row, "label": row.get("name", row["symbol"])}
-    return build(sources, datetime.now(UTC).date())
+    source_json = json.dumps(sources, sort_keys=True, ensure_ascii=False)
+    with _BUILD_LOCK:
+        return _cached_build(source_json, datetime.now(UTC).date())

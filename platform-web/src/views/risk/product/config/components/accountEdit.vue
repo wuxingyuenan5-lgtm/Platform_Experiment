@@ -80,7 +80,7 @@
   async function feakSave(params: any) {
     useApiBasic({
       apiFn: postAccountConfig(params),
-      successFn: (res) => {
+      successFn: () => {
         emit('success');
       },
       finallyFn() {

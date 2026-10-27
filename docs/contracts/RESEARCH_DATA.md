@@ -344,13 +344,44 @@ so this projection is not an official real-time CME probability feed. Normalized
 calculation inputs are archived under `history/research/fedwatch/` in the configured
 local-data root. The hourly refresh gate invalidates snapshots from older methods.
 
+### Dashboard read performance and session-return corrections (2026-10-27)
+
+Macro/commodity/crypto providers reuse a validated snapshot only while the resolved
+artifact path, nanosecond modification time, size and file identity are unchanged.
+Atomic producer replacements invalidate the snapshot immediately; JSON parsing and
+Decimal validation run outside the API event loop, with concurrent reads coalesced.
+Observation freshness is still evaluated on each read. Missing/corrupt replacements
+retain the last valid history explicitly as stale, rather than returning a fresh
+cached success. Narrative calculations retain their full historical warm-up but only
+compute scores that can enter the five-year view plus its momentum boundary; reuse
+is keyed by all source content and the UTC calculation date, not a fixed stale TTL.
+
+Stock-pool 5/20-day returns use N+1 unique closes for N exchange sessions:
+`close[t] / close[t-N] - 1`. They are not sums of daily percentage returns or
+calendar-day windows. Mainland and Hong Kong session calendars are separate; an
+unknown calendar, missing session or insufficient history yields null. The stock
+pool's index 20-day field is derived independently from its close history and does
+not reuse the separate 21-session one-month field. The current persisted pool was
+corrected without advancing quote dates, collection times or source metadata.
+
+WGC selected-country purchase reports are discovered from the official Gold Focus
+index instead of Goldhub's rotating home page. The ETH reserve source's explicit
+wind-down notice is classified as `source_discontinued`, retaining historical company
+records without inventing a current full-company table. EIA request failures exclude
+credential-bearing query URLs from logged exception traces.
+
 ### Refresh scheduling
 
 The overseas worker uses the same in-process `lifespan` + periodic-poll shape as the A-share
 worker. It is a bounded in-process task, not an independently deployed scheduler, and it is
 enabled only while `research_refresh_enabled` is set.
 
-- The worker refreshes at most once per dataset per China-calendar day, and only at or after
+- ETF flows recheck every two hours at or after **06:00 Asia/Shanghai**, so delayed
+  fund disclosures and same-session revisions are not frozen by the first successful
+  fetch of the day. All-fund-missing Farside rows with a displayed Total of zero
+  are unpublished placeholders and do not advance the observation date. Actual
+  published zero fund values remain zero; partially disclosed rows retain nulls.
+- Other daily datasets refresh at most once per China-calendar day, and only at or after
   **06:00 Asia/Shanghai** (after the US close). Before that window `refresh_overseas` returns
   `not_due` and performs no network call.
 - Idempotency is evaluated per dataset from the latest `fetched_at`; an already-refreshed dataset
@@ -373,6 +404,12 @@ replaces provisional observations in the same bucket and writes the replacement 
 transaction; historical legacy revisions are reduced to the latest observation per bucket
 on read. Incremental calculation starts on a session boundary to preserve the previous
 session's cumulative seed and avoid dropping a return at an arbitrary refresh timestamp.
+Runtime repair also aligns its two-day lower bound to a session boundary, rather than
+starting halfway through a session. The complete recalculated overlap is published
+atomically; writing only its last two hours would splice values based on different
+seeds or source revisions. The 2026-10-27 correction recalculated retained derived
+values from their stored final sample prices, preserving source closes, observation
+dates and acquisition metadata; original payloads were backed up before correction.
 
 The cumulative-movement GET accepts optional timezone-aware `start` and `end` timestamps,
 inclusive and bounded by the retained 365-day read window. The backend filters first and
@@ -752,3 +789,58 @@ User-supplied reference screenshots are preserved unchanged in public/images/gol
 The FX/overseas-spread page reads `jpTreasury` (`jp_treasury_10y`), `riskInvestmentGradeOas` (`us_ig_oas`) and existing `riskHighYieldOas` (`us_hy_oas`) groups from the same macro dashboard contract. JP10Y is the Japan Ministry of Finance official constant-maturity 10Y reference yield in percent, Asia/Tokyo daily observations; it is not asserted to equal an intraday TradingView quote. The CSV 10Y header is selected by name, missing cells remain absent, negative/zero yields remain valid. MOF historical and current-month raw CSVs and retrieval metadata are archived. Bootstrap and month rollover read the historical CSV; other runs read the full current-month CSV. Returned windows own their revisions and same-source older history is retained. Invalid/nonfinite/empty source responses do not replace the prior canonical file.
 
 IG OAS maps only to FRED `BAMLC0A0CM`, HY OAS only to `BAMLH0A0HYM2`; these are option-adjusted spreads, not effective yields or unadjusted corporate-minus-Treasury spreads. Both retain percent units (1%=100bp). ICE series use internal-use-only metadata, and local observations preceding FRED's rolling three-year public window are preserved. IG is collected in the existing research-extension refresh; HY reuses the existing FRED-core collection. JP10Y is another independently failure-handled job in that same existing extension refresh. No new scheduler or duplicate HY collector is introduced. Canonical JSON feeds the existing dashboard builder, DuckDB mirror and read-only API. All three cards have source links and default to1 year; older available history remains selectable.
+
+### Historical retention and source vintages (2026-10-27)
+
+The independent producer owns canonical histories and their existing DuckDB mirror. FRED and Choice rolling refreshes retain the older prefix only when native identity, unit and frequency match; returned revision windows own their values, including explicit FRED NULLs. YoY uses the same calendar month/quarter a year earlier, not an offset through non-null records. Full FRED backfill uses archived source CSVs. Native Treasury history was extended to 1990; ChinaBond 2Y/10Y/30Y to their available 2006-03-01 start. WGC country reserves retain every returned native quarter from 2000-12-31, with missing latest-quarter values still NULL/no_data. Binance BTC/ETH daily spot histories start at listing on 2017-08-17, without missing calendar days. MT5 gold retains the existing endpoint's 2,000 closed D1 bars from 2019-01-24; this is not a claim of unlimited broker history.
+
+API-owned price archives remain in the existing research SQLite history table. `market_price` uses source + instrument + observation date, independent of its consuming card; native currency and Decimal text are preserved. Full backfill is an explicit maintenance operation, while regular production archives closed snapshots without enlarging normal GET payloads. Yahoo artifacts identify themselves as parsed vendor closes, not original HTTP bodies. MOEX uses official native history, retaining its old prefix and refreshing the recent revision window after initial backfill. Legitimate negative WTI closes remain valid.
+
+Tencent history pages retain raw responses. Existing `stock` receives only older positive observations whose overlapping adjustment vintage agrees; a changed QFQ vintage is never silently spliced. Complete native captures, including legitimate nonpositive adjusted prefixes, use `stock_tencent_qfq_native` or `stock_tencent_day_native` with capture identity and actual source field. HK uses Tencent's HK history endpoint. Choice forward-adjusted prices (`AdjustFlag=3`, `FillData=0`) stay separately in `stock_choice_qfq`; raw pre-listing NULLs remain in acquisition evidence and internal NULLs remain in the stored valid-history interval. These datasets are not interchangeable return inputs. CSI theme-index backfill checked all shared dates before prefix insertion and excluded the source's copied request-boundary row; official backcast index levels do not imply historical membership snapshots.
+
+The current Choice account explicitly rejects macro dates older than three years (10000013). Securities CSD returned data-limit error 10001029 after 90 securities; later requests were stopped. A separate Choice COMEX total-stock series retains native ounces and agrees with the overlapping public CME observations; it does not invent registered/eligible history. Unconfirmed indicator mappings, unavailable older releases and pre-collection snapshots remain absent. Source history coverage does not establish point-in-time availability or completeness of historical constituents.
+
+`history/coverage.json` records native identity, units/frequency, first/last dates, counts, NULL counts and computed integrity flags. `history/integrity-20261027.json` records the verified canonical/API inventory, finite-value/JSON/date checks, backup validation and real API reads. Raw evidence and the pre-maintenance backup stay under the data root. A valid date range alone is not proof that every expected trading session exists.
+
+### Equity failure isolation (2026-10-27)
+
+Theme availability is not a prerequisite for valuation or market-structure rendering. Theme calculation failures leave independent market calculations running; valuation and Hong Kong projections publish independently. Failed sections preserve their last good section with its actual data dates, or report only that section unavailable on first failure. Optional `sectionStatus` identifies market/themes/valuation/Hong Kong failures; an aggregate `partial` status never hides usable sections. Individual chart error boundaries display a local retry action and prevent a chart exception from unmounting unrelated content. GET continues to read published data without contacting upstream sources.
+
+### Read latency and scheduled recovery (2026-10-27)
+
+Market-detail reads reuse a validated snapshot until its SQLite dataset metadata revision changes. Concurrent reads coalesce per market; freshness is still evaluated at read time, and missing datasets or invalid new contracts are not served as a falsely fresh cache hit. ETF spot-price joins use batches of at most 400 exact closed UTC timestamps rather than two queries per date. The original historical-before-daily precedence, quality rejection, positive finite prices, source/instrument identity and missing-day behavior are unchanged. Equity artifacts already encode financial values as JSON text; their route emits that JSON without a second recursive financial encoder and retains the no-store response header.
+
+FRED, Yahoo and Binance collection errors are isolated per native series. Other series continue, failed canonical files remain intact, and the CLI returns nonzero for partial failure. The existing four-times-daily Windows runner retries failed acquisition commands once after independent jobs finish; for these three collectors it passes only the canonical IDs of failed series. Dependent builders and the mirror run after recovery. `refresh-latest.json` retains all `attempts`, while `steps` records each command's last attempt and its `failedSeries`; a persistent source error remains partial, and a build/mirror error remains failed. This does not change scheduler times, TLS/proxy policy or source entitlements. Existing StartWhenAvailable/IgnoreNew and the two-hour task bound remain in place.
+
+The 2026-10-27 fresh-source comparison is stored in `history/external-value-verification-20261027.json`, with original response bytes, retrieval times and hashes under `raw/research/value-verification-20261027/`. It matched 678 values/cells across the successful FRED, Treasury, WGC, Binance and Farside reads. Two independent FRED checks still failed to connect and remain unverified in that evidence. Source agreement is distinct from supplier truth, historical revisions, and future uptime. Real native scheduled runs still encountered intermittent connection failures and unavailable option-chain inputs; recovery tests, selected live repairs and short latency measurements do not establish multi-week unattended stability.
+
+
+### A-share financing, weekly ETFs and domestic volatility (2026-10-27)
+
+The A-share ETF page adds calendar-week summaries for the existing tracked broad-index funds, not a new top-N universe. Daily estimated flow retains the existing share-change-times-price definition. Weekly flow and estimated turnover require every available index trading session for each selected fund; incomplete member/weeks keep NULL totals. Index weekly return is last close divided by the immediately preceding week's last session close minus one, never the sum of daily percentage changes. An open current week is marked through its last observed trading day. Weekly stacked fund bars and the black index-price line share tooltips and adaptive value axes. The requested market-cap ratio remains unavailable: the denominator must be actual index-constituent circulating market capitalization, not index turnover or free-float-adjusted index capitalization, and its numerator must be actual ETF shares times unadjusted price. The Owner clarified the numerator universe is the existing page's funds. No current or historical ratio is fabricated; the small Choice CSD fallback returned 10001029 (data limit exceeded).
+
+`/research/a-share/financing` is read-only and combines independently retained local sources. The existing producer adds `refresh-cn-equity` to its existing four daily refreshes; it does not add another scheduler. Two-market margin balances, gross financing purchases and financing balance changes retain native CNY100million units and exchange dates. Historical balance reconciliation allows only each printed field's half-last-decimal rounding tolerance. Balance change is not gross financing purchases.
+
+CFFEX native monthly ZIP/GB18030 CSV (`今收盘`) and current-month daily XML retain actual IF/IH/IC/IM contract identity and date from 2024 onward, matching available benchmark history. The official download endpoint is native public HTTP; no credential or TLS-verification override is used. Basis is actual contract closing price minus exactly matching spot-index closing price, with percentage basis relative to spot. No annualized basis is asserted without verified expiry/calendar inputs. The optional nearby display picks the earliest listed contract on each date and discloses the actual contract in its tooltip; fixed-contract histories remain selectable. Missing same-date spot quotes produce no calculated basis.
+
+SSE option risk rows retain decimal `IMPLC_VOLATLTY`; display multiplies by100. For 510050/510300/510500/588000/588080, each month selects standard M contracts closest to absolute Delta0.5 separately for calls/puts, requires both sides, and averages their IV. This is a delta-selected ETF-option proxy, explicitly not CFFEX IO/HO/MO IV, a VIX statistic or constant30-day volatility. Raw rows, selected actual contracts, dates and months are retained. Source-reported SHFE gold monthly IV reuses the existing `o_cursigma` collector without a duplicate fetch/model. Source failures preserve prior publications and independently report partial status. Futures and selected ETF-option IV also mirror into DuckDB with date/instrument primary keys, Decimal values and complete source documents; margin uses canonical-series tables. Native raw responses remain archived before parsing. No historical period before the obtained source coverage is synthesized.
+
+
+### Combined Treasury comparison and macro layout (2026-10-27)
+
+US rates replace the separate Treasury detail/distribution and term-spread widgets with one full-width two-pane comparison. The upper pane contains native DFF, US03MY, US02Y, US10Y and US30Y annualized yields in percent; the lower pane contains 2Y−3M, 10Y−2Y and 30Y−10Y, expressed as percentage points (0.47 points equals47bp). The three new canonical `_pct` series use Decimal subtraction and exact observation-date joins without filling missing dates. Existing basis-point series and other Treasury widgets retain their existing definitions. The existing producer's dashboard build owns the new calculations and group; no upstream collector or scheduler is added. Both panes share the trading-session timeline, axis pointer, range selector and adaptive axes. DFF is stepped; the 10Y line uses dark ink on the platform's light background. The TradingView reference link is retained.
+
+Macro narratives follow market details in navigation; FX/overseas spreads follow risk appetite. US IG OAS is displayed alongside the existing single HY OAS card in US rates; FX no longer duplicates either OAS. Economic widgets are ordered within each country by aggregate activity/surveys, demand, labour, profits and policy/credit support. WGC country reserves are titled `各国黄金储备` and initialize in the searchable descending-quantity table, retaining native observation dates and missing values. The underlying reserves data definition is unchanged.
+
+
+### 2026-10-27 月度季节性、广度与宽基ETF市值占比
+
+`GET /research/seasonality/{gold|btc}`仅投影本地完整原始序列：MT5 XAUUSD及Binance BTCUSDT；不拼接美元与USDT。月收益=当月最后有效收盘/上月最后有效收盘−1；缺少相邻月份基准留空。年/YTD和按日历月对齐的年度曲线采用上一年12月末基准，不能把月收益简单相加；当前年/月仅截至实际数据日。范围选择影响年度样本、均值及涨跌次数，当前年度曲线不延长至年末；超过七个日历日的价格缺口分段。
+
+市场观察新增同日涨跌/平盘家数及差值、20/60/200/252交易日均线参与比例、窗口新高/低数量和实际覆盖。美国使用版本化主题代表股票目录，排除ETF，不称为全美股或标普500广度；A股涨跌来自全市场收盘快照，历史参与指标只覆盖具备完整基准交易日行情的股票，不能以局部历史推定全A。等于窗口极值计入新高/低；新高低不是对首次突破的断言。
+
+`refresh-cn-equity`原后台任务新增闭市ETF与指数市值留存：本页既定ETF目录，原生价格×实际份额（元/份×份÷1亿），分母腾讯指数流通市值（亿元，非调整自由流通市值）。仅同日闭市数据可计算，份额乘价须与原生ETF市值在0.1%内核对。东方财富同日指数流通市值作为独立核对，返回且偏差超过1%或日期不符时拒绝该次更新；连接失败单独留存`validationError`，不阻断主源已验证的同日计算，不把缺失值写零。首次归档为2026-10-27，历史分母尚未补齐；没有用当日分母回推历史。原始响应、精确Decimal结果、分项和核验状态写`public/v1/a-share/etf-market-cap-ratios.json`，DuckDB镜像为`cn_equity_etf_cap_ratios`及`cn_equity_source_documents`。旧日期、修订与失败保留沿用本地归档方式。
+
+国内黄金IV位于金价驱动分析，中国杠杆交易与风险偏好位于A股两融与国内衍生品。减半周期显示起止天数控制实际可视范围与纵轴取值，查询游标另行保留。两张财库分布表采用所在行高度并保留内部滚动。
+
+主题组件异常仅留在本组件边界；后续已发布`generatedAt`变化时重新挂载主题边界，避免成功更新后仍保持上次渲染失败状态。新快照恢复及其他模块隔离已通过故障注入测试。

@@ -40,12 +40,14 @@
         ><small>{{ lastPrice?.date || '暂无已接通数据' }}</small></div
       >
     </div>
-    <SourceSeriesPlot
-      v-if="plotSeries.length"
-      :key="`${selected?.id}:${metric?.id}:${years}`"
-      :series="plotSeries"
-      :colors="['#3366a3', '#111111']"
-    />
+    <WidgetErrorBoundary :key="`${selected?.id}:${metric?.id}:${years}`" widget-title="估值走势图">
+      <SourceSeriesPlot
+        v-if="plotSeries.length"
+        :key="`${selected?.id}:${metric?.id}:${years}`"
+        :series="plotSeries"
+        :colors="['#3366a3', '#111111']"
+      />
+    </WidgetErrorBoundary>
     <p v-if="metric && !metric.history.length" role="status">该指标暂无已接通数据。</p>
     <a v-if="metric?.sourceUrl" :href="metric.sourceUrl" target="_blank" rel="noopener noreferrer"
       >{{ metric.source }} ↗</a
@@ -55,6 +57,7 @@
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue';
   import SourceSeriesPlot from '../charts/SourceSeriesPlot.vue';
+  import WidgetErrorBoundary from './WidgetErrorBoundary';
   import type { IndexValuationChart } from '@/api/equityObservatory';
   import type { MacroDashboardSeries } from '@/api/hedgeResearch';
 

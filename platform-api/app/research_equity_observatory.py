@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from app.data_audit_calendar import calendar_snapshot
 from app.database_connection import read_only_connection
 from app.research_a_share_repository import read_dataset, read_dataset_metadata
-from app.research_equity_catalog import CN_INDICES, CN_REFERENCE_CODES, CN_THEME_CODES
+from app.research_equity_catalog import CN_INDICES, CN_REFERENCE_CODES, CN_THEME_CODES, US_THEMES
 from app.research_equity_metrics import (
     cn_structure,
     credit_impulse,
@@ -119,6 +119,14 @@ def valuations(sources, market, today):
     return result
 
 
+def _isolated_themes(market, observations, latest, **kwargs):
+    try:
+        return theme_observations(market, observations, latest, **kwargs)
+    except Exception:
+        _LOG.exception("Equity %s themes failed; independent market sections continue", market)
+        return None
+
+
 def build_cn(today, sources):
     stocks = read_dataset("stocks") or []
     metadata = read_dataset_metadata("stocks") or {}
@@ -209,7 +217,7 @@ def build_cn(today, sources):
         }
         for r in aligned
     }
-    themes = theme_observations(
+    themes = _isolated_themes(
         "cn",
         observations,
         structure["date"],
@@ -302,6 +310,9 @@ def build_cn(today, sources):
         "structure": structure,
         "structureHistory": history,
         "themes": themes,
+        "breadth": market_breadth(
+            observations, sorted(p["date"] for p in benchmark_points), structure["date"]
+        ),
         "indices": indices,
         "crowding": crowding,
         "valuations": valuations(sources, "cn", today),
@@ -311,6 +322,44 @@ def build_cn(today, sources):
         "source": metadata.get("source"),
         "sourceFetchedAt": metadata.get("fetched_at"),
     }
+
+
+def market_breadth(observations, sessions, latest, codes=None):
+    """Current fixed sample; never label partial history as exchange-wide breadth."""
+    from app.research_equity_themes import price_map
+
+    universe = {k: v for k, v in observations.items() if codes is None or k in codes}
+    counts = {"advancing": 0, "declining": 0, "unchanged": 0, "valid": 0}
+    participation = []
+    prices = {k: price_map(v.get("history", []), latest) for k, v in universe.items()}
+    for key, observation in universe.items():
+        if observation.get("date") != latest:
+            continue
+        value = number(observation.get("returnPct"))
+        if value is None and len(sessions) >= 2:
+            a, b = (prices[key].get(d) for d in sessions[-2:])
+            value = b / a - 1 if a and b else None
+        if value is not None:
+            counts["valid"] += 1
+            counts["advancing" if value > 0 else "declining" if value < 0 else "unchanged"] += 1
+    for period in (20, 60, 200, 252):
+        window = sessions[-period:]
+        valid = [
+            p for p in prices.values() if len(window) == period and all(d in p for d in window)
+        ]
+        above = sum(p[latest] > sum(p[d] for d in window) / period for p in valid)
+        highs = sum(p[latest] >= max(p[d] for d in window) for p in valid)
+        lows = sum(p[latest] <= min(p[d] for d in window) for p in valid)
+        participation.append(
+            {
+                "period": period,
+                "valid": len(valid),
+                "abovePct": percentage(above, len(valid)),
+                "highs": highs,
+                "lows": lows,
+            }
+        )
+    return {"date": latest, "expected": len(universe), **counts, "participation": participation}
 
 
 def build_us(today, sources):
@@ -337,7 +386,7 @@ def build_us(today, sources):
             "region": "美股上市；经营地域未分类",
             "industry": None,
         }
-    themes = theme_observations(
+    themes = _isolated_themes(
         "us",
         observations,
         latest,
@@ -358,7 +407,7 @@ def build_us(today, sources):
         "XLV": "医疗",
         "XLY": "可选消费",
     }
-    themes["sectors"] = [
+    sector_metrics = [
         {
             "code": code,
             "name": name,
@@ -371,6 +420,8 @@ def build_us(today, sources):
         }
         for code, name in sector_names.items()
     ]
+    if themes is not None:
+        themes["sectors"] = sector_metrics
     trends = {symbol: trend(r.get("history", [])) for symbol, r in by_symbol.items()}
     ratios = []
     for numerator, denominator, name in [
@@ -436,6 +487,12 @@ def build_us(today, sources):
         "status": snapshot.get("status", "no_data"),
         "sourceFetchedAt": snapshot.get("retrievedAt"),
         "themes": themes,
+        "breadth": market_breadth(
+            observations,
+            sorted(p["date"] for p in baseline),
+            latest,
+            {c for _, parts in US_THEMES for _, symbols in parts for c in symbols.split()},
+        ),
         "ratios": ratios,
         "participation": participation,
         "risk": risk,
@@ -496,21 +553,49 @@ def produce_local(sources):
     results = {}
     for market, build in [("cn", build_cn), ("us", build_us)]:
         try:
-            payload = build(stamp[:10], sources)
+            previous = read_artifact(market) or {}
+            section_status = {}
+            try:
+                payload = build(stamp[:10], sources)
+                section_status["market"] = "ready"
+                if "themes" in payload and payload["themes"] is None:
+                    payload["themes"] = previous.get("themes")
+                    section_status["themes"] = "stale" if payload["themes"] else "error"
+            except Exception:
+                _LOG.exception("Equity %s market section failed; other sections continue", market)
+                payload = {**previous, "market": market, "status": "partial"}
+                payload.setdefault("date", None)
+                payload.setdefault("themes", None)
+                section_status["market"] = "stale" if previous else "error"
             from app.research_equity_valuation import build_valuation_charts
 
-            payload["valuationCharts"] = build_valuation_charts(sources, market)
+            try:
+                payload["valuationCharts"] = build_valuation_charts(sources, market)
+                section_status["valuation"] = "ready"
+            except Exception:
+                _LOG.exception(
+                    "Equity %s valuation section failed; market section retained", market
+                )
+                payload["valuationCharts"] = previous.get("valuationCharts", [])
+                section_status["valuation"] = "stale" if payload["valuationCharts"] else "error"
             payload["generatedAt"] = stamp
             payload["schemaVersion"] = "1.0"
             if market == "cn":
-                payload["hongKong"] = build_hk(stamp[:10], sources)
+                try:
+                    payload["hongKong"] = build_hk(stamp[:10], sources)
+                    section_status["hongKong"] = "ready"
+                except Exception:
+                    _LOG.exception("Hong Kong section failed; mainland sections retained")
+                    payload["hongKong"] = previous.get("hongKong")
+                    section_status["hongKong"] = "stale" if payload["hongKong"] else "error"
+            payload["sectionStatus"] = section_status
             incomplete = (
                 any(v["status"] != "ready" for v in payload.get("valuations", []))
                 or any(r["count"] != r["expected"] for r in payload.get("indexCrowding", []))
-                or (market == "cn" and payload["hongKong"]["status"] != "ready")
+                or (market == "cn" and (payload.get("hongKong") or {}).get("status") != "ready")
                 or (market == "us" and any(not r.get("date") for r in payload.get("ratios", [])))
             )
-            if payload["status"] == "ready" and incomplete:
+            if incomplete or any(state != "ready" for state in section_status.values()):
                 payload["status"] = "partial"
             payload["sources"] = [
                 {

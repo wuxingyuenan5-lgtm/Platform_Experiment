@@ -559,7 +559,8 @@ class AShareResearchProvider:
         try:
             payload = self._direct_json(
                 opener,
-                "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+                ("https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get" if len(code) == 5
+                 else "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"),
                 {"param": f"{symbol},day,,,300,qfq"},
                 headers={"User-Agent": "Mozilla/5.0"},
             )
@@ -689,11 +690,11 @@ class AShareResearchProvider:
                 turnover_yuan=latest["amount"],
                 volatility_20_pct=annualized_volatility_20(closes),
                 return_1d_pct=_pct_change(current, closes[-2]),
-                return_1w_pct=_pct_change(current, closes[-6] if len(closes) >= 6 else closes[0]),
-                return_1m_pct=_pct_change(current, closes[-22] if len(closes) >= 22 else closes[0]),
+                return_1w_pct=_pct_change(current, closes[-6]) if len(closes) >= 6 else None,
+                return_1m_pct=_pct_change(current, closes[-22]) if len(closes) >= 22 else None,
                 return_1y_pct=_pct_change(
                     current,
-                    closes[-253] if len(closes) >= 253 else closes[0],
+                    closes[-253] if len(closes) >= 253 else None,
                 ),
                 return_ytd_pct=_pct_change(current, _closest_prior(history, year_start)),
                 return_qtd_pct=_pct_change(current, _closest_prior(history, quarter_start)),

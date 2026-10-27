@@ -58,10 +58,10 @@ const macroSectionOrder = [
   'macro-market',
   'macro-liquidity',
   'macro-rates',
-  'macro-fx',
   'macro-growth',
   'macro-inflation',
   'macro-risk-appetite',
+  'macro-fx',
 ] as const;
 
 const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = {
@@ -85,7 +85,7 @@ const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = 
 
 const widgetTextOverrides: Record<string, { title?: string }> = {
   'etf-weekly-flows': { title: '全球黄金 ETF 资金流' },
-  'central-bank-holders': { title: '官方黄金储备 · 分国家' },
+  'central-bank-holders': { title: '各国黄金储备' },
   'central-bank-buyers': { title: '央行购金' },
 };
 

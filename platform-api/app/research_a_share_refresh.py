@@ -4,7 +4,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
@@ -77,11 +77,33 @@ async def _finish_refresh_locked(
         )
 
 
-def _history_return(points: list[AShareIndexHistoryPoint], sessions: int) -> float | None:
-    if len(points) <= sessions:
+def _history_return(
+    points: list[AShareIndexHistoryPoint], sessions: int, session_days=None
+) -> float | None:
+    by_day = {str(point.observed_at): point.close for point in points}
+    days = sorted(by_day)
+    if not days:
         return None
-    current, base = points[-1].close, points[-1 - sessions].close
+    if session_days is not None:
+        days = [day for day in session_days if day <= days[-1]][-sessions - 1 :]
+    else:
+        days = days[-sessions - 1 :]
+    if len(days) != sessions + 1 or any(day not in by_day for day in days):
+        return None
+    current, base = by_day[days[-1]], by_day[days[0]]
     return float(current / base - 1) if base > 0 else None
+
+
+def _stock_session_days(trade_date: str, hk: bool):
+    if hk:
+        from app.research_hk_calendar import hk_last_session
+
+        end = date.fromisoformat(trade_date)
+        days = [end - timedelta(days=i) for i in range(60)]
+        return sorted(day.isoformat() for day in days if hk_last_session(day) == day)
+    with read_only_connection() as db:
+        calendar = calendar_snapshot(db, trade_date)
+    return calendar["days"] if calendar else []
 
 
 def _history_ytd(points: list[AShareIndexHistoryPoint]) -> float | None:
@@ -369,6 +391,10 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
         [code for code in codes if code not in histories]
     )
     stock_rows, stock_history = [], []
+    calendars = {
+        hk: _stock_session_days(trade_date, hk)
+        for hk in {len(str(code)) == 5 for code in codes}
+    } if trade_date else {}
     for code in codes:
         quote, prior = (
             quotes.get(code),
@@ -416,8 +442,10 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
                 "history_date": str(history[-1].observed_at) if history else None,
                 "history_source": "collected" if code in histories else "stored",
                 "change": float(quote.return_pct / 100) if quote.return_pct is not None else None,
-                "change_5d": _history_return(history, 5) if aligned else None,
-                "change_20d": _history_return(history, 20) if aligned else None,
+                "change_5d": _history_return(history, 5, calendars.get(len(code) == 5, []))
+                if aligned else None,
+                "change_20d": _history_return(history, 20, calendars.get(len(code) == 5, []))
+                if aligned else None,
                 "ytd": _history_ytd(history) if aligned else None,
                 "amount_yi": float(quote.turnover_yuan / Decimal("1e8")),
                 "turnover": float(quote.turnover_pct) if quote.turnover_pct is not None else None,
@@ -697,12 +725,12 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                             "instrument_id": row.code,
                             "code": row.code,
                             "name": row.name,
+                            "change_5d": _history_return(row.history, 5),
+                            "change_20d": _history_return(row.history, 20),
                             **{
                                 key: float(value / 100) if value is not None else None
                                 for key, value in (
                                     ("change", row.return_1d_pct),
-                                    ("change_5d", row.return_1w_pct),
-                                    ("change_20d", row.return_1m_pct),
                                     ("ytd", row.return_ytd_pct),
                                 )
                             },

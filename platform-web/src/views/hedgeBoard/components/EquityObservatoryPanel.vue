@@ -11,21 +11,87 @@
       }}</button>
     </div>
     <p v-if="error" role="alert" class="notice">观察数据读取失败，已保留当前内容。请重试。</p>
-    <p v-if="!data?.themes" role="status">{{
+    <p v-if="!data" role="status">{{
       loading ? '正在读取市场观察…' : '暂无已发布的市场观察数据'
     }}</p>
     <template v-else>
-      <EquityThemePanel
+      <section
+        v-if="
+          data.breadth &&
+          (!view || view === 'overview' || view === 'structure' || view === 'crowding')
+        "
+        class="observation-section"
+      >
+        <h2>市场广度与参与度</h2>
+        <p
+          >{{ data.breadth.date }} · {{ market === 'us' ? '主题代表股票样本' : 'A股收盘快照' }} ·
+          涨跌有效 {{ data.breadth.valid }} / {{ data.breadth.expected }}</p
+        >
+        <div class="metric-grid"
+          ><article
+            ><span>上涨</span><strong>{{ data.breadth.advancing }}</strong></article
+          ><article
+            ><span>下跌</span><strong>{{ data.breadth.declining }}</strong></article
+          ><article
+            ><span>平盘</span><strong>{{ data.breadth.unchanged }}</strong></article
+          ><article
+            ><span>涨跌家数差</span
+            ><strong>{{ data.breadth.advancing - data.breadth.declining }}</strong></article
+          ></div
+        >
+        <div class="table-scroll"
+          ><table
+            ><thead
+              ><tr
+                ><th>窗口</th><th>站上均线比例</th><th>窗口新高</th><th>窗口新低</th
+                ><th>完整历史覆盖</th></tr
+              ></thead
+            ><tbody
+              ><tr v-for="r in data.breadth.participation" :key="r.period"
+                ><th>{{ r.period }}交易日</th><td>{{ format(r.abovePct, '%') }}</td
+                ><td>{{ r.highs }}</td
+                ><td>{{ r.lows }}</td
+                ><td>{{ r.valid }} / {{ data.breadth.expected }}</td></tr
+              ></tbody
+            ></table
+          ></div
+        >
+        <p class="definition"
+          >均线与新高低仅统计窗口内交易日完整的个股；{{
+            market === 'us'
+              ? '固定代表股票样本，不代表全美股或标普500成分。'
+              : '历史行情覆盖有限，历史参与度不是全A口径。'
+          }}新高低包含等于窗口极值；当前样本不回填历史成分。</p
+        >
+      </section>
+      <WidgetErrorBoundary
         v-if="!view || view === 'themes'"
-        :market="market"
-        :data="data.themes"
-        :industries="data.structure?.industries || []"
-      />
-
-      <IndexValuationPanel
-        v-if="!view || view === 'valuation'"
-        :charts="data.valuationCharts || []"
-      />
+        :key="`themes:${market}:${data.generatedAt}`"
+        widget-title="主题与行业"
+      >
+        <p
+          v-if="data.sectionStatus?.market === 'stale' || data.sectionStatus?.themes === 'stale'"
+          role="status"
+          >主题数据更新失败，当前显示已保留的数据。</p
+        >
+        <EquityThemePanel
+          v-if="data.themes"
+          :market="market"
+          :data="data.themes"
+          :industries="data.structure?.industries || []"
+        />
+        <p v-else role="status">主题与行业数据暂不可用</p>
+      </WidgetErrorBoundary>
+      <WidgetErrorBoundary v-if="!view || view === 'valuation'" widget-title="指数估值">
+        <p v-if="data.sectionStatus?.valuation === 'stale'" role="status"
+          >估值更新失败，当前显示已保留的数据。</p
+        >
+        <p v-else-if="data.sectionStatus?.valuation === 'error'" role="status">估值数据暂不可用</p>
+        <IndexValuationPanel
+          v-if="data.sectionStatus?.valuation !== 'error'"
+          :charts="data.valuationCharts || []"
+        />
+      </WidgetErrorBoundary>
 
       <section
         v-if="!view || view === 'structure' || (market === 'cn' && view === 'crowding')"
@@ -198,22 +264,24 @@
               ></table
             ></div
           >
-          <VibeTimeChart
-            v-if="selectedRatio?.history?.length"
-            :key="ratioName"
-            :title="selectedRatio.name"
-            y-label="比值"
-            :precision="4"
-            :dates="selectedRatio.history.map((p) => p.date)"
-            :series="[
-              {
-                name: selectedRatio.symbols || '比值',
-                type: 'line',
-                color: '#3366a3',
-                values: selectedRatio.history.map((p) => numeric(p.value)),
-              },
-            ]"
-          />
+          <WidgetErrorBoundary widget-title="走势图" :key="ratioName">
+            <VibeTimeChart
+              v-if="selectedRatio?.history?.length"
+              :key="ratioName"
+              :title="selectedRatio.name"
+              y-label="比值"
+              :precision="4"
+              :dates="selectedRatio.history.map((p) => p.date)"
+              :series="[
+                {
+                  name: selectedRatio.symbols || '比值',
+                  type: 'line',
+                  color: '#3366a3',
+                  values: selectedRatio.history.map((p) => numeric(p.value)),
+                },
+              ]"
+            />
+          </WidgetErrorBoundary>
         </template>
       </section>
 
@@ -232,23 +300,28 @@
             ><small>{{ row.date }} · {{ format(row.returnPct, '%') }}</small></article
           ></div
         >
-        <VibeTimeChart
+        <WidgetErrorBoundary
+          widget-title="走势图"
+          :key="row.name"
           v-for="row in (data.hongKong.indices || []).filter((i) =>
             /恒生科技|恒生互联网/.test(i.name),
           )"
-          :key="row.name"
-          :title="row.name + ' · 价格走势'"
-          y-label="指数点位"
-          :dates="row.history.map((p) => p.date)"
-          :series="[
-            {
-              name: row.name,
-              type: 'line',
-              color: '#111111',
-              values: row.history.map((p) => numeric(p.value)),
-            },
-          ]"
-        />
+        >
+          <VibeTimeChart
+            :key="row.name"
+            :title="row.name + ' · 价格走势'"
+            y-label="指数点位"
+            :dates="row.history.map((p) => p.date)"
+            :series="[
+              {
+                name: row.name,
+                type: 'line',
+                color: '#111111',
+                values: row.history.map((p) => numeric(p.value)),
+              },
+            ]"
+          />
+        </WidgetErrorBoundary>
         <div class="composite"
           ><span>港股领航指标</span><strong>{{ format(data.hongKong.value) }}</strong
           ><span
@@ -283,21 +356,23 @@
         <p class="definition"
           >每项按过去60个月标准化，至少36期，同月四项齐全才等权合成。信用脉冲为滚动12月新增社融/名义GDP比例的同比变化；社零2月为1—2月合计口径。历史使用当前可得修订数据，不宣称已验证领先预测能力。</p
         >
-        <VibeTimeChart
-          v-if="data.hongKong.history.length"
-          title="港股宏观四因子"
-          frequency="monthly"
-          y-label="标准分"
-          :dates="data.hongKong.history.map((p) => p.date)"
-          :series="[
-            {
-              name: '等权标准分',
-              type: 'line',
-              color: '#38827c',
-              values: data.hongKong.history.map((p) => numeric(p.value)),
-            },
-          ]"
-        />
+        <WidgetErrorBoundary widget-title="走势图">
+          <VibeTimeChart
+            v-if="data.hongKong.history.length"
+            title="港股宏观四因子"
+            frequency="monthly"
+            y-label="标准分"
+            :dates="data.hongKong.history.map((p) => p.date)"
+            :series="[
+              {
+                name: '等权标准分',
+                type: 'line',
+                color: '#38827c',
+                values: data.hongKong.history.map((p) => numeric(p.value)),
+              },
+            ]"
+          />
+        </WidgetErrorBoundary>
       </section>
       <p v-if="view === 'hk' && !data.hongKong" role="status">暂无已发布的港股观察数据</p>
       <details class="source-details"
@@ -335,6 +410,7 @@
   } from '@/api/equityObservatory';
   import VibeTimeChart from '../aShare/components/VibeTimeChart.vue';
   import IndexValuationPanel from './IndexValuationPanel.vue';
+  import WidgetErrorBoundary from './WidgetErrorBoundary';
   import EquityThemePanel from './EquityThemePanel.vue';
 
   import { useResearchViewState, useResearchSnapshots } from '../composables/researchWorkspace';

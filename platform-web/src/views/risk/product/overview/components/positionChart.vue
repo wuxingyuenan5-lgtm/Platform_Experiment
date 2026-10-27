@@ -48,7 +48,7 @@
   const dataSoure = ref<any>([]);
   // 当前币种
   const currency = ref('CNY');
-  let currencyList = new Set();
+  let currencyList = new Set<string>();
   // const loading = ref(false);
   const colorList = ['#F55458', '#5BB86F', '#2C97EB', '#FFD54F', '#F57C00'];
   watch(
@@ -116,7 +116,7 @@
           Object.entries(_data).forEach(([key, value]) => {
             if (key != 'product') {
               const _keyArr = key.split('&');
-              _total += parseFloat(value || 0);
+              _total += Number(value || 0);
               _items.push({
                 category: _keyArr?.[1],
                 name: _keyArr?.[0],
@@ -141,10 +141,10 @@
                 return `<div style="display: flex; justify-content: space-between; align-items: center;">
                 <div class='mr-4'>
                   ${params?.[i]?.marker}${item.name}-<span class="${
-                    _isSpot ? 'text-[#2c97ebff]' : 'text-[#eb6e2cff]'
-                  }">${_isSpot ? '现货' : '期货'}</span><span class="${
-                    item.side == 'Buy' ? 'text-[#22B573]' : 'text-[#C1272D]'
-                  }">${item.side == 'Buy' ? '-买入' : item.side == 'Sell' ? '-卖出' : ''}</span> 
+                  _isSpot ? 'text-[#2c97ebff]' : 'text-[#eb6e2cff]'
+                }">${_isSpot ? '现货' : '期货'}</span><span class="${
+                  item.side == 'Buy' ? 'text-[#22B573]' : 'text-[#C1272D]'
+                }">${item.side == 'Buy' ? '-买入' : item.side == 'Sell' ? '-卖出' : ''}</span>
                 </div>
                 <div>
                   <span>${formateNumStr(item.value, { decimals: 2, keepZero: true })}</span>

@@ -74,6 +74,8 @@ export type LocalWidgetKey =
   | 'macro-cn-pmi'
   | 'macro-cn-credit'
   | 'macro-cn-inflation'
+  | 'gold-seasonality'
+  | 'btc-seasonality'
   | 'macro-cn-risk-leverage'
   | 'macro-cn-risk-volatility'
   | 'macro-cn-policy-rates'
@@ -447,15 +449,17 @@ export const researchModules: ResearchModule[] = [
               ],
             },
           ),
-          localChart('美国 PMI', 'ISM 制造业 / 服务业 · 50为荣枯线', 'macro-us-pmi'),
           localChart(
-            '非农新增就业与 ADP',
-            'BLS 非农 / ADP 私营就业 · 季调 · 千人',
-            'macro-us-employment',
+            'GDPNow',
+            'Atlanta Fed · FRED 每季度最新估计，年化环比；不含季度内历次预测路径',
+            'macro-gdp-now',
+            {
+              height: 280,
+              sourceNote: 'FRED / Atlanta Fed',
+            },
           ),
-          localChart('美国失业率', 'BLS · 月度 · 季调 · %', 'macro-us-unemployment'),
-          localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
           localChart('广义经济活动', 'CFNAI / CFNAIMA3', 'macro-growth-activity'),
+          localChart('美国 PMI', 'ISM 制造业 / 服务业 · 50为荣枯线', 'macro-us-pmi'),
           localChart(
             '实际个人消费支出 · 季调年率',
             'BEA · 月度 · 季调年率 · 十亿美元',
@@ -472,20 +476,18 @@ export const researchModules: ResearchModule[] = [
             'macro-us-consumption-momentum',
           ),
           localChart(
+            '非农新增就业与 ADP',
+            'BLS 非农 / ADP 私营就业 · 季调 · 千人',
+            'macro-us-employment',
+          ),
+          localChart('美国失业率', 'BLS · 月度 · 季调 · %', 'macro-us-unemployment'),
+          localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
+          localChart(
             '美国企业盈利预期 · SPF',
             '企业税后利润预测中位数：当季 / 4季度后 · 季调年率',
             'macro-us-profit-expectations',
             {
               sourceUrl: 'https://www.philadelphiafed.org/surveys-and-data/cprof',
-            },
-          ),
-          localChart(
-            'GDPNow',
-            'Atlanta Fed · FRED 每季度最新估计，年化环比；不含季度内历次预测路径',
-            'macro-gdp-now',
-            {
-              height: 280,
-              sourceNote: 'FRED / Atlanta Fed',
             },
           ),
           localChart('银行信贷标准', '商业和工业贷款标准收紧比例', 'macro-lending-standards', {
@@ -572,6 +574,14 @@ export const researchModules: ResearchModule[] = [
             },
           ),
           localChart(
+            '美国投资级债信用利差（OAS）',
+            'ICE BofA · BAMLC0A0CM · %',
+            'macro-risk-ig-oas',
+            {
+              sourceUrl: 'https://fred.stlouisfed.org/series/BAMLC0A0CM',
+            },
+          ),
+          localChart(
             '美国高收益债信用利差（OAS）',
             'ICE BofA US High Yield OAS via FRED',
             'macro-risk-hy-oas',
@@ -593,8 +603,8 @@ export const researchModules: ResearchModule[] = [
             sourceUrl: 'https://www.newyorkfed.org/markets/reference-rates/sofr',
           }),
           localChart(
-            '美债详情 · 年化收益率',
-            '3M / 2Y / 5Y / 10Y / 30Y',
+            '美债收益率与期限利差',
+            'DFF / US03MY / US02Y / US10Y / US30Y',
             'macro-treasury-details',
             {
               referenceLinks: [
@@ -602,11 +612,6 @@ export const researchModules: ResearchModule[] = [
               ],
             },
           ),
-          localChart('美债期限价差', '10Y−3M / 10Y−2Y / 30Y−5Y · bp', 'macro-treasury-spreads', {
-            referenceLinks: [
-              { label: 'TradingView 参考', href: 'https://cn.tradingview.com/chart/WJhhGPpA/' },
-            ],
-          }),
           localChart(
             '美国国债市场流动性指数 · GVLQUSD',
             'Bloomberg US Government Securities Liquidity Index',
@@ -661,22 +666,6 @@ export const researchModules: ResearchModule[] = [
             '欧洲主权债利差 · 相对德国（月度）',
             '法国−德国 / 意大利−德国 · 10年 · bp',
             'macro-europe-spreads',
-          ),
-          localChart(
-            '美国投资级债信用利差（OAS）',
-            'ICE BofA · BAMLC0A0CM · %',
-            'macro-risk-ig-oas',
-            {
-              sourceUrl: 'https://fred.stlouisfed.org/series/BAMLC0A0CM',
-            },
-          ),
-          localChart(
-            '美国高收益债信用利差（OAS）',
-            'ICE BofA · BAMLH0A0HYM2 · %',
-            'macro-risk-hy-oas',
-            {
-              sourceUrl: 'https://fred.stlouisfed.org/series/BAMLH0A0HYM2',
-            },
           ),
           localChart('跨币种基差 · USD/JPY、EUR/USD', '', 'macro-cross-currency-basis', {
             sourceUrl: 'https://www.bis.org/publ/qtrpdf/r_qt1609e.htm',
@@ -825,7 +814,7 @@ export const researchModules: ResearchModule[] = [
               'https://en.macromicro.me/charts/93189/gold-demand-central-banks-and-other-inst',
             ),
           }),
-          localChart('官方黄金储备 · 分国家', '', 'central-bank-holders', {
+          localChart('各国黄金储备', '', 'central-bank-holders', {
             height: 420,
             sourceNote: 'World Gold Council / IMF · 季度截面',
             referenceLinks: macroMicroReference(
@@ -877,6 +866,8 @@ export const researchModules: ResearchModule[] = [
             'gold-factor-model',
           ),
           localChart('金银期权结构', '成交量趋势、内在价值与最大痛点', 'gold-options'),
+          localChart('国内黄金 IV', '上期所黄金期权隐含波动率', 'gold-shfe-iv'),
+          localChart('黄金月度统计分析', 'XAUUSD 月度收益与季节性', 'gold-seasonality'),
         ],
       },
       {
@@ -1226,6 +1217,7 @@ export const researchModules: ResearchModule[] = [
             '暂无已接通数据 · OKLink · CEX 地址与链上资金流跟踪',
             'https://www.oklink.com/zh-hans/cex-list',
           ),
+          localChart('BTC 月度统计分析', 'BTC 月度收益与季节性', 'btc-seasonality'),
         ],
       },
     ],
@@ -1257,20 +1249,21 @@ const chinaMacroSections: Record<string, Array<[string, string, LocalWidgetKey]>
       'GDP累计同比 / 规上工业增加值同比 / 社会消费品零售总额同比',
       'macro-cn-growth',
     ],
-    ['中国社会消费品零售总额', '当月金额（2月为1—2月合计） / 同比 · 亿元 / %', 'macro-cn-retail'],
     ['中国景气调查', '制造业 PMI / 非制造业商务活动指数 · 50为荣枯线', 'macro-cn-pmi'],
-    ['中国新增信贷', '当月新增人民币贷款 / 社会融资规模增量 · 亿元', 'macro-cn-credit'],
+    ['中国社会消费品零售总额', '当月金额（2月为1—2月合计） / 同比 · 亿元 / %', 'macro-cn-retail'],
     ['中国投资结构', '固定资产 / 制造业 / 基建 / 民间投资累计同比', 'macro-cn-investment'],
     ['中国房地产周期', '开发投资 / 商品房销售面积与金额 / 新开工面积累计同比', 'macro-cn-property'],
     ['中国进出口', '出口 / 进口金额同比 · 美元口径', 'macro-cn-trade'],
-    ['中国财政收支', '财政收入 / 预算支出累计同比', 'macro-cn-fiscal'],
-    ['中国工业企业利润', '规模以上工业企业利润总额累计同比', 'macro-cn-profits'],
     ['中国城镇就业', '全国 / 31个大城市城镇调查失业率', 'macro-cn-labor'],
     [
       '中国分年龄就业',
       '16–24 / 25–29 / 30–59岁，不含在校生；新口径自2023年12月起',
       'macro-cn-youth-labor',
     ],
+
+    ['中国工业企业利润', '规模以上工业企业利润总额累计同比', 'macro-cn-profits'],
+    ['中国财政收支', '财政收入 / 预算支出累计同比', 'macro-cn-fiscal'],
+    ['中国新增信贷', '当月新增人民币贷款 / 社会融资规模增量 · 亿元', 'macro-cn-credit'],
   ],
   'macro-inflation': [
     [
@@ -1282,11 +1275,6 @@ const chinaMacroSections: Record<string, Array<[string, string, LocalWidgetKey]>
     ['中国工业价格分项', 'PPI生产资料 / 生活资料同比', 'macro-cn-ppi-details'],
   ],
   'macro-risk-appetite': [
-    [
-      '中国杠杆交易与风险偏好',
-      '融资余额 / 融资融券成交额占比 · 观察杠杆需求',
-      'macro-cn-risk-leverage',
-    ],
     [
       '中国股票市场波动',
       '上证综指20交易日已实现波动率（年化），不是隐含波动率',

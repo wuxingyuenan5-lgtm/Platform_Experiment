@@ -15,6 +15,19 @@ def hedge_board_data_root() -> Path:
     return Path(configured) if configured else DEFAULT_HEDGE_BOARD_DATA_ROOT
 
 
+def local_json_revision(relative_path: str) -> tuple[str, int, int, int] | None:
+    """Identify atomic producer replacements without reading their full histories."""
+    root = hedge_board_data_root().resolve()
+    path = (root / relative_path).resolve()
+    if root != path and root not in path.parents:
+        raise ResearchProviderError("local_data_path_outside_root")
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return str(path), stat.st_mtime_ns, stat.st_size, stat.st_ino
+
+
 def read_local_json(relative_path: str) -> dict[str, Any]:
     root = hedge_board_data_root().resolve()
     path = (root / relative_path).resolve()

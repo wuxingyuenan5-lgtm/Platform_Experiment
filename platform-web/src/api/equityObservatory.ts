@@ -184,6 +184,24 @@ export interface IndexValuationChart {
   }>;
 }
 export interface EquityObservatory {
+  breadth?: {
+    date: string;
+    expected: number;
+    valid: number;
+    advancing: number;
+    declining: number;
+    unchanged: number;
+    participation: Array<{
+      period: number;
+      valid: number;
+      abovePct: EquityValue;
+      highs: number;
+      lows: number;
+    }>;
+  };
+  sectionStatus?: Partial<
+    Record<'market' | 'themes' | 'valuation' | 'hongKong', 'ready' | 'stale' | 'error'>
+  >;
   valuationCharts?: IndexValuationChart[];
   indexCrowding?: Array<
     EquityDistribution & {
@@ -201,7 +219,7 @@ export interface EquityObservatory {
   date?: string;
   generatedAt: string | null;
   sourceFetchedAt?: string;
-  themes?: EquityThemes;
+  themes?: EquityThemes | null;
   structure?: {
     date: string;
     closed: boolean;

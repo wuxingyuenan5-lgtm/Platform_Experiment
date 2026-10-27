@@ -76,10 +76,13 @@ export function setSchemas(
       },
       componentProps: {
         showSearch: true,
-        api: getAccountList,
+        api: async (params) =>
+          (await getAccountList(params)).items.map((item) => ({
+            name: item.nickname || item.account,
+            id: item.id,
+          })),
         labelField: 'name',
         valueField: 'id',
-        resultField: 'data',
         filterOption: (input, option) => {
           return option?.label.toLocaleLowerCase().includes(input?.toLocaleLowerCase());
         },

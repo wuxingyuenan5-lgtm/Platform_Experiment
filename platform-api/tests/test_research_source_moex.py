@@ -93,6 +93,12 @@ def test_official_history_pagination_incremental_cache_and_intraday(tmp_path, mo
 
 
 def test_global_uses_moex_and_preserves_identity_and_units(monkeypatch):
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW.astimezone(tz) if tz else NOW.replace(tzinfo=None)
+
+    monkeypatch.setattr(provider, "datetime", FixedDatetime)
     monkeypatch.setattr(provider, "MARKET_SYMBOLS", {"global": {"global-rsx": "IMOEX"}})
 
     async def source(*args, **kwargs):

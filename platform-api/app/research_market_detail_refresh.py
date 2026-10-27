@@ -52,7 +52,7 @@ async def refresh_market_details(*, force: bool = False) -> dict[str, str]:
                 if previous:
                     for row in MarketDetailResponse.model_validate(previous).rows:
                         expected_symbol = MARKET_SYMBOLS[market_id].get(row.id)
-                        if expected_symbol and row.symbol != expected_symbol.replace('%5E', '^'):
+                        if expected_symbol and row.symbol != expected_symbol.replace("%5E", "^"):
                             continue
                         if row.id not in present:
                             row.status = "stale"
@@ -70,6 +70,9 @@ async def refresh_market_details(*, force: bool = False) -> dict[str, str]:
                     row.status = "stale"
             async with RESEARCH_DB_WRITE_LOCK:
                 try:
+                    from app.research_market_history import archive_snapshot
+
+                    await asyncio.to_thread(archive_snapshot, market_id, snapshot, run_id)
                     await asyncio.to_thread(
                         write_dataset,
                         dataset,

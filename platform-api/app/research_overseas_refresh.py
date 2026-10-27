@@ -1,7 +1,7 @@
 """海外研究数据（FedWatch / ETF Flow / Deribit IV）定时刷新 worker。
 
 调度沿用 A 股的 lifespan + 周期轮询模式：FedWatch 全天按 1 小时幂等窗口刷新，
-其他日度数据在北京时间 06:00 后按中国日幂等。单个数据源
+ETF在北京时间06:00后每两小时复核，其余日度数据按中国日幂等。单个数据源
 失败不阻塞其他源（return_exceptions 隔离），失败保留上一次有效数据。
 """
 
@@ -164,7 +164,7 @@ async def _collect_etf_flow(force: bool, asset: str = "btc") -> tuple[str, str]:
     # Keep the established BTC dataset identity for existing history and
     # consumers; ETH gets its own sibling dataset.
     dataset = "crypto_etf_flow" if asset_key == "btc" else "crypto_eth_etf_flow"
-    if not force and _already_refreshed_today(dataset):
+    if not force and _already_refreshed_within(dataset, timedelta(hours=2)):
         return "up_to_date", ""
     run_id = uuid4().hex
     async with RESEARCH_DB_WRITE_LOCK:

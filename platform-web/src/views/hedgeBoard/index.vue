@@ -134,13 +134,14 @@
       ];
     if (activeCategory.value === 'global') return [{ key: 'details', label: '市场明细与区域轮动' }];
     return [
-      ...visibleSections.value.map((section) => ({
-        key: section.id,
-        label: getSectionTitle(section.id, section.title),
-      })),
+      ...visibleSections.value.flatMap((section) => [
+        { key: section.id, label: getSectionTitle(section.id, section.title) },
+        ...(activeCategory.value === 'macro' && section.id === 'macro-market'
+          ? [{ key: 'narratives', label: '宏观主题与叙事' }]
+          : []),
+      ]),
       ...(activeCategory.value === 'macro'
         ? [
-            { key: 'narratives', label: '宏观主题与叙事' },
             { key: 'calendar', label: '经济日历' },
             { key: 'expectations', label: 'polymarket' },
           ]

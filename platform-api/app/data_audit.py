@@ -69,6 +69,7 @@ HISTORY = {
     "hot_stock": 96,
     "index": 96,
     "stock": 96,
+    "market_price": 96,
     "crypto_etf_flow": 36,
     "crypto_eth_etf_flow": 36,
     "macro_fedwatch": 2,
@@ -77,6 +78,7 @@ HISTORY = {
     "cumulative_volatility": 2,
 }
 LEGACY = {"hot_stocks", "shenwan_history"}
+ARCHIVAL_HISTORY = {"stock_choice_qfq", "stock_tencent_qfq_native", "stock_tencent_day_native"}
 
 
 def iso_now():
@@ -106,8 +108,12 @@ class AuditCheck(TypedDict):
 
 def check(key, name, group, status="healthy", message="检查通过", **evidence) -> AuditCheck:
     return {
-        "key": key, "name": name, "group": group,
-        "status": status, "message": message, "evidence": evidence,
+        "key": key,
+        "name": name,
+        "group": group,
+        "status": status,
+        "message": message,
+        "evidence": evidence,
     }
 
 
@@ -323,30 +329,30 @@ def inspect_database(now, *, deep=False):
         )
         checks.append(
             check(
-            "worker.a_share",
-            "A股日度生产执行",
-            "后台任务",
-            "error"
-            if due and (not attempted_today or latest_run["status"] == "error")
-            else "warning"
-            if (due and latest_run["status"] != "ready")
-            or (local.hour >= 16 and is_trading_day is None)
-            else "healthy",
-            "交易日今日后台未留下执行记录"
-            if due and not attempted_today
-            else "今日后台执行失败"
-            if due and latest_run["status"] == "error"
-            else "今日后台尚未取得完整收盘数据"
-            if due and latest_run["status"] != "ready"
-            else "已过检查时点，但交易日历不可用，无法判断是否应执行"
-            if local.hour >= 16 and is_trading_day is None
-            else "今日为非交易日，无需日度行情生产"
-            if is_trading_day is False
-            else "未到时限或已有执行记录",
-            lastAttempt=latest_run["started_at"] if latest_run else None,
-            lastStatus=latest_run["status"] if latest_run else None,
-            tradingDay=is_trading_day,
-            rule="仅按平台缓存的独立交易日历判断；交易日16点后应有执行记录",
+                "worker.a_share",
+                "A股日度生产执行",
+                "后台任务",
+                "error"
+                if due and (not attempted_today or latest_run["status"] == "error")
+                else "warning"
+                if (due and latest_run["status"] != "ready")
+                or (local.hour >= 16 and is_trading_day is None)
+                else "healthy",
+                "交易日今日后台未留下执行记录"
+                if due and not attempted_today
+                else "今日后台执行失败"
+                if due and latest_run["status"] == "error"
+                else "今日后台尚未取得完整收盘数据"
+                if due and latest_run["status"] != "ready"
+                else "已过检查时点，但交易日历不可用，无法判断是否应执行"
+                if local.hour >= 16 and is_trading_day is None
+                else "今日为非交易日，无需日度行情生产"
+                if is_trading_day is False
+                else "未到时限或已有执行记录",
+                lastAttempt=latest_run["started_at"] if latest_run else None,
+                lastStatus=latest_run["status"] if latest_run else None,
+                tradingDay=is_trading_day,
+                rule="仅按平台缓存的独立交易日历判断；交易日16点后应有执行记录",
             )
         )
         for name in sorted(SNAPSHOTS | set(snapshots)):
@@ -393,13 +399,20 @@ def inspect_database(now, *, deep=False):
                 checks.append(check("snapshot." + name, name, "市场明细", "error", "快照格式无效"))
                 continue
             item = freshness(
-                "snapshot." + name, name, "市场明细", payload.get("retrievedAt"), 1, now,
-                sourceDate=payload.get("asOf"), sourceStatus=payload.get("status"),
+                "snapshot." + name,
+                name,
+                "市场明细",
+                payload.get("retrievedAt"),
+                1,
+                now,
+                sourceDate=payload.get("asOf"),
+                sourceStatus=payload.get("status"),
             )
             if payload.get("status") != "ready":
                 item.update(
-                    status="warning" if payload.get("status") == "partial"
-                    and item["status"] == "healthy" else "error",
+                    status="warning"
+                    if payload.get("status") == "partial" and item["status"] == "healthy"
+                    else "error",
                     message="市场数据不完整：" + str(payload.get("status")),
                 )
             checks.append(item)
@@ -414,6 +427,17 @@ def inspect_database(now, *, deep=False):
             if name in LEGACY:
                 checks.append(
                     check("history." + name, name, "历史归档", "info", "旧版归档，不再要求日更")
+                )
+            elif name in ARCHIVAL_HISTORY:
+                checks.append(
+                    check(
+                        "history." + name,
+                        name,
+                        "历史归档",
+                        "info",
+                        "按原始来源与复权版本归档，不设日更要求",
+                        **(row or {}),
+                    )
                 )
             elif name not in HISTORY:
                 checks.append(
@@ -689,9 +713,12 @@ def inspect_artifacts(now):
                     series_row.get("label", series_id),
                     "研究文件库",
                     series_row.get("retrievedAt"),
-                    {"daily_business_day": 72, "weekly": 240, "monthly": 1080, "quarterly": 2880}.get(
-                        str(series_row.get("frequency", "")).lower(), 48
-                    ),
+                    {
+                        "daily_business_day": 72,
+                        "weekly": 240,
+                        "monthly": 1080,
+                        "quarterly": 2880,
+                    }.get(str(series_row.get("frequency", "")).lower(), 48),
                     now,
                     frequency=series_row.get("frequency"),
                     sourceDate=series_row.get("observationDate"),
@@ -701,9 +728,15 @@ def inspect_artifacts(now):
                     while previous_weekday.weekday() >= 5:
                         previous_weekday -= timedelta(days=1)
                     observed = str(series_row.get("observationDate") or "")[:10]
-                    if observed and observed < previous_weekday.isoformat() and item["status"] == "healthy":
+                    if (
+                        observed
+                        and observed < previous_weekday.isoformat()
+                        and item["status"] == "healthy"
+                    ):
                         item.update(status="warning", message="来源观测日期落后于最近工作日")
-                if (series_row.get("isStale") or status not in {"ready", "available"}) and item["status"] != "error":
+                if (series_row.get("isStale") or status not in {"ready", "available"}) and item[
+                    "status"
+                ] != "error":
                     item.update(status="warning", message="来源未就绪或声明数据陈旧")
                 results.append(item)
         except Exception as exc:
@@ -769,16 +802,27 @@ def source_check(source, value, now):
         and value.get("marketStatus") == "closed"
     ):
         result = freshness(
-            key, source, "策略行情", value.get("lastReadAt"), 0.25, now,
-            sourceStatus=status, marketStatus="closed",
+            key,
+            source,
+            "策略行情",
+            value.get("lastReadAt"),
+            0.25,
+            now,
+            sourceStatus=status,
+            marketStatus="closed",
         )
         if result["status"] == "healthy":
             result.update(status="info", message="MT5 交易时段已关闭，本次扫描无新报价")
         return result
     if source == "history:mt5" and status == "range_scanned":
         return check(
-            key, source, "策略行情", "info", "历史窗口已扫描完成",
-            sourceStatus=status, through=value.get("target"),
+            key,
+            source,
+            "策略行情",
+            "info",
+            "历史窗口已扫描完成",
+            sourceStatus=status,
+            through=value.get("target"),
         )
     if timestamp is None and value.get("lastReceivedAtMs") is not None:
         try:
@@ -870,8 +914,10 @@ def inspect_runtime(now):
                             "策略行情",
                             "error" if used >= budget else "warning" if ratio >= 0.8 else "healthy",
                             (
-                                "采集空间已达到预算" if used >= budget
-                                else "采集空间接近预算" if ratio >= 0.8
+                                "采集空间已达到预算"
+                                if used >= budget
+                                else "采集空间接近预算"
+                                if ratio >= 0.8
                                 else "采集空间在预算内"
                             ),
                             usedBytes=used,
@@ -884,9 +930,7 @@ def inspect_runtime(now):
                     # ``bybit`` is an aggregate subscription lifecycle state;
                     # freshness is reported by its concrete spot/linear/rates
                     # child streams below.
-                    bybit_children = [
-                        name for name in sources if name.startswith("bybit:")
-                    ]
+                    bybit_children = [name for name in sources if name.startswith("bybit:")]
                     if source == "bybit" and bybit_children:
                         result.append(
                             check(

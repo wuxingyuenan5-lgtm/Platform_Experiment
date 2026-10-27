@@ -76,7 +76,7 @@
   async function feakSave(params: any) {
     useApiBasic({
       apiFn: postProductConfig(params),
-      successFn: (res) => {
+      successFn: () => {
         emit('success');
       },
       finallyFn() {

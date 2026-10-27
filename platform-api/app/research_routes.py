@@ -7,6 +7,7 @@ from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from app.auth import Principal, require_permission
@@ -20,8 +21,8 @@ from app.research_a_share_repository import (
     read_stock_pool,
     update_stock_pool_membership,
 )
+from app.research_cn_financing import broad_etfs, domestic_financing
 from app.research_cross_asset import read_cross_asset
-from app.research_macro_narratives import read_macro_narratives
 from app.research_cumulative_volatility import read_cumulative_volatility
 from app.research_data_schemas import (
     AShareDashboardResponse,
@@ -30,9 +31,11 @@ from app.research_data_schemas import (
     StockSnapshotResponse,
 )
 from app.research_equity_observatory import read_equity_observatory
-from app.research_etf_tracking import catalog as etf_catalog, detail as etf_detail
+from app.research_etf_tracking import catalog as etf_catalog
+from app.research_etf_tracking import detail as etf_detail
 from app.research_gold import analyst_page, read_gold
 from app.research_hk_share_refresh import refresh_hk_share_research
+from app.research_macro_narratives import read_macro_narratives
 from app.research_overseas_refresh import refresh_overseas
 from app.research_overseas_repository import (
     read_dataset_health,
@@ -139,7 +142,33 @@ def equity_observatory(market: str, _: ResearchPrincipal, response: Response):
     if market not in {"cn", "us"}:
         raise HTTPException(422, detail="Unsupported equity market")
     response.headers["Cache-Control"] = "no-store"
-    return jsonable_encoder(read_equity_observatory(market), custom_encoder={Decimal: str})
+    # Published JSON already preserves financial Decimal values as text. Avoid
+    # recursively encoding the large history tree a second time on every read.
+    return JSONResponse(content=read_equity_observatory(market), headers=dict(response.headers))
+
+
+@router.get("/a-share/financing")
+def a_share_financing(_: ResearchPrincipal, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return JSONResponse(content=domestic_financing(), headers=dict(response.headers))
+
+
+@router.get("/a-share/broad-etfs/{key}")
+def a_share_broad_etfs(key: str, _: ResearchPrincipal, response: Response):
+    if key not in {
+        "hs300",
+        "sse50",
+        "sse180",
+        "csi500",
+        "csi800",
+        "csi1000",
+        "chinext",
+        "star50",
+        "sz100",
+    }:
+        raise HTTPException(422, detail="Unsupported broad index")
+    response.headers["Cache-Control"] = "no-store"
+    return broad_etfs(key)
 
 
 @router.get("/a-share/etf-tracking")
@@ -672,30 +701,47 @@ async def trigger_overseas_refresh(
     return {"data": {"status": status, "sources": health}}
 
 
-@router.get('/crypto/treasury-weekly-history')
+@router.get("/crypto/treasury-weekly-history")
 async def treasury_weekly_history(_: ResearchPrincipal):
     from app.research_treasury_weekly import get_history
+
     return get_history()
 
 
-@router.get('/crypto/treasury-weekly-snapshot')
+@router.get("/crypto/treasury-weekly-snapshot")
 async def treasury_weekly_snapshot(_: ResearchPrincipal):
     from app.research_treasury_weekly import get_snapshot
+
     return get_snapshot()
 
 
-@router.get('/crypto/treasury-weekly-snapshot/image')
+@router.get("/crypto/treasury-weekly-snapshot/image")
 async def treasury_weekly_snapshot_image(_: ResearchPrincipal):
     from fastapi.responses import FileResponse
+
     from app.research_local_data import hedge_board_data_root, read_local_json
+
     try:
-        manifest = read_local_json('public/v1/crypto/treasury-weekly-snapshot.json')
+        manifest = read_local_json("public/v1/crypto/treasury-weekly-snapshot.json")
     except ResearchProviderError:
         manifest = {}
-    mime = manifest.get('imageMimeType', 'image/png')
-    suffix = '.jpg' if mime == 'image/jpeg' else '.png'
-    mime = 'image/jpeg' if suffix == '.jpg' else 'image/png'
-    target = hedge_board_data_root() / ('public/v1/crypto/treasury-weekly-latest' + suffix)
+    mime = manifest.get("imageMimeType", "image/png")
+    suffix = ".jpg" if mime == "image/jpeg" else ".png"
+    mime = "image/jpeg" if suffix == ".jpg" else "image/png"
+    target = hedge_board_data_root() / ("public/v1/crypto/treasury-weekly-latest" + suffix)
     if not target.is_file():
-        raise HTTPException(404, detail='snapshot_not_available')
+        raise HTTPException(404, detail="snapshot_not_available")
     return FileResponse(target, media_type=mime)
+
+
+@router.get("/seasonality/{asset}", tags=["research"])
+async def seasonality_history(asset: str, _: ResearchPrincipal) -> dict[str, object]:
+    from app.research_local_data import read_local_json
+
+    paths = {
+        "gold": "public/v1/commodity/series/xauusd_daily_close.json",
+        "btc": "public/v1/crypto/series/binance_btc_spot.json",
+    }
+    if asset not in paths:
+        raise HTTPException(status_code=404, detail="Unknown seasonal asset")
+    return await asyncio.to_thread(read_local_json, paths[asset])

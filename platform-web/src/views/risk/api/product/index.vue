@@ -10,9 +10,9 @@
           <div class="color-secondary">连接状态：</div>
           <Select v-model="searchInfo.symbol" placeholder="请选择标的" style="width: 180px" />
         </div> -->
-        <Button class="w-74px" type="primary" @click="reload">查询</Button>
+        <Button class="w-74px" type="primary" @click="() => reload()">查询</Button>
       </div>
-      <!-- <Button type="primary" @click="reload">全部切断</Button> -->
+      <!-- <Button type="primary" @click="() => reload()">全部切断</Button> -->
     </div>
 
     <BasicTable @register="registerTable" body-padding="">

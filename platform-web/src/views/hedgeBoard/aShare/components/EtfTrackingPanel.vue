@@ -1,5 +1,6 @@
 <template>
   <section id="a-share-etf-tracking" class="etf-panel">
+    <BroadEtfPanel :refresh-key="refreshKey" />
     <header class="etf-heading"
       ><div><span class="eyebrow">ETF MONITOR</span><h2>机构持仓与 ETF 跟踪</h2></div
       ><button :disabled="loading || detailLoading" @click="refresh()">刷新数据</button></header
@@ -312,6 +313,7 @@
 </template>
 
 <script setup lang="ts">
+  import BroadEtfPanel from './BroadEtfPanel.vue';
   import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
   import {
     getEtfCatalog,

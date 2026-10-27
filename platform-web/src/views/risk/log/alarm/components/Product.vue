@@ -34,7 +34,7 @@
         <!-- <div class="flex items-center">
           <RangePicker v-model:value="searchInfo.timeRange" style="width: 200px" />
         </div> -->
-        <Button type="primary" @click="reload">查询</Button>
+        <Button type="primary" @click="() => reload()">查询</Button>
       </div>
       <div class="pb-2">
         <Button type="primary" @click="postNtificationFn({ action: 'readAll' })">全部已读</Button>

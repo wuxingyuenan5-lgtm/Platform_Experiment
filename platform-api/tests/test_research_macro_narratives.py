@@ -51,6 +51,21 @@ def test_extended_exchange_holiday_does_not_reset_valid_history():
     assert result[list(values)[300]]["baselineCount"] >= 126
 
 
+def test_bounded_scores_match_full_history_baseline_and_momentum(monkeypatch):
+    from app import research_macro_narratives as module
+
+    values = history(3500)
+    doc = {"status": "ready", "observations": [
+        {"date": d, "value": str(v)} for d, v in values.items()]}
+    definition = ("a", "a", "rates", "test", (("a", 1, "ratio"),))
+    today = date(2032, 8, 1)
+    bounded = build_driver(definition, {"a": doc}, today)
+    original = module.rolling_signal
+    monkeypatch.setattr(module, "rolling_signal", lambda v, t, **_: original(v, t))
+    full = build_driver(definition, {"a": doc}, today)
+    assert bounded == full
+
+
 def test_composites_require_both_legs_and_only_exact_common_dates():
     values = history()
     doc = {

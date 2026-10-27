@@ -1,4 +1,4 @@
-import type { EChartsOption } from 'echarts';
+import type { BarSeriesOption, EChartsOption, LineSeriesOption } from 'echarts';
 import type { PositionRow } from '../components/goldResearch';
 import type { MacroDashboardObservation } from '@/api/hedgeResearch';
 
@@ -53,12 +53,14 @@ export function cotChangeOptions(first: PositionRow, last: PositionRow): ECharts
       axisLabel: { rotate: 25, interval: 0, fontSize: 10 },
     },
     yAxis: { type: 'value', name: '持仓变动 · 手' },
-    series: (['long', 'short'] as const).map((key) => ({
-      type: 'bar',
-      name: key === 'long' ? '多头变动' : '空头变动',
-      data: rows.map((r) => r[key]),
-      barMaxWidth: 24,
-    })),
+    series: (['long', 'short'] as const).map(
+      (key): BarSeriesOption => ({
+        type: 'bar',
+        name: key === 'long' ? '多头变动' : '空头变动',
+        data: rows.map((r) => r[key]),
+        barMaxWidth: 24,
+      }),
+    ),
   };
 }
 
@@ -109,20 +111,23 @@ export function cotHistoryOptions(
         connectNulls: false,
         data: prices.map((p) => [`${p.date}T00:00:00Z`, p.value == null ? null : Number(p.value)]),
       },
-      ...(['long', 'short'] as const).map((key) => ({
-        type: 'line' as const,
-        name: `资产管理机构${key === 'long' ? '多' : '空'}头（含套利）`,
-        xAxisIndex: 1,
-        yAxisIndex: 1,
-        showSymbol: false,
-        connectNulls: false,
-        data: rows.map((r) => [
-          `${r.date}T00:00:00Z`,
-          r.categories.managed.spreading == null
-            ? null
-            : ((r.categories.managed[key] + r.categories.managed.spreading) / r.openInterest) * 100,
-        ]),
-      })),
+      ...(['long', 'short'] as const).map(
+        (key): LineSeriesOption => ({
+          type: 'line' as const,
+          name: `资产管理机构${key === 'long' ? '多' : '空'}头（含套利）`,
+          xAxisIndex: 1,
+          yAxisIndex: 1,
+          showSymbol: false,
+          connectNulls: false,
+          data: rows.map((r) => [
+            `${r.date}T00:00:00Z`,
+            r.categories.managed.spreading == null
+              ? null
+              : ((r.categories.managed[key] + r.categories.managed.spreading) / r.openInterest) *
+                100,
+          ]) as LineSeriesOption['data'],
+        }),
+      ),
     ],
   };
 }

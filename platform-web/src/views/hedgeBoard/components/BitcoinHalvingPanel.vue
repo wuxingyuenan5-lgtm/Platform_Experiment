@@ -96,12 +96,32 @@
             </text>
           </svg>
           <label class="halving-slider"
+            >显示起点：第 {{ rangeStart }} 天
+            <input
+              v-model.number="rangeStart"
+              type="range"
+              min="0"
+              :max="rangeEnd - 1"
+              aria-label="减半周期显示起点"
+            />
+          </label>
+          <label class="halving-slider"
+            >显示终点：第 {{ rangeEnd }} 天
+            <input
+              v-model.number="rangeEnd"
+              type="range"
+              :min="rangeStart + 1"
+              :max="maxDay"
+              aria-label="减半周期显示终点"
+            />
+          </label>
+          <label class="halving-slider"
             >减半后第 {{ cursorDay }} 天
             <input
               v-model.number="cursorDay"
               type="range"
-              min="0"
-              :max="maxDay"
+              :min="rangeStart"
+              :max="rangeEnd"
               step="1"
               aria-label="减半后天数"
             />
@@ -194,8 +214,23 @@
       ),
     ),
   );
+  const rangeStart = ref(0),
+    rangeEnd = ref(1095);
+  watch(
+    maxDay,
+    (days) => {
+      rangeStart.value = 0;
+      rangeEnd.value = days;
+    },
+    { immediate: true },
+  );
+  watch([rangeStart, rangeEnd], () => {
+    cursorDay.value = Math.max(rangeStart.value, Math.min(rangeEnd.value, cursorDay.value));
+  });
   const dayTicks = computed(() =>
-    [0, 0.25, 0.5, 0.75, 1].map((fraction) => Math.round(maxDay.value * fraction)),
+    [0, 0.25, 0.5, 0.75, 1].map((fraction) =>
+      Math.round(rangeStart.value + (rangeEnd.value - rangeStart.value) * fraction),
+    ),
   );
   watch(maxDay, (days) => {
     cursorDay.value = Math.min(cursorDay.value, days);
@@ -212,7 +247,7 @@
     visibleCycles.value
       .flatMap((c) =>
         c.points
-          .filter((p) => p.day <= maxDay.value && p.value !== null)
+          .filter((p) => p.day >= rangeStart.value && p.day <= rangeEnd.value && p.value !== null)
           .map((p) => Number(p.value)),
       )
       .filter((v) => v > 0),
@@ -235,14 +270,15 @@
         )
       : [0, 0.25, 0.5, 0.75, 1].map((fraction) => fraction * bounds.value.span),
   );
-  const x = (day: number) => 60 + (day / maxDay.value) * (rightEdge.value - 60);
+  const x = (day: number) =>
+    60 + ((day - rangeStart.value) / (rangeEnd.value - rangeStart.value)) * (rightEdge.value - 60);
   const y = (value: number) =>
     plotBottom.value -
     ((transform(value) - bounds.value.low) / bounds.value.span) * (plotBottom.value - 20);
   function path(cycle: Cycle) {
     let previous = -2;
     return cycle.points
-      .filter((p) => p.day <= maxDay.value)
+      .filter((p) => p.day >= rangeStart.value && p.day <= rangeEnd.value)
       .map((point) => {
         if (point.value === null || point.value <= 0) {
           previous = -2;
@@ -267,7 +303,9 @@
           (((event.clientX - rect.left) / rect.width) * chartWidth.value - 60) /
             (rightEdge.value - 60),
         ),
-      ) * maxDay.value,
+      ) *
+        (rangeEnd.value - rangeStart.value) +
+        rangeStart.value,
     );
   }
   useDashboardRefresh(async () => {

@@ -16,11 +16,13 @@
         ></div
       >
     </header>
-    <ThemeStrengthOverview
-      v-if="mode === 'themes'"
-      :themes="data.items.filter((t) => t.kind !== 'satellite')"
-      @select="focusTheme"
-    />
+    <WidgetErrorBoundary widget-title="强弱矩阵">
+      <ThemeStrengthOverview
+        v-if="mode === 'themes'"
+        :themes="data.items.filter((t) => t.kind !== 'satellite')"
+        @select="focusTheme"
+      />
+    </WidgetErrorBoundary>
     <div v-if="mode === 'themes'" class="workspace-grid">
       <aside class="mainline-nav" aria-label="主线选择">
         <div class="nav-heading"
@@ -182,21 +184,26 @@
                   <span>20日相对基准 {{ fmt(stock.relative20, 'pp') }}</span></p
                 ></div
               ><button @click="selectedStock = ''" aria-label="关闭股票走势">关闭 ×</button></header
-            ><VibeTimeChart
+            ><WidgetErrorBoundary
               v-if="stock.history?.length"
+              widget-title="走势图"
               :key="`${market}:${stock.code}`"
-              :title="`${stock.name} · 收盘价格`"
-              y-label="价格"
-              :dates="stock.history.map((p) => p.date)"
-              :series="[
-                {
-                  name: stock.name,
-                  color: '#2864ec',
-                  type: 'line',
-                  values: stock.history.map((p) => num(p.value)),
-                },
-              ]"
-            /><p v-else>暂无可用历史价格</p
+            >
+              <VibeTimeChart
+                :key="`${market}:${stock.code}`"
+                :title="`${stock.name} · 收盘价格`"
+                y-label="价格"
+                :dates="stock.history.map((p) => p.date)"
+                :series="[
+                  {
+                    name: stock.name,
+                    color: '#2864ec',
+                    type: 'line',
+                    values: stock.history.map((p) => num(p.value)),
+                  },
+                ]"
+              /> </WidgetErrorBoundary
+            ><p v-else>暂无可用历史价格</p
             ><div class="stock-meta"
               ><span>归属主线：{{ stock.themes?.join(' / ') }}</span
               ><a
@@ -319,6 +326,7 @@
   import VibeTimeChart from '../aShare/components/VibeTimeChart.vue';
   import ThemeStrengthOverview from './ThemeStrengthOverview.vue';
   import EquityStylePanel from './EquityStylePanel.vue';
+  import WidgetErrorBoundary from './WidgetErrorBoundary';
 
   const props = defineProps<{
     market: 'cn' | 'us';

@@ -124,9 +124,7 @@ Total
 
 5.0
 """
-    tickers, rows = provider._parse_farside_all_data_markdown(
-        markdown, ("IBIT", "FBTC", "Total")
-    )
+    tickers, rows = provider._parse_farside_all_data_markdown(markdown, ("IBIT", "FBTC", "Total"))
     assert tickers == ["IBIT", "FBTC", "Total"]
     assert rows == [
         ["11 Jan 2024", "111.7", "227.0", "655.3"],
@@ -167,6 +165,56 @@ def test_etf_fetch_falls_back_to_farside_reader_when_direct_page_is_blocked(
 
     assert calls == [provider._FARSIDE_BTC_URL, provider._FARSIDE_BTC_READER_URL]
     assert data["days"][-1]["flows"]["Total"] == 433.0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("asset", ["btc", "eth"])
+def test_etf_unpublished_total_zero_does_not_advance_latest_date(monkeypatch, asset):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        provider,
+        "_get",
+        lambda *a, **k: SimpleNamespace(text="table", raise_for_status=lambda: None),
+    )
+    monkeypatch.setattr(
+        provider,
+        "_parse_farside_btc",
+        lambda text: (
+            ["FUND", "Total"],
+            [
+                ["22 Oct 2026", "-", "0"],
+                ["23 Oct 2026", "0", "0"],
+                ["26 Oct 2026", "-", "0"],
+            ],
+        ),
+    )
+    result = provider.fetch_etf_flow(1, asset)
+    assert result["days"] == [{"date": "2026-10-23", "flows": {"FUND": 0.0, "Total": 0.0}}]
+
+
+@pytest.mark.unit
+def test_etf_rechecks_same_day_late_publication_after_two_hours(overseas_db, monkeypatch):
+    from datetime import datetime, timedelta
+
+    actual_gate = refresh._already_refreshed_within
+    now = datetime.now(UTC)
+    monkeypatch.setattr(
+        refresh, "read_latest_fetched_at", lambda _: (now - timedelta(hours=3)).isoformat()
+    )
+    monkeypatch.setattr(
+        refresh,
+        "fetch_etf_flow",
+        lambda *a: {
+            "tickers": ["IBIT", "Total"],
+            "days": [{"date": "2026-10-23", "flows": {"IBIT": 12.5, "Total": 12.5}}],
+        },
+    )
+    monkeypatch.setattr(refresh, "_read_shared_daily_prices", lambda *a: {})
+    assert asyncio.run(refresh._collect_etf_flow(False, "btc"))[0] == "ready"
+    monkeypatch.setattr(refresh, "read_latest_fetched_at", lambda _: now.isoformat())
+    assert actual_gate("crypto_etf_flow", timedelta(hours=2), now=now)
+    assert asyncio.run(refresh._collect_etf_flow(False, "btc"))[0] == "up_to_date"
 
 
 @pytest.mark.unit
@@ -237,9 +285,7 @@ def test_get_builds_a_scoped_client_with_verification_and_no_env_proxy(
             return _FakeResponse()
 
     monkeypatch.setattr(provider.httpx, "Client", _FakeClient)
-    monkeypatch.setattr(
-        provider.truststore, "SSLContext", lambda *_: "system-trust-store"
-    )
+    monkeypatch.setattr(provider.truststore, "SSLContext", lambda *_: "system-trust-store")
 
     result = provider._get("https://example.invalid/data", params={"a": 1})
 
@@ -300,9 +346,7 @@ def test_get_retries_configured_proxy_when_direct_upstream_is_blocked(
     ("hour", "expected"),
     [(5, False), (6, True), (12, True), (23, True)],
 )
-def test_refresh_is_due_only_at_or_after_0600_china_time(
-    hour: int, expected: bool
-) -> None:
+def test_refresh_is_due_only_at_or_after_0600_china_time(hour: int, expected: bool) -> None:
     """美股收盘后 06:00（Asia/Shanghai）起才允许自动刷新。"""
     local = datetime(2026, 9, 11, hour, 0, tzinfo=refresh._CHINA)
     assert refresh._overseas_refresh_due(local.astimezone(UTC)) is expected
@@ -345,14 +389,10 @@ def test_fedwatch_refresh_gate_is_hourly_not_daily(monkeypatch: pytest.MonkeyPat
     fetched = {"value": "2026-09-20T04:10:00+00:00"}
     monkeypatch.setattr(refresh, "read_latest_fetched_at", lambda _dataset: fetched["value"])
 
-    assert refresh._already_refreshed_within(
-        "macro_fedwatch", timedelta(hours=1), now=now
-    ) is True
+    assert refresh._already_refreshed_within("macro_fedwatch", timedelta(hours=1), now=now) is True
 
     fetched["value"] = "2026-09-20T03:59:00+00:00"
-    assert refresh._already_refreshed_within(
-        "macro_fedwatch", timedelta(hours=1), now=now
-    ) is False
+    assert refresh._already_refreshed_within("macro_fedwatch", timedelta(hours=1), now=now) is False
 
 
 @pytest.mark.unit
@@ -404,9 +444,7 @@ def test_corrupt_fetched_at_does_not_block_future_refreshes(overseas_db, seed_ru
 
 
 @pytest.mark.unit
-def test_refresh_keeps_fedwatch_hourly_cadence_before_0600(
-    overseas_db, monkeypatch
-) -> None:
+def test_refresh_keeps_fedwatch_hourly_cadence_before_0600(overseas_db, monkeypatch) -> None:
     """早于 06:00 仍允许 FedWatch 更新，日度源继续走 China 日门控。"""
     monkeypatch.setattr(refresh, "_overseas_refresh_due", lambda: False)
 
@@ -503,9 +541,7 @@ def test_dataset_health_reports_no_data_without_fabricating_a_value(overseas_db)
 
 
 @pytest.mark.unit
-def test_dataset_health_is_ready_after_a_successful_collection(
-    overseas_db, monkeypatch
-) -> None:
+def test_dataset_health_is_ready_after_a_successful_collection(overseas_db, monkeypatch) -> None:
     """成功刷新后健康状态为 ready，且不残留错误信息。"""
     monkeypatch.setattr(
         refresh,
@@ -550,6 +586,7 @@ def test_one_failed_source_does_not_block_the_others(overseas_db, monkeypatch) -
         raise provider.ResearchProviderError("farside_btc_empty")
 
     monkeypatch.setattr(refresh, "fetch_fedwatch", _boom)
+
     def _flow(_days=14, _asset="btc"):
         ticker = "IBIT" if _asset == "btc" else "ETHA"
         return {
@@ -603,17 +640,26 @@ def test_latest_series_roundtrip_and_dedup(overseas_db, seed_run) -> None:
     seed_run("r2")
     seed_run("r3")
     repository.write_overseas_series(
-        "r1", "macro_fedwatch", "2026-09-10", {"__meta__": {"effr": 4.30}},
+        "r1",
+        "macro_fedwatch",
+        "2026-09-10",
+        {"__meta__": {"effr": 4.30}},
         source="fixture",
     )
     repository.write_overseas_series(
-        "r2", "macro_fedwatch", "2026-09-10", {"__meta__": {"effr": 4.33}},
+        "r2",
+        "macro_fedwatch",
+        "2026-09-10",
+        {"__meta__": {"effr": 4.33}},
         source="fixture",
     )
     assert repository.read_latest_series("macro_fedwatch")["__meta__"]["effr"] == 4.33
 
     repository.write_overseas_series(
-        "r3", "macro_fedwatch", "2026-09-11", {"__meta__": {"effr": 4.35}},
+        "r3",
+        "macro_fedwatch",
+        "2026-09-11",
+        {"__meta__": {"effr": 4.35}},
         source="fixture",
     )
     assert repository.read_latest_observed_at("macro_fedwatch") == "2026-09-11"
@@ -897,7 +943,7 @@ def test_read_routes_expose_status_field_for_stale_reporting() -> None:
 
     source = inspect.getsource(routes)
     # 每个海外读取端点都带上健康状态
-    assert 'read_dataset_health' in source
+    assert "read_dataset_health" in source
     assert source.count('"status": health["status"]') >= 4
     assert source.count('"lastError": health["lastError"]') >= 4
 
@@ -956,3 +1002,54 @@ def test_etf_uses_shared_spot_exact_closed_days_and_ignores_legacy_contract(
     assert [d["price"] for d in result["days"]] == [100, 200]
     assert result["flowUnit"] == asset.upper()
     assert [d["totalFlow"] for d in result["days"]] == [10000, 10000]
+
+
+def test_shared_spot_prices_batch_queries_preserve_precedence(overseas_db, monkeypatch):
+    import json
+    from contextlib import contextmanager
+
+    from app import database_connection
+
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    days = [(start + timedelta(days=i)).date().isoformat() for i in range(801)]
+    def stamp(i):
+        return int((start + timedelta(days=i + 1)).timestamp() * 1000)
+    with connection() as db:
+        db.executemany(
+            "INSERT INTO research_strategy_projection VALUES(?,?,?,?)",
+            [
+                (
+                    "daily_candle",
+                    "BTCUSDT:spot:trade",
+                    stamp(i),
+                    json.dumps({"close": str(i + 1), "quality": []}),
+                )
+                for i in range(801)
+            ],
+        )
+        db.executemany(
+            "INSERT INTO research_strategy_projection VALUES(?,?,?,?)",
+            [
+                ("historical_candle", "BTCUSDT:spot:trade", stamp(i), json.dumps(payload))
+                for i, payload in [
+                    (0, {"close": "100", "quality": []}),
+                    (1, {"close": "200", "quality": ["invalid"]}),
+                ]
+            ],
+        )
+    original = database_connection.read_only_connection
+    queries = []
+
+    @contextmanager
+    def traced():
+        with original() as db:
+            db.set_trace_callback(queries.append)
+            yield db
+
+    monkeypatch.setattr(database_connection, "read_only_connection", traced)
+    prices = repository._read_shared_daily_prices("btc", days)
+    assert len(prices) == 801
+    assert prices[days[0]] == 100  # historical wins when valid
+    assert prices[days[1]] == 2  # invalid historical falls back to exact daily close
+    assert prices[days[-1]] == 801
+    assert sum("FROM research_strategy_projection" in query for query in queries) == 3

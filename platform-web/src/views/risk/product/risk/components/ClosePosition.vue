@@ -308,9 +308,11 @@
     return result;
   }
   // 筛选仅包含 spot 和 linear 的组合
-  function filterOnlyMixedLinear(positions) {
+  function filterOnlyMixedLinear(
+    positions: Array<{ symbol: string; category: string; size: number | string }>,
+  ) {
     // 按 symbol 分组
-    const grouped = positions.reduce((map, pos) => {
+    const grouped = positions.reduce<Record<string, typeof positions>>((map, pos) => {
       if (!map[pos.symbol]) {
         map[pos.symbol] = [];
       }

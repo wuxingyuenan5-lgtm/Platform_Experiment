@@ -145,7 +145,6 @@
           name: '净值',
           scale: true,
           splitLine: {
-            showMinLine: false,
             show: true,
             lineStyle: {
               color: '#000000', // #fff 0.2

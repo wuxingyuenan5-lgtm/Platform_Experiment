@@ -118,10 +118,10 @@
       month.value = contracts.value[0]?.month || '';
   });
   const contract = computed(() => contracts.value.find((c) => c.month === month.value));
-  const points = computed<(string | number | null)[][]>(() =>
+  const points = computed<[string | number, string | number | null][]>(() =>
     mode.value === 'curve'
-      ? contract.value?.curve.map((r) => [r.price, r.intrinsicValue]) || []
-      : (data.value?.history || []).map((r) => [
+      ? contract.value?.curve.map((r): [number, number] => [r.price, r.intrinsicValue]) || []
+      : (data.value?.history || []).map((r): [string, string | number | null] => [
           r.date,
           r[product.value + (mode.value === 'ratio' ? 'ratio' : mode.value + 'Ema30')],
         ]),

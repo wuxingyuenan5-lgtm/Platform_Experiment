@@ -555,7 +555,7 @@ def fetch_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
         raise ResearchProviderError(f"farside_{asset_key}_empty")
 
     parsed: list[dict[str, Any]] = []
-    for cells in rows[-days:]:
+    for cells in rows:
         if len(cells) < 2:
             continue
         try:
@@ -565,11 +565,15 @@ def fetch_etf_flow(days: int = 3650, asset: str = "btc") -> dict[str, Any]:
         flows = {}
         for i, ticker in enumerate(tickers):
             flows[ticker] = _parse_flow(cells[i + 1]) if i + 1 < len(cells) else None
+        # Farside creates the next session with every fund still '-' and a
+        # displayed Total of 0. This is an unpublished row, not zero flow.
+        if not any(value is not None for ticker, value in flows.items() if ticker != "Total"):
+            continue
         parsed.append({"date": day, "flows": flows})
 
     if not parsed:
         raise ResearchProviderError("farside_btc_unparsable")
-    return {"tickers": tickers, "days": parsed}
+    return {"tickers": tickers, "days": parsed[-days:]}
 
 
 # ---------------------------------------------------------------------------

@@ -76,11 +76,18 @@
                 widget.localKey === 'macro-global-m2' ||
                 widget.localKey === 'macro-fed-balance-structure' ||
                 widget.localKey === 'macro-fed-assets' ||
+                widget.localKey === 'macro-treasury-details' ||
                 widget.localKey === 'macro-corporate-yields' ||
                 widget.localKey === 'etf-weekly-flows' ||
                 widget.localKey === 'crypto-cny-usdt',
               'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
               'widget-card--macro-polymarket-fed': widget.localKey === 'macro-polymarket-fed',
+              'widget-card--stretch-table': ['crypto-treasuries', 'crypto-eth-reserves'].includes(
+                widget.localKey || '',
+              ),
+              'widget-card--seasonality': ['gold-seasonality', 'btc-seasonality'].includes(
+                widget.localKey || '',
+              ),
               'widget-card--halving': widget.localKey === 'crypto-halving-cycles',
               'widget-card--urpd': widget.localKey === 'crypto-urpd',
               'widget-card--etf-premium': widget.localKey === 'crypto-etf-premium',
@@ -188,9 +195,15 @@
     return [
       ...section.widgets.filter((widget) => widget.localKey === 'etf-weekly-flows'),
       ...section.widgets.filter(
-        (widget) => widget.kind !== 'external-link' && widget.localKey !== 'etf-weekly-flows',
+        (widget) =>
+          widget.kind !== 'external-link' &&
+          widget.localKey !== 'etf-weekly-flows' &&
+          !['gold-seasonality', 'btc-seasonality'].includes(widget.localKey || ''),
       ),
       ...section.widgets.filter((widget) => widget.kind === 'external-link'),
+      ...section.widgets.filter((widget) =>
+        ['gold-seasonality', 'btc-seasonality'].includes(widget.localKey || ''),
+      ),
     ];
   }
 
@@ -414,6 +427,41 @@
     display: grid;
     gap: 16px;
     align-items: start;
+  }
+
+  .widget-card--seasonality {
+    grid-column: 1 / -1;
+  }
+
+  .widget-card--stretch-table {
+    display: flex;
+    position: relative;
+    flex-direction: column;
+    align-self: stretch;
+    min-height: 450px;
+
+    :deep(.chart-expand__surface:not([aria-modal='true'])) {
+      display: flex;
+      position: absolute;
+      flex-direction: column;
+      height: 100%;
+      inset: 0;
+    }
+
+    :deep(.visible-chart),
+    :deep(.local-widget-stack) {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    :deep(.distribution-scroll) {
+      flex: 1;
+      height: 0;
+      min-height: 330px;
+      max-height: none !important;
+    }
   }
 
   .widget-grid--hero {

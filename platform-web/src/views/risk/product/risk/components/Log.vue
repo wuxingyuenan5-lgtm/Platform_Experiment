@@ -31,7 +31,7 @@
 <script lang="tsx" setup>
   import { SimpleContainer } from '@/components/Container';
   import { BasicTable, useTable } from '@/components/Table';
-  import { getLogColumns, setSchemas } from '../data';
+  import { getLogColumns } from '../data';
   import { Select, RangePicker, Button, Input } from 'ant-design-vue';
   import { nextTick, reactive, watch } from 'vue';
   import { getExecutionTasks } from '@/api/risk/execution';

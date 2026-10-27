@@ -188,16 +188,18 @@
           {{ marketDetailExpanded ? '收起' : '展开' }}
         </button>
       </div>
-      <TerminalDetailPanel
-        v-if="marketDetailExpanded"
-        id="market-terminal-detail-content"
-        title="市场明细"
-        :market-id="displayConfig.id"
-        :columns="displayConfig.detailColumns"
-        :groups="displayConfig.detailGroups"
-        :readonly="readonlyDetails"
-        @index-chart="(code, name) => emit('index-chart', code, name)"
-      />
+      <WidgetErrorBoundary widget-title="市场明细">
+        <TerminalDetailPanel
+          v-if="marketDetailExpanded"
+          id="market-terminal-detail-content"
+          title="市场明细"
+          :market-id="displayConfig.id"
+          :columns="displayConfig.detailColumns"
+          :groups="displayConfig.detailGroups"
+          :readonly="readonlyDetails"
+          @index-chart="(code, name) => emit('index-chart', code, name)"
+        />
+      </WidgetErrorBoundary>
     </section>
 
     <section
@@ -372,6 +374,7 @@
     AShareDashboardResponse,
     AShareIndexSnapshot,
   } from '@/api/hedgeResearch';
+  import WidgetErrorBoundary from './WidgetErrorBoundary';
   import { mergeTerminalMarket } from '../nativeData/marketDetailAdapter';
 
   import TerminalDetailPanel from './TerminalDetailPanel.vue';

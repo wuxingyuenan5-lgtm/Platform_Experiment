@@ -74,12 +74,23 @@ class MarketDetailProvider:
         self._timeout_seconds = timeout_seconds
         self._user_agent = user_agent
         self._last_known_good: dict[str, MarketDetailResponse] = {}
+        self._snapshot_revisions: dict[str, tuple] = {}
+        self._snapshot_locks: dict[str, asyncio.Lock] = {}
 
-    async def get(self, market_id: str) -> MarketDetailResponse:
-        if market_id in MARKET_SYMBOLS:
-            from app.research_a_share_repository import read_dataset
+    def _read_snapshot(self, market_id: str) -> MarketDetailResponse:
+        from app.config import get_settings
+        from app.research_a_share_repository import read_dataset, read_dataset_metadata
 
-            document = await asyncio.to_thread(read_dataset, f"market_detail_{market_id}")
+        dataset = f"market_detail_{market_id}"
+        metadata = read_dataset_metadata(dataset)
+        if metadata is None:
+            self._snapshot_revisions.pop(market_id, None)
+            self._last_known_good.pop(market_id, None)
+            return MarketDetailResponse(market_id=market_id, status="no_data")
+        revision = (str(get_settings().database_path), *metadata.values())
+        contract = self._last_known_good.get(market_id)
+        if contract is None or self._snapshot_revisions.get(market_id) != revision:
+            document = read_dataset(dataset)
             if document is None:
                 return MarketDetailResponse(market_id=market_id, status="no_data")
             try:
@@ -88,15 +99,23 @@ class MarketDetailProvider:
                 raise ResearchProviderError("market_detail_invalid_snapshot") from exc
             if contract.market_id != market_id:
                 raise ResearchProviderError("market_detail_schema_mismatch")
-            if contract.rows and (
-                contract.retrieved_at is None
-                or datetime.now(UTC) - contract.retrieved_at > timedelta(hours=1)
-            ):
-                contract.status = "stale" if contract.rows else "no_data"
-                for row in contract.rows:
-                    if row.status not in {"no_data", "error"}:
-                        row.status = "stale"
-            return contract
+            self._last_known_good[market_id] = contract
+            self._snapshot_revisions[market_id] = revision
+        if contract.rows and (
+            contract.retrieved_at is None
+            or datetime.now(UTC) - contract.retrieved_at > timedelta(hours=1)
+        ):
+            contract.status = "stale"
+            for row in contract.rows:
+                if row.status not in {"no_data", "error"}:
+                    row.status = "stale"
+        return contract
+
+    async def get(self, market_id: str) -> MarketDetailResponse:
+        if market_id in MARKET_SYMBOLS:
+            lock = self._snapshot_locks.setdefault(market_id, asyncio.Lock())
+            async with lock:
+                return await asyncio.to_thread(self._read_snapshot, market_id)
         if market_id != "macro":
             raise ResearchProviderError("market_detail_not_enabled")
         try:
@@ -126,10 +145,11 @@ class MarketDetailProvider:
 
             async def fetch(row_id: str, symbol: str):
                 async with semaphore:
-                    if market_id == 'gold' and symbol in {'AU0','AG0','LC0'}:
-                        return await _fetch_sina_futures(client,row_id,symbol)
-                    if market_id == 'global' and row_id == 'global-rsx':
+                    if market_id == "gold" and symbol in {"AU0", "AG0", "LC0"}:
+                        return await _fetch_sina_futures(client, row_id, symbol)
+                    if market_id == "global" and row_id == "global-rsx":
                         from app.research_source_moex import fetch_imoex
+
                         return await fetch_imoex(client, self._user_agent)
                     return await self._fetch_yahoo_history(client, row_id, symbol)
 
@@ -148,7 +168,9 @@ class MarketDetailProvider:
             quote_meta[row_id] = metadata
             if points:
                 series[row_id] = points
-        derived = GOLD_DERIVED if market_id == "gold" else CRYPTO_DERIVED if market_id == "crypto" else {}
+        derived = (
+            GOLD_DERIVED if market_id == "gold" else CRYPTO_DERIVED if market_id == "crypto" else {}
+        )
         for row_id, (numerator, denominator) in derived.items():
             ratio = _ratio_series(series.get(numerator, []), series.get(denominator, []))
             if ratio:
@@ -163,12 +185,12 @@ class MarketDetailProvider:
             row.currency = metadata.get("currency")
             row.price_kind = metadata.get("price_kind", "observation")
             row.as_of = metadata.get("as_of") or row.as_of
-            if metadata.get('source'):
-                row.source = metadata['source']
-                row.source_url = metadata['source_url']
-                row.name = metadata['name']
-                row.unit = metadata['unit']
-                row.quality_flags.extend(metadata.get('quality_flags', []))
+            if metadata.get("source"):
+                row.source = metadata["source"]
+                row.source_url = metadata["source_url"]
+                row.name = metadata["name"]
+                row.unit = metadata["unit"]
+                row.quality_flags.extend(metadata.get("quality_flags", []))
             if row.price_kind == "intraday":
                 row.quality_flags.append("unfinished_daily_bar")
             # Date-labelled returns must not include an unfinished session.
@@ -182,7 +204,9 @@ class MarketDetailProvider:
                 if market_id == "us" or row.id in {"gold-gld-row", "crypto-btc-row", "global-rsx"}
                 else []
             )
-            row.symbol = metadata.get("symbol") or yahoo_symbols.get(row.id, row.id).replace("%5E", "^")
+            row.symbol = metadata.get("symbol") or yahoo_symbols.get(row.id, row.id).replace(
+                "%5E", "^"
+            )
             if row.symbol.startswith("^"):
                 row.unit = "index"
             if row.id in GOLD_DERIVED or row.id in CRYPTO_DERIVED:
@@ -218,11 +242,20 @@ class MarketDetailProvider:
         )
 
     async def _fetch_yahoo_history(
-        self, client: httpx.AsyncClient, row_id: str, symbol: str
+        self, client: httpx.AsyncClient, row_id: str, symbol: str, *, full_history: bool = False
     ) -> tuple[str, list[tuple[str, Decimal]], str, dict]:
         response = await client.get(
             f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
-            params={"range": "2y", "interval": "1d", "events": "history"},
+            params=(
+                {
+                    "period1": 0,
+                    "period2": int(datetime.now(UTC).timestamp()),
+                    "interval": "1d",
+                    "events": "history",
+                }
+                if full_history
+                else {"range": "2y", "interval": "1d", "events": "history"}
+            ),
             headers={"User-Agent": self._user_agent},
         )
         response.raise_for_status()
@@ -281,12 +314,22 @@ GOLD_YAHOO_SYMBOLS = {
     "gold-gas-row": "NG=F",
 }
 
-GOLD_YAHOO_SYMBOLS.update({'gold-au1':'AU0','gold-ag1':'AG0','gold-ltc1':'LC0','gold-zijin':'601899.SS','gold-luoyang':'603993.SS','gold-tongling':'000630.SZ','gold-spy-source':'SPY'})
+GOLD_YAHOO_SYMBOLS.update(
+    {
+        "gold-au1": "AU0",
+        "gold-ag1": "AG0",
+        "gold-ltc1": "LC0",
+        "gold-zijin": "601899.SS",
+        "gold-luoyang": "603993.SS",
+        "gold-tongling": "000630.SZ",
+        "gold-spy-source": "SPY",
+    }
+)
 GOLD_DERIVED = {
-    'gold-ratio-xaucopper': ('gold-xau-row','gold-copper-row'),
-    'gold-ratio-xauoil': ('gold-xau-row','gold-wti-row'),
-    'gold-ratio-xauspy': ('gold-xau-row','gold-spy-source'),
-    'gold-ratio-gdxxau': ('gold-gdx-row','gold-xau-row'),
+    "gold-ratio-xaucopper": ("gold-xau-row", "gold-copper-row"),
+    "gold-ratio-xauoil": ("gold-xau-row", "gold-wti-row"),
+    "gold-ratio-xauspy": ("gold-xau-row", "gold-spy-source"),
+    "gold-ratio-gdxxau": ("gold-gdx-row", "gold-xau-row"),
     "gold-ratio-row": ("gold-xau-row", "gold-slv-row"),
 }
 
@@ -318,17 +361,28 @@ CRYPTO_YAHOO_SYMBOLS = {
     "crypto-usdc-row": "USDC-USD",
 }
 
-CRYPTO_YAHOO_SYMBOLS.update({f'crypto-{coin.lower()}usd':f'{coin}-USD' for coin in ['AAVE','UNI','HUMA','ONDO','PLUME','PEPE','SUI','USDT']})
-CRYPTO_YAHOO_SYMBOLS.update({'crypto-uniusd':'UNI7083-USD','crypto-pepeusd':'PEPE24478-USD','crypto-suiusd':'SUI20947-USD'})
-CRYPTO_YAHOO_SYMBOLS.update({'crypto-xau-source':'GC=F','crypto-spy-source':'SPY'})
+CRYPTO_YAHOO_SYMBOLS.update(
+    {
+        f"crypto-{coin.lower()}usd": f"{coin}-USD"
+        for coin in ["AAVE", "UNI", "HUMA", "ONDO", "PLUME", "PEPE", "SUI", "USDT"]
+    }
+)
+CRYPTO_YAHOO_SYMBOLS.update(
+    {
+        "crypto-uniusd": "UNI7083-USD",
+        "crypto-pepeusd": "PEPE24478-USD",
+        "crypto-suiusd": "SUI20947-USD",
+    }
+)
+CRYPTO_YAHOO_SYMBOLS.update({"crypto-xau-source": "GC=F", "crypto-spy-source": "SPY"})
 CRYPTO_DERIVED = {
-    'crypto-ratio-mstrbtc': ('crypto-mstr-row','crypto-btc-row'),
-    'crypto-ratio-crclbtc': ('crypto-crcl-row','crypto-btc-row'),
-    'crypto-ratio-coinbtc': ('crypto-coin-row','crypto-btc-row'),
-    'crypto-ratio-ethbtc': ('crypto-eth-row','crypto-btc-row'),
-    'crypto-ratio-btcxau': ('crypto-btc-row','crypto-xau-source'),
-    'crypto-ratio-btcspy': ('crypto-btc-row','crypto-spy-source'),
-    'crypto-ratio-ethsol': ('crypto-eth-row','crypto-sol-row'),
+    "crypto-ratio-mstrbtc": ("crypto-mstr-row", "crypto-btc-row"),
+    "crypto-ratio-crclbtc": ("crypto-crcl-row", "crypto-btc-row"),
+    "crypto-ratio-coinbtc": ("crypto-coin-row", "crypto-btc-row"),
+    "crypto-ratio-ethbtc": ("crypto-eth-row", "crypto-btc-row"),
+    "crypto-ratio-btcxau": ("crypto-btc-row", "crypto-xau-source"),
+    "crypto-ratio-btcspy": ("crypto-btc-row", "crypto-spy-source"),
+    "crypto-ratio-ethsol": ("crypto-eth-row", "crypto-sol-row"),
 }
 
 
@@ -563,48 +617,97 @@ def _change_from_period_start(
 def _crypto_cap_rows():
     """CoinGecko public global snapshot; preserve native update time and collected history."""
     import requests
+
     from app.research_a_share_repository import read_dataset
+
     try:
-        response=requests.get('https://api.coingecko.com/api/v3/global',timeout=25)
+        response = requests.get("https://api.coingecko.com/api/v3/global", timeout=25)
         response.raise_for_status()
-        data=response.json()['data']
-        total=Decimal(str(data['total_market_cap']['usd']))
-        shares=data['market_cap_percentage']
-        btc=Decimal(str(shares['btc']));eth=Decimal(str(shares['eth']))
-        metrics={'crypto-total':total,'crypto-total2':total*(100-btc)/100,'crypto-total3':total*(100-btc-eth)/100,
-                 'crypto-btcd':btc,'crypto-usdtd':Decimal(str(shares['usdt'])),
-                 'crypto-othersd':100-sum(Decimal(str(v)) for v in sorted(shares.values(),reverse=True)[:10])}
-        timestamp=datetime.fromtimestamp(data['updated_at'],UTC)
-        day=timestamp.date().isoformat()
-        prior={row['id']:row for row in (read_dataset('market_detail_crypto') or {}).get('rows',[])}
-        result=[]
-        for sid,value in metrics.items():
-            history={r['date']:Decimal(r['value']) for r in prior.get(sid,{}).get('history',[])}
-            history[day]=value
-            row=_market_row(sid,sorted(history.items()))
-            row.source='CoinGecko';row.source_url='https://www.coingecko.com/en/global-charts'
-            row.symbol=sid.removeprefix('crypto-').upper();row.currency='USD' if 'total' in sid else None
-            row.unit='price' if 'total' in sid else 'percent';row.price_kind='intraday';row.as_of=timestamp.isoformat()
-            row.history=[{'date':d,'value':str(v)} for d,v in sorted(history.items())][-260:]
-            row.quality_flags=['coingecko_coverage_not_tradingview_index','history_since_first_collection']
+        data = response.json()["data"]
+        total = Decimal(str(data["total_market_cap"]["usd"]))
+        shares = data["market_cap_percentage"]
+        btc = Decimal(str(shares["btc"]))
+        eth = Decimal(str(shares["eth"]))
+        metrics = {
+            "crypto-total": total,
+            "crypto-total2": total * (100 - btc) / 100,
+            "crypto-total3": total * (100 - btc - eth) / 100,
+            "crypto-btcd": btc,
+            "crypto-usdtd": Decimal(str(shares["usdt"])),
+            "crypto-othersd": 100
+            - sum(Decimal(str(v)) for v in sorted(shares.values(), reverse=True)[:10]),
+        }
+        timestamp = datetime.fromtimestamp(data["updated_at"], UTC)
+        day = timestamp.date().isoformat()
+        prior = {
+            row["id"]: row for row in (read_dataset("market_detail_crypto") or {}).get("rows", [])
+        }
+        result = []
+        for sid, value in metrics.items():
+            history = {
+                r["date"]: Decimal(r["value"]) for r in prior.get(sid, {}).get("history", [])
+            }
+            history[day] = value
+            row = _market_row(sid, sorted(history.items()))
+            row.source = "CoinGecko"
+            row.source_url = "https://www.coingecko.com/en/global-charts"
+            row.symbol = sid.removeprefix("crypto-").upper()
+            row.currency = "USD" if "total" in sid else None
+            row.unit = "price" if "total" in sid else "percent"
+            row.price_kind = "intraday"
+            row.as_of = timestamp.isoformat()
+            row.history = [{"date": d, "value": str(v)} for d, v in sorted(history.items())][-260:]
+            row.quality_flags = [
+                "coingecko_coverage_not_tradingview_index",
+                "history_since_first_collection",
+            ]
             result.append(row)
         return result
     except Exception:
         import logging
-        logging.getLogger(__name__).exception('Public crypto capitalization refresh failed')
+
+        logging.getLogger(__name__).exception("Public crypto capitalization refresh failed")
         return []
 
 
 async def _fetch_sina_futures(client, row_id, symbol):
     import json
-    url=f'https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_{symbol}=/InnerFuturesNewService.getDailyKLine'
-    response=await client.get(url,params={'symbol':symbol},headers={'User-Agent':'Mozilla/5.0'})
+
+    url = f"https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_{symbol}=/InnerFuturesNewService.getDailyKLine"
+    response = await client.get(
+        url, params={"symbol": symbol}, headers={"User-Agent": "Mozilla/5.0"}
+    )
     response.raise_for_status()
-    text=response.text
-    rows=json.loads(text[text.index('['):text.rindex(']')+1])
-    points=sorted({str(r['d']):Decimal(str(r['c'])) for r in rows if r.get('c') is not None and str(r['d'])<=datetime.now(ZoneInfo('Asia/Shanghai')).date().isoformat()}.items())
-    if not points or any(not v.is_finite() or v<=0 for _,v in points):raise ValueError('invalid Sina futures history')
-    name,unit,tv={'AU0':('沪金主力连续','cny_per_gram','AU1!'),'AG0':('沪银主力连续','cny_per_kg','AG1!'),'LC0':('碳酸锂主力连续','cny_per_tonne','LC1!')}[symbol]
-    return row_id,points,'Asia/Shanghai',{'source':'Sina Finance','source_url':str(response.url),'name':name,
-        'unit':unit,'currency':'CNY','symbol':tv,'price_kind':'close','as_of':points[-1][0],
-        'quality_flags':['source_native_continuous_contract','continuous_futures_not_spot']}
+    text = response.text
+    rows = json.loads(text[text.index("[") : text.rindex("]") + 1])
+    points = sorted(
+        {
+            str(r["d"]): Decimal(str(r["c"]))
+            for r in rows
+            if r.get("c") is not None
+            and str(r["d"]) <= datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+        }.items()
+    )
+    if not points or any(not v.is_finite() or v <= 0 for _, v in points):
+        raise ValueError("invalid Sina futures history")
+    name, unit, tv = {
+        "AU0": ("沪金主力连续", "cny_per_gram", "AU1!"),
+        "AG0": ("沪银主力连续", "cny_per_kg", "AG1!"),
+        "LC0": ("碳酸锂主力连续", "cny_per_tonne", "LC1!"),
+    }[symbol]
+    return (
+        row_id,
+        points,
+        "Asia/Shanghai",
+        {
+            "source": "Sina Finance",
+            "source_url": str(response.url),
+            "name": name,
+            "unit": unit,
+            "currency": "CNY",
+            "symbol": tv,
+            "price_kind": "close",
+            "as_of": points[-1][0],
+            "quality_flags": ["source_native_continuous_contract", "continuous_futures_not_spot"],
+        },
+    )
