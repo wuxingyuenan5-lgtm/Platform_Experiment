@@ -1,10 +1,11 @@
-"""Isolated, read-only Choice CSD fallback for research observations.
+"""Isolated, read-only Choice daily close fallback for research observations.
 
 The native SDK is executed in a short-lived child process so a DLL fault or a
 blocking login cannot take down the API worker. Child output is parsed locally
 and never forwarded; credentials are supplied only through the SDK's existing
 user-level activation store.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 DEFAULT_SDK_ROOT = Path.home() / ".choice" / "EMQuantAPI_Python" / "python3"
-_CHILD = r'''
+_CHILD = r"""
 import json, sys
 from decimal import Decimal
 import pandas as pd
@@ -27,22 +28,17 @@ try:
     if getattr(login, "ErrorCode", -1) != 0:
         print(json.dumps({"ok": False, "error": "login_failed"}))
     else:
-        result = c.csd(
-            code,
-            "CLOSE",
-            day,
-            day,
-            "Period=1,AdjustFlag=1,Order=1,FillData=0,RowIndex=2,Ispandas=1,RECVtimeout=60",
+        result = c.css(
+            code, "CLOSE",
+            "TradeDate=" + day + ",Ispandas=1,RECVtimeout=60",
         )
         value = None
         if isinstance(result, pd.DataFrame) and "CLOSE" in result.columns:
-            close = pd.to_numeric(result["CLOSE"], errors="coerce")
-            matches = [
-                index for index in result.index if str(index)[:10].replace("/", "-") == day
-            ]
-            if matches:
-                values = close.loc[matches].dropna().tolist()
-                value = values[0] if values else None
+            if "DATES" in result.columns and code in result.index:
+                row = result.loc[code]
+                if str(row["DATES"])[:10].replace("/", "-") == day:
+                    candidate = pd.to_numeric(row["CLOSE"], errors="coerce")
+                    value = candidate if pd.notna(candidate) else None
         print(json.dumps({
             "ok": value is not None,
             "value": str(value) if value is not None else None,
@@ -52,15 +48,15 @@ finally:
         c.stop()
     except Exception:
         pass
-'''
+"""
 
 
-def choice_csd_close(
+def choice_daily_close(
     trade_date: date | str,
     *,
     instrument_code: str = "801102.SWI",
     timeout_seconds: float = 8.0,
-    sdk_root: Path | None = None,
+    sdk_root: Path | str | None = None,
 ) -> Decimal | None:
     """Return one Choice close, or None for every unavailable/invalid outcome."""
     root = Path(sdk_root or os.environ.get("VG_CHOICE_SDK_ROOT", DEFAULT_SDK_ROOT))
@@ -76,8 +72,12 @@ def choice_csd_close(
     try:
         completed = subprocess.run(
             [python_executable, "-c", _CHILD, instrument_code, day],
-            cwd=str(root), env=env, capture_output=True, text=True,
-            timeout=max(0.5, timeout_seconds), check=False,
+            cwd=str(root),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=max(0.5, timeout_seconds),
+            check=False,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except (OSError, subprocess.TimeoutExpired):

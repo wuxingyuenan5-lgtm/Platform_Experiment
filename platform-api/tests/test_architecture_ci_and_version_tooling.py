@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -133,3 +135,89 @@ def test_permanent_workflows_have_distinct_long_term_responsibilities() -> None:
     assert "name: platform-api" in platform
     assert "name: execution-runtime" in platform
     assert "name: platform-web" in platform
+
+
+@pytest.mark.parametrize("case", ["local_tmp", "tracked_tmp", "unknown_root"])
+def test_local_outputs_do_not_hide_tracked_artifacts_or_unknown_roots(
+    tmp_path: Path, monkeypatch, case: str,
+) -> None:
+    structure = load_script("repository_structure", "scripts/check-repository-structure.py")
+    monkeypatch.setattr(structure, "ROOT", tmp_path)
+    services = {name: tmp_path / name for name in structure.EXPECTED_SERVICES}
+    for path in services.values():
+        path.mkdir()
+    monkeypatch.setattr(structure, "EXPECTED_SERVICES", services)
+    (tmp_path / "tmp").mkdir()
+    (tmp_path / "tmp/kept.html").write_text("reference", encoding="utf-8")
+    if case == "unknown_root":
+        (tmp_path / "fourth-service").mkdir()
+
+    def tracked_files(command, **kwargs):
+        assert command == ["git", "ls-files", "-z", "--", "tmp/"]
+        assert kwargs["cwd"] == tmp_path
+        output = b"tmp/kept.html\0tmp/moved.html\0" if case == "tracked_tmp" else b""
+        return subprocess.CompletedProcess(command, 0, stdout=output)
+
+    monkeypatch.setattr(structure.subprocess, "run", tracked_files)
+    errors: list[str] = []
+    structure.check_root_directories(errors)
+    if case == "local_tmp":
+        assert errors == []
+    elif case == "tracked_tmp":
+        assert len(errors) == 1 and "tracked temporary output" in errors[0]
+    else:
+        assert len(errors) == 1 and "fourth-service: unregistered" in errors[0]
+
+
+@pytest.mark.parametrize(
+    "case", ["large_owner", "missing_owner", "sample_reintroduced", "windows_newlines"]
+)
+def test_frontend_size_advice_preserves_real_boundary_failures(case: str) -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is required for the frontend boundary runner")
+    runner = r"""
+const fs = require('node:fs');
+const read = fs.readFileSync;
+const exists = fs.existsSync;
+const mode = process.argv[1];
+fs.readFileSync = function(file, ...args) {
+  let value = read.call(this, file, ...args);
+  const name = String(file).replaceAll('\\', '/');
+  if (mode === 'large_owner' && name.endsWith('/charts/LocalChartWidget.ts')) {
+    value += '\n'.repeat(1000);
+  }
+  if (mode === 'sample_reintroduced' && name.endsWith('/spread-carry/index.vue')) {
+    value = String(value).replace(
+      '../shared/StrategyResearchWorkspace.vue', '@/data/sample/spread',
+    );
+  }
+  if (mode === 'windows_newlines' && name.includes('/router/routes/modules/')) {
+    value = String(value).replace(/\r?\n/g, '\r\n');
+  }
+  return value;
+};
+fs.existsSync = function(file) {
+  const name = String(file).replaceAll('\\', '/');
+  if (mode === 'missing_owner' && name.endsWith('/charts/LocalChartWidget.ts')) {
+    return false;
+  }
+  return exists.call(this, file);
+};
+require('./platform-web/scripts/check-codebase-boundaries.cjs');
+const manifest = require('./platform-web/scripts/formal-route-manifest.cjs').generateManifest();
+if (manifest.modules.some(item => item.path.includes('\\'))) {
+  throw new Error('Manifest paths depend on host separators');
+}
+"""
+    result = subprocess.run(
+        [node, "-e", runner, case], cwd=ROOT, capture_output=True, text=True,
+        encoding="utf-8", check=False,
+    )
+    if case in {"large_owner", "windows_newlines"}:
+        assert result.returncode == 0, result.stderr
+        assert "[maintenance]" in result.stderr
+    elif case == "missing_owner":
+        assert result.returncode != 0 and "Hedge Board owner is missing" in result.stderr
+    else:
+        assert result.returncode != 0 and "without sample data" in result.stderr

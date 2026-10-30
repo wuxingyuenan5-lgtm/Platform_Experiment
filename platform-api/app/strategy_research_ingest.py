@@ -51,6 +51,34 @@ def fetch_batch(after, limit=1000):
     return response.json()
 
 
+def acknowledge_archive():
+    """Retryable acknowledgement, only after durable catalog commit and shard verification."""
+    from app.strategy_research_repository import parts
+
+    current = checkpoint()["cursor"]
+    if not current:
+        return
+    catalog = parts()
+    if not catalog or catalog[-1]["end_cursor"] != current:
+        raise ValueError("archive checkpoint has no committed shard")
+    part = catalog[-1]
+    import hashlib
+
+    import pyarrow.parquet as pq
+
+    path = root_path() / part["path"]
+    if hashlib.sha256(path.read_bytes()).hexdigest() != part["checksum"]:
+        raise ValueError("archive acknowledgement checksum mismatch")
+    if pq.read_metadata(path).num_rows != part["row_count"]:
+        raise ValueError("archive acknowledgement row count mismatch")
+    response = runtime_transport.post(
+        get_settings().runtime_base_url.rstrip("/") + "/v1/market-data/archive-ack",
+        json={"cursor": current, "checksum": part["checksum"]},
+        timeout=5,
+    )
+    response.raise_for_status()
+
+
 async def consume(pool):
     STATUS.update(status="waiting", error=None)
     pending = None
@@ -86,6 +114,7 @@ async def consume(pool):
                 await run_serving_job(pool, publish, pending)
                 invalidate_capture_status_cache()
                 pending = None
+                await asyncio.to_thread(acknowledge_archive)
             await asyncio.sleep(0.25)
         except asyncio.CancelledError:
             # Unpublished work replays from the last committed cursor on restart.
@@ -109,6 +138,7 @@ def compute_job(job, storage=None):
     if storage is not None:
         get_settings().database_path = storage[0]
         get_settings().strategy_research_path = storage[1]
+        get_settings().strategy_research_database_path = storage[2] if len(storage) > 2 else None
     from app.strategy_research_experiments import run_experiment
     from app.strategy_research_repository import experiment_cancelled, parts, read_rows
 
@@ -149,7 +179,14 @@ async def experiments():
                     continue
                 try:
                     result = await asyncio.get_running_loop().run_in_executor(
-                        pool, compute_job, job, (get_settings().database_path, str(root_path()))
+                        pool,
+                        compute_job,
+                        job,
+                        (
+                            get_settings().database_path,
+                            str(root_path()),
+                            get_settings().strategy_research_database_path,
+                        ),
                     )
                     await asyncio.to_thread(finish_experiment, job["run_id"], result)
                 except asyncio.CancelledError:
@@ -165,9 +202,10 @@ async def experiments():
             stop.set()
 
 
-def initialize_serving_worker(database_path, archive_path):
+def initialize_serving_worker(database_path, archive_path, research_database_path=None):
     get_settings().database_path = database_path
     get_settings().strategy_research_path = archive_path
+    get_settings().strategy_research_database_path = research_database_path
 
 
 def project_serving_once():
@@ -201,7 +239,8 @@ async def projections(pool):
                 pool, project_serving_once
             )
             await asyncio.sleep(
-                0.2 if basis_progressed and not (candle_progressed or progressed)
+                0.2
+                if basis_progressed and not (candle_progressed or progressed)
                 else (0.02 if candle_progressed or progressed else 1)
             )
         except (asyncio.CancelledError, BrokenProcessPool):
@@ -216,10 +255,13 @@ async def serving():
     # This is one API-owned worker, sharing the existing durable cursor and lease.
     while True:
         pool = ProcessPoolExecutor(
-            max_workers=1, mp_context=multiprocessing.get_context("spawn"),
+            max_workers=1,
+            mp_context=multiprocessing.get_context("spawn"),
             initializer=initialize_serving_worker,
             initargs=(
-                str(Path(get_settings().database_path).resolve()), str(root_path().resolve())
+                str(Path(get_settings().database_path).resolve()),
+                str(root_path().resolve()),
+                get_settings().strategy_research_database_path,
             ),
         )
         tasks = [asyncio.create_task(consume(pool))]

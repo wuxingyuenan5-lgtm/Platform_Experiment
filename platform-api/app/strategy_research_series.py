@@ -239,6 +239,20 @@ class Deriver:
                     "historyCoverage": "observations_only",
                 }
             ]
+        if kind in {"quote_minute", "spread_minute"}:
+            return [
+                dict(
+                    p,
+                    receivedAt=event["runtimeReceivedAt"],
+                    quoteScope=event["quoteScope"],
+                    pairId=p["entity"] if kind == "spread_minute" else "",
+                    eventId=event["eventId"],
+                    ingestionMode=event["ingestionMode"],
+                )
+            ]
+        if kind == "quote_sample":
+            key = f"bybit:{p['category']}:{p['symbol']}"
+            return self._accept(self._quote(event, key, p.get("bid"), p.get("ask")))
         if kind == "bybit_message":
             category = stream.split(":")[1]
             topic = p.get("topic", "")
@@ -314,10 +328,32 @@ class Deriver:
                 qevent = dict(event)
                 qevent["eventId"] += ":" + str(index)
                 qevent["sourceEventTimeMs"] = tick.get("time_msc")
+                clock = p.get("nativeClockEvidence", {})
+                converted = (
+                    p.get("timeConversionVersion") == "mt5-observed-utc-offset.v1"
+                    and clock.get("methodVersion") == "mt5-observed-utc-offset.v1"
+                    and clock.get("account") == p.get("account")
+                    and clock.get("symbol", "").upper() == p.get("symbol", "").upper()
+                    and clock.get("samples", 0) >= 3
+                    and clock.get("collectorSessionId") == event["collectorSessionId"]
+                    and 0
+                    <= int(event["runtimeMonotonicNs"]) - int(clock.get("measuredMonotonicNs", 0))
+                    <= int(clock.get("maxAgeNs", 0))
+                    and event["ingestionMode"] == "realtime"
+                )
+                if converted:
+                    qevent["sourceEventTimeMs"] = str(
+                        int(tick["time_msc"]) - int(clock["nativeUtcOffsetMs"])
+                    )
                 quote = self._quote(qevent, key, tick.get("bid"), tick.get("ask"))
                 quote["quoteScope"] = scope_key
                 quote["specification"] = p.get("specification", {})
-                quote["quality"] = sorted(set(quote["quality"] + ["clock_unverified"]))
+                quote["nativeSourceTimeMs"] = tick.get("time_msc")
+                quote["timeConversionVersion"] = (
+                    p.get("timeConversionVersion") if converted else None
+                )
+                if not converted or quote.get("sourceAgeAtReceive") is None:
+                    quote["quality"] = sorted(set(quote["quality"] + ["clock_unverified"]))
                 out.extend(self._accept(quote))
             self.state["tickCounts"][scope_key] = dict(counts)
         return out
@@ -368,7 +404,12 @@ class Deriver:
         if event["ingestionMode"] != "realtime":
             flags.append("backfill_only")
         source = event.get("sourceEventTimeMs")
-        bounds = source_age_bounds(event) if key.startswith("bybit:") else None
+        measured_mt5 = (
+            key.startswith("mt5:")
+            and event.get("payload", {}).get("timeConversionVersion")
+            == "mt5-observed-utc-offset.v1"
+        )
+        bounds = source_age_bounds(event) if key.startswith("bybit:") or measured_mt5 else None
         if source is None or (key.startswith("bybit:") and bounds is None):
             flags.append("clock_unverified")
         return {
@@ -385,6 +426,7 @@ class Deriver:
             "ask": str(ask),
             "quality": flags,
             "ingestionMode": event["ingestionMode"],
+            "samplingIntervalMs": event.get("payload", {}).get("samplingIntervalMs", 0),
         }
 
     def _accept(self, quote):
@@ -399,6 +441,13 @@ class Deriver:
                 continue
             left, right = self.state["quotes"].get(a), self.state["quotes"].get(b)
             if left is None or right is None:
+                continue
+            interval = max(left.get("samplingIntervalMs", 0), right.get("samplingIntervalMs", 0))
+            if interval and (
+                left.get("samplingIntervalMs", 0) != right.get("samplingIntervalMs", 0)
+                or time_ms(left["receivedAt"]) // interval
+                != time_ms(right["receivedAt"]) // interval
+            ):
                 continue
             now = time_ms(quote["receivedAt"])
             flags = set(left["quality"] + right["quality"])
@@ -444,6 +493,7 @@ class Deriver:
                     "quality": sorted(flags),
                     "methodVersion": METHOD,
                     "qualityProfileId": QUALITY,
+                    "samplingIntervalMs": interval,
                     **values,
                 }
             )
@@ -458,6 +508,27 @@ def seconds_series(events, *, valid_only=True, max_age_ms=2000):
             continue
         start = time_ms(row["receivedAt"])
         valid = not row["quality"] and "midSpread" in row
+        interval = row.get("samplingIntervalMs", 0)
+        if interval:
+            if valid or not valid_only:
+                # A point sample proves no intervening duration or intraminute extrema.
+                bucket = start // interval * interval
+                buckets[bucket // 1000] = {
+                    "timeMs": str(start),
+                    "bucketTimeMs": str(bucket),
+                    "validDurationMs": 0,
+                    "updates": 1,
+                    "quality": row["quality"],
+                    "samplingIntervalMs": interval,
+                    "observedAt": row["receivedAt"],
+                    "ohlc": {
+                        field: dict.fromkeys(("open", "high", "low", "close"), row[field])
+                        for field in ("midSpread", "buySpread", "sellSpread")
+                        if field in row
+                    },
+                    "sampling": "minute_observed_point_not_OHLC",
+                }
+            continue
         # Last event is a point, not evidence of future coverage.
         end = start
         if i + 1 < len(events):
@@ -516,10 +587,21 @@ def quantile(values, fraction):
 
 def distribution(events):
     seconds = seconds_series(events)
-    values = [r["ohlc"]["midSpread"]["close"] for r in seconds if r["validDurationMs"] > 0]
+    values = [
+        r["ohlc"]["midSpread"]["close"]
+        for r in seconds
+        if (r["validDurationMs"] > 0 or r.get("samplingIntervalMs"))
+        and not r.get("quality")
+        and r["ohlc"].get("midSpread")
+    ]
     excluded = Counter(flag for r in events for flag in r.get("quality", []))
     return {
-        "sampling": "equal_1s_close",
+        "sampling": "mixed_observed_resolution"
+        if any(r.get("samplingIntervalMs") for r in seconds)
+        and any(not r.get("samplingIntervalMs") for r in seconds)
+        else "observed_1m_points"
+        if any(r.get("samplingIntervalMs") for r in seconds)
+        else "equal_1s_close",
         "quantileMethod": "linear_R7",
         "sampleCount": len(values),
         "p10": quantile(values, ".1"),

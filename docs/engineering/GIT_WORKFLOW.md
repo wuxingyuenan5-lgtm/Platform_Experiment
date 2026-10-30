@@ -2,13 +2,11 @@
 
 ## Branch and review
 
-- Work on a named branch by default. If the Owner explicitly asks to make the current local snapshot the latest `main`, a direct local commit on `main` is allowed; that instruction still does not authorize pushing or rewriting history.
+- Ordinary local work may continue in the current checkout; a new branch or PR is not a prerequisite. When a new branch is useful or requested, use `codex/<slug>` unless the Owner specifies another name. If the Owner explicitly asks to make the current local snapshot the latest `main`, a direct local commit on `main` is allowed; that instruction still does not authorize pushing or rewriting history.
 - Use one pull request for one coherent outcome.
 - Keep non-trivial work Draft until implementation and validation are complete.
 - Do not merge, tag, release or deploy without an explicit owner decision.
 - Prefer one to four logical commits rather than one commit per file.
-
-Typical prefixes are `feature/`, `fix/`, `refactor/`, `hardening/`, `docs/` and `chore/`.
 
 ## Change classes
 
@@ -20,15 +18,37 @@ Typical prefixes are `feature/`, `fix/`, `refactor/`, `hardening/`, `docs/` and 
 
 Critical changes preserve explicit rollback/forward-fix and protected semantics in the PR description. A completed phase document or evidence ledger is not required in the worktree.
 
+Line counts are maintenance signals, not correctness or architecture acceptance.
+The frontend boundary check reports large owners without forcing a split only
+to meet a number; missing owners, forbidden dependencies, unsafe data sources
+and route/permission violations remain blocking. Split only a demonstrated
+second responsibility. Local outputs belong in ignored `tmp/`; retained source
+references belong in `references/`, never in product/runtime import paths.
+
+After changing formal route modules, regenerate the validation-only manifest
+with `node platform-web/scripts/formal-route-manifest.cjs --write`, then run
+`node platform-web/scripts/check-codebase-boundaries.cjs`. Generated paths use
+forward slashes and source hashes normalize CRLF to LF so Windows and CI agree;
+the manifest does not grant routes, permissions or trading authority.
+
 ## Maintained CI
 
 - `.github/workflows/platform-ci.yml` — Platform API, Runtime and frontend build/test matrix;
-- `.github/workflows/repository-quality.yml` — version, context, documentation and architecture boundaries;
+- `.github/workflows/repository-quality.yml` — version, documentation, data ownership and architecture boundaries;
 - `.github/workflows/secret-scan.yml` — secret detection;
 - maintained browser E2E workflows;
 - `.github/workflows/platform-visual-baseline.yml` — existing visual workflow, changed only by dedicated visual work.
 
 Historical branch-, phase- and PR-specific workflows are not retained.
+
+Each check owns its concern: the version checker owns synchronized version
+declarations, the documentation checker owns navigation and stage continuity,
+and the structure checker owns executable architecture boundaries. Formatting
+or missing migration commentary may prompt review, but not impose a new approval
+step. Product data ownership is maintained directly in
+`config/product-data-owner-matrix.json`; there is no separate override layer.
+This inventory describes ownership and declared availability, not runtime health
+or authority to enable Live Write.
 
 ## Version
 
@@ -56,12 +76,8 @@ External-data code has a separate boundary: inspecting it and running mocked tes
 
 ## Pull-request description
 
-Record:
-
-- baseline and head;
-- scope and explicit exclusions;
-- contract and safety impact;
-- actual validation commands/results;
-- deployment prerequisites and known limits.
-
-Do not duplicate commit history or historical phase receipts.
+Use the short repository template: result, actual validation, documentation impact,
+and material risks or operation prerequisites. Add contract, safety and recovery
+detail when the change affects them; a small documentation edit does not need
+role, Context Pack, token accounting, staged gates or historical receipts.
+Do not duplicate commit history.

@@ -36,7 +36,7 @@ from app.research_data_schemas import (
 )
 from app.research_equity_catalog import CN_REFERENCE_CODES, CN_THEME_CODES
 from app.research_provider_a_share import INDEX_DEFINITIONS
-from app.research_provider_choice import choice_csd_close
+from app.research_provider_choice import choice_daily_close
 from app.research_service import _PROVIDER, collect_a_share_dashboard
 from app.research_write_lock import RESEARCH_DB_WRITE_LOCK
 
@@ -194,8 +194,16 @@ def _daily_market_archive_row(
         and emotion.trade_date
         and str(emotion.trade_date) == trade_date
     )
-    limit_up = emotion.limit_up_count if aligned_emotion else None
-    limit_down = emotion.limit_down_count if aligned_emotion else None
+    limit_up = (
+        emotion.limit_up_count
+        if aligned_emotion and not isinstance(emotion, BaseException)
+        else None
+    )
+    limit_down = (
+        emotion.limit_down_count
+        if aligned_emotion and not isinstance(emotion, BaseException)
+        else None
+    )
     payload = {
         "date": trade_date,
         "universe": universe_key,
@@ -391,10 +399,11 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
         [code for code in codes if code not in histories]
     )
     stock_rows, stock_history = [], []
-    calendars = {
-        hk: _stock_session_days(trade_date, hk)
-        for hk in {len(str(code)) == 5 for code in codes}
-    } if trade_date else {}
+    calendars = (
+        {hk: _stock_session_days(trade_date, hk) for hk in {len(str(code)) == 5 for code in codes}}
+        if trade_date
+        else {}
+    )
     for code in codes:
         quote, prior = (
             quotes.get(code),
@@ -408,7 +417,12 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
             (
                 str(point.observed_at),
                 code,
-                {"close": point.close, "turnoverYuan": point.turnover_yuan},
+                {
+                    "close": point.close,
+                    "turnoverYuan": point.turnover_yuan,
+                    "sourceName": point.source_name or "tencent-qfq-daily",
+                    "priceAdjustment": "qfq",
+                },
             )
             for point in history
             if code in histories
@@ -424,9 +438,7 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
         member = member_by_code.get(code)
         observed = _quote_date(quote)
         aligned = bool(history and observed and str(history[-1].observed_at) == observed)
-        status = (
-            "ready" if aligned and quote.return_pct is not None and code in histories else "partial"
-        )
+        status = "ready" if aligned and quote.return_pct is not None else "partial"
         if observed and trade_date and observed < trade_date:
             status = "stale"
         stock_rows.append(
@@ -440,12 +452,16 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
                 "status": status,
                 "observed_at": quote.observed_at.isoformat() if quote.observed_at else None,
                 "history_date": str(history[-1].observed_at) if history else None,
-                "history_source": "collected" if code in histories else "stored",
+                "history_source": (history[-1].source_name or "tencent-qfq-daily")
+                if history and code in histories
+                else "stored",
                 "change": float(quote.return_pct / 100) if quote.return_pct is not None else None,
                 "change_5d": _history_return(history, 5, calendars.get(len(code) == 5, []))
-                if aligned else None,
+                if aligned
+                else None,
                 "change_20d": _history_return(history, 20, calendars.get(len(code) == 5, []))
-                if aligned else None,
+                if aligned
+                else None,
                 "ytd": _history_ytd(history) if aligned else None,
                 "amount_yi": float(quote.turnover_yuan / Decimal("1e8")),
                 "turnover": float(quote.turnover_pct) if quote.turnover_pct is not None else None,
@@ -547,18 +563,21 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             )
             spots_closed = bool(
                 close_window_open
+                and trade_date is not None
                 and isinstance(spots, list)
                 and spots
                 and all(_closed_quote(row, trade_date) for row in spots)
             )
             sectors_closed = bool(
                 close_window_open
+                and trade_date is not None
                 and isinstance(sector_quotes, list)
                 and len(sector_quotes) == 4
                 and all(_closed_quote(row, trade_date) for row in sector_quotes)
             )
             innovation_closed = bool(
                 close_window_open
+                and trade_date is not None
                 and isinstance(innovation, dict)
                 and _closed_quote(innovation, trade_date)
             )
@@ -580,7 +599,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             choice_enabled = choice_settings.choice_csd_enabled
             choice_communication_close = (
                 await asyncio.to_thread(
-                    choice_csd_close,
+                    choice_daily_close,
                     trade_date,
                     sdk_root=choice_settings.choice_sdk_root,
                     timeout_seconds=choice_settings.choice_csd_timeout_seconds,
@@ -612,7 +631,8 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                                     "instrument_code": "000300.SH",
                                     "trade_date": point.observed_at,
                                     "close": point.close,
-                                    "source_name": dashboard.market_detail.meta.source,
+                                    "source_name": point.source_name
+                                    or dashboard.market_detail.meta.source,
                                     "definition_version": "close-v1",
                                     "payload": point,
                                 }
@@ -643,8 +663,8 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                             "instrument_code": "801102.SWI",
                             "trade_date": trade_date,
                             "close": choice_communication_close,
-                            "source_name": "choice-csd-close-801102.SWI",
-                            "definition_version": "choice-csd-daily-close-v1",
+                            "source_name": "choice-css-close-801102.SWI",
+                            "definition_version": "choice-css-daily-close-v1",
                             "industry_level": "swi-l1",
                             "payload": {
                                 "instrumentCode": "801102.SWI",
@@ -704,7 +724,12 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                     (
                         str(point.observed_at),
                         code,
-                        {"close": point.close, "turnoverYuan": point.turnover_yuan},
+                        {
+                            "close": point.close,
+                            "turnoverYuan": point.turnover_yuan,
+                            "sourceName": point.source_name,
+                            "priceAdjustment": "qfq",
+                        },
                     )
                     for code, points in histories.items()
                     if code not in codes
@@ -745,6 +770,21 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 datasets.append(("stocks", spots, "东方财富全市场行情"))
                 # A close date comes from quotes, never the scheduler's wall clock.
                 if spots_closed:
+                    from app.research_theme_crowding import close_amount_points
+
+                    amount_points = close_amount_points(
+                        [row.model_dump(mode="json", by_alias=True) for row in spots],
+                        trade_date,
+                        closed=True,
+                    )
+                    if amount_points:
+                        history_sets.append(
+                            (
+                                "theme_amount",
+                                amount_points,
+                                "东方财富全市场收盘成交额 / 主题代表股票",
+                            )
+                        )
                     hot = [
                         (
                             trade_date,
@@ -768,7 +808,9 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                     )
             if isinstance(memberships, list) and memberships:
                 datasets.append(("memberships", memberships, "申万行业分类"))
-            history_sets.append(("stock", stock_history, "腾讯复权日线"))
+            history_sets.append(
+                ("stock", stock_history, "逐条标记来源：新浪A股/腾讯港股前复权日线")
+            )
             modules = [
                 dashboard.market_detail,
                 dashboard.breadth,
@@ -791,11 +833,19 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             refresh_message = (
                 f"股票池{len(stock_rows)}只，{missing}只数据不完整" if missing else None
             )
+            if trade_date and not close_window_open:
+                refresh_message = "收盘确认窗口未到16:15，尚未发布当日完整收盘数据" + (
+                    "；" + refresh_message if refresh_message else ""
+                )
+            elif trade_date and not spots_closed:
+                refresh_message = "全市场尚未取得同日15:00后的完整收盘报价" + (
+                    "；" + refresh_message if refresh_message else ""
+                )
             if choice_enabled and choice_communication_close is None:
                 refresh_message = (
-                    f"{refresh_message}；Choice CSD未取得801102.SWI收盘价"
+                    f"{refresh_message}；Choice日收盘未取得801102.SWI收盘价"
                     if refresh_message
-                    else "Choice CSD未取得801102.SWI收盘价"
+                    else "Choice日收盘未取得801102.SWI收盘价"
                 )
             async with RESEARCH_DB_WRITE_LOCK:
                 await asyncio.to_thread(
@@ -842,8 +892,25 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await asyncio.gather(task, return_exceptions=True)
 
 
+def _next_refresh_delay(
+    result: str | None, interval_seconds: float, now: datetime | None = None
+) -> float:
+    delay = max(60.0, interval_seconds)
+    local = (now or datetime.now(UTC)).astimezone(_CHINA)
+    # An ordinary polling interval must not skip the owned daily start or
+    # the existing close-confirmation boundary by another whole cycle.
+    boundary = (
+        time(15, 10) if result == "not_due" else time(16, 15) if result == "partial" else None
+    )
+    if boundary is not None and local.time() < boundary:
+        target = local.replace(hour=boundary.hour, minute=boundary.minute, second=0, microsecond=0)
+        delay = min(delay, max(1.0, (target - local).total_seconds()))
+    return delay
+
+
 async def _run_periodic(interval_seconds: float) -> None:
     while True:
+        result = None
         try:
             result = await refresh_a_share_research()
             if result in {"error", "partial"}:
@@ -863,4 +930,4 @@ async def _run_periodic(interval_seconds: float) -> None:
             # A one-off database/provider/runtime error must not kill the in-process
             # scheduler permanently. The next interval retries from persisted state.
             _LOGGER.exception("A-share scheduled refresh cycle crashed; it will retry")
-        await asyncio.sleep(max(60.0, interval_seconds))
+        await asyncio.sleep(_next_refresh_delay(result, interval_seconds))

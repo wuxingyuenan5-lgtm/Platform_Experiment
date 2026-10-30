@@ -263,7 +263,8 @@ class BybitConnections:
                 ws = None
                 try:
                     ws = Socket(channel_type=category, testnet=False, retries=3)
-                    ws.orderbook_stream(depth=50, symbol=symbols, callback=lambda _: None)
+                    # Minute research uses L1; execution subscriptions remain unchanged.
+                    ws.orderbook_stream(depth=1, symbol=symbols, callback=lambda _: None)
                     if category == "linear":
                         ws.ticker_stream(symbol=symbols, callback=lambda _: None)
                     self._research_sockets.append(ws)

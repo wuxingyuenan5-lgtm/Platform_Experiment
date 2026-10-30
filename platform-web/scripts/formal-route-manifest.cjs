@@ -8,7 +8,7 @@ const { ManifestError, findRouteObject, parseRoute } = require('./formal-route-p
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_MANIFEST = path.join(DEFAULT_ROOT, 'scripts', 'formal-route-manifest.json');
-const ROUTE_MODULE_ROOT = path.join('src', 'router', 'routes', 'modules');
+const ROUTE_MODULE_ROOT = path.posix.join('src', 'router', 'routes', 'modules');
 
 function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
@@ -30,8 +30,8 @@ function generateManifest(options = {}) {
   const paths = new Map();
   for (const modulePath of routeModulePaths(root)) {
     const absolute = path.join(root, ...modulePath.split('/'));
-    const raw = fs.readFileSync(absolute);
-    const source = raw.toString('utf8');
+    // Manifest identity must survive Windows/Linux checkout line endings.
+    const source = fs.readFileSync(absolute, 'utf8').replace(/\r\n/g, '\n');
     if (/(?:^|[\/])(demo|mock|tests?|example|template)(?:[\/]|$)/i.test(modulePath)) {
       throw new ManifestError(`forbidden route module entered formal discovery: ${modulePath}`);
     }
@@ -59,7 +59,7 @@ function generateManifest(options = {}) {
     }
     modules.push({
       path: modulePath,
-      sha256: sha256(raw),
+      sha256: sha256(source),
       routes,
     });
   }

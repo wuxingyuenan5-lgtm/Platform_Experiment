@@ -17,6 +17,8 @@
 | 启停、健康检查和恢复 | [operations/RUNBOOK.md](operations/RUNBOOK.md) |
 | 受控实盘验收 | [operations/LIVE_ACCEPTANCE_RUNBOOK.md](operations/LIVE_ACCEPTANCE_RUNBOOK.md) |
 | Git、评审和 CI | [engineering/GIT_WORKFLOW.md](engineering/GIT_WORKFLOW.md) |
+| 日常启动和使用入口 | [根 README](../README.md#日常使用) |
+| 视觉、交互和前端组件约定 | [前端文档入口](../platform-web/docs/README.md)中的 DESIGN / FRONTEND / ACCEPTANCE |
 
 产品范围与策略位于 `product/`；UI 和前端实现细节位于 [platform-web/docs/README.md](../platform-web/docs/README.md)。历史任务卡、evidence、program 和旧阶段计划已经退出当前文档树，必要追溯由 Git 历史承担。
 
@@ -51,8 +53,13 @@
 
 一个独立验收结果只保留一个活跃阶段快照；完成后把稳定事实归回 Owner，状态归回 `PROJECT.md`，历史由 Git 保留。需求尚未被 Owner 确认时只进入驾驶舱发现箱。
 
+项目的持久记忆就是本页所列权威与活跃阶段。工具生成的记忆、旧 `.workbuddy` 日志和聊天可帮助检索，但不能覆盖当前规则、充当运行证明或授予权限。没有每次变更自动同步全部记忆的保证；任务涉及的事实由AI在原Owner内更新，无需创始人手动维护技术记录。
+
+文档检查重点阻断缺失入口、坏链接、失联阶段和明确的旧候选版本；不要求固定英文句子或章节排版，迁移说明仅作内容复核提醒。版本一致性归 `scripts/check-version-consistency.py`，代码架构归 `scripts/check-repository-structure.py`，不重复维护同一检查。检查通过不代表语义或外部运行已全部验收；只核对本次受影响的事实。
+
 ## 保持文档精简
 
 - 当前状态放驾驶舱，稳定规则放对应权威，测试和实现证据留在代码与 Git。
 - 引用事实 Owner，不复制合同、长期记忆或另一份阶段进度。
 - 普通开发不新增任务卡、计划、回执、审计报告或流程框架。
+- 按已有用途更新，不照模板新建 TODO、项目概览、设计、组件或用户手册的同义副本。使用说明先补根 README 或现有模块文档；面向用户的发布说明仅在确有发布需要时整理，开发历史由 Git 保留。

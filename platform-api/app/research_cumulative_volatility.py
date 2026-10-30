@@ -292,11 +292,14 @@ def _has_recoverable_gap(asset: str, start: datetime, end: datetime) -> bool:
                 ),
             )
         ]
+    from app.strategy_research_database import read_only_connection as research_read
+
+    with research_read() as research_db:
         for previous, following in zip(days, days[1:], strict=False):
             missing_start = previous + timedelta(days=1)
             if missing_start >= following:
                 continue
-            rows = db.execute(
+            rows = research_db.execute(
                 "SELECT payload_json FROM research_strategy_projection "
                 "WHERE kind='historical_candle' "
                 "AND entity=? AND at_ms>=? AND at_ms<? ORDER BY at_ms LIMIT 64",

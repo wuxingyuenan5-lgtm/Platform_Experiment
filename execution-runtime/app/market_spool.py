@@ -40,7 +40,7 @@ class MarketSpool:
         self.sequence = 0
         self.durable_sequence = 0
         self.queue: queue.Queue = queue.Queue(queue_size)
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.stop_event = threading.Event()
         self.error: str | None = None
         self.dropped = 0
@@ -53,6 +53,8 @@ class MarketSpool:
         self._name = ""
         self._bytes = 0
         self.recovery_gaps: list[str] = []
+        self.acknowledged_cursor = None
+        self.reclaimed_bytes = 0
 
     def start(self):
         self._lease = (self.root / "capture.lock").open("a+b")
@@ -213,6 +215,10 @@ class MarketSpool:
                 self._file.close()
 
     def read(self, after: str | None = None, limit=1000):
+        with self.lock:
+            return self._read(after, limit)
+
+    def _read(self, after: str | None = None, limit=1000):
         if not 1 <= limit <= 5000:
             raise ValueError("limit must be 1..5000")
         with self.lock:
@@ -253,6 +259,44 @@ class MarketSpool:
             "capture": self.status(),
         }
 
+    def acknowledge(self, cursor: str, checksum: str):
+        """Reclaim only sealed segments before a committed, verified archive cursor.
+
+        The API is the single archive consumer. Keep its cursor segment so retries
+        and restart reads remain valid. Never touch other directories or the writer.
+        """
+        if not isinstance(cursor, str) or not isinstance(checksum, str):
+            raise ValueError("invalid archive receipt")
+        if len(checksum) != 64 or any(c not in "0123456789abcdef" for c in checksum):
+            raise ValueError("invalid archive checksum")
+        # Validate the frame boundary before persisting or reclaiming anything.
+        name, _ = cursor.rsplit(":", 1)
+        with self.lock:
+            self.read(cursor, limit=1)
+            if self.acknowledged_cursor:
+                old_name, old_offset = self.acknowledged_cursor.rsplit(":", 1)
+                if (name, int(cursor.rsplit(":", 1)[1])) < (old_name, int(old_offset)):
+                    raise ValueError("archive acknowledgement regressed")
+            receipt = self.root / "archive-ack.json"
+            temp = receipt.with_suffix(".pending")
+            with temp.open("wb") as stream:
+                stream.write(canonical({"cursor": cursor, "checksum": checksum}))
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp, receipt)
+            self.acknowledged_cursor = cursor
+            for part in sorted(self.durable):
+                if part >= name or part == self._name:
+                    continue
+                path = self.root / part
+                if path.is_symlink() or path.resolve().parent != self.root.resolve():
+                    raise ValueError("unsafe spool segment")
+                size = path.stat().st_size
+                path.unlink()
+                self._bytes -= self.durable.pop(part)
+                self.reclaimed_bytes += size
+        return {"acknowledgedCursor": cursor, "reclaimedBytes": str(self.reclaimed_bytes)}
+
     def status(self):
         return {
             "sessionId": self.session,
@@ -266,6 +310,8 @@ class MarketSpool:
             "budgetBytes": str(self.max_bytes),
             "freeBytes": str(shutil.disk_usage(self.root).free),
             "recoveryGaps": self.recovery_gaps,
+            "acknowledgedCursor": self.acknowledged_cursor,
+            "reclaimedBytes": str(self.reclaimed_bytes),
         }
 
     def close(self):

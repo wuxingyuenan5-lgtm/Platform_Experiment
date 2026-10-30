@@ -392,6 +392,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/research/strategies/minute-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Minute History */
+    get: operations['minute_history_api_v1_research_strategies_minute_history_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/research/strategies/pairs/{pair}/distribution': {
     parameters: {
       query?: never;
@@ -5950,6 +5967,40 @@ export interface operations {
       };
     };
   };
+  minute_history_api_v1_research_strategies_minute_history_get: {
+    parameters: {
+      query: {
+        entity: string;
+        kind?: 'quote_minute' | 'spread_minute';
+        start_ms: number;
+        end_ms: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResearchResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
   get_distribution_api_v1_research_strategies_pairs__pair__distribution_get: {
     parameters: {
       query: {
@@ -6057,7 +6108,7 @@ export interface operations {
         from: string;
         to: string;
         view?: 'valid' | 'all';
-        resolution?: '1s' | '15m' | '1h' | '8h' | '1d' | 'event';
+        resolution?: '1m' | '1s' | '15m' | '1h' | '8h' | '1d' | 'event';
         symbol?: string;
       };
       header?: never;

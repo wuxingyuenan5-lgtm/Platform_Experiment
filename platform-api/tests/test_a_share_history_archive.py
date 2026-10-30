@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from app.database_bootstrap import bootstrap_database
 from app.research_a_share_repository import write_market_archive, write_price_archive
-from app.research_provider_choice import choice_csd_close
+from app.research_provider_choice import choice_daily_close
 from app.schema_migrations import apply_migrations
 from scripts.import_vibe_a_share_history import _market_record, _price_record
 
@@ -136,7 +136,7 @@ def test_choice_provider_is_timeout_safe_and_does_not_forward_child_output(
         raise __import__("subprocess").TimeoutExpired(args[0], 1)
 
     monkeypatch.setattr("app.research_provider_choice.subprocess.run", timeout)
-    assert choice_csd_close("2026-10-09", sdk_root=tmp_path, timeout_seconds=1) is None
+    assert choice_daily_close("2026-10-09", sdk_root=tmp_path, timeout_seconds=1) is None
 
 
 def test_choice_provider_accepts_choice_slash_date_index(tmp_path) -> None:
@@ -150,11 +150,11 @@ class c:
     @staticmethod
     def stop(): return Result()
     @staticmethod
-    def csd(*args, **kwargs):
-        return pd.DataFrame({'CODES':['801102.SWI'],'CLOSE':['8570.51']}, index=['2026/10/09'])
+    def css(*args, **kwargs):
+        return pd.DataFrame({'DATES':['2026/10/09'],'CLOSE':['8570.51']}, index=['801102.SWI'])
 """,
         encoding="utf-8",
     )
-    assert choice_csd_close("2026-10-09", sdk_root=tmp_path, timeout_seconds=10) == Decimal(
+    assert choice_daily_close("2026-10-09", sdk_root=tmp_path, timeout_seconds=10) == Decimal(
         "8570.51"
     )

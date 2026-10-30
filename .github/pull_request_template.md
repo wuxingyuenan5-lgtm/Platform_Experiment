@@ -1,37 +1,15 @@
-## Outcome
+## Result
 
-What measurable result does this pull request deliver?
+Describe the problem and resulting behavior. Scale detail to the change; ordinary local work does not require a PR or a task card.
 
-## Scope
+## Validation
 
-- Role:
-- Context Pack:
-- Write scope:
-- Included:
-- Explicitly excluded:
+List the relevant checks actually run and their results. Distinguish isolated tests from real API/browser or external evidence, and state what remains unverified.
 
-## Contracts and safety
+## Documentation
 
-- Public API or data-contract impact:
-- Database schema impact:
-- Live Write impact:
-- New infrastructure:
-- Unproven facts:
+Name the existing authority or stage updated, or write `Docs: no update needed`. Replace superseded conclusions rather than appending another progress log.
 
-## Verification
+## Risks and operation
 
-- Commands executed:
-- CI status:
-- Evidence:
-- Token/context anomaly:
-
-## Deployment prerequisites
-
-List required external variables, credentials, migrations or operator actions. Write `none` when not applicable.
-
-## Risk and rollback
-
-State the main risk and the smallest safe rollback or forward-fix.
-
-- Residual risks:
-- Next gate:
+For affected contracts, persistence, permissions or trading safety, explain the impact, recovery and any required external prerequisites. Omit irrelevant detail; a PR does not authorize deployment, external writes or real trading.

@@ -50,6 +50,8 @@ test('crosshair reuses plot geometry; window, legend and data still update with 
   try {
     const initial = s.geometry.value;
     assert.equal(initial[0].segments.length, 2);
+    assert.ok(initial[0].segments[0].isolated);
+    assert.equal(initial[0].segments[1].isolated, null);
     assert.ok(!initial[1].segments[0].points.includes('NaN'));
     for (let i = 0; i < 100; i++) {
       s.hover.value = i % 4;
@@ -96,4 +98,45 @@ test('ETF window movement dispatches zoom without rebuilding historical series',
     await vue.nextTick();
     assert.equal(sets, 2);
   } finally { s.close(); }
+});
+
+test('ETF main and collapsible flow plots retain their own data and financing axes', async () => {
+  for (const flowsOnly of [false, true]) {
+    let option;
+    const props = vue.reactive({
+      flowsOnly, start: '2026-01-01', end: '2026-01-02', tooltip: true,
+      detail: {
+        series: [
+          {date:'2026-01-01',etf_qfq_close:1,qfq_delta_units_yi:-2,flow_to_index_pct:-0.5},
+          {date:'2026-01-02',etf_qfq_close:2,qfq_delta_units_yi:0,flow_to_index_pct:0},
+        ],
+        group: [], disclosures: [],
+        margin: [{date:'2026-01-01',financing_balance_yi:11,financing_net_buy_yi:-1}],
+        groupMargin: [{date:'2026-01-01',index_financing_balance_yi:33,index_financing_net_buy_yi:3}],
+      },
+    });
+    const s = setup('EtfLinkedCharts.vue', props, 'render', {
+      '@/hooks/web/useECharts': {useECharts:()=>({getInstance:()=>null,setOptions:async o=>{option=o;}})},
+    });
+    try {
+      await s.render();
+      assert.equal(option.grid.length,flowsOnly?2:5);
+      assert.equal(option.series.some(s=>s.id==='index_close'||s.name==='本组 ETF 总份额'),false);
+      if (flowsOnly) {
+        assert.equal(option.series.length,2);
+        assert.equal(option.series[0].data[0],-2);
+        assert.equal(option.series[0].data[1],0);
+        assert.equal(option.series[1].data[0],-0.5);
+      } else {
+        const balance=option.series.find(s=>s.id==='financing_balance_yi');
+        assert.equal(balance.xAxisIndex,3);
+        assert.equal(balance.data[0],11);
+        assert.equal(balance.data[1],null);
+        assert.equal(option.series.find(s=>s.id==='index_financing_balance_yi').data[0],33);
+        assert.equal(option.series.find(s=>s.name==='ETF 融资净买入').xAxisIndex,3);
+        assert.equal(option.series.find(s=>s.name==='成分股融资净买入').xAxisIndex,4);
+        assert.equal(option.series.some(s=>s.id==='qfq_delta_units_yi'),false);
+      }
+    } finally {s.close();}
+  }
 });

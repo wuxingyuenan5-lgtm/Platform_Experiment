@@ -10,7 +10,7 @@ import json
 from collections import Counter
 from decimal import Decimal
 
-from app.database_connection import connection, read_only_connection
+from app.strategy_research_database import connection, read_only_connection
 from app.strategy_research_repository import assert_sqlite_safe, now, root_path
 from app.strategy_research_series import quantile, seconds_series, time_ms
 
@@ -238,7 +238,9 @@ def project_next():
     rows.sort(key=lambda r: time_ms(r["receivedAt"]))
     for r in rows:
         kind = r["kind"]
-        if kind == "historical_candle":
+        if kind in {"quote_minute", "spread_minute"}:
+            put(kind, r["entity"], r["bucketStartMs"], r)
+        elif kind == "historical_candle":
             if (
                 int(r["intervalMs"]) == 86400000
                 and not r.get("quality")
@@ -277,7 +279,10 @@ def project_next():
         boundary = time_ms(events[-1]["receivedAt"]) // 1000 * 1000 - 2000
         for view in ("valid", "all"):
             for second in seconds_series(events, valid_only=view == "valid"):
-                if int(second["timeMs"]) >= previous["rewriteFrom"]:
+                # Minute buckets may start before the two-second rewrite boundary.
+                if int(second["timeMs"]) >= previous["rewriteFrom"] or second.get(
+                    "samplingIntervalMs"
+                ):
                     put("spread_" + view, pair, second["timeMs"], second)
         for e in events[len(tail) :]:
             put("spread_latest", pair, 0, e)
@@ -465,7 +470,9 @@ def second_statistics(rows, all_rows):
     values = [
         Decimal(r["ohlc"]["midSpread"]["close"])
         for r in rows
-        if r["validDurationMs"] > 0 and r["ohlc"].get("midSpread")
+        if (r["validDurationMs"] > 0 or r.get("samplingIntervalMs"))
+        and not r.get("quality")
+        and r["ohlc"].get("midSpread")
     ]
     bins = []
     if values:
@@ -476,7 +483,12 @@ def second_statistics(rows, all_rows):
             counts[min(11, int((value - lo) / width))] += 1
         bins = [{"label": str(lo + i * width), "count": n} for i, n in enumerate(counts)]
     return {
-        "sampling": "equal_1s_close",
+        "sampling": "mixed_observed_resolution"
+        if any(r.get("samplingIntervalMs") for r in rows)
+        and any(not r.get("samplingIntervalMs") for r in rows)
+        else "observed_1m_points"
+        if any(r.get("samplingIntervalMs") for r in rows)
+        else "equal_1s_close",
         "quantileMethod": "linear_R7",
         "sampleCount": len(values),
         "p10": quantile(values, ".1"),
@@ -484,7 +496,9 @@ def second_statistics(rows, all_rows):
         "p90": quantile(values, ".9"),
         "validDurationMs": str(sum(r["validDurationMs"] for r in rows)),
         "exclusions": dict(Counter(q for r in all_rows for q in r.get("quality", []))),
-        "exclusionUnit": "seconds",
+        "exclusionUnit": "observations"
+        if any(r.get("samplingIntervalMs") for r in rows)
+        else "seconds",
         "histogram": bins,
     }
 
@@ -568,11 +582,13 @@ def spread_chart(rows):
         previous = None
         for row in rows:
             at = int(row["timeMs"])
-            if previous is not None and at - previous > 1000:
+            interval = row.get("samplingIntervalMs", 1000)
+            bucket = int(row.get("bucketTimeMs", row["timeMs"]))
+            if previous is not None and bucket - previous > interval:
                 points.append({"value": [previous + 1000, None]})
             value = row["ohlc"].get(key, {}).get("close")
             points.append({"value": [at, value], "exactPrice": value})
-            previous = at
+            previous = bucket
         series.append(
             {
                 "name": name,

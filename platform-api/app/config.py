@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # merely because a stale environment file contains the legacy flag.
     strategy_research_worker_enabled: bool = False
     strategy_research_projection_enabled: bool = False
+    strategy_research_database_path: str | None = None
     strategy_research_path: str = "./data/strategy-research"
     strategy_research_min_free_bytes: int = 1_000_000_000
     research_refresh_enabled: bool = True

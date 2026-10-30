@@ -183,7 +183,29 @@ export interface IndexValuationChart {
     history: Array<{ date: string; value: EquityValue }>;
   }>;
 }
+export interface ThemeCrowdingBasket {
+  name: string;
+  expected: number;
+  priceBaseDate: string | null;
+  history: Array<{
+    date: string;
+    amountYuan: EquityValue;
+    marketAmountYuan: EquityValue;
+    sharePct: EquityValue;
+    shareMa5: EquityValue;
+    amountCount: number;
+    price: EquityValue;
+    priceCount: number;
+  }>;
+}
+export interface ThemeCrowding {
+  date: string | null;
+  version: string;
+  effectiveFrom: string;
+  items: Array<ThemeCrowdingBasket & { segments: ThemeCrowdingBasket[] }>;
+}
 export interface EquityObservatory {
+  themeCrowding?: ThemeCrowding;
   breadth?: {
     date: string;
     expected: number;

@@ -357,7 +357,7 @@ def funding_board(
     board = {
         "updatedAt": max((r["receivedAt"] for r in latest.values()), default=""),
         "symbolOptions": sorted(s.removesuffix("USDT") for s in latest if s.endswith("USDT")),
-                "resolutionOptions": ["1H", "8H", "日"],
+        "resolutionOptions": ["1H", "8H", "日"],
         "usdtExchanges": ["Bybit"],
         "inverseExchanges": [],
         "rows": table,
@@ -439,7 +439,11 @@ def historical_prices(
     display_ms = (
         FUNDING_RESOLUTION_MS[resolution]
         if pair == "funding-btc"
-        else 60000 if hi - lo <= 86400000 else 300000 if hi - lo <= 7 * 86400000 else 900000
+        else 60000
+        if hi - lo <= 86400000
+        else 300000
+        if hi - lo <= 7 * 86400000
+        else 900000
     )
     stored = price_coverage(symbol, lo, hi)
     prices = {}
@@ -530,10 +534,9 @@ def latest(pair: str, principal: Reader):
     result = envelope(row, ["provisional_until_manifest_commit"] if provisional else [])
     if row:
         result.receivedAt = row["receivedAt"]
-        result.stale = (
-            bool(row["quality"])
-            or datetime.now(UTC).timestamp() * 1000 - time_ms(row["receivedAt"]) > 2000
-        )
+        result.stale = bool(row["quality"]) or datetime.now(UTC).timestamp() * 1000 - time_ms(
+            row["receivedAt"]
+        ) > max(2000, row.get("samplingIntervalMs", 0) + 2000)
         result.status = (
             "unavailable" if result.stale else "provisional" if provisional else "available"
         )
@@ -547,7 +550,7 @@ def series(
     start: Annotated[datetime, Query(alias="from")],
     end: Annotated[datetime, Query(alias="to")],
     view: Literal["valid", "all"] = "valid",
-    resolution: Literal["1s", "15m", "1h", "8h", "1d", "event"] = "1s",
+    resolution: Literal["1m", "1s", "15m", "1h", "8h", "1d", "event"] = "1m",
     symbol: Annotated[str, Query(max_length=24)] = "BTC",
 ):
     access(pair, principal)
@@ -559,6 +562,7 @@ def series(
         raise HTTPException(422, "Require an aware window of at most 31 days")
     lo, hi = time_ms(start.isoformat()), time_ms(end.isoformat())
     interval_ms = {
+        "1m": 60_000,
         "15m": 900_000,
         "1h": 3_600_000,
         "8h": 28_800_000,
@@ -570,9 +574,7 @@ def series(
         series_by_symbol: dict[str, list[dict[str, Any]]] = {}
         distributions: dict[str, dict[str, Any]] = {}
         for symbol_base in FUNDING_BASIS_SYMBOLS:
-            data, all_rows, _ = funding_basis_series_rows(
-                symbol_base, lo, hi, interval_ms, view
-            )
+            data, all_rows, _ = funding_basis_series_rows(symbol_base, lo, hi, interval_ms, view)
             if len(all_rows) > 10000:
                 raise HTTPException(422, "Narrow the window: maximum 10000 returned points")
             series_by_symbol[symbol_base] = data
@@ -594,12 +596,13 @@ def series(
             }
         )
     symbol_base = normalize_research_symbol(symbol, pair=pair)
+    basis_source = "observed_paired_quotes"
     if pair == "funding-btc" and symbol_base != "BTC":
         data, all_rows, basis_source = funding_basis_series_rows(
             symbol_base, lo, hi, interval_ms or 900_000, view
         )
         stats = second_statistics(data, all_rows)
-    elif resolution in ("1s", "15m", "1h", "8h", "1d"):
+    elif resolution in ("1m", "1s", "15m", "1h", "8h", "1d"):
         valid = read_projection("spread_valid", pair, lo, hi, interval_ms=interval_ms, limit=10001)
         all_rows = read_projection("spread_all", pair, lo, hi, interval_ms=interval_ms, limit=10001)
         if len(all_rows) > 10000:
@@ -739,3 +742,31 @@ def read_draft(draft_id: str, principal: Reader):
         raise HTTPException(404, "Research draft not found")
     access(payload["pairId"], principal)
     return envelope({"id": draft_id, "parameters": payload, "executionAuthorized": False})
+
+
+@router.get("/minute-history", response_model=ResearchResponse)
+def minute_history(
+    principal: Reader,
+    entity: str,
+    kind: Literal["quote_minute", "spread_minute"] = "quote_minute",
+    start_ms: int = Query(..., ge=0),
+    end_ms: int = Query(..., ge=0),
+):
+    if end_ms < start_ms or end_ms - start_ms > 31 * 86400000:
+        raise HTTPException(422, "minute history window must be within 31 days")
+    if entity in {"cross-gold", "mt5:XAUUSD"}:
+        access("cross-gold", principal)
+    result = envelope(
+        {
+            "entity": entity,
+            "kind": kind,
+            "intervalMs": 60000,
+            "rows": read_projection(kind, entity, start_ms, end_ms),
+            "aggregateCoverage": "observed_updates_only",
+        },
+        method="observed-minute-ohlc.v1",
+    )
+
+    result.coverage["sourceResolution"] = "observed_minute_60000ms"
+    result.coverage["sourceClock"] = "per_observation_calibration"
+    return result

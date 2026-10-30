@@ -3,9 +3,14 @@
     <div
       ref="chartRef"
       class="linked-chart"
+      :style="{ height: `${plots.length * 186 + 22}px` }"
       role="img"
       tabindex="0"
-      aria-label="ETF联动历史图：价格、成交额、份额、申赎、指数及融资。Ctrl加滚轮缩放，拖动平移。"
+      :aria-label="
+        flowsOnly
+          ? 'ETF申赎历史图：日度申赎份额及净申赎占指数成交额。Ctrl加滚轮缩放，拖动平移。'
+          : 'ETF联动历史图：价格、成交额、份额及融资。Ctrl加滚轮缩放，拖动平移。'
+      "
       @pointerenter="bindEvents"
       @wheel.capture="allowPageScroll"
       @focus="bindEvents"
@@ -25,7 +30,13 @@
   import type { EtfDetail } from '@/api/etfTracking';
   import { numeric } from './etfTrackingModel';
 
-  const props = defineProps<{ detail: EtfDetail; start: string; end: string; tooltip: boolean }>();
+  const props = defineProps<{
+    detail: EtfDetail;
+    start: string;
+    end: string;
+    tooltip: boolean;
+    flowsOnly?: boolean;
+  }>();
   const emit = defineEmits<{ (event: 'range', start: string, end: string): void }>();
   const chartRef = ref<HTMLDivElement | null>(null);
   const chart = useECharts(chartRef as Ref<HTMLDivElement>, 'light');
@@ -35,16 +46,18 @@
     ink = '#27364c';
   let cursor = 0;
   let bound: ReturnType<typeof chart.getInstance> = null;
-  const plots = [
-    ['日线价格走势', 'etf_qfq_close', '元', false],
-    ['日度 ETF 成交额（估算）', 'etf_qfq_turnover_est_yi', '亿元', true],
-    ['日线 ETF 份额走势 · 圆点为持仓披露', 'qfq_total_units_yi', '亿份', false],
-    ['日度 ETF 申购赎回份额', 'qfq_delta_units_yi', '亿份', true],
-    ['净申赎金额 / 指数成交额', 'flow_to_index_pct', '%', true],
-    ['对应指数与本组 ETF 总份额', 'index_close', '点', false],
-    ['ETF 融资余额与融资净买入', 'financing_balance_yi', '亿元', false],
-    ['指数成分股融资余额与融资净买入', 'index_financing_balance_yi', '亿元', false],
-  ] as const;
+  const plots = props.flowsOnly
+    ? ([
+        ['日度 ETF 申购赎回份额', 'qfq_delta_units_yi', '亿份', true],
+        ['净申赎金额 / 指数成交额', 'flow_to_index_pct', '%', true],
+      ] as const)
+    : ([
+        ['日线价格走势', 'etf_qfq_close', '元', false],
+        ['日度 ETF 成交额（估算）', 'etf_qfq_turnover_est_yi', '亿元', true],
+        ['日线 ETF 份额走势 · 圆点为持仓披露', 'qfq_total_units_yi', '亿份', false],
+        ['ETF 融资余额与融资净买入', 'financing_balance_yi', '亿元', false],
+        ['指数成分股融资余额与融资净买入', 'index_financing_balance_yi', '亿元', false],
+      ] as const);
   const numberFormat = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
   const showNumber = (value: unknown) => {
     const n = numeric(value as number | null);
@@ -53,15 +66,14 @@
   async function render() {
     const rows = props.detail.series;
     const dates = rows.map((r) => r.date);
-    const group = new Map(props.detail.group.map((r) => [r.date, r]));
     const margin = new Map(props.detail.margin.map((r) => [r.date, r]));
     const groupMargin = new Map(props.detail.groupMargin.map((r) => [r.date, r]));
-    const values = plots.map((plot, i) =>
+    const values = plots.map((plot) =>
       rows.map((r) =>
         numeric(
-          i === 6
+          plot[1] === 'financing_balance_yi'
             ? margin.get(r.date)?.[plot[1]]
-            : i === 7
+            : plot[1] === 'index_financing_balance_yi'
             ? groupMargin.get(r.date)?.[plot[1]]
             : r[plot[1]],
         ),
@@ -108,11 +120,19 @@
       data: values[i],
       emphasis: { disabled: true },
     }));
-    for (const [gridIndex, field, name, unit, map, bar] of [
-      [5, 'qfq_total_units_yi', '本组 ETF 总份额', '亿份', group, false],
-      [6, 'financing_net_buy_yi', 'ETF 融资净买入', '亿元', margin, true],
-      [7, 'index_financing_net_buy_yi', '成分股融资净买入', '亿元', groupMargin, true],
+    for (const [balanceField, field, name, unit, map, bar] of [
+      ['financing_balance_yi', 'financing_net_buy_yi', 'ETF 融资净买入', '亿元', margin, true],
+      [
+        'index_financing_balance_yi',
+        'index_financing_net_buy_yi',
+        '成分股融资净买入',
+        '亿元',
+        groupMargin,
+        true,
+      ],
     ] as const) {
+      const gridIndex = plots.findIndex((plot) => plot[1] === balanceField);
+      if (gridIndex < 0) continue;
       const axisIndex = yAxis.length;
       yAxis.push({
         type: 'value',
@@ -147,30 +167,31 @@
         ? [{ value: [day, value], ratio: d.combined_ratio_pct, report: d.report_date }]
         : [];
     });
-    series.push({
-      id: 'disclosures',
-      name: '持仓披露',
-      type: 'scatter',
-      xAxisIndex: 2,
-      yAxisIndex: 2,
-      symbolSize: 8,
-      itemStyle: { color: '#fff', borderColor: blue, borderWidth: 2 },
-      label: {
-        show: true,
-        position: 'top',
-        color: '#667b9c',
-        fontSize: 10,
-        formatter: (p: any) => `${showNumber(p.data.ratio)}%`,
-      },
-      data: disclosures,
-      tooltip: {
-        trigger: 'item',
-        formatter: (p: any) =>
-          `报告期 ${p.data.report}\n披露占比 ${showNumber(p.data.ratio)}%\n份额 ${showNumber(
-            p.value[1],
-          )} 亿份`,
-      },
-    });
+    if (!props.flowsOnly)
+      series.push({
+        id: 'disclosures',
+        name: '持仓披露',
+        type: 'scatter',
+        xAxisIndex: 2,
+        yAxisIndex: 2,
+        symbolSize: 8,
+        itemStyle: { color: '#fff', borderColor: blue, borderWidth: 2 },
+        label: {
+          show: true,
+          position: 'top',
+          color: '#667b9c',
+          fontSize: 10,
+          formatter: (p: any) => `${showNumber(p.data.ratio)}%`,
+        },
+        data: disclosures,
+        tooltip: {
+          trigger: 'item',
+          formatter: (p: any) =>
+            `报告期 ${p.data.report}\n披露占比 ${showNumber(p.data.ratio)}%\n份额 ${showNumber(
+              p.value[1],
+            )} 亿份`,
+        },
+      });
     const start = Math.max(
       0,
       dates.findIndex((d) => !props.start || d >= props.start),
@@ -279,7 +300,7 @@
         void render();
         return;
       }
-      // Moving the window must not rebuild all eleven historical data series.
+      // Moving the window only updates zoom; historical series stay intact.
       instance.dispatchAction(
         {
           type: 'dataZoom',
@@ -304,7 +325,6 @@
 
   .linked-chart {
     width: 100%;
-    height: 1510px;
   }
 
   .linked-chart:focus-visible {

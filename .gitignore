@@ -27,6 +27,7 @@ execution-runtime/data/
 platform-api/data/
 
 # Local generated outputs
+/tmp/
 outputs/
 .codex/
 !.codex/

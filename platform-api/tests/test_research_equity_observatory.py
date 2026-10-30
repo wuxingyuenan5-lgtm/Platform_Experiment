@@ -622,3 +622,73 @@ def test_theme_calculation_failure_keeps_us_market_structure(monkeypatch):
     assert payload["date"] == "2026-10-26"
     assert payload["ratios"][0]["close"] is not None
     assert len(payload["participation"]) > 0
+
+
+def test_us_retained_closed_histories_survive_failed_quote_refresh(monkeypatch):
+    from datetime import date, timedelta
+
+    from app import research_equity_observatory as module
+    from app.research_equity_catalog import US_THEMES
+
+    days = [(date(2026, 9, 29) + timedelta(days=i)).isoformat() for i in range(22)]
+    symbols = {"SPY"} | {s for _, parts in US_THEMES for _, codes in parts for s in codes.split()}
+    rows = [
+        {
+            "symbol": s,
+            "id": s,
+            "name": s,
+            "status": "stale",
+            "history": [{"date": d, "value": str(100 + i)} for i, d in enumerate(days)],
+        }
+        for s in symbols
+    ]
+    monkeypatch.setattr(module, "read_dataset", lambda _: {"rows": rows, "status": "partial"})
+    monkeypatch.setattr(module, "valuations", lambda *_: [])
+    result = module.build_us(days[-1], {})
+    assert result["status"] == "partial"  # latest source failure remains visible
+    assert all(t["return20Rankable"] and t["returnPctRankable"] for t in result["themes"]["items"])
+    # An actually missing session still excludes that stock, irrespective of status.
+    row = next(r for r in rows if r["symbol"] == "NVDA")
+    row["history"].pop(-2)
+    result = module.build_us(days[-1], {})
+    member = next(m for t in result["themes"]["items"] for m in t["members"] if m["code"] == "NVDA")
+    assert member["return20"] is None and member["returnPct"] is None
+
+
+def test_cn_new_snapshot_retains_last_closed_theme_until_benchmark_catches_up(monkeypatch):
+    from contextlib import nullcontext
+
+    from app import research_a_share_repository as repository
+    from app import research_equity_observatory as module
+
+    old_themes = {"date": "2026-10-28", "items": [{"name": "retained", "return20": "2"}]}
+    stocks = [
+        {
+            "securityCode": "600519",
+            "securityName": "fixture",
+            "observedAt": "2026-10-29T06:59:59Z",
+            "returnPct": "1",
+            "turnoverYuan": "100",
+        }
+    ]
+    monkeypatch.setattr(module, "read_dataset", lambda name: stocks if name == "stocks" else [])
+    monkeypatch.setattr(module, "read_dataset_metadata", lambda _: {"status": "ready"})
+    monkeypatch.setattr(
+        module, "read_artifact", lambda name: {"themes": old_themes} if name == "cn" else {}
+    )
+    monkeypatch.setattr(module, "read_only_connection", lambda: nullcontext(None))
+    monkeypatch.setattr(
+        module, "calendar_snapshot", lambda *_: {"days": ["2026-10-28", "2026-10-29"]}
+    )
+    monkeypatch.setattr(module, "valuations", lambda *_: [])
+    monkeypatch.setattr(
+        repository, "read_index_history", lambda _: [{"observedAt": "2026-10-28", "close": "4000"}]
+    )
+    monkeypatch.setattr(repository, "read_stored_stock_histories", lambda _: {})
+    monkeypatch.setattr(repository, "read_theme_amount_history", lambda: [])
+    result = module.build_cn("2026-10-29", {})
+    assert result["date"] == "2026-10-29" and result["themes"] == old_themes
+    assert result["breadth"]["valid"] == 0
+    stocks[0]["observedAt"] = "2026-10-29T07:01:00Z"
+    result = module.build_cn("2026-10-29", {})
+    assert result["themes"] == old_themes

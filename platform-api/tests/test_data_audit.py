@@ -244,3 +244,41 @@ def test_financial_units_missingness_and_valid_empty_day():
         "market", "market", {"totalAmountYuan": 0, "up": 1, "down": 1, "flat": 0}
     )
     assert audit.history_row_valid("hot_stock", "__day__", {})
+
+
+def test_history_inventory_seeks_boundaries_without_archive_scan():
+    import sqlite3
+
+    db = sqlite3.connect(":memory:")
+    db.execute(
+        "CREATE TABLE research_a_share_history (dataset TEXT, observed_at TEXT, "
+        "fetched_at TEXT, entity_code TEXT, PRIMARY KEY(dataset,observed_at,entity_code))"
+    )
+    db.execute(
+        "CREATE INDEX audit_cover ON research_a_share_history (dataset, observed_at, fetched_at)"
+    )
+    db.executemany(
+        "INSERT INTO research_a_share_history VALUES (?,?,?,?)",
+        [
+            ("intraday", f"2026-10-{1 + i // 1000:02d}T{i % 1000:04d}", "old", str(i))
+            for i in range(20000)
+        ]
+        + [("new_dataset", "2026-10-29", "latest", "x")],
+    )
+    # A full COUNT/GROUP BY would exceed this VM budget. Boundary seeks must
+    # still discover unknown datasets and preserve actual date/fetch endpoints.
+    steps = 0
+
+    def budget():
+        nonlocal steps
+        steps += 1
+        return int(steps > 100)
+
+    db.set_progress_handler(budget, 100)
+    result = audit.history_inventory(db)
+    assert set(result) == {"intraday", "new_dataset"}
+    assert result["intraday"]["start"] == "2026-10-01T0000"
+    assert result["intraday"]["end"] == "2026-10-20T0999"
+    assert result["new_dataset"]["fetched"] == "latest"
+    assert "rows" not in result["intraday"]
+    db.close()

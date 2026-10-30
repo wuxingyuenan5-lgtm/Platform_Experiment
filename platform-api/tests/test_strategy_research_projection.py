@@ -4,7 +4,7 @@ import json
 from datetime import timedelta
 
 import pytest
-from test_strategy_research import T, event
+from test_strategy_research import T, event, minute_quote
 
 from app.config import get_settings
 from app.database import initialize_database
@@ -55,6 +55,31 @@ def test_seconds_match_whole_archive_across_shards_and_cursor_replay(archive):
         pass
     assert read_projection("spread_valid", "funding-btc") == expected
     assert project_next() is False
+
+
+def test_minute_quotes_project_across_parts_without_filling_missing_minutes(archive):
+    after = None
+    for i, (minute, category) in enumerate(
+        ((0, "linear"), (0, "spot"), (2, "linear"), (2, "spot"))
+    ):
+        row = minute_quote(i + 1, category, T + timedelta(minutes=minute, milliseconds=i))
+        publish(
+            {
+                "schemaVersion": "market-events.v1",
+                "after": after,
+                "nextCursor": str(i + 1),
+                "events": [row],
+            }
+        )
+        while project_next():
+            pass
+        after = str(i + 1)
+    points = read_projection("spread_valid", "funding-btc")
+    assert len(points) == 2
+    assert int(points[1]["bucketTimeMs"]) - int(points[0]["bucketTimeMs"]) == 120000
+    assert int(points[0]["timeMs"]) > int(points[0]["bucketTimeMs"])
+    assert read_projection("spread_valid", "funding-btc", 0, int(points[0]["bucketTimeMs"])) == []
+    assert all(p["samplingIntervalMs"] == 60000 and p["validDurationMs"] == 0 for p in points)
 
 
 def test_indexed_sampling_preserves_decimal_and_empty_intervals(archive):
@@ -169,10 +194,12 @@ def test_spread_chart_preserves_exact_prices_and_breaks_gaps():
     from app.strategy_research_projection import spread_chart
 
     value = "1.123456789012345678901"
-    series = spread_chart([
-        {"timeMs": "1000", "ohlc": {"midSpread": {"close": value}}},
-        {"timeMs": "4000", "ohlc": {"midSpread": {"close": value}}},
-    ])
+    series = spread_chart(
+        [
+            {"timeMs": "1000", "ohlc": {"midSpread": {"close": value}}},
+            {"timeMs": "4000", "ohlc": {"midSpread": {"close": value}}},
+        ]
+    )
     assert [s["selected"] for s in series] == [True, False, False]
     assert series[0]["data"] == [
         {"value": [1000, value], "exactPrice": value},
@@ -184,18 +211,27 @@ def test_spread_chart_preserves_exact_prices_and_breaks_gaps():
 def test_large_shard_projects_every_row_without_decoding_unused_raw_payloads(archive, monkeypatch):
     raw = event(1)
     raw.update(
-        kind="price_history", stream="bybit:linear:BTCUSDT:trade", ingestionMode="backfill",
+        kind="price_history",
+        stream="bybit:linear:BTCUSDT:trade",
+        ingestionMode="backfill",
         payload={
-            "intervalMs": "60000", "symbol": "BTCUSDT", "category": "linear",
+            "intervalMs": "60000",
+            "symbol": "BTCUSDT",
+            "category": "linear",
             "priceType": "trade",
-            "response": {"result": {"list": [
-                [str(1_000_000 + i * 60000), "1", "2", "1", "1.123456789012"]
-                for i in range(701)
-            ]}},
+            "response": {
+                "result": {
+                    "list": [
+                        [str(1_000_000 + i * 60000), "1", "2", "1", "1.123456789012"]
+                        for i in range(701)
+                    ]
+                }
+            },
         },
     )
-    publish({"schemaVersion": "market-events.v1", "after": None,
-             "nextCursor": "1", "events": [raw]})
+    publish(
+        {"schemaVersion": "market-events.v1", "after": None, "nextCursor": "1", "events": [raw]}
+    )
     original_loads = json.loads
     decoded_raw = []
 

@@ -23,6 +23,7 @@ This document owns current code and data responsibilities. It records present au
 | Human browser role capability registry | `platform-api/app/user_permissions.py`, `platform-api/app/user_authority.py` | page-local role invention or API-Key role conversion |
 | Browser route capability transformation and route/menu access | `platform-web/src/access/browserRouteCapabilities.ts`, `platform-web/src/access/userAccess.ts`, `platform-web/src/router/routes/index.ts` | backend authorization decisions or data-scope enforcement |
 | Product data envelope and restored state presentation | `platform-web/src/data/productDataEnvelope.ts`, `platform-web/src/components/ProductDataState/`, `platform-web/src/data/sample/` | fabricated provider success or authoritative realtime market facts |
+| Product data ownership inventory | `config/product-data-owner-matrix.json`, checked by `scripts/audit-product-data-owner-matrix.py` | live runtime health, permission grants or Live Write activation; no parallel override registry |
 | Personal-security form and payload contracts | `platform-web/src/views/risk/profile/security/contracts.ts`, `platform-web/src/views/risk/profile/security/modules.tsx` | parent persistence, provider completion or synthetic success responses |
 
 Frontend owners present and transform capabilities but do not own backend authorization decisions. Menu hiding is not a security authorization boundary. The sample-data directory does not own realtime market facts. Personal-security child components must not fabricate parent persistence or provider success.
@@ -71,6 +72,7 @@ Risk policy must remain deterministic and independently testable. Risk persisten
 | Core bootstrap | `app/database_bootstrap.py` |
 | Fixed reference seeds | `app/database_seeds.py` |
 | Ordered additive migrations | `app/schema_migrations.py` |
+| Configured research SQLite and offline cutover | `app/strategy_research_database.py`; catalog/private research state in `strategy_research_repository.py`, rebuildable reads in `strategy_research_projection.py` |
 | Domain DDL/SQL | the registered repository or persistence owner |
 
 Account snapshot scope and financial read projections are checked by `platform-api/tests/test_strategy_account_snapshot.py`; migrations by `tests/test_schema_migrations.py`. Local service recovery is owned by `scripts/dev-platform.ps1` and `scripts/platform-watchdog.ps1`; `scripts/tests/test_platform_watchdog.py` injects fake process/network failures and checks bounded recovery, foreign-process refusal and Live Write interruption protection. `scripts/tests/test_platform_child_launcher.py` verifies log handles after launcher exit. These isolated checks do not establish long-running venue/Worker stability.

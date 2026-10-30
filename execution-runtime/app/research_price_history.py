@@ -66,7 +66,11 @@ def capture_prices(client, spool, category, symbol, price_type, days=30, *, inte
     # Initial history moves forward, so the same cursor naturally catches up later.
     after = state.get("through", floor - interval_ms)
     if after >= last_closed:
-        return state
+        return {
+            **state,
+            "lastCheckedAtMs": str(time.time_ns() // 1000000),
+            "expectedClosedThroughMs": last_closed,
+        }
     start = after + interval_ms
     end = min(last_closed, start + 999 * interval_ms)
     method = client.get_mark_price_kline if price_type == "mark" else client.get_kline

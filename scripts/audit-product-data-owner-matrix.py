@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import sys
 from collections import Counter
@@ -13,7 +12,6 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MATRIX = ROOT / "config" / "product-data-owner-matrix.json"
-DEFAULT_OVERRIDES = ROOT / "config" / "product-data-owner-overrides.json"
 FORMAL_MANIFEST = ROOT / "platform-web" / "scripts" / "formal-route-manifest.json"
 
 REQUIRED_ENTRY_FIELDS = {
@@ -66,7 +64,9 @@ def _load_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
-        raise AuditError(f"missing required registry: {path.relative_to(ROOT)}") from exc
+        raise AuditError(
+            f"missing required registry: {path.relative_to(ROOT)}"
+        ) from exc
     except json.JSONDecodeError as exc:
         raise AuditError(f"invalid JSON in {path.relative_to(ROOT)}: {exc}") from exc
     if not isinstance(value, dict):
@@ -74,7 +74,9 @@ def _load_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def _formal_view_routes(manifest: dict[str, Any]) -> tuple[dict[str, str], dict[str, str]]:
+def _formal_view_routes(
+    manifest: dict[str, Any],
+) -> tuple[dict[str, str], dict[str, str]]:
     routes: dict[str, str] = {}
     names: dict[str, str] = {}
     for module in manifest.get("modules", []):
@@ -95,39 +97,7 @@ def _formal_view_routes(manifest: dict[str, Any]) -> tuple[dict[str, str], dict[
     return routes, names
 
 
-def _apply_overrides(
-    matrix: dict[str, Any], overrides: dict[str, Any]
-) -> dict[str, Any]:
-    if overrides.get("schema_version") != 1:
-        raise AuditError("product data owner overrides schema_version must be 1")
-    values = overrides.get("overrides")
-    if not isinstance(values, dict):
-        raise AuditError("product data owner overrides must contain an overrides object")
-
-    resolved = copy.deepcopy(matrix)
-    entries = resolved.get("entries")
-    if not isinstance(entries, list):
-        raise AuditError("product data owner matrix must contain entries")
-    by_module = {
-        entry.get("module"): entry
-        for entry in entries
-        if isinstance(entry, dict) and isinstance(entry.get("module"), str)
-    }
-    unknown = sorted(set(values) - set(by_module))
-    if unknown:
-        raise AuditError(f"overrides reference unknown modules: {unknown}")
-    for module, patch in values.items():
-        if not isinstance(patch, dict) or not patch:
-            raise AuditError(f"{module}: override must be a non-empty object")
-        forbidden = {"module", "routes", "route_names", "view_owner"} & patch.keys()
-        if forbidden:
-            raise AuditError(f"{module}: overrides cannot change formal ownership fields {sorted(forbidden)}")
-        by_module[module].update(copy.deepcopy(patch))
-    resolved["resolved_with"] = str(DEFAULT_OVERRIDES.relative_to(ROOT))
-    return resolved
-
-
-def resolve_matrix(matrix_path: Path, overrides_path: Path) -> dict[str, Any]:
+def load_matrix(matrix_path: Path) -> dict[str, Any]:
     matrix = _load_json(matrix_path)
     if matrix.get("schema_version") != 1:
         raise AuditError("product data owner matrix schema_version must be 1")
@@ -143,7 +113,7 @@ def resolve_matrix(matrix_path: Path, overrides_path: Path) -> dict[str, Any]:
     authority = matrix.get("authority")
     if not isinstance(authority, str) or not authority:
         raise AuditError("product data owner matrix requires a durable authority")
-    return _apply_overrides(matrix, _load_json(overrides_path))
+    return matrix
 
 
 def _is_repository_path(value: str) -> bool:
@@ -161,9 +131,8 @@ def audit(
     matrix_path: Path,
     *,
     require_closed: bool,
-    overrides_path: Path = DEFAULT_OVERRIDES,
 ) -> dict[str, Any]:
-    matrix = resolve_matrix(matrix_path, overrides_path)
+    matrix = load_matrix(matrix_path)
     manifest = _load_json(FORMAL_MANIFEST)
     formal_routes, formal_names = _formal_view_routes(manifest)
 
@@ -215,7 +184,11 @@ def audit(
             mapped_routes[route] = view_owner
             mapped_names[name] = route
 
-        for field in ("frontend_services", "application_services", "repository_or_provider"):
+        for field in (
+            "frontend_services",
+            "application_services",
+            "repository_or_provider",
+        ):
             values = raw_entry[field]
             if not isinstance(values, list):
                 raise AuditError(f"{module}: {field} must be a list")
@@ -236,7 +209,9 @@ def audit(
             raise AuditError(f"{module}: invalid closure_status {closure_status!r}")
         statuses[closure_status] += 1
         gap_reason = raw_entry["gap_reason"]
-        if closure_status == "gap" and (not isinstance(gap_reason, str) or not gap_reason):
+        if closure_status == "gap" and (
+            not isinstance(gap_reason, str) or not gap_reason
+        ):
             raise AuditError(f"{module}: gap entries require gap_reason")
         if closure_status != "gap" and gap_reason is not None:
             raise AuditError(f"{module}: closed entries must set gap_reason to null")
@@ -244,11 +219,17 @@ def audit(
             raise AuditError(f"{module}: unresolved product/data gap: {gap_reason}")
 
         if raw_entry["empty_state"] not in ALLOWED_EMPTY:
-            raise AuditError(f"{module}: invalid empty_state {raw_entry['empty_state']!r}")
+            raise AuditError(
+                f"{module}: invalid empty_state {raw_entry['empty_state']!r}"
+            )
         if raw_entry["unavailable_state"] not in ALLOWED_UNAVAILABLE:
-            raise AuditError(f"{module}: invalid unavailable_state {raw_entry['unavailable_state']!r}")
+            raise AuditError(
+                f"{module}: invalid unavailable_state {raw_entry['unavailable_state']!r}"
+            )
         if raw_entry["live_write"] is not False:
-            raise AuditError(f"{module}: product data ownership must not enable Live Write")
+            raise AuditError(
+                f"{module}: product data ownership must not enable Live Write"
+            )
         if not isinstance(raw_entry["writes"], bool):
             raise AuditError(f"{module}: writes must be boolean")
 
@@ -265,28 +246,44 @@ def audit(
             if not isinstance(raw_entry[field], str) or not raw_entry[field]:
                 raise AuditError(f"{module}: {field} must be a non-empty string")
 
-        if closure_status == "verified" and raw_entry["real_data_source"].startswith("not-configured"):
-            raise AuditError(f"{module}: verified entry cannot use not-configured source")
-        if closure_status == "explicit_unavailable" and raw_entry["unavailable_state"] not in {
+        if closure_status == "verified" and raw_entry["real_data_source"].startswith(
+            "not-configured"
+        ):
+            raise AuditError(
+                f"{module}: verified entry cannot use not-configured source"
+            )
+        if closure_status == "explicit_unavailable" and raw_entry[
+            "unavailable_state"
+        ] not in {
             "not_configured",
             "unsupported",
         }:
-            raise AuditError(f"{module}: explicit_unavailable requires not_configured or unsupported")
+            raise AuditError(
+                f"{module}: explicit_unavailable requires not_configured or unsupported"
+            )
 
     missing_routes = sorted(set(formal_routes) - set(mapped_routes))
     extra_routes = sorted(set(mapped_routes) - set(formal_routes))
     if missing_routes or extra_routes:
-        raise AuditError(f"route coverage mismatch: missing={missing_routes}, extra={extra_routes}")
+        raise AuditError(
+            f"route coverage mismatch: missing={missing_routes}, extra={extra_routes}"
+        )
     missing_names = sorted(set(formal_names) - set(mapped_names))
     extra_names = sorted(set(mapped_names) - set(formal_names))
     if missing_names or extra_names:
-        raise AuditError(f"route-name coverage mismatch: missing={missing_names}, extra={extra_names}")
+        raise AuditError(
+            f"route-name coverage mismatch: missing={missing_names}, extra={extra_names}"
+        )
     for route, expected_view in formal_routes.items():
         if mapped_routes[route] != expected_view:
-            raise AuditError(f"{route}: matrix view {mapped_routes[route]} does not match {expected_view}")
+            raise AuditError(
+                f"{route}: matrix view {mapped_routes[route]} does not match {expected_view}"
+            )
     for name, expected_route in formal_names.items():
         if mapped_names[name] != expected_route:
-            raise AuditError(f"{name}: matrix route {mapped_names[name]} does not match {expected_route}")
+            raise AuditError(
+                f"{name}: matrix route {mapped_names[name]} does not match {expected_route}"
+            )
 
     return {
         "schema_version": 1,
@@ -302,18 +299,14 @@ def audit(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
-    parser.add_argument("--overrides", type=Path, default=DEFAULT_OVERRIDES)
     parser.add_argument("--require-closed", action="store_true")
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--resolved-output", type=Path)
     args = parser.parse_args()
     try:
         result = audit(
             args.matrix,
             require_closed=args.require_closed,
-            overrides_path=args.overrides,
         )
-        resolved = resolve_matrix(args.matrix, args.overrides)
     except AuditError as exc:
         print(f"product-data-owner audit failed: {exc}", file=sys.stderr)
         return 1
@@ -323,12 +316,6 @@ def main() -> int:
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(payload + "\n", encoding="utf-8")
-    if args.resolved_output is not None:
-        args.resolved_output.parent.mkdir(parents=True, exist_ok=True)
-        args.resolved_output.write_text(
-            json.dumps(resolved, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
     return 0
 
 

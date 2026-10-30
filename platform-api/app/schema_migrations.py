@@ -799,56 +799,77 @@ PLATFORM_MIGRATIONS: tuple[Migration, ...] = (
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=24, name="account-capital-movements", statements=(
-        """CREATE TABLE account_capital_movements (
+    Migration(
+        version=24,
+        name="account-capital-movements",
+        statements=(
+            """CREATE TABLE account_capital_movements (
             account_id TEXT NOT NULL REFERENCES accounts(id), external_event_id TEXT NOT NULL,
             asset_scope TEXT NOT NULL, occurred_at TEXT NOT NULL, currency TEXT NOT NULL,
             amount TEXT, event_type TEXT NOT NULL, payload_json TEXT NOT NULL,
             PRIMARY KEY(account_id, asset_scope, external_event_id))""",
-        "CREATE INDEX ix_capital_movement_time ON "
-        "account_capital_movements(account_id, asset_scope, occurred_at)",
-        """CREATE TABLE account_capital_coverage (
+            "CREATE INDEX ix_capital_movement_time ON "
+            "account_capital_movements(account_id, asset_scope, occurred_at)",
+            """CREATE TABLE account_capital_coverage (
             account_id TEXT NOT NULL REFERENCES accounts(id), asset_scope TEXT NOT NULL,
             start_at TEXT NOT NULL, end_at TEXT NOT NULL, updated_at TEXT NOT NULL,
             PRIMARY KEY(account_id, asset_scope, start_at))""",
-        """CREATE TABLE account_capital_sync (
+            """CREATE TABLE account_capital_sync (
             account_id TEXT PRIMARY KEY REFERENCES accounts(id), attempted_at TEXT NOT NULL,
             status TEXT NOT NULL, error_code TEXT)""",
-        """CREATE TABLE account_valuation_rates (
+            """CREATE TABLE account_valuation_rates (
             account_id TEXT NOT NULL REFERENCES accounts(id), currency TEXT NOT NULL,
             as_of TEXT NOT NULL, usd_rate TEXT NOT NULL,
             PRIMARY KEY(account_id, currency, as_of))""",
-    )),
+        ),
+    ),
 )
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=25, name="capital-valuation-provenance", statements=(
-        "ALTER TABLE account_valuation_rates "
-        "ADD COLUMN source TEXT NOT NULL DEFAULT 'bybit_wallet'",
-    )),
+    Migration(
+        version=25,
+        name="capital-valuation-provenance",
+        statements=(
+            "ALTER TABLE account_valuation_rates "
+            "ADD COLUMN source TEXT NOT NULL DEFAULT 'bybit_wallet'",
+        ),
+    ),
 )
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=26, name="cross-spread-adverse-spread-guards", statements=(
-        "ALTER TABLE cross_spread_exit_plans "
-        "ADD COLUMN take_profit_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
-        "ALTER TABLE cross_spread_exit_plans "
-        "ADD COLUMN stop_loss_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
-    )),
+    Migration(
+        version=26,
+        name="cross-spread-adverse-spread-guards",
+        statements=(
+            "ALTER TABLE cross_spread_exit_plans "
+            "ADD COLUMN take_profit_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
+            "ALTER TABLE cross_spread_exit_plans "
+            "ADD COLUMN stop_loss_max_adverse_spread TEXT NOT NULL DEFAULT '0'",
+        ),
+    ),
 )
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=27, name="cross-spread-terminal-fill-evidence", statements=(
-        "CREATE TABLE runtime_order_terminals (order_id TEXT PRIMARY KEY REFERENCES orders(id), "
-        "event_id TEXT NOT NULL UNIQUE, filled_quantity TEXT NOT NULL, occurred_at TEXT NOT NULL)",
-    )),
+    Migration(
+        version=27,
+        name="cross-spread-terminal-fill-evidence",
+        statements=(
+            "CREATE TABLE runtime_order_terminals "
+            "(order_id TEXT PRIMARY KEY REFERENCES orders(id), "
+            "event_id TEXT NOT NULL UNIQUE, filled_quantity TEXT NOT NULL, "
+            "occurred_at TEXT NOT NULL)",
+        ),
+    ),
 )
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=28, name="cross-spread-open-triggers", statements=(
-        """CREATE TABLE cross_spread_open_triggers (
+    Migration(
+        version=28,
+        name="cross-spread-open-triggers",
+        statements=(
+            """CREATE TABLE cross_spread_open_triggers (
             id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
             direction TEXT NOT NULL, quantity_oz TEXT NOT NULL, limit_spread TEXT NOT NULL,
             limit_strategy TEXT NOT NULL, request_json TEXT NOT NULL,
@@ -856,80 +877,100 @@ PLATFORM_MIGRATIONS += (
             updated_at TEXT NOT NULL, triggered_at TEXT, execution_batch_id TEXT,
             failure_reason TEXT
         )""",
-        "CREATE INDEX idx_cross_spread_open_triggers_status "
-        "ON cross_spread_open_triggers(status, created_at)",
-    )),
+            "CREATE INDEX idx_cross_spread_open_triggers_status "
+            "ON cross_spread_open_triggers(status, created_at)",
+        ),
+    ),
 )
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=29, name="account-read-job-status", statements=(
-        """CREATE TABLE account_read_jobs (
+    Migration(
+        version=29,
+        name="account-read-job-status",
+        statements=(
+            """CREATE TABLE account_read_jobs (
             account_id TEXT NOT NULL REFERENCES accounts(id),
             job TEXT NOT NULL CHECK(job IN ('history','settlements')),
             status TEXT NOT NULL, last_attempt_at TEXT NOT NULL,
             last_success_at TEXT, error_code TEXT,
             PRIMARY KEY(account_id, job)
         )""",
-    )),
+        ),
+    ),
 )
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=30, name="strategy-research-archive", statements=(
-        """CREATE TABLE research_strategy_parts (
+    Migration(
+        version=30,
+        name="strategy-research-archive",
+        statements=(
+            """CREATE TABLE research_strategy_parts (
             part_id TEXT PRIMARY KEY, start_cursor TEXT, end_cursor TEXT NOT NULL UNIQUE,
             path TEXT NOT NULL UNIQUE, checksum TEXT NOT NULL, row_count INTEGER NOT NULL,
             first_at TEXT NOT NULL,last_at TEXT NOT NULL,published_at TEXT NOT NULL)""",
-        """CREATE TABLE research_strategy_capture (
+            """CREATE TABLE research_strategy_capture (
             id INTEGER PRIMARY KEY CHECK(id=1),cursor TEXT,state_json TEXT NOT NULL,
             status_json TEXT NOT NULL)""",
-        """CREATE TABLE research_strategy_experiments (
+            """CREATE TABLE research_strategy_experiments (
             run_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,parameters_json TEXT NOT NULL,
             parts_json TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN
             ('queued','running','completed','failed','cancelled')),
             result_json TEXT,error TEXT,created_at TEXT NOT NULL)""",
-        """CREATE TABLE research_strategy_drafts (
+            """CREATE TABLE research_strategy_drafts (
             id TEXT PRIMARY KEY,user_id TEXT NOT NULL,payload_json TEXT NOT NULL,
             created_at TEXT NOT NULL)""",
-    )),
+        ),
+    ),
 )
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=31, name="strategy-research-serving-projection", statements=(
-        """CREATE TABLE research_strategy_projection (
+    Migration(
+        version=31,
+        name="strategy-research-serving-projection",
+        statements=(
+            """CREATE TABLE research_strategy_projection (
             kind TEXT NOT NULL, entity TEXT NOT NULL, at_ms INTEGER NOT NULL,
             payload_json TEXT NOT NULL, PRIMARY KEY(kind,entity,at_ms)) WITHOUT ROWID""",
-        """CREATE TABLE research_strategy_projection_cursor (
+            """CREATE TABLE research_strategy_projection_cursor (
             id INTEGER PRIMARY KEY CHECK(id=1), part_rowid INTEGER NOT NULL,
             state_json TEXT NOT NULL, updated_at TEXT NOT NULL)""",
-    )),
-    Migration(version=32, name="strategy-management-serving-projection", statements=(
-        """CREATE TABLE strategy_management_projection (
+        ),
+    ),
+    Migration(
+        version=32,
+        name="strategy-management-serving-projection",
+        statements=(
+            """CREATE TABLE strategy_management_projection (
           strategy_instance_id TEXT NOT NULL, account_id TEXT NOT NULL DEFAULT '',
           kind TEXT NOT NULL, payload_json TEXT, updated_at TEXT, requested_at TEXT NOT NULL,
           attempted_at TEXT, error_code TEXT,
           PRIMARY KEY(strategy_instance_id,account_id,kind)) WITHOUT ROWID""",
-    )),
-    Migration(version=33, name="execution-risk-persistence", statements=(
-        """CREATE TABLE IF NOT EXISTS trading_kill_switches (
+        ),
+    ),
+    Migration(
+        version=33,
+        name="execution-risk-persistence",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS trading_kill_switches (
           scope_type TEXT NOT NULL, scope_id TEXT NOT NULL, enabled INTEGER NOT NULL,
           reason TEXT, actor TEXT NOT NULL, version INTEGER NOT NULL, updated_at TEXT NOT NULL,
           PRIMARY KEY(scope_type, scope_id))""",
-        """CREATE TABLE IF NOT EXISTS kill_switch_commands (
+            """CREATE TABLE IF NOT EXISTS kill_switch_commands (
           idempotency_key TEXT PRIMARY KEY, payload_hash TEXT NOT NULL,
           scope_type TEXT NOT NULL, scope_id TEXT NOT NULL, created_at TEXT NOT NULL)""",
-        """CREATE TABLE IF NOT EXISTS execution_risk_policies (
+            """CREATE TABLE IF NOT EXISTS execution_risk_policies (
           strategy_instance_id TEXT PRIMARY KEY, max_leg_delay_seconds INTEGER NOT NULL,
           max_residual_notional TEXT NOT NULL, failure_action TEXT NOT NULL,
           actor TEXT NOT NULL, updated_at TEXT NOT NULL,
           FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id))""",
-        """CREATE TABLE IF NOT EXISTS execution_risk_policy_commands (
+            """CREATE TABLE IF NOT EXISTS execution_risk_policy_commands (
           idempotency_key TEXT PRIMARY KEY, payload_hash TEXT NOT NULL,
           strategy_instance_id TEXT NOT NULL, created_at TEXT NOT NULL,
           FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id))""",
-        """CREATE TABLE IF NOT EXISTS execution_batch_risk (
+            """CREATE TABLE IF NOT EXISTS execution_batch_risk (
           batch_id TEXT PRIMARY KEY, strategy_instance_id TEXT NOT NULL,
           max_leg_delay_seconds INTEGER NOT NULL, max_residual_notional TEXT NOT NULL,
           failure_action TEXT NOT NULL, risk_status TEXT NOT NULL,
@@ -938,55 +979,75 @@ PLATFORM_MIGRATIONS += (
           risk_reason TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
           FOREIGN KEY(batch_id) REFERENCES execution_batches(id),
           FOREIGN KEY(strategy_instance_id) REFERENCES strategy_instances(id))""",
-        """CREATE TABLE IF NOT EXISTS execution_risk_actions (
+            """CREATE TABLE IF NOT EXISTS execution_risk_actions (
           id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
           payload_hash TEXT NOT NULL, batch_id TEXT NOT NULL, action TEXT NOT NULL,
           status TEXT NOT NULL, actor TEXT NOT NULL, reason TEXT,
           generated_order_ids_json TEXT NOT NULL, failure_reason TEXT,
           created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
           FOREIGN KEY(batch_id) REFERENCES execution_batches(id))""",
-        """CREATE INDEX IF NOT EXISTS idx_execution_risk_actions_batch
+            """CREATE INDEX IF NOT EXISTS idx_execution_risk_actions_batch
           ON execution_risk_actions(batch_id, created_at)""",
-    )),
-    Migration(version=34, name="funding-basis-serving-projection", statements=(
-        """CREATE TABLE funding_basis_projection_cursor (
+        ),
+    ),
+    Migration(
+        version=34,
+        name="funding-basis-serving-projection",
+        statements=(
+            """CREATE TABLE funding_basis_projection_cursor (
           id INTEGER PRIMARY KEY CHECK(id=1), last_at_ms INTEGER NOT NULL DEFAULT 0,
           completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1)),
           updated_at TEXT NOT NULL)""",
-    )),
+        ),
+    ),
 )
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=35, name="management-history-read-indexes", statements=(
-        "CREATE INDEX idx_account_risk_history_cover\n"
-        "        ON account_risk_snapshots(account_id,as_of,created_at,"
-        "currency,equity,asset_scope,total_assets)\n"
-        "        WHERE equity IS NOT NULL",
-        """CREATE INDEX idx_market_spread_instance_time
+    Migration(
+        version=35,
+        name="management-history-read-indexes",
+        statements=(
+            "CREATE INDEX idx_account_risk_history_cover\n"
+            "        ON account_risk_snapshots(account_id,as_of,created_at,"
+            "currency,equity,asset_scope,total_assets)\n"
+            "        WHERE equity IS NOT NULL",
+            """CREATE INDEX idx_market_spread_instance_time
         ON market_spread_snapshots(strategy_key,strategy_instance_id,observed_at)""",
-    )),
+        ),
+    ),
 )
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=36, name="data-audit-persistence", statements=(
-        """CREATE TABLE IF NOT EXISTS data_audit_runs (
+    Migration(
+        version=36,
+        name="data-audit-persistence",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS data_audit_runs (
           id INTEGER PRIMARY KEY, checked_at TEXT NOT NULL, report_json TEXT NOT NULL)""",
-        """CREATE TABLE IF NOT EXISTS data_audit_calendar (
+            """CREATE TABLE IF NOT EXISTS data_audit_calendar (
           market TEXT PRIMARY KEY, fetched_at TEXT NOT NULL,
           days_json TEXT NOT NULL, source TEXT NOT NULL)""",
-    )),
+        ),
+    ),
 )
 
 
 PLATFORM_MIGRATIONS += (
-    Migration(version=37, name="cross-market-sampling-read-index", statements=(
-        """CREATE INDEX idx_market_spread_instance_created
+    Migration(
+        version=37,
+        name="cross-market-sampling-read-index",
+        statements=(
+            """CREATE INDEX idx_market_spread_instance_created
         ON market_spread_snapshots(strategy_key,strategy_instance_id,created_at DESC)""",
-    )),
-    Migration(version=38, name="user-research-market-layouts", statements=(
-        """CREATE TABLE user_research_market_layouts (
+        ),
+    ),
+    Migration(
+        version=38,
+        name="user-research-market-layouts",
+        statements=(
+            """CREATE TABLE user_research_market_layouts (
             user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             market_id TEXT NOT NULL,
             groups_json TEXT NOT NULL,
@@ -994,9 +1055,13 @@ PLATFORM_MIGRATIONS += (
             updated_at TEXT NOT NULL,
             PRIMARY KEY(user_id, market_id)
         )""",
-    )),
-    Migration(version=39, name="funding-executable-spread-exit-plans", statements=(
-        """CREATE TABLE funding_exit_plans (
+        ),
+    ),
+    Migration(
+        version=39,
+        name="funding-executable-spread-exit-plans",
+        statements=(
+            """CREATE TABLE funding_exit_plans (
             open_instruction_id TEXT PRIMARY KEY REFERENCES strategy_runs(id),
             account_id TEXT NOT NULL REFERENCES accounts(id),
             revision INTEGER NOT NULL CHECK(revision>0),
@@ -1010,20 +1075,32 @@ PLATFORM_MIGRATIONS += (
             last_error TEXT,
             updated_at TEXT NOT NULL
         )""",
-    )),
-    Migration(version=40, name="execution-audit-subject-lookup", statements=(
-        "CREATE INDEX idx_audit_events_subject_type ON audit_events(subject_id,event_type)",
-    )),
-    Migration(version=41, name="account-current-observation-lookups", statements=(
-        "CREATE INDEX idx_balance_current_currency "
-        "ON balance_snapshots(account_id,upper(currency),as_of DESC,id)",
-        "CREATE INDEX idx_account_risk_observed_time "
-        "ON account_risk_snapshots(account_id,julianday(as_of) DESC,asset_scope)",
-        "CREATE INDEX idx_account_capital_coverage_end "
-        "ON account_capital_coverage(account_id,asset_scope,julianday(end_at) DESC)",
-    )),
-    Migration(version=42, name="a-share-source-history-archive", statements=(
-        """CREATE TABLE research_a_share_market_archive (
+        ),
+    ),
+    Migration(
+        version=40,
+        name="execution-audit-subject-lookup",
+        statements=(
+            "CREATE INDEX idx_audit_events_subject_type ON audit_events(subject_id,event_type)",
+        ),
+    ),
+    Migration(
+        version=41,
+        name="account-current-observation-lookups",
+        statements=(
+            "CREATE INDEX idx_balance_current_currency "
+            "ON balance_snapshots(account_id,upper(currency),as_of DESC,id)",
+            "CREATE INDEX idx_account_risk_observed_time "
+            "ON account_risk_snapshots(account_id,julianday(as_of) DESC,asset_scope)",
+            "CREATE INDEX idx_account_capital_coverage_end "
+            "ON account_capital_coverage(account_id,asset_scope,julianday(end_at) DESC)",
+        ),
+    ),
+    Migration(
+        version=42,
+        name="a-share-source-history-archive",
+        statements=(
+            """CREATE TABLE research_a_share_market_archive (
             universe_key TEXT NOT NULL CHECK(universe_key IN ('all_a','sh_sz_a')),
             trade_date TEXT NOT NULL, amount_yuan TEXT,
             up INTEGER, down INTEGER, flat INTEGER, limit_up INTEGER, limit_down INTEGER,
@@ -1031,9 +1108,9 @@ PLATFORM_MIGRATIONS += (
             definition_version TEXT, payload_json TEXT NOT NULL,
             quality_status TEXT NOT NULL DEFAULT 'ready', imported_at TEXT NOT NULL,
             PRIMARY KEY(universe_key,trade_date))""",
-        """CREATE INDEX idx_a_share_market_archive_date
+            """CREATE INDEX idx_a_share_market_archive_date
             ON research_a_share_market_archive(trade_date,universe_key)""",
-        """CREATE TABLE research_a_share_price_history (
+            """CREATE TABLE research_a_share_price_history (
             instrument_code TEXT NOT NULL, trade_date TEXT NOT NULL,
             source_name TEXT NOT NULL, definition_version TEXT NOT NULL DEFAULT '',
             industry_level TEXT NOT NULL DEFAULT '', close TEXT,
@@ -1041,14 +1118,110 @@ PLATFORM_MIGRATIONS += (
             imported_at TEXT NOT NULL,
             PRIMARY KEY(instrument_code,trade_date,source_name,
                 definition_version,industry_level))""",
-        """CREATE INDEX idx_a_share_price_history_lookup
+            """CREATE INDEX idx_a_share_price_history_lookup
             ON research_a_share_price_history(instrument_code,trade_date)""",
-        """CREATE TABLE research_a_share_archive_conflicts (
+            """CREATE TABLE research_a_share_archive_conflicts (
             id INTEGER PRIMARY KEY, table_name TEXT NOT NULL, natural_key TEXT NOT NULL,
             existing_payload_json TEXT NOT NULL, incoming_payload_json TEXT NOT NULL,
             source_name TEXT NOT NULL, reason TEXT NOT NULL, observed_at TEXT NOT NULL,
             UNIQUE(table_name,natural_key,incoming_payload_json))""",
-    )),
+        ),
+    ),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(
+        version=43,
+        name="history-audit-covering-index",
+        statements=(
+            """CREATE INDEX idx_research_history_audit_cover
+            ON research_a_share_history(dataset, observed_at, fetched_at)""",
+        ),
+    ),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(
+        version=44,
+        name="research-history-incremental-audit",
+        statements=(
+            "CREATE INDEX idx_a_share_price_audit_date "
+            "ON research_a_share_price_history(trade_date)",
+            "CREATE INDEX idx_a_share_conflict_audit_date "
+            "ON research_a_share_archive_conflicts(observed_at)",
+            "CREATE INDEX idx_history_stock_audit_window "
+            "ON research_a_share_history(entity_code,observed_at) WHERE dataset='stock'",
+            """CREATE TABLE data_audit_history_changes (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT, dataset TEXT NOT NULL,
+            observed_at TEXT NOT NULL, entity_code TEXT NOT NULL, operation TEXT NOT NULL)""",
+            """CREATE TABLE data_audit_history_cursor (
+            id INTEGER PRIMARY KEY CHECK(id=1), last_seq INTEGER NOT NULL,
+            started_at TEXT NOT NULL, checked_at TEXT NOT NULL)""",
+            """CREATE TABLE data_audit_history_findings (
+            dataset TEXT NOT NULL, observed_at TEXT NOT NULL, entity_code TEXT NOT NULL,
+            problem TEXT NOT NULL, checked_at TEXT NOT NULL,
+            PRIMARY KEY(dataset,observed_at,entity_code))""",
+            """CREATE TRIGGER audit_history_insert AFTER INSERT ON research_a_share_history
+            BEGIN INSERT INTO data_audit_history_changes(dataset,observed_at,entity_code,operation)
+            VALUES(NEW.dataset,NEW.observed_at,NEW.entity_code,'upsert'); END""",
+            """CREATE TRIGGER audit_history_update AFTER UPDATE ON research_a_share_history
+            WHEN OLD.payload_json IS NOT NEW.payload_json OR OLD.source IS NOT NEW.source
+              OR OLD.dataset IS NOT NEW.dataset OR OLD.observed_at IS NOT NEW.observed_at
+              OR OLD.entity_code IS NOT NEW.entity_code
+            BEGIN
+              INSERT INTO data_audit_history_changes(dataset,observed_at,entity_code,operation)
+              SELECT OLD.dataset,OLD.observed_at,OLD.entity_code,'delete'
+              WHERE OLD.dataset IS NOT NEW.dataset OR OLD.observed_at IS NOT NEW.observed_at
+                OR OLD.entity_code IS NOT NEW.entity_code;
+              INSERT INTO data_audit_history_changes(dataset,observed_at,entity_code,operation)
+              VALUES(NEW.dataset,NEW.observed_at,NEW.entity_code,'upsert'); END""",
+            """CREATE TRIGGER audit_history_delete AFTER DELETE ON research_a_share_history
+            BEGIN INSERT INTO data_audit_history_changes(dataset,observed_at,entity_code,operation)
+            VALUES(OLD.dataset,OLD.observed_at,OLD.entity_code,'delete'); END""",
+        ),
+    ),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(
+        version=45,
+        name="research-audit-change-retention",
+        statements=(
+            "ALTER TABLE data_audit_history_changes ADD COLUMN changed_at TEXT NOT NULL DEFAULT ''",
+            "UPDATE data_audit_history_changes SET changed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",
+            "DROP TRIGGER audit_history_insert",
+            "DROP TRIGGER audit_history_update",
+            "DROP TRIGGER audit_history_delete",
+            """CREATE TRIGGER audit_history_insert AFTER INSERT ON research_a_share_history
+            BEGIN INSERT INTO data_audit_history_changes
+            (dataset,observed_at,entity_code,operation,changed_at)
+            VALUES(NEW.dataset,NEW.observed_at,NEW.entity_code,'upsert',
+                   strftime('%Y-%m-%dT%H:%M:%fZ','now')); END""",
+            """CREATE TRIGGER audit_history_update AFTER UPDATE ON research_a_share_history
+            WHEN OLD.payload_json IS NOT NEW.payload_json OR OLD.source IS NOT NEW.source
+              OR OLD.dataset IS NOT NEW.dataset OR OLD.observed_at IS NOT NEW.observed_at
+              OR OLD.entity_code IS NOT NEW.entity_code
+            BEGIN
+              INSERT INTO data_audit_history_changes
+              (dataset,observed_at,entity_code,operation,changed_at)
+              SELECT OLD.dataset,OLD.observed_at,OLD.entity_code,'delete',
+                     strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              WHERE OLD.dataset IS NOT NEW.dataset OR OLD.observed_at IS NOT NEW.observed_at
+                OR OLD.entity_code IS NOT NEW.entity_code;
+              INSERT INTO data_audit_history_changes
+              (dataset,observed_at,entity_code,operation,changed_at)
+              VALUES(NEW.dataset,NEW.observed_at,NEW.entity_code,'upsert',
+                     strftime('%Y-%m-%dT%H:%M:%fZ','now')); END""",
+            """CREATE TRIGGER audit_history_delete AFTER DELETE ON research_a_share_history
+            BEGIN INSERT INTO data_audit_history_changes
+            (dataset,observed_at,entity_code,operation,changed_at)
+            VALUES(OLD.dataset,OLD.observed_at,OLD.entity_code,'delete',
+                   strftime('%Y-%m-%dT%H:%M:%fZ','now')); END""",
+        ),
+    ),
 )
 
 

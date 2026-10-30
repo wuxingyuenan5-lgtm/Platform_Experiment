@@ -73,12 +73,13 @@ def test_public_native_callback_precedes_sdk_book_rewrite(monkeypatch):
     from app.config import Settings
 
     sockets = []
+    depths = []
 
     def construct(self, **kwargs):
         sockets.append(self)
 
     monkeypatch.setattr(WebSocket, "__init__", construct)
-    monkeypatch.setattr(WebSocket, "orderbook_stream", lambda *a, **k: None)
+    monkeypatch.setattr(WebSocket, "orderbook_stream", lambda *a, **k: depths.append(k["depth"]))
     monkeypatch.setattr(WebSocket, "ticker_stream", lambda *a, **k: None)
     monkeypatch.setattr(WebSocket, "is_connected", lambda self: True)
     owner = BybitConnections(Settings())
@@ -94,8 +95,84 @@ def test_public_native_callback_precedes_sdk_book_rewrite(monkeypatch):
     assert events[0][0][3]["type"] == "delta"
     assert events[0][1]["source_layer"] == "native_websocket"
     assert len(sockets) == 2
+    assert depths == [1, 1]
     owner.start_research_streams(lambda *a, **k: None)
     assert len(sockets) == 2
+
+
+def test_research_quotes_sample_once_per_minute_and_ticker_deltas_merge(monkeypatch):
+    from types import SimpleNamespace
+
+    from app import research_market_capture as module
+
+    class Clock(datetime):
+        stamp = datetime(2026, 10, 28, 1, 0, 1, tzinfo=UTC)
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.stamp
+
+    monkeypatch.setattr(module, "datetime", Clock)
+    saved = []
+    capture = module.ResearchCapture(None, None)
+    capture.spool = SimpleNamespace(capture=lambda *a, **k: saved.append((a, k)) or len(saved))
+    quote = {
+        "topic": "orderbook.1.BTCUSDT",
+        "type": "snapshot",
+        "data": {"b": [["100.00000000001", "2"]], "a": [["101", "3"]]},
+    }
+    for _ in range(100):
+        capture._capture_bybit(
+            "bybit_message", "bybit:linear:orderbook.1.BTCUSDT", "public", quote, source_ms=123
+        )
+    assert len(saved) == 1
+    assert saved[0][0][0] == "quote_sample"
+    assert saved[0][0][3]["samplingIntervalMs"] == 60000
+    assert saved[0][0][3]["bid"] == "100.00000000001"
+    assert "data" not in saved[0][0][3]
+    ticker = {
+        "topic": "tickers.BTCUSDT",
+        "type": "snapshot",
+        "data": {"symbol": "BTCUSDT", "fundingRate": "0.001", "markPrice": "100"},
+    }
+    stream = "bybit:linear:tickers.BTCUSDT"
+    capture._capture_bybit("bybit_message", stream, "public", ticker)
+    capture._capture_bybit(
+        "bybit_message", stream, "public", dict(ticker, type="delta", data={"fundingRate": "0.002"})
+    )
+    assert len(saved) == 2
+    Clock.stamp = Clock.stamp.replace(minute=1)
+    capture._capture_bybit(
+        "bybit_message", stream, "public", dict(ticker, type="delta", data={"markPrice": "102"})
+    )
+    assert saved[-1][0][3]["data"]["fundingRate"] == "0.002"
+    assert saved[-1][0][3]["data"]["markPrice"] == "102"
+    capture._capture_bybit("bybit_message", "bybit:linear:orderbook.1.BTCUSDT", "public", quote)
+    assert len(saved) == 4
+
+
+def test_minute_tick_sampling_preserves_identity_and_native_count():
+    from app.research_market_capture import project_scan_fields, sample_ticks
+
+    ticks = [
+        {"time_msc": "60001", "bid": "1"},
+        {"time_msc": "60002", "bid": "2"},
+        {"time_msc": "180001", "bid": "3"},
+    ]
+    batch = {"ticks": ticks, "account": "fixed", "server": "broker", "symbol": "XAUUSD.s"}
+    sampled = sample_ticks(batch, 60000)
+    assert sampled["ticks"] == ticks[1:]
+    assert sampled["nativeTickCount"] == 3 and batch["ticks"] == ticks
+    assert sampled["account"] == "fixed" and sampled["symbol"] == "XAUUSD.s"
+    response = {
+        "retCode": 0,
+        "time": 123,
+        "result": {"list": [{"symbol": "BTCUSDT", "fundingRate": "0.01", "unused": "x" * 1000}]},
+    }
+    compact = project_scan_fields(response, {"symbol", "fundingRate"})
+    assert compact["time"] == 123
+    assert compact["result"]["list"] == [{"symbol": "BTCUSDT", "fundingRate": "0.01"}]
+    assert "unused" in response["result"]["list"][0]
 
 
 def test_mt5_range_preserves_every_native_row(monkeypatch):
@@ -245,10 +322,9 @@ def test_mt5_research_yield_is_deferred_without_source_gap(tmp_path, monkeypatch
             raise RuntimeError("Research yielded to account operations")
 
     capture.gateway = Gateway()
-    monkeypatch.setattr(
-        "app.research_clock.conservative_utc_now", lambda _: datetime.now(UTC)
-    )
+    monkeypatch.setattr("app.research_clock.conservative_utc_now", lambda _: datetime.now(UTC))
 
+    monkeypatch.setattr("app.research_clock.live_mt5_clock", lambda _: {"nativeUtcOffsetMs": 0})
     capture._mt5()
 
     assert capture.source_health["mt5:XAUUSD"] == {

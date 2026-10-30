@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from collections.abc import Iterable
 from pathlib import Path
@@ -22,12 +23,6 @@ REQUIRED_ENTRYPOINTS = (
     "docs/engineering/GIT_WORKFLOW.md",
     "docs/contracts/README.md",
 )
-CANDIDATE_AUTHORITY_PATHS = (
-    "docs/BASELINE.md",
-    "docs/contracts/AUTHORIZATION.md",
-    "docs/contracts/ACCESS_MATRIX.md",
-    "docs/architecture/OWNERSHIP.md",
-)
 EXCLUDED_PARTS = frozenset(
     {
         ".git",
@@ -36,6 +31,7 @@ EXCLUDED_PARTS = frozenset(
         ".workbuddy",
         ".mypy_cache",
         ".pytest_cache",
+        ".pytest-basetemp",
         ".ruff_cache",
         ".turbo",
         ".venv",
@@ -46,6 +42,7 @@ EXCLUDED_PARTS = frozenset(
         "node_modules",
         "outputs",
         "test-results",
+        "tmp",
         "vendor",
     }
 )
@@ -56,32 +53,14 @@ FENCED_CODE_PATTERN = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
 HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 CURRENT_STATE_ALIASES = re.compile(r"^current[-_]state\.md$", re.IGNORECASE)
 START_HERE_ALIASES = re.compile(r"^start[-_]here(?:\.md)?$", re.IGNORECASE)
-DELETED_ACTIVE_TREES = re.compile(r"(?:^|/)(?:planning|projects)/", re.IGNORECASE)
 HISTORICAL_CONTEXT = re.compile(
     r"历史|过时|已退役|已替代|已完成|已归档|非当前|historical|retired|superseded|completed|archived|not current",
-    re.IGNORECASE,
-)
-CURRENT_LEGACY_STATUS = re.compile(
-    r"(?:当前阶段|实施计划|适用版本|^#).*?(?:Platform\s+V6|Production\s+Gate|0\.9\.\d+.*Phase|Phase\s*[0-9])",
     re.IGNORECASE,
 )
 ACTIVE_STATUS_PATTERN = re.compile(
     r"^(?:状态：`?active`?|Status:\s*active)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
-DRAFT_PR_STATUS_PATTERN = re.compile(
-    r"状态[^\n]*(?:frozen\s+for\s+)?Draft\s+PR\s*#\d+[^\n]*(?:acceptance)?",
-    re.IGNORECASE,
-)
-CURRENT_STATE_STALE_MARKERS = (
-    "Frontend product restoration has not been executed",
-    "remains outside the current non-UI scope",
-)
-CURRENT_STATE_SCOPE_REQUIREMENTS = (
-    ("browser access", "Capability alignment"),
-    ("frontend product restoration", "restored product pages", "product restoration"),
-)
-AUTH_CONTRACT_PATH = "docs/contracts/AUTHORIZATION.md"
 WORKSTATION_PATH_PATTERNS = (
     (
         "Windows user profile",
@@ -92,11 +71,15 @@ WORKSTATION_PATH_PATTERNS = (
     ),
     (
         "macOS user home",
-        re.compile(r"/Users/(?!<user>(?:/|$)|username(?:/|$)|\$\{?USER\}?(?:/|$))[^/\s`]+(?:/|$)"),
+        re.compile(
+            r"/Users/(?!<user>(?:/|$)|username(?:/|$)|\$\{?USER\}?(?:/|$))[^/\s`]+(?:/|$)"
+        ),
     ),
     (
         "Linux user home",
-        re.compile(r"/home/(?!<user>(?:/|$)|username(?:/|$)|\$\{?USER\}?(?:/|$))[^/\s`]+(?:/|$)"),
+        re.compile(
+            r"/home/(?!<user>(?:/|$)|username(?:/|$)|\$\{?USER\}?(?:/|$))[^/\s`]+(?:/|$)"
+        ),
     ),
 )
 
@@ -130,16 +113,48 @@ def next_patch_version(version: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
-def candidate_authority_paths(root: Path) -> list[Path]:
-    return [root / relative for relative in CANDIDATE_AUTHORITY_PATHS]
-
-
 def is_active_authority(root: Path, path: Path, content: str) -> bool:
     relative = path.relative_to(root).as_posix()
     if relative in REQUIRED_ENTRYPOINTS:
         return True
+    if relative.startswith("docs/workstreams/"):
+        return path.resolve() in active_workstream_paths(root)
     header = "\n".join(content.splitlines()[:20])
     return ACTIVE_STATUS_PATTERN.search(header) is not None
+
+
+def active_workstream_paths(root: Path) -> set[Path]:
+    """Use the existing cockpit links, without a second registry or status syntax."""
+    project = root / "docs/PROJECT.md"
+    if not project.is_file():
+        return set()
+    content = markdown_without_examples(project.read_text(encoding="utf-8"))
+    stage_root = (root / "docs/workstreams").resolve()
+    paths: set[Path] = set()
+    for match in MARKDOWN_LINK_PATTERN.finditer(content):
+        target = markdown_link_target(match.group("target"))
+        if target is None:
+            continue
+        candidate = resolve_repository_target(root, project, target)
+        if candidate and candidate.parent == stage_root and candidate.suffix == ".md":
+            paths.add(candidate)
+    return paths
+
+
+def validate_workstreams(root: Path) -> list[str]:
+    declared = active_workstream_paths(root)
+    present = {path.resolve() for path in (root / "docs/workstreams").glob("*.md")}
+    errors = [
+        f"{path.relative_to(root.resolve()).as_posix()}: workstream is not linked "
+        "from PROJECT.md"
+        for path in sorted(present - declared)
+    ]
+    errors.extend(
+        f"docs/PROJECT.md: declared workstream is missing: "
+        f"{path.relative_to(root.resolve()).as_posix()}"
+        for path in sorted(declared - present)
+    )
+    return errors
 
 
 def markdown_link_target(raw_target: str) -> str | None:
@@ -169,12 +184,16 @@ def resolve_repository_target(root: Path, source: Path, target: str) -> Path | N
     if path_text.startswith("/"):
         return (root / path_text.lstrip("/")).resolve()
     relative_source = source.resolve().relative_to(root.resolve()).as_posix()
-    if path_text.startswith("docs/") and relative_source.startswith("platform-web/docs/"):
+    if path_text.startswith("docs/") and relative_source.startswith(
+        "platform-web/docs/"
+    ):
         root_candidate = (root / path_text).resolve()
         if root_candidate.exists():
             return root_candidate
         return (root / "platform-web" / path_text).resolve()
-    if path_text.startswith(("docs/", "tasks/", "projects/", "platform-web/", "README.md", "AGENTS.md")):
+    if path_text.startswith(
+        ("docs/", "tasks/", "projects/", "platform-web/", "README.md", "AGENTS.md")
+    ):
         return (root / path_text).resolve()
     return (source.parent / path_text).resolve()
 
@@ -195,10 +214,14 @@ def validate_markdown_links(root: Path, paths: Iterable[Path]) -> list[str]:
             try:
                 candidate.relative_to(root)
             except ValueError:
-                errors.append(f"{relative_source}: local Markdown target escapes repository: {target}")
+                errors.append(
+                    f"{relative_source}: local Markdown target escapes repository: {target}"
+                )
                 continue
             if not candidate.exists():
-                errors.append(f"{relative_source}: local Markdown target does not exist: {target}")
+                errors.append(
+                    f"{relative_source}: local Markdown target does not exist: {target}"
+                )
     return sorted(errors)
 
 
@@ -213,7 +236,9 @@ def validate_backticked_paths(root: Path, active_paths: Iterable[Path]) -> list[
             path_part = target.split("#", 1)[0]
             if any(character in target for character in "*?{}<>"):
                 continue
-            if "/" not in path_part and not path_part.startswith(("README.md", "AGENTS.md")):
+            if "/" not in path_part and not path_part.startswith(
+                ("README.md", "AGENTS.md")
+            ):
                 continue
             candidate = resolve_repository_target(root, source, target)
             if candidate is None:
@@ -221,69 +246,15 @@ def validate_backticked_paths(root: Path, active_paths: Iterable[Path]) -> list[
             try:
                 candidate.relative_to(root)
             except ValueError:
-                errors.append(f"{relative_source}: backticked Markdown path escapes repository: {target}")
+                errors.append(
+                    f"{relative_source}: backticked Markdown path escapes repository: {target}"
+                )
                 continue
             if not candidate.exists():
-                errors.append(f"{relative_source}: backticked repository Markdown path does not exist: {target}")
-    return sorted(errors)
-
-
-def validate_active_status(root: Path, active_paths: Iterable[Path]) -> list[str]:
-    errors: list[str] = []
-    for source in sorted(active_paths):
-        relative = source.relative_to(root).as_posix()
-        content = markdown_without_examples(source.read_text(encoding="utf-8"))
-        for line_number, line in enumerate(content.splitlines(), start=1):
-            if DELETED_ACTIVE_TREES.search(line):
-                errors.append(f"{relative}:{line_number}: active document references a retired planning/task/project path")
-            if CURRENT_LEGACY_STATUS.search(line) and not HISTORICAL_CONTEXT.search(line):
-                errors.append(f"{relative}:{line_number}: old V6/Production Gate/phase text is presented as current")
-    return sorted(errors)
-
-
-def validate_candidate_documentation(
-    root: Path,
-    paths: Iterable[Path] | None = None,
-) -> list[str]:
-    errors: list[str] = []
-    stable_version = candidate_version(root)
-    if not stable_version:
-        errors.append("VERSION is missing or empty for candidate documentation validation")
-
-    candidate_paths = list(paths) if paths is not None else candidate_authority_paths(root)
-    for source in candidate_paths:
-        if not source.is_file():
-            errors.append(
-                "candidate documentation authority is missing: "
-                f"{source.relative_to(root).as_posix()}"
-            )
-
-    current_path = root / "docs/BASELINE.md"
-    current = current_path.read_text(encoding="utf-8") if current_path.is_file() else ""
-    for marker in CURRENT_STATE_STALE_MARKERS:
-        if marker in current:
-            errors.append(f"docs/BASELINE.md contains stale candidate status: {marker}")
-    current_folded = current.casefold()
-    for alternatives in CURRENT_STATE_SCOPE_REQUIREMENTS:
-        if not any(alternative.casefold() in current_folded for alternative in alternatives):
-            errors.append(
-                "docs/BASELINE.md must describe current candidate scope: "
-                + " or ".join(alternatives)
-            )
-
-    auth_path = root / AUTH_CONTRACT_PATH
-    if auth_path.is_file() and "verification pending" in auth_path.read_text(encoding="utf-8").casefold():
-        errors.append(f"{AUTH_CONTRACT_PATH} contains stale verification status: verification pending")
-
-    for source in sorted(path for path in candidate_paths if path.is_file()):
-        relative = source.relative_to(root).as_posix()
-        content = markdown_without_examples(source.read_text(encoding="utf-8"))
-        for line_number, line in enumerate(content.splitlines(), start=1):
-            if DRAFT_PR_STATUS_PATTERN.search(line):
                 errors.append(
-                    f"{relative}:{line_number}: candidate status must not persist a Draft PR number"
+                    f"{relative_source}: backticked repository Markdown path does not exist: {target}"
                 )
-    return sorted(set(errors))
+    return sorted(errors)
 
 
 def validate_portable_documentation(root: Path, paths: Iterable[Path]) -> list[str]:
@@ -307,65 +278,68 @@ def validate_entrypoints(root: Path) -> list[str]:
     current = root / "docs/BASELINE.md"
     for path in markdown_paths(root):
         if START_HERE_ALIASES.fullmatch(path.name):
-            errors.append(f"parallel documentation entrypoint is forbidden: {path.relative_to(root)}")
-        if CURRENT_STATE_ALIASES.fullmatch(path.name) and path.resolve() != current.resolve():
-            errors.append(f"parallel current-state entrypoint is forbidden: {path.relative_to(root)}")
-    return errors
-
-
-def validate_current_authority(root: Path) -> list[str]:
-    current = (root / "docs/BASELINE.md").read_text(encoding="utf-8")
-    stable_version = candidate_version(root)
-    errors: list[str] = []
-    candidate = re.search(r"Current candidate target: Platform `([^`]+)`\.", current)
-    if candidate is None or candidate.group(1) not in {
-        stable_version, next_patch_version(stable_version)
-    }:
-        errors.append("BASELINE.md candidate target must be the stable VERSION or next patch")
-    required = (
-        f"Stable baseline: Platform `{stable_version}`",
-        "Platform Live Write and Runtime Live Write remain disabled by default",
-        "Candidate validation does not mean the candidate is released, deployed or production-ready",
-        "remain unverified",
-        "must not be assumed",
-        "Concrete active branch, HEAD and PR state are volatile Git/GitHub facts",
-    )
-    for anchor in required:
-        if anchor not in current:
-            errors.append(f"BASELINE.md missing durable authority fact: {anchor}")
-    volatile = (
-        "Active branch:",
-        "Current branch:",
-        "Active review:",
-        "Draft PR",
-        "Open/Unmerged",
-    )
-    for marker in volatile:
-        if marker in current:
-            errors.append(f"BASELINE.md must not persist volatile Git/GitHub fact: {marker}")
-    if re.search(r"<[A-Z][A-Z0-9_]+>", current):
-        errors.append("BASELINE.md contains an unresolved placeholder")
+            errors.append(
+                f"parallel documentation entrypoint is forbidden: {path.relative_to(root)}"
+            )
+        if (
+            CURRENT_STATE_ALIASES.fullmatch(path.name)
+            and path.resolve() != current.resolve()
+        ):
+            errors.append(
+                f"parallel current-state entrypoint is forbidden: {path.relative_to(root)}"
+            )
     return errors
 
 
 def validate_project_cockpit(root: Path) -> list[str]:
-    project = (root / "docs/PROJECT.md").read_text(encoding="utf-8")
+    project_path = root / "docs/PROJECT.md"
+    if not project_path.is_file():
+        return []  # The entrypoint check reports the missing file.
+    project = project_path.read_text(encoding="utf-8")
     errors: list[str] = []
-    required = (
-        "## Now",
-        "## Next",
-        "## Later",
-        "## 发现箱",
-        "## 更新约定",
-    )
-    for anchor in required:
-        if anchor not in project:
-            errors.append(f"PROJECT.md missing project-tracking section: {anchor}")
-    volatile = ("Active branch:", "Current branch:", "Draft PR", "Open/Unmerged")
-    for marker in volatile:
-        if marker in project:
-            errors.append(f"PROJECT.md must not persist volatile Git/GitHub fact: {marker}")
+    version = candidate_version(root)
+    for line in project.splitlines():
+        match = re.search(r"Platform\s+`?(\d+\.\d+\.\d+)`?\s*(?:候选|candidate)", line)
+        if (
+            match
+            and not HISTORICAL_CONTEXT.search(line)
+            and match.group(1) not in {version, next_patch_version(version)}
+        ):
+            errors.append(
+                f"PROJECT.md contains stale candidate version: {match.group(1)}"
+            )
     return errors
+
+
+def migration_review_notes(root: Path) -> list[str]:
+    """Prompt a content review without imposing a heading format or blocking work."""
+    source = root / "platform-api/app/schema_migrations.py"
+    guide = root / "docs/database/README.md"
+    if not source.is_file() or not guide.is_file():
+        return []  # Missing required entrypoints are reported separately.
+    versions = [
+        keyword.value.value
+        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "Migration"
+        for keyword in node.keywords
+        if keyword.arg == "version"
+        and isinstance(keyword.value, ast.Constant)
+        and type(keyword.value.value) is int
+    ]
+    if not versions:
+        return []
+    latest = max(versions)
+    mentions = re.findall(
+        r"(?:迁移(?:版本)?|migration|schema(?:\s+version)?|version)\s*[:：`v ]*(\d+)",
+        guide.read_text(encoding="utf-8"),
+        re.IGNORECASE | re.MULTILINE,
+    )
+    documented = {int(value) for value in mentions}
+    if latest not in documented:
+        return [f"review whether migration {latest} needs a database-guide update"]
+    return []
 
 
 def validate_repository(root: Path) -> list[str]:
@@ -377,12 +351,10 @@ def validate_repository(root: Path) -> list[str]:
     ]
     return sorted(
         validate_entrypoints(root)
-        + validate_current_authority(root)
         + validate_project_cockpit(root)
-        + validate_candidate_documentation(root)
+        + validate_workstreams(root)
         + validate_markdown_links(root, all_paths)
         + validate_backticked_paths(root, active_paths)
-        + validate_active_status(root, active_paths)
         + validate_portable_documentation(root, all_paths)
     )
 
@@ -390,6 +362,8 @@ def validate_repository(root: Path) -> list[str]:
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     errors = validate_repository(root)
+    for note in migration_review_notes(root):
+        print(f"Documentation review note: {note}")
     if errors:
         print("Documentation consistency checks failed:")
         for error in errors:

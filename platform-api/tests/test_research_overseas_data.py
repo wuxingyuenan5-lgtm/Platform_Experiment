@@ -1008,7 +1008,7 @@ def test_shared_spot_prices_batch_queries_preserve_precedence(overseas_db, monke
     import json
     from contextlib import contextmanager
 
-    from app import database_connection
+    from app import strategy_research_database as database_connection
 
     start = datetime(2020, 1, 1, tzinfo=UTC)
     days = [(start + timedelta(days=i)).date().isoformat() for i in range(801)]

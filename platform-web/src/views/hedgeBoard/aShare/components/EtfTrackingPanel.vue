@@ -308,6 +308,27 @@
           ></div
         ></details
       >
+      <section class="flow-history">
+        <button
+          type="button"
+          class="flow-history-toggle"
+          :aria-expanded="showFlowCharts"
+          aria-controls="etf-flow-history"
+          :aria-label="showFlowCharts ? '收起ETF申赎历史' : '展开ETF申赎历史'"
+          @click="showFlowCharts = !showFlowCharts"
+          ><strong>ETF申赎历史</strong><span>{{ showFlowCharts ? '收起' : '展开' }}</span></button
+        >
+        <div v-if="showFlowCharts" id="etf-flow-history">
+          <EtfLinkedCharts
+            flows-only
+            :detail="detail"
+            :start="start"
+            :end="end"
+            :tooltip="tooltip"
+            @range="setRange"
+          />
+        </div>
+      </section>
     </template>
   </section>
 </template>
@@ -347,6 +368,7 @@
   const loading = ref(false),
     detailLoading = ref(false),
     error = ref('');
+  const showFlowCharts = ref(false);
   const selected = useResearchViewState('selected', '510310'),
     query = useResearchViewState('query', ''),
     category = useResearchViewState('category', ''),
@@ -1233,6 +1255,19 @@
 
   .text-button small {
     display: inline;
+  }
+
+  .flow-history {
+    margin-top: 18px;
+  }
+
+  .flow-history-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 12px 16px;
   }
 
   .method {

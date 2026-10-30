@@ -148,8 +148,10 @@ def test_gold_provider_builds_real_90_day_series_and_ratio(monkeypatch: pytest.M
     contract = asyncio.run(provider._get_live_market_detail("gold"))
 
     assert contract.status == "partial"
-    assert {'gold-xau-row', 'gold-ratio-row', 'gold-zijin', 'gold-tongling'} <= {row.id for row in contract.rows}
-    assert not any(row.id.endswith('-source') for row in contract.rows)
+    assert {"gold-xau-row", "gold-ratio-row", "gold-zijin", "gold-tongling"} <= {
+        row.id for row in contract.rows
+    }
+    assert not any(row.id.endswith("-source") for row in contract.rows)
     assert all(len(row.spark_90d) == 90 for row in contract.rows if row.sample_size is None)
     ratio = next(row for row in contract.rows if row.id == "gold-ratio-row")
     assert ratio.spark_90d[-1] == Decimal("1")
@@ -251,3 +253,40 @@ def test_breadth_does_not_count_open_utc_day():
     rows = market_detail._breadth_rows("crypto", {"crypto-btc-row": points})
     assert rows[0].close == 0
     assert rows[0].observation_date == (today - timedelta(days=1)).isoformat()
+
+
+@pytest.mark.parametrize(
+    "offset,crypto,expected",
+    [(0, False, True), (-1, False, False), (61, False, False), (0, True, False)],
+)
+def test_missing_daily_candle_only_admits_matching_completed_regular_close(
+    offset, crypto, expected
+):
+    from datetime import UTC, datetime, timedelta
+
+    end = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+    stamp = int(end.timestamp())
+    payload = {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [stamp - 86400, stamp],
+                    "meta": {
+                        "exchangeTimezoneName": "UTC",
+                        "instrumentType": "CRYPTOCURRENCY" if crypto else "ETF",
+                        "regularMarketTime": stamp + offset,
+                        "regularMarketPrice": 123.45,
+                        "currentTradingPeriod": {"regular": {"end": stamp}},
+                    },
+                    "indicators": {"quote": [{"close": [120, None]}]},
+                }
+            ]
+        }
+    }
+    result = asyncio.run(
+        MarketDetailProvider(timeout_seconds=1, user_agent="test")._fetch_yahoo_history(
+            _Client(payload), "spy", "SPY"
+        )
+    )
+    assert (result[1][-1][1] == Decimal("123.45")) == expected
+    assert bool(result[3]["quote_quality_flags"]) == expected

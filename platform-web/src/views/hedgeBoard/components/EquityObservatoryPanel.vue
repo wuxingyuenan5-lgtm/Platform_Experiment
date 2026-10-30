@@ -15,6 +15,14 @@
       loading ? '正在读取市场观察…' : '暂无已发布的市场观察数据'
     }}</p>
     <template v-else>
+      <WidgetErrorBoundary
+        v-if="market === 'cn' && view === 'crowding'"
+        :key="`theme-crowding:${data.generatedAt}`"
+        widget-title="主题成交与价格"
+      >
+        <ThemeCrowdingPanel v-if="data.themeCrowding" :data="data.themeCrowding" />
+        <p v-else role="status">主题成交与价格数据待生成</p>
+      </WidgetErrorBoundary>
       <section
         v-if="
           data.breadth &&
@@ -29,14 +37,19 @@
         >
         <div class="metric-grid"
           ><article
-            ><span>上涨</span><strong>{{ data.breadth.advancing }}</strong></article
+            ><span>上涨</span
+            ><strong>{{ data.breadth.valid ? data.breadth.advancing : '—' }}</strong></article
           ><article
-            ><span>下跌</span><strong>{{ data.breadth.declining }}</strong></article
+            ><span>下跌</span
+            ><strong>{{ data.breadth.valid ? data.breadth.declining : '—' }}</strong></article
           ><article
-            ><span>平盘</span><strong>{{ data.breadth.unchanged }}</strong></article
+            ><span>平盘</span
+            ><strong>{{ data.breadth.valid ? data.breadth.unchanged : '—' }}</strong></article
           ><article
             ><span>涨跌家数差</span
-            ><strong>{{ data.breadth.advancing - data.breadth.declining }}</strong></article
+            ><strong>{{
+              data.breadth.valid ? data.breadth.advancing - data.breadth.declining : '—'
+            }}</strong></article
           ></div
         >
         <div class="table-scroll"
@@ -49,8 +62,8 @@
             ><tbody
               ><tr v-for="r in data.breadth.participation" :key="r.period"
                 ><th>{{ r.period }}交易日</th><td>{{ format(r.abovePct, '%') }}</td
-                ><td>{{ r.highs }}</td
-                ><td>{{ r.lows }}</td
+                ><td>{{ r.valid ? r.highs : '—' }}</td
+                ><td>{{ r.valid ? r.lows : '—' }}</td
                 ><td>{{ r.valid }} / {{ data.breadth.expected }}</td></tr
               ></tbody
             ></table
@@ -72,7 +85,9 @@
         <p
           v-if="data.sectionStatus?.market === 'stale' || data.sectionStatus?.themes === 'stale'"
           role="status"
-          >主题数据更新失败，当前显示已保留的数据。</p
+          ><template v-if="data.themes?.date && data.themes.date !== data.date"
+            >最新收盘历史尚未齐全，当前主题统计截至 {{ data.themes.date }}。</template
+          ><template v-else>主题数据更新失败，当前显示已保留的数据。</template></p
         >
         <EquityThemePanel
           v-if="data.themes"
@@ -412,6 +427,7 @@
   import IndexValuationPanel from './IndexValuationPanel.vue';
   import WidgetErrorBoundary from './WidgetErrorBoundary';
   import EquityThemePanel from './EquityThemePanel.vue';
+  import ThemeCrowdingPanel from './ThemeCrowdingPanel.vue';
 
   import { useResearchViewState, useResearchSnapshots } from '../composables/researchWorkspace';
 
@@ -429,8 +445,6 @@
     v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
   const format = (v: EquityValue | undefined, suffix = '') =>
     numeric(v) == null ? '—' : `${numeric(v)!.toFixed(2)}${suffix}`;
-  const tone = (v: EquityValue | undefined) =>
-    numeric(v) == null || numeric(v) === 0 ? '' : numeric(v)! > 0 ? 'positive' : 'negative';
   const shownIndustries = computed(() =>
     (data.value?.structure?.industries || []).slice(0, allIndustries.value ? undefined : 12),
   );

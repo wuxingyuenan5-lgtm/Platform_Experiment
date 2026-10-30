@@ -559,16 +559,31 @@ class AShareResearchProvider:
         try:
             payload = self._direct_json(
                 opener,
-                ("https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get" if len(code) == 5
-                 else "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"),
+                (
+                    "https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get"
+                    if len(code) == 5
+                    else "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get"
+                ),
                 {"param": f"{symbol},day,,,300,qfq"},
                 headers={"User-Agent": "Mozilla/5.0"},
             )
             node = (payload.get("data") or {}).get(symbol) or {}
-            rows = self._normalize_tencent_history(node.get("qfqday") or node.get("day") or [])
-            return [
-                AShareIndexHistoryPoint(observed_at=row["date"], close=row["close"]) for row in rows
-            ]
+            # Tencent's qfq request returns `day` for unadjusted listings (as
+            # handled by the upstream stock_zh_a_hist_tx adapter). Both branches
+            # belong to this same explicit qfq request, not a second raw query.
+            raw_rows = node.get("qfqday") or node.get("day")
+            rows = self._normalize_tencent_history(raw_rows or [])
+            return sorted(
+                [
+                    AShareIndexHistoryPoint(
+                        observed_at=row["date"],
+                        close=row["close"],
+                        source_name="tencent-qfq-daily",
+                    )
+                    for row in rows
+                ],
+                key=lambda point: point.observed_at,
+            )
         except ResearchProviderError:
             return []
 
@@ -709,6 +724,7 @@ class AShareResearchProvider:
                 history=[
                     AShareIndexHistoryPoint(
                         observed_at=item["date"],
+                        source_name=item.get("source"),
                         close=item["close"],
                         turnover_yuan=item["amount"],
                     )
@@ -724,16 +740,18 @@ class AShareResearchProvider:
 
         opener = build_opener(ProxyHandler({}))
         if code in {"000300", "000852", "399006", "000688"}:
-            endpoint = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-            response = self._direct_json(
-                opener,
-                endpoint,
-                {"param": f"{symbol},day,,,800,qfq"},
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
-            node = (response.get("data") or {}).get(symbol) or {}
-            rows = node.get("qfqday") or node.get("day") or []
-            return self._normalize_tencent_history(rows)
+            records = _records(self._akshare().stock_zh_index_daily(symbol=symbol))
+            return [
+                {
+                    "date": _date(row.get("date")),
+                    "close": _decimal(row.get("close")),
+                    "amount": None,
+                    "source": "sina-index-daily",
+                }
+                for row in records
+                if _date(row.get("date")) is not None
+                and (_decimal(row.get("close")) or Decimal("0")) > 0
+            ][-800:]
 
         endpoint = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
         response = self._direct_json(

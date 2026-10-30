@@ -102,3 +102,40 @@ def test_hong_kong_history_uses_its_native_endpoint(monkeypatch):
     monkeypatch.setattr(provider, "_direct_json", fetch)
     assert len(provider._direct_stock_history("00700")) == 1
     assert "/hkfqkline/" in urls[0]
+
+
+def test_cn_stock_history_requires_native_qfq_with_source_identity(monkeypatch):
+    from app.research_provider_a_share import AShareResearchProvider
+
+    provider = AShareResearchProvider(
+        timeout_seconds=1, user_agent="test", akshare_loader=lambda: None
+    )
+    calls = []
+
+    def fetch(_opener, url, params, **_kwargs):
+        calls.append((url, params))
+        return {
+            "data": {
+                "sh600519": {
+                    "qfqday": [
+                        ["2026-10-29", "10", "10.123456789"],
+                        ["2026-10-28", "10", "9.9"],
+                    ]
+                }
+            }
+        }
+
+    monkeypatch.setattr(provider, "_direct_json", fetch)
+    rows = provider._direct_stock_history("600519")
+    assert calls[0][1]["param"] == "sh600519,day,,,300,qfq"
+    assert "/app/newfqkline/" in calls[0][0]
+    assert rows[-1].source_name == "tencent-qfq-daily"
+    assert rows[-1].close == Decimal("10.123456789")
+    assert str(rows[-1].observed_at) == "2026-10-29"
+
+    monkeypatch.setattr(
+        provider,
+        "_direct_json",
+        lambda *a, **k: {"data": {"sh600519": {"day": [["2026-10-29", "10", "11"]]}}},
+    )
+    assert provider._direct_stock_history("600519")[-1].close == Decimal("11")

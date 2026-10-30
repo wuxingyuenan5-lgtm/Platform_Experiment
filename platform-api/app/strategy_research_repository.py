@@ -12,11 +12,11 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app.config import get_settings
-from app.database_connection import connection, read_only_connection
+from app.config import PLATFORM_API_ROOT, get_settings
+from app.strategy_research_database import connection, read_only_connection
 from app.strategy_research_series import METHOD, QUALITY, Deriver, stable_hash
 
-SCHEMA = "strategy-research.parquet.v1"
+SCHEMA = "strategy-research.parquet.v2"
 _CAPTURE_STATUS_CACHE: tuple[str, float, dict] | None = None
 _CAPTURE_STATUS_LOCK = threading.Lock()
 _CAPTURE_STATUS_TTL_SECONDS = 30.0
@@ -29,7 +29,8 @@ def invalidate_capture_status_cache():
 
 
 def root_path():
-    return Path(get_settings().strategy_research_path).resolve()
+    path = Path(get_settings().strategy_research_path)
+    return (path if path.is_absolute() else PLATFORM_API_ROOT / path).resolve()
 
 
 def now():
@@ -121,10 +122,30 @@ def publish(batch):
         }
         for e in derived
     ]
+    # Frequently queried minute facts are physical columns, with exact decimal text.
+    metrics = ("bid", "ask", "buySpread", "sellSpread", "midSpread")
+    for row in rows:
+        value = json.loads(row["event_json"])
+        if row["layer"] == "raw":
+            value = value.get("payload", {})
+        row["entity"] = value.get("entity")
+        row["bucket_start_ms"] = value.get("bucketStartMs")
+        row["sample_count"] = (
+            value.get("count") if value.get("kind") in {"quote_minute", "spread_minute"} else None
+        )
+        for metric in metrics:
+            for field in ("open", "high", "low", "close"):
+                row[metric + "_" + field] = value.get("values", {}).get(metric, {}).get(field)
     schema = pa.schema(
         [
             (name, pa.string())
             for name in ("layer", "kind", "pair", "scope", "received_at", "event_json")
+        ]
+        + [("entity", pa.string()), ("bucket_start_ms", pa.int64()), ("sample_count", pa.int64())]
+        + [
+            (metric + "_" + field, pa.string())
+            for metric in metrics
+            for field in ("open", "high", "low", "close")
         ],
         metadata={
             b"schema": SCHEMA.encode(),

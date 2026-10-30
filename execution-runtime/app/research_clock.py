@@ -46,3 +46,76 @@ def conservative_utc_now(evidence):
         - int(evidence["driftAllowanceNs"])
     )
     return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(microseconds=lower_ns // 1000)
+
+
+class Mt5ObservedClock:
+    """Live-only whole-hour native-label calibration against witnessed UTC.
+
+    Requires advancing ticks and consistent elapsed time. Never applies today's
+    offset to historical records or changes execution/OS clocks.
+    """
+
+    def __init__(self):
+        self.previous = None
+        self.count = 0
+        self.evidence = None
+
+    def observe(self, native_ms, utc_ms, account, symbol):
+        offset = round((native_ms - utc_ms) / 3600000) * 3600000
+        age = utc_ms - (native_ms - offset)
+        previous = self.previous
+        if abs(offset) > 14 * 3600000 or not -250 <= age <= 2000:
+            self.previous, self.count, self.evidence = None, 0, None
+            return None
+        if previous and previous[2:] == (offset, account, symbol):
+            advance = native_ms - previous[0]
+            elapsed = utc_ms - previous[1]
+            if advance == 0:
+                return self.evidence
+            if advance < 0 or abs(advance - elapsed) > 1000:
+                self.count, self.evidence = 0, None
+            else:
+                self.count += 1
+        else:
+            self.count, self.evidence = 1, None
+        self.previous = (native_ms, utc_ms, offset, account, symbol)
+        if self.count >= 3:
+            self.evidence = dict(
+                methodVersion="mt5-observed-utc-offset.v1",
+                nativeUtcOffsetMs=offset,
+                account=account,
+                symbol=symbol,
+                nativeTimeMs=str(native_ms),
+                referenceUtcMs=str(utc_ms),
+                samples=self.count,
+                measuredMonotonicNs=str(time.monotonic_ns()),
+                maxAgeNs="30000000000",
+                scope="live_observations_only",
+            )
+        return self.evidence
+
+
+def live_mt5_clock(evidence):
+    if not evidence:
+        return None
+    age = time.monotonic_ns() - int(evidence["measuredMonotonicNs"])
+    return evidence if 0 <= age <= int(evidence["maxAgeNs"]) else None
+
+
+def quote_time_quality(evidence, source_ms):
+    """Use the UTC interval, including drift, without treating host wall time as UTC."""
+    if evidence is None or source_ms is None:
+        return ["clock_unverified"]
+    elapsed = time.monotonic_ns() - int(evidence["localMonotonicNs"])
+    if not 0 <= elapsed <= int(evidence["maxAgeNs"]):
+        return ["clock_unverified"]
+    upper = (
+        int(evidence["localReceivedNs"])
+        + elapsed
+        + int(evidence["offsetUpperNs"])
+        + int(evidence["driftAllowanceNs"])
+        - int(source_ms) * 1000000
+    )
+    if upper < 0:
+        return ["clock_unverified"]
+    return ["stale_quote"] if upper > 2000000000 else []

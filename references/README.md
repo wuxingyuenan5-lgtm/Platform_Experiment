@@ -11,6 +11,8 @@
 | `screenshots/` | 页面截图、竞品截图、视觉参考 |
 | `research/` | 市场研究、行业资料、技术调研 |
 
+`research/gold-source/` 保留早期黄金来源网页与脚本快照，仅作历史研究参考，不证明当前来源可用性，也不供产品或运行代码导入。本地临时截图和抓取中间文件放入被忽略的根 `tmp/`。
+
 ## 当前状态
 
 - `schema.sql`、`库结构.sql`、`risk_control.sql`已归档到`references/database/`；

@@ -289,6 +289,8 @@ def run_experiment(rows, params):
     params = dict(params)
     params["_workPoints"] = 0
     rows = [r for r in rows if time_ms(r["receivedAt"]) <= time_ms(params["to"])]
+    if any(r.get("samplingIntervalMs", 0) for r in rows):
+        raise ValueError("分钟采样历史不支持逐笔触价、延迟及深度成交回放；请缩小到旧逐笔数据区间")
     # Archive order preserves Runtime session order; wall-clock reversal is unknown.
     for previous, current in zip(rows, rows[1:], strict=False):
         if time_ms(current["receivedAt"]) < time_ms(previous["receivedAt"]):

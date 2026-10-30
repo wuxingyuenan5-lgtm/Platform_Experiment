@@ -29,8 +29,6 @@ def _read_shared_daily_prices(asset: str, dates: list[str]) -> dict[str, float]:
         return {}
     from datetime import timedelta
 
-    from app.database_connection import read_only_connection
-
     result = {}
     entity = asset.upper() + "USDT:spot:trade"
     now_ms = int(datetime.now(UTC).timestamp() * 1000)
@@ -41,7 +39,9 @@ def _read_shared_daily_prices(asset: str, dates: list[str]) -> dict[str, float]:
         for day in dates
     }
     closed_stamps = sorted(stamp for stamp in stamps if stamp <= now_ms)
-    with read_only_connection() as db:
+    from app.strategy_research_database import read_only_connection as research_read
+
+    with research_read() as db:
         for offset in range(0, len(closed_stamps), 400):
             batch = closed_stamps[offset : offset + 400]
             placeholders = ",".join("?" for _ in batch)

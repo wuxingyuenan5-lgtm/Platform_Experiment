@@ -123,6 +123,13 @@
                 :stroke-width="entry.item.lineWidth || 2"
                 class="vibe-chart-line"
               />
+              <circle
+                v-if="segment.isolated"
+                :cx="segment.isolated.x"
+                :cy="segment.isolated.y"
+                r="3"
+                :fill="entry.item.color"
+              />
             </template>
           </g>
           <line
@@ -412,6 +419,7 @@
           ? []
           : segments(item).map((points) => ({
               points: points.map((point) => `${point.x},${point.y}`).join(' '),
+              isolated: points.length === 1 ? points[0] : null,
               area: item.type === 'area' ? areaPath(points, item) : '',
             })),
     })),

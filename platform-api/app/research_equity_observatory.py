@@ -186,7 +186,12 @@ def build_cn(today, sources):
             [s.get("medianTurnover") for s in samples], industry["medianTurnover"]
         )
         industry["sampleCount"] = len(samples)
-    from app.research_a_share_repository import read_index_history, read_stored_stock_histories
+    from app.research_a_share_repository import (
+        read_index_history,
+        read_stored_stock_histories,
+        read_theme_amount_history,
+    )
+    from app.research_theme_crowding import build_theme_crowding, close_amount_points
 
     histories = read_stored_stock_histories(list(CN_THEME_CODES + CN_REFERENCE_CODES))
     history_points = {
@@ -227,6 +232,24 @@ def build_cn(today, sources):
             for code, points in history_points.items()
             if code in CN_REFERENCE_CODES
         },
+    )
+    if (
+        not structure["closed"]
+        or not benchmark_points
+        or benchmark_points[-1]["date"] != structure["date"]
+    ):
+        # Keep the last confirmed theme snapshot while the new session's
+        # quote/benchmark history is incomplete; never relabel its date.
+        themes = previous.get("themes")
+    current_amounts = close_amount_points(aligned, structure["date"], closed=complete)
+    stored_amounts = read_theme_amount_history()
+    if current_amounts:
+        stored_amounts = [p for p in stored_amounts if p[0] != structure["date"]]
+    theme_crowding = build_theme_crowding(
+        histories,
+        stored_amounts + current_amounts,
+        [p["date"] for p in benchmark_points],
+        structure["date"],
     )
     indices = []
     for row in read_dataset("market_detail") or []:
@@ -310,6 +333,7 @@ def build_cn(today, sources):
         "structure": structure,
         "structureHistory": history,
         "themes": themes,
+        "themeCrowding": theme_crowding,
         "breadth": market_breadth(
             observations, sorted(p["date"] for p in benchmark_points), structure["date"]
         ),
@@ -336,7 +360,7 @@ def market_breadth(observations, sessions, latest, codes=None):
         if observation.get("date") != latest:
             continue
         value = number(observation.get("returnPct"))
-        if value is None and len(sessions) >= 2:
+        if value is None and len(sessions) >= 2 and sessions[-1] == latest:
             a, b = (prices[key].get(d) for d in sessions[-2:])
             value = b / a - 1 if a and b else None
         if value is not None:
@@ -345,7 +369,12 @@ def market_breadth(observations, sessions, latest, codes=None):
     for period in (20, 60, 200, 252):
         window = sessions[-period:]
         valid = [
-            p for p in prices.values() if len(window) == period and all(d in p for d in window)
+            p
+            for p in prices.values()
+            if len(window) == period
+            and window[-1] == latest
+            and latest in p
+            and all(d in p for d in window)
         ]
         above = sum(p[latest] > sum(p[d] for d in window) / period for p in valid)
         highs = sum(p[latest] >= max(p[d] for d in window) for p in valid)
@@ -374,12 +403,13 @@ def build_us(today, sources):
     for r in rows:
         points = [p for p in r.get("history", []) if latest and p["date"] <= latest]
         day = points[-1]["date"] if points else None
+        # Transport refresh failure leaves a retained closed history marked
+        # stale. Its already-archived same-session prices remain valid inputs;
+        # exact session coverage is checked separately by window_metrics.
         observations[r["symbol"]] = {
             "name": r.get("name") if r.get("name") != r.get("id") else r["symbol"],
             "date": day,
-            "status": "ready"
-            if day and day == latest and r.get("status") == "ready"
-            else "no_data",
+            "status": "ready" if day and day == latest else "no_data",
             "history": points,
             "source": r.get("source"),
             "sourceUrl": r.get("sourceUrl"),
@@ -558,6 +588,8 @@ def produce_local(sources):
             try:
                 payload = build(stamp[:10], sources)
                 section_status["market"] = "ready"
+                if payload.get("themes") and payload["themes"].get("date") != payload.get("date"):
+                    section_status["themes"] = "stale"
                 if "themes" in payload and payload["themes"] is None:
                     payload["themes"] = previous.get("themes")
                     section_status["themes"] = "stale" if payload["themes"] else "error"

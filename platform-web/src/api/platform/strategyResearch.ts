@@ -24,7 +24,7 @@ export async function researchSeries(
   from: string,
   to: string,
   view: 'all' | 'valid',
-  resolution: '1s' | '15m' | '1h' | '8h' | '1d' | 'event' = '1s',
+  resolution: '1m' | '1s' | '15m' | '1h' | '8h' | '1d' | 'event' = '1m',
   symbol = 'BTC',
 ) {
   return strategyData(

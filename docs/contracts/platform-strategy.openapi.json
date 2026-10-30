@@ -11791,7 +11791,7 @@
   },
   "info": {
     "title": "Platform API",
-    "version": "0.11.3"
+    "version": "0.11.4"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -12867,6 +12867,82 @@
         ]
       }
     },
+    "/api/v1/research/strategies/minute-history": {
+      "get": {
+        "operationId": "minute_history_api_v1_research_strategies_minute_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entity",
+            "required": true,
+            "schema": {
+              "title": "Entity",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "quote_minute",
+              "enum": [
+                "quote_minute",
+                "spread_minute"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_ms",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "Start Ms",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_ms",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "title": "End Ms",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Minute History",
+        "tags": [
+          "strategy-research"
+        ]
+      }
+    },
     "/api/v1/research/strategies/pairs/{pair}/distribution": {
       "get": {
         "operationId": "get_distribution_api_v1_research_strategies_pairs__pair__distribution_get",
@@ -13111,8 +13187,9 @@
             "name": "resolution",
             "required": false,
             "schema": {
-              "default": "1s",
+              "default": "1m",
               "enum": [
+                "1m",
                 "1s",
                 "15m",
                 "1h",

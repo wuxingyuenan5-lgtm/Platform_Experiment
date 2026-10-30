@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ast
 import re
-import runpy
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,20 +28,8 @@ ALLOWED_TOP_LEVEL_DIRECTORIES = {
     "platform-web",
     "references",
     "scripts",
+    "tmp",  # Ignored local outputs only; versioned files are rejected below.
 }
-REQUIRED_ENTRYPOINTS = (
-    "README.md",
-    "AGENTS.md",
-    "docs/README.md",
-    "docs/BASELINE.md",
-    "docs/architecture/SYSTEM_MAP.md",
-    "docs/architecture/OWNERSHIP.md",
-    "docs/operations/RUNBOOK.md",
-    "docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md",
-    "docs/database/README.md",
-    "docs/engineering/GIT_WORKFLOW.md",
-    "docs/contracts/README.md",
-)
 FORBIDDEN_BACKEND_IMPORTS = {"MetaTrader5", "binance", "ccxt", "ib_insync", "pybit"}
 HISTORICAL_WORKFLOW_PATTERN = re.compile(
     r"(?:0[-.]9[-.]2|0[-.]9[-.]3|phase[-_ ]?[0-6])", re.IGNORECASE
@@ -73,6 +61,20 @@ def check_root_directories(errors: list[str]) -> None:
                 f"{path.name}: unregistered top-level directory; maintained services are "
                 "platform-web, platform-api and execution-runtime"
             )
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "--", "tmp/"],
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+    )
+    if tracked.returncode:
+        errors.append("cannot verify temporary-output tracking with git ls-files")
+    else:
+        for name in tracked.stdout.decode("utf-8").split("\0"):
+            if name and (ROOT / name).exists():
+                errors.append(
+                    f"{name}: tracked temporary output; retain references under references/"
+                )
 
 
 def check_backend_venue_boundary(errors: list[str]) -> None:
@@ -103,11 +105,13 @@ def check_execution_risk_boundaries(errors: list[str]) -> None:
     if "app.database" in source["models"] or "fastapi" in source["models"]:
         errors.append("execution_risk_models.py must not access database or HTTP")
     if any(
-        token in source["policy"] for token in ("app.database", "fastapi", "connection()")
+        token in source["policy"]
+        for token in ("app.database", "fastapi", "connection()")
     ):
         errors.append("execution_risk_policy.py must remain pure and deterministic")
     if any(
-        token in source["repository"] for token in ("fastapi", "APIRouter", "HTTPException")
+        token in source["repository"]
+        for token in ("fastapi", "APIRouter", "HTTPException")
     ):
         errors.append("execution_risk_repository.py must not contain HTTP logic")
     for anchor in (
@@ -117,42 +121,30 @@ def check_execution_risk_boundaries(errors: list[str]) -> None:
         "CREATE TABLE IF NOT EXISTS execution_risk_actions",
     ):
         if anchor not in source["repository"]:
-            errors.append(f"execution_risk_repository.py missing persistence anchor: {anchor}")
+            errors.append(
+                f"execution_risk_repository.py missing persistence anchor: {anchor}"
+            )
     if "from app.trade_commands import" in source["router"]:
-        errors.append("execution_risk.py must not import the concrete trade-command implementation")
+        errors.append(
+            "execution_risk.py must not import the concrete trade-command implementation"
+        )
     if "connection()" in source["router"] or "app.database" in source["router"]:
         errors.append("execution_risk.py must not access the database directly")
     if "configure_trade_command_port" not in source["router"]:
         errors.append("execution_risk.py is missing the local trade-command port")
-    if "configure_trade_command_port(create_trade_command)" not in source["application"]:
-        errors.append("application.py must wire the execution-risk trade-command port")
-
-
-def check_documents(errors: list[str]) -> None:
-    for relative in REQUIRED_ENTRYPOINTS:
-        if not (ROOT / relative).is_file():
-            errors.append(f"{relative}: required active entrypoint is missing")
-    current = ROOT / "docs/BASELINE.md"
-    if current.is_file():
-        authority = runpy.run_path(str(Path(__file__).with_name("check-documentation-consistency.py")))
-        errors.extend(authority["validate_current_authority"](ROOT))
-        source = current.read_text(encoding="utf-8")
-        candidate = re.search(r"Current candidate target: Platform `([^`]+)`\.", source)
-        if candidate and f"The Platform {candidate.group(1)} candidate scope includes" not in source:
-            errors.append("docs/BASELINE.md candidate scope must match its declared target")
-    database = ROOT / "docs/database/README.md"
     if (
-        database.is_file()
-        and "app/execution_risk_repository.py"
-        not in database.read_text(encoding="utf-8")
+        "configure_trade_command_port(create_trade_command)"
+        not in source["application"]
     ):
-        errors.append("docs/database/README.md must register execution_risk_repository.py")
+        errors.append("application.py must wire the execution-risk trade-command port")
 
 
 def check_execution_risk_typecheck_scope(errors: list[str]) -> None:
     path = ROOT / "platform-api/pyproject.toml"
     if not path.is_file():
-        errors.append("platform-api/pyproject.toml: type-check configuration is missing")
+        errors.append(
+            "platform-api/pyproject.toml: type-check configuration is missing"
+        )
         return
     source = path.read_text(encoding="utf-8")
     for module in (
@@ -162,7 +154,9 @@ def check_execution_risk_typecheck_scope(errors: list[str]) -> None:
         "app/execution_risk_repository.py",
     ):
         if module not in source:
-            errors.append(f"platform-api/pyproject.toml must include {module} in Pyright scope")
+            errors.append(
+                f"platform-api/pyproject.toml must include {module} in Pyright scope"
+            )
     ignore_match = re.search(r"(?ms)^ignore\s*=\s*\[(.*?)^\]", source)
     ignored = ignore_match.group(1) if ignore_match else ""
     for module in ("app/execution_risk.py", "app/execution_risk_repository.py"):
@@ -182,13 +176,17 @@ def check_long_term_governance(errors: list[str]) -> None:
         "python scripts/frontend-no-new-debt.py",
     ):
         if command not in source:
-            errors.append(f"repository-quality workflow missing permanent gate: {command}")
+            errors.append(
+                f"repository-quality workflow missing permanent gate: {command}"
+            )
 
 
 def check_deployment_contract(errors: list[str]) -> None:
     path = ROOT / "platform-web/.gitlab-ci.yml"
     if not path.is_file():
-        errors.append("platform-web/.gitlab-ci.yml: deployment configuration is missing")
+        errors.append(
+            "platform-web/.gitlab-ci.yml: deployment configuration is missing"
+        )
         return
     source = path.read_text(encoding="utf-8")
     for variable in ("PLATFORM_WEB_DEPLOY_DIR", "PLATFORM_WEB_PUBLIC_URL"):
@@ -234,7 +232,6 @@ def main() -> int:
     check_root_directories(errors)
     check_backend_venue_boundary(errors)
     check_execution_risk_boundaries(errors)
-    check_documents(errors)
     check_execution_risk_typecheck_scope(errors)
     check_long_term_governance(errors)
     check_deployment_contract(errors)

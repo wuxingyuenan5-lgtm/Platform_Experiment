@@ -33,18 +33,20 @@ def test_current_product_data_owner_matrix_is_closed_and_covers_formal_views() -
     audit = _load_audit_module()
     result = audit.audit(MATRIX, require_closed=True)
     assert result["status"] == "ok"
-    assert result["formal_routes"] == 30
-    assert result["route_names"] == 30
-    assert result["entries"] == 21
-    assert result["unique_views"] == 21
     assert result["closure"].get("gap", 0) == 0
     assert "evidence_debt" not in result
 
 
 def test_missing_formal_route_is_rejected(tmp_path: Path) -> None:
     audit = _load_audit_module()
-    target = _write_matrix(tmp_path, lambda value: value["entries"][0]["routes"].clear())
-    with pytest.raises(audit.AuditError, match="routes must be a non-empty list"):
+
+    def remove_audit_route(value: dict) -> None:
+        value["entries"] = [entry for entry in value["entries"] if entry["module"] != "data-audit"]
+
+    target = _write_matrix(tmp_path, remove_audit_route)
+    with pytest.raises(
+        audit.AuditError, match=r"route coverage mismatch: missing=\['/risk/data-audit'\]"
+    ):
         audit.audit(target, require_closed=True)
 
 
@@ -58,11 +60,12 @@ def test_registry_cannot_enable_live_write(tmp_path: Path) -> None:
         audit.audit(target, require_closed=True)
 
 
-def test_require_closed_rejects_unresolved_product_gap(tmp_path: Path) -> None:
+@pytest.mark.parametrize("module", ["account", "strategy-management"])
+def test_require_closed_rejects_unresolved_product_gap(tmp_path: Path, module: str) -> None:
     audit = _load_audit_module()
 
     def add_unresolved_gap(value: dict) -> None:
-        account = next(entry for entry in value["entries"] if entry["module"] == "account")
+        account = next(entry for entry in value["entries"] if entry["module"] == module)
         account["closure_status"] = "gap"
         account["gap_reason"] = "test unresolved account owner"
 

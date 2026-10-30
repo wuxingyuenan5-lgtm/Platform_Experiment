@@ -682,7 +682,7 @@ def write_dashboard(
                             row.get("observedAt", row.get("observed_at")),
                             code,
                             json.dumps(row, ensure_ascii=False),
-                            dashboard.market_detail.meta.source,
+                            row.get("sourceName") or dashboard.market_detail.meta.source,
                             fetched,
                             run_id,
                         ),
@@ -1296,6 +1296,14 @@ def publish_refresh(
                 dataset, payload, source=source, run_id=run_id, observed_at=trade_date, db=db
             )
         for dataset, points, source in histories:
+            if dataset == "theme_amount" and trade_date:
+                # A revised close replaces its whole matched universe, so a
+                # missing member cannot survive from an earlier same-day run.
+                db.execute(
+                    "DELETE FROM research_a_share_history "
+                    "WHERE dataset='theme_amount' AND observed_at=?",
+                    (trade_date,),
+                )
             if dataset == "hot_stock" and trade_date:
                 db.execute(
                     "DELETE FROM research_a_share_history "
@@ -1347,9 +1355,24 @@ def read_stored_stock_histories(codes: list[str]) -> dict[str, list[AShareIndexH
                 observed_at=row["observed_at"],
                 close=payload["close"],
                 turnover_yuan=payload.get("turnoverYuan"),
+                source_name=payload.get("sourceName"),
             )
         )
     return result
+
+
+def read_theme_amount_history() -> list[tuple[str, str, dict[str, Any]]]:
+    from app.database_connection import read_only_connection
+
+    with read_only_connection() as db:
+        rows = db.execute(
+            """SELECT observed_at,entity_code,payload_json FROM research_a_share_history
+            WHERE dataset='theme_amount' AND observed_at IN (
+                SELECT DISTINCT observed_at FROM research_a_share_history
+                WHERE dataset='theme_amount' ORDER BY observed_at DESC LIMIT 1500)
+            ORDER BY observed_at,entity_code"""
+        ).fetchall()
+    return [(r["observed_at"], r["entity_code"], json.loads(r["payload_json"])) for r in rows]
 
 
 def read_stock_detail(code: str) -> dict[str, Any]:

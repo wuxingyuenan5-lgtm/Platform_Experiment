@@ -47,6 +47,27 @@ def copy_version_fixture(tmp_path: Path) -> None:
         shutil.copy2(source, target)
 
 
+@pytest.mark.parametrize(("patch_offset", "valid"), [(-1, False), (0, True), (1, True), (2, False)])
+def test_candidate_target_policy_is_owned_by_version_checker(
+    tmp_path: Path, patch_offset: int, valid: bool,
+) -> None:
+    copy_version_fixture(tmp_path)
+    major, minor, patch = (int(part) for part in CURRENT_VERSION.split("."))
+    candidate = f"{major}.{minor}.{patch + patch_offset}"
+    baseline = tmp_path / "docs/BASELINE.md"
+    source = baseline.read_text(encoding="utf-8")
+    source = re.sub(
+        r"Current candidate target: Platform `[^`]+`",
+        f"Current candidate target: Platform `{candidate}`", source,
+    )
+    baseline.write_text(source, encoding="utf-8")
+    if valid:
+        version_checker.check_versions(tmp_path)
+    else:
+        with pytest.raises(SystemExit, match="candidate target must be the stable VERSION"):
+            version_checker.check_versions(tmp_path)
+
+
 @pytest.mark.parametrize(
     ("relative_path", "stale"),
     [

@@ -14,15 +14,18 @@
       "frontend_services": [],
       "api_endpoints": [],
       "application_services": [],
-      "repository_or_provider": [],
-      "real_data_source": "not-configured",
+      "repository_or_provider": [
+        "platform-web/src/views/dashboard/index.vue"
+      ],
+      "real_data_source": "not-configured: dashboard aggregate owners",
       "permissions": [
-        "platform:read"
+        "dashboard.read"
       ],
       "roles": [
         "ceo",
         "tech_lead",
-        "employee"
+        "employee",
+        "member"
       ],
       "refresh": "none",
       "as_of": "required-when-ready",
@@ -32,15 +35,15 @@
       "precision": "decimal-string-required",
       "empty_state": "no_data",
       "unavailable_state": "not_configured",
-      "fallback": "none",
+      "fallback": "sample:dashboard-restoration; visibly labeled; actionable=false",
       "writes": false,
       "live_write": false,
       "e2e": [
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "production view contains static market/calendar presentation without a registered data owner"
+      "closure_status": "explicit_unavailable",
+      "gap_reason": null
     },
     {
       "module": "account",
@@ -105,17 +108,29 @@
         "AuditIndex"
       ],
       "view_owner": "platform-web/src/views/audit/index.vue",
-      "frontend_services": [],
-      "api_endpoints": [],
-      "application_services": [],
-      "repository_or_provider": [],
-      "real_data_source": "not-configured",
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
+      ],
+      "api_endpoints": [
+        "data-service:/health",
+        "/risk/api/v1/risk-records/",
+        "/notifications/api/v1/messages/"
+      ],
+      "application_services": [
+        "external:data-service",
+        "external:risk-service",
+        "external:notification-service"
+      ],
+      "repository_or_provider": [
+        "external:audit-source-aggregation"
+      ],
+      "real_data_source": "data-service health plus risk and notification facts",
       "permissions": [],
       "roles": [
         "admin-legacy"
       ],
-      "refresh": "none",
-      "as_of": "required-when-ready",
+      "refresh": "on-mount and manual",
+      "as_of": "latest source event or provider health timestamp",
       "timezone": "UTC",
       "currency": "not-applicable",
       "unit": "event",
@@ -129,8 +144,8 @@
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "formal route has no registered API/service/repository chain"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "data",
@@ -157,18 +172,21 @@
         "external:data-service account provider"
       ],
       "real_data_source": "configured dataHttp origin",
-      "permissions": [],
+      "permissions": [
+        "data.read"
+      ],
       "roles": [
-        "admin-legacy",
+        "ceo",
+        "tech_lead",
         "employee",
-        "guest-legacy"
+        "member"
       ],
       "refresh": "on-mount and manual",
       "as_of": "asset_updated_at and health metadata",
       "timezone": "source-defined",
       "currency": "USD",
       "unit": "account facts",
-      "precision": "currently-number-gap",
+      "precision": "decimal-string",
       "empty_state": "no_data",
       "unavailable_state": "provider_unavailable",
       "fallback": "none",
@@ -180,8 +198,8 @@
       "provider_smoke": [
         "data-service health"
       ],
-      "closure_status": "gap",
-      "gap_reason": "permissive fallback and number coercion collapse unavailable values into empty/zero"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "finance",
@@ -208,18 +226,21 @@
         "external:data-service accounting provider"
       ],
       "real_data_source": "configured dataHttp origin",
-      "permissions": [],
+      "permissions": [
+        "finance.read"
+      ],
       "roles": [
-        "admin-legacy",
+        "ceo",
+        "tech_lead",
         "employee",
-        "guest-legacy"
+        "member"
       ],
       "refresh": "on-mount and manual",
       "as_of": "asset_updated_at/updated_at",
       "timezone": "source-defined",
       "currency": "USD",
       "unit": "money and ratio",
-      "precision": "currently-number-gap",
+      "precision": "decimal-string",
       "empty_state": "no_data",
       "unavailable_state": "provider_unavailable",
       "fallback": "none",
@@ -231,21 +252,40 @@
       "provider_smoke": [
         "data-service finance endpoints"
       ],
-      "closure_status": "gap",
-      "gap_reason": "number coercion and empty object fallback do not distinguish zero from unavailable"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "financial-ai-daily-review",
-      "routes": ["/financial-ai/daily-review"],
-      "route_names": ["FinancialAiDailyReview"],
+      "routes": [
+        "/financial-ai/daily-review"
+      ],
+      "route_names": [
+        "FinancialAiDailyReview"
+      ],
       "view_owner": "platform-web/src/views/financialAi/dailyReview.vue",
-      "frontend_services": ["platform-web/src/api/financialAi.ts"],
-      "api_endpoints": ["/api/v1/financial-ai/chat"],
-      "application_services": ["platform-api/app/financial_ai_routes.py"],
-      "repository_or_provider": ["platform-api/app/financial_ai_routes.py"],
+      "frontend_services": [
+        "platform-web/src/api/financialAi.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/financial-ai/chat"
+      ],
+      "application_services": [
+        "platform-api/app/financial_ai_routes.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/financial_ai_routes.py"
+      ],
       "real_data_source": "request-time market, industry and research context plus configured model output",
-      "permissions": ["platform:read"],
-      "roles": ["ceo", "tech_lead", "employee", "member"],
+      "permissions": [
+        "platform:read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
       "refresh": "explicit user analysis request",
       "as_of": "per-source upstream time plus generation time",
       "timezone": "source-defined; generated timestamps are timezone-aware",
@@ -257,23 +297,49 @@
       "fallback": "explicit partial-source or model failure; no fabricated answer",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
-      "provider_smoke": ["configured provider or allowlisted subscription CLI"],
+      "e2e": [
+        "platform-visual"
+      ],
+      "provider_smoke": [
+        "configured provider or allowlisted subscription CLI"
+      ],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "financial-ai-stock-analysis",
-      "routes": ["/financial-ai/stock-analysis"],
-      "route_names": ["FinancialAiStockAnalysis"],
+      "routes": [
+        "/financial-ai/stock-analysis"
+      ],
+      "route_names": [
+        "FinancialAiStockAnalysis"
+      ],
       "view_owner": "platform-web/src/views/financialAi/stockAnalysis.vue",
-      "frontend_services": ["platform-web/src/api/financialAi.ts"],
-      "api_endpoints": ["/api/v1/financial-ai/global-stock/{symbol}", "/api/v1/financial-ai/chat"],
-      "application_services": ["platform-api/app/financial_ai_routes.py"],
-      "repository_or_provider": ["platform-api/app/financial_ai_routes.py", "external:Eastmoney", "external:Yahoo Finance"],
+      "frontend_services": [
+        "platform-web/src/api/financialAi.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/financial-ai/global-stock/{symbol}",
+        "/api/v1/financial-ai/chat"
+      ],
+      "application_services": [
+        "platform-api/app/financial_ai_routes.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/financial_ai_routes.py",
+        "external:Eastmoney",
+        "external:Yahoo Finance"
+      ],
       "real_data_source": "request-time global security snapshot plus configured model output",
-      "permissions": ["platform:read"],
-      "roles": ["ceo", "tech_lead", "employee", "member"],
+      "permissions": [
+        "platform:read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
       "refresh": "explicit user lookup or analysis request",
       "as_of": "upstream market or report time plus generation time",
       "timezone": "source-defined",
@@ -285,23 +351,48 @@
       "fallback": "explicit upstream or model failure; no fabricated answer",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
-      "provider_smoke": ["global security upstream and configured model"],
+      "e2e": [
+        "platform-visual"
+      ],
+      "provider_smoke": [
+        "global security upstream and configured model"
+      ],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "financial-ai-news-radar",
-      "routes": ["/financial-ai/news-radar"],
-      "route_names": ["FinancialAiNewsRadar"],
+      "routes": [
+        "/financial-ai/news-radar"
+      ],
+      "route_names": [
+        "FinancialAiNewsRadar"
+      ],
       "view_owner": "platform-web/src/views/financialAi/newsRadar.vue",
-      "frontend_services": ["platform-web/src/api/financialAi.ts"],
-      "api_endpoints": ["/api/v1/financial-ai/news-radar", "/api/v1/financial-ai/chat"],
-      "application_services": ["platform-api/app/financial_ai_routes.py"],
-      "repository_or_provider": ["platform-api/app/financial_ai_routes.py", "external:allowlisted public RSS sources"],
+      "frontend_services": [
+        "platform-web/src/api/financialAi.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/financial-ai/news-radar",
+        "/api/v1/financial-ai/chat"
+      ],
+      "application_services": [
+        "platform-api/app/financial_ai_routes.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/financial_ai_routes.py",
+        "external:allowlisted public RSS sources"
+      ],
       "real_data_source": "allowlisted public RSS items plus optional configured model output",
-      "permissions": ["platform:read"],
-      "roles": ["ceo", "tech_lead", "employee", "member"],
+      "permissions": [
+        "platform:read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
       "refresh": "on request with five-minute process cache; explicit refresh may bypass cache",
       "as_of": "source publication time plus fetch time",
       "timezone": "source-defined; normalized timestamps are timezone-aware",
@@ -313,23 +404,49 @@
       "fallback": "partial-source result with explicit source errors",
       "writes": false,
       "live_write": false,
-      "e2e": ["platform-visual"],
-      "provider_smoke": ["allowlisted RSS sources"],
+      "e2e": [
+        "platform-visual"
+      ],
+      "provider_smoke": [
+        "allowlisted RSS sources"
+      ],
       "closure_status": "verified",
       "gap_reason": null
     },
     {
       "module": "financial-ai-connection",
-      "routes": ["/financial-ai/ai-connection"],
-      "route_names": ["FinancialAiConnection"],
+      "routes": [
+        "/financial-ai/ai-connection"
+      ],
+      "route_names": [
+        "FinancialAiConnection"
+      ],
       "view_owner": "platform-web/src/views/financialAi/aiConnection.vue",
-      "frontend_services": ["platform-web/src/api/financialAi.ts"],
-      "api_endpoints": ["/api/v1/financial-ai/connection", "/api/v1/financial-ai/capabilities", "/api/v1/financial-ai/test-connection"],
-      "application_services": ["platform-api/app/financial_ai_routes.py"],
-      "repository_or_provider": ["platform-api/app/financial_ai_routes.py"],
+      "frontend_services": [
+        "platform-web/src/api/financialAi.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/financial-ai/connection",
+        "/api/v1/financial-ai/capabilities",
+        "/api/v1/financial-ai/test-connection"
+      ],
+      "application_services": [
+        "platform-api/app/financial_ai_routes.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/financial_ai_routes.py"
+      ],
       "real_data_source": "server-side machine connection metadata and allowlisted CLI capability detection",
-      "permissions": ["platform:read", "settings.write"],
-      "roles": ["ceo", "tech_lead", "employee", "member"],
+      "permissions": [
+        "platform:read",
+        "settings.write"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
       "refresh": "explicit read, capability check, connection test or settings write",
       "as_of": "request time",
       "timezone": "timezone-aware server time",
@@ -341,8 +458,12 @@
       "fallback": "explicit not-configured or connection failure state; secrets are never returned",
       "writes": true,
       "live_write": false,
-      "e2e": ["platform-visual"],
-      "provider_smoke": ["configured provider or allowlisted subscription CLI"],
+      "e2e": [
+        "platform-visual"
+      ],
+      "provider_smoke": [
+        "configured provider or allowlisted subscription CLI"
+      ],
       "closure_status": "verified",
       "gap_reason": null
     },
@@ -356,7 +477,7 @@
       ],
       "view_owner": "platform-web/src/views/hedgeBoard/macro/index.vue",
       "frontend_services": [
-        "platform-web/src/api/platform/research.ts"
+        "platform-web/src/api/hedgeResearch.ts"
       ],
       "api_endpoints": [
         "/api/v1/research/macro/expectations"
@@ -370,11 +491,13 @@
       ],
       "real_data_source": "free public research providers",
       "permissions": [
-        "platform:read"
+        "research.read"
       ],
       "roles": [
-        "admin-legacy",
-        "employee"
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
       ],
       "refresh": "on-mount and manual",
       "as_of": "generatedAt/meta.fetchedAt",
@@ -415,21 +538,28 @@
       "frontend_services": [],
       "api_endpoints": [],
       "application_services": [],
-      "repository_or_provider": [],
-      "real_data_source": "not-configured per category",
-      "permissions": [],
-      "roles": [
-        "admin-legacy",
-        "employee"
+      "repository_or_provider": [
+        "external:tradingview-widgets",
+        "platform-web/src/views/hedgeBoard/nativeData/dashboardClean.ts"
       ],
-      "refresh": "none",
-      "as_of": "required-when-ready",
-      "timezone": "UTC",
+      "real_data_source": "TradingView public widgets; static design widgets are isolated and disclosed",
+      "permissions": [
+        "research.read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
+      "refresh": "provider widget refresh",
+      "as_of": "provider-defined",
+      "timezone": "provider-defined",
       "currency": "mixed",
       "unit": "market-defined",
-      "precision": "decimal-string-required",
+      "precision": "provider-defined; Decimal required for Platform-owned values",
       "empty_state": "no_data",
-      "unavailable_state": "not_configured",
+      "unavailable_state": "provider_unavailable",
       "fallback": "none",
       "writes": false,
       "live_write": false,
@@ -438,8 +568,8 @@
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "generic board must expose data-source status instead of implicit/static content"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "hedge-a-share",
@@ -451,7 +581,8 @@
       ],
       "view_owner": "platform-web/src/views/hedgeBoard/aShare/index.vue",
       "frontend_services": [
-        "platform-web/src/api/platform/research.ts"
+        "platform-web/src/api/hedgeResearch.ts",
+        "platform-web/src/api/platform/researchWatchlist.ts"
       ],
       "api_endpoints": [
         "/api/v1/research/a-share/dashboard",
@@ -468,11 +599,13 @@
       ],
       "real_data_source": "AKShare adapters and platform watchlist",
       "permissions": [
-        "platform:read"
+        "research.read"
       ],
       "roles": [
-        "admin-legacy",
-        "employee"
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
       ],
       "refresh": "on-mount and manual",
       "as_of": "generatedAt/meta.fetchedAt",
@@ -518,13 +651,17 @@
       "api_endpoints": [],
       "application_services": [],
       "repository_or_provider": [
-        "docs/trading-tools-bookmarks-review.md"
+        "platform-web/docs/trading-tools-bookmarks-review.md"
       ],
       "real_data_source": "reviewed static bookmark catalog",
-      "permissions": [],
+      "permissions": [
+        "research.read"
+      ],
       "roles": [
-        "admin-legacy",
-        "employee"
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
       ],
       "refresh": "build-time sync",
       "as_of": "catalog review date",
@@ -554,24 +691,39 @@
         "MonitorIndex"
       ],
       "view_owner": "platform-web/src/views/monitor/index.vue",
-      "frontend_services": [],
-      "api_endpoints": [],
-      "application_services": [],
-      "repository_or_provider": [],
-      "real_data_source": "not-configured",
-      "permissions": [],
-      "roles": [
-        "admin-legacy",
-        "employee"
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
       ],
-      "refresh": "none",
-      "as_of": "required-when-ready",
+      "api_endpoints": [
+        "data-service:/health",
+        "current browser session"
+      ],
+      "application_services": [
+        "external:data-service",
+        "external:current-authenticated-session"
+      ],
+      "repository_or_provider": [
+        "external:data-service-health",
+        "external:browser-session-store"
+      ],
+      "real_data_source": "data-service health plus current authenticated session",
+      "permissions": [
+        "monitor.read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
+      "refresh": "on-mount and manual",
+      "as_of": "provider health timestamp",
       "timezone": "UTC",
       "currency": "not-applicable",
       "unit": "status",
       "precision": "not-applicable",
       "empty_state": "no_data",
-      "unavailable_state": "not_configured",
+      "unavailable_state": "provider_unavailable",
       "fallback": "none",
       "writes": false,
       "live_write": false,
@@ -579,8 +731,8 @@
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "formal route has no registered system/runtime status chain"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "notification",
@@ -601,11 +753,13 @@
         "external/legacy notification endpoint"
       ],
       "repository_or_provider": [
-        "external notification owner"
+        "external:notification-service"
       ],
-      "real_data_source": "configured defHttp origin",
+      "real_data_source": "configured notification endpoint",
       "permissions": [],
-      "roles": [],
+      "roles": [
+        "authenticated-session"
+      ],
       "refresh": "on-mount",
       "as_of": "created_at/createdAt",
       "timezone": "source-defined",
@@ -621,8 +775,8 @@
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "route lacks explicit access metadata and API adapter silently returns empty list"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "reports",
@@ -633,24 +787,38 @@
         "ReportsIndex"
       ],
       "view_owner": "platform-web/src/views/reports/index.vue",
-      "frontend_services": [],
-      "api_endpoints": [],
-      "application_services": [],
-      "repository_or_provider": [],
-      "real_data_source": "not-configured",
-      "permissions": [],
-      "roles": [
-        "admin-legacy",
-        "employee"
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
       ],
-      "refresh": "none",
-      "as_of": "required-when-ready",
+      "api_endpoints": [
+        "/risk/api/v1/risk-records/",
+        "/notifications/api/v1/messages/"
+      ],
+      "application_services": [
+        "external:risk-service",
+        "external:notification-service"
+      ],
+      "repository_or_provider": [
+        "external:report-source-aggregation"
+      ],
+      "real_data_source": "risk and notification facts",
+      "permissions": [
+        "reports.read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
+      "refresh": "on-mount and manual",
+      "as_of": "latest source event",
       "timezone": "UTC",
       "currency": "mixed",
       "unit": "report",
       "precision": "decimal-string-required",
       "empty_state": "no_data",
-      "unavailable_state": "not_configured",
+      "unavailable_state": "provider_unavailable",
       "fallback": "none",
       "writes": false,
       "live_write": false,
@@ -658,8 +826,8 @@
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "formal route has no registered report data owner"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "risk",
@@ -674,15 +842,23 @@
         "platform-web/src/api/riskControl.ts"
       ],
       "api_endpoints": [
-        "/risk/api/v1/risk-records/"
+        "/risk/api/v1/risk-records/",
+        "/notifications/api/v1/messages/",
+        "data-service:/health",
+        "data-service:/api/v1/accounts",
+        "data-service:/api/v1/data/total",
+        "data-service:/product/nav/productRatio",
+        "data-service:/exchange/"
       ],
       "application_services": [
-        "external/legacy risk endpoint"
+        "external:risk-service",
+        "external:notification-service",
+        "external:data-service"
       ],
       "repository_or_provider": [
-        "external risk owner"
+        "external:risk-and-account-fact-providers"
       ],
-      "real_data_source": "configured defHttp origin",
+      "real_data_source": "risk, notification, account, finance and health facts",
       "permissions": [
         "risk.read"
       ],
@@ -692,13 +868,13 @@
         "employee"
       ],
       "refresh": "on-mount and manual",
-      "as_of": "created_at",
+      "as_of": "latest source fact timestamp",
       "timezone": "source-defined",
-      "currency": "not-applicable",
-      "unit": "risk event",
-      "precision": "not-applicable",
+      "currency": "USD",
+      "unit": "risk and account facts",
+      "precision": "decimal-string",
       "empty_state": "no_data",
-      "unavailable_state": "request_error",
+      "unavailable_state": "provider_unavailable",
       "fallback": "none",
       "writes": false,
       "live_write": false,
@@ -706,8 +882,8 @@
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "API adapter silently maps malformed/unavailable responses to empty list"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "users",
@@ -770,32 +946,48 @@
         "SettingsProfile"
       ],
       "view_owner": "platform-web/src/views/settings/index.vue",
-      "frontend_services": [],
-      "api_endpoints": [],
-      "application_services": [],
-      "repository_or_provider": [],
-      "real_data_source": "not-configured",
-      "permissions": [],
-      "roles": [
-        "admin-legacy"
+      "frontend_services": [
+        "platform-web/src/api/riskControl.ts"
       ],
-      "refresh": "none",
-      "as_of": "required-when-ready",
+      "api_endpoints": [
+        "data-service:/health",
+        "current browser session"
+      ],
+      "application_services": [
+        "external:data-service",
+        "external:current-authenticated-session"
+      ],
+      "repository_or_provider": [
+        "external:data-service-health",
+        "external:browser-session-store"
+      ],
+      "real_data_source": "current session and data-service health; settings writes explicitly not configured",
+      "permissions": [
+        "settings.read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
+      "refresh": "on-mount and manual",
+      "as_of": "provider health timestamp",
       "timezone": "UTC",
       "currency": "not-applicable",
       "unit": "configuration",
       "precision": "not-applicable",
       "empty_state": "no_data",
-      "unavailable_state": "not_configured",
-      "fallback": "none",
+      "unavailable_state": "provider_unavailable",
+      "fallback": "unavailable settings-write owner; personal account remains real self-service",
       "writes": false,
       "live_write": false,
       "e2e": [
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "formal route has no registered settings owner"
+      "closure_status": "verified",
+      "gap_reason": null
     },
     {
       "module": "strategy-platform",
@@ -807,7 +999,8 @@
       ],
       "view_owner": "platform-web/src/views/platform/index.vue",
       "frontend_services": [
-        "platform-web/src/api/platform/trading.ts"
+        "platform-web/src/api/platform/trading.ts",
+        "platform-web/src/api/platform/strategyResearch.ts"
       ],
       "api_endpoints": [
         "/api/v1/trading/commands",
@@ -819,14 +1012,20 @@
         "platform-api/app/trade_command_execution.py"
       ],
       "repository_or_provider": [
-        "platform-api/app/repositories.py",
-        "execution-runtime"
+        "platform-api/app/trading.py",
+        "execution-runtime",
+        "platform-web/src/views/strategy/funding-carry/index.vue",
+        "platform-web/src/views/strategy/spread-carry/index.vue"
       ],
       "real_data_source": "platform trading facts and runtime-v1",
-      "permissions": [],
+      "permissions": [
+        "strategy.read"
+      ],
       "roles": [
-        "admin-legacy",
-        "employee"
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
       ],
       "refresh": "polling/manual",
       "as_of": "runtime and order timestamps",
@@ -836,7 +1035,7 @@
       "precision": "decimal-string",
       "empty_state": "no_data",
       "unavailable_state": "runtime_unavailable",
-      "fallback": "none",
+      "fallback": "Platform research APIs preserve missingness and quality; execution remains separately authorized through Platform API and Runtime; no research sample fallback",
       "writes": true,
       "live_write": false,
       "e2e": [
@@ -844,6 +1043,57 @@
         "platform-visual"
       ],
       "provider_smoke": [],
+      "closure_status": "verified",
+      "gap_reason": null
+    },
+    {
+      "module": "data-audit",
+      "routes": [
+        "/risk/data-audit"
+      ],
+      "route_names": [
+        "DataAudit"
+      ],
+      "view_owner": "platform-web/src/views/risk/data-audit/index.vue",
+      "frontend_services": [
+        "platform-web/src/api/platform/dataAudit.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/risk/data-audit"
+      ],
+      "application_services": [
+        "platform-api/app/data_audit.py",
+        "platform-api/app/data_audit_history.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/data_audit.py",
+        "platform-api/app/data_audit_calendar.py",
+        "platform-api/app/data_audit_history.py"
+      ],
+      "real_data_source": "persisted data_audit_runs, operational_alerts and history-change findings; bounded recent checks and isolated research-copy baselines retain individual coverage and quality states",
+      "permissions": [
+        "risk.read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee"
+      ],
+      "refresh": "bounded background audit every 5 minutes; isolated weekly full research audit starts 03:00-05:00 Asia/Shanghai; visible page reads every 60 seconds or manually",
+      "as_of": "checkedAt, per-check source timestamps and full-copy history sequence cutoff; monitorStale and baseline age remain explicit",
+      "timezone": "UTC evidence; source calendars remain independent",
+      "currency": "not-applicable",
+      "unit": "data quality check and alert",
+      "precision": "source evidence preserved; no inferred financial values",
+      "empty_state": "no_data",
+      "unavailable_state": "request_error",
+      "fallback": "last persisted report remains dated; absent or stalled monitor is not healthy",
+      "writes": false,
+      "live_write": false,
+      "e2e": [],
+      "provider_smoke": [
+        "platform-api/tests/test_data_audit.py"
+      ],
       "closure_status": "verified",
       "gap_reason": null
     },
@@ -856,33 +1106,49 @@
         "StrategyManagement"
       ],
       "view_owner": "platform-web/src/views/strategy/index.vue",
-      "frontend_services": [],
-      "api_endpoints": [],
-      "application_services": [],
-      "repository_or_provider": [],
-      "real_data_source": "not-configured",
-      "permissions": [],
-      "roles": [
-        "admin-legacy",
-        "employee"
+      "frontend_services": [
+        "platform-web/src/views/strategy/management/composables/useStrategyManagementOverview.ts",
+        "platform-web/src/api/platform/trading.ts",
+        "platform-web/src/api/platform/strategyQueries.ts"
       ],
-      "refresh": "none",
-      "as_of": "required-when-ready",
+      "api_endpoints": [
+        "/api/v1/strategies/management-overview"
+      ],
+      "application_services": [
+        "platform-api/app/catalog_routes.py",
+        "platform-api/app/strategy_management_projection.py"
+      ],
+      "repository_or_provider": [
+        "platform-web/src/views/strategy/management/index.vue",
+        "platform-api/app/strategy_management_projection.py"
+      ],
+      "real_data_source": "persisted Platform strategy management projection; account and strategy facts keep independent scope and coverage",
+      "permissions": [
+        "strategy.read"
+      ],
+      "roles": [
+        "ceo",
+        "tech_lead",
+        "employee",
+        "member"
+      ],
+      "refresh": "active-page polling and manual reads of background projection",
+      "as_of": "projection and source observation timestamps; stale and incomplete coverage remain explicit",
       "timezone": "UTC",
       "currency": "mixed",
       "unit": "strategy",
-      "precision": "decimal-string-required",
+      "precision": "decimal-string",
       "empty_state": "no_data",
-      "unavailable_state": "not_configured",
-      "fallback": "none",
+      "unavailable_state": "request_error",
+      "fallback": "dated persisted projection or explicit error; no synthetic catalog or zero-filled financial history",
       "writes": false,
       "live_write": false,
       "e2e": [
         "platform-visual"
       ],
       "provider_smoke": [],
-      "closure_status": "gap",
-      "gap_reason": "formal route has no registered strategy catalog owner"
+      "closure_status": "verified",
+      "gap_reason": null
     }
   ]
 }

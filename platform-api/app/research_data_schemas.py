@@ -188,6 +188,7 @@ class AShareIndexSnapshot(ResearchApiModel):
 
 
 class AShareIndexHistoryPoint(ResearchApiModel):
+    source_name: str | None = None
     observed_at: date
     close: Decimal = Field(gt=0)
     turnover_yuan: Decimal | None = Field(default=None, ge=0)

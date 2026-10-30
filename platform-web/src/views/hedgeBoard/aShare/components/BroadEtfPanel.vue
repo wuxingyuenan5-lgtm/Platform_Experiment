@@ -1,7 +1,7 @@
 <template>
   <section class="broad-panel">
     <header
-      ><h2>宽基 ETF · 周频资金</h2
+      ><h2>宽基 ETF · 日频资金</h2
       ><select v-model="selected" aria-label="宽基指数"
         ><option v-for="o in data?.options || defaults" :key="o.key" :value="o.key">{{
           o.label
@@ -12,33 +12,31 @@
     ><p v-if="loading">正在读取宽基历史…</p>
     <template v-if="data">
       <FinancingChart
-        :title="`${label} ETF 周净申赎（估算）`"
+        :title="`${label} ETF 日净申赎（估算）`"
         :rows="rows"
         :lines="lines"
-        note="已跟踪ETF的份额变化×价格估算，按自然周汇总；黑线为指数收盘。缺失交易日不按零计入。"
+        note="已跟踪ETF的每日份额变化×价格估算；黑线为同日指数收盘。缺失交易日不按零计入。"
       />
       <div class="summary" v-if="latest"
-        ><span>{{ latest.date }}{{ latest.partialWeek ? ' · 本周截至当日' : '' }}</span
+        ><span>{{ latest.date }}</span
         ><strong>合计 {{ amount(latest.total) }} 亿元</strong
-        ><span>周成交额 {{ amount(latest.turnoverYi) }} 亿元</span
-        ><span>指数周涨跌 {{ amount(latest.indexReturnPct) }}%</span
+        ><span>日成交额 {{ amount(latest.turnoverYi) }} 亿元</span
+        ><span>指数日涨跌 {{ amount(latest.indexReturnPct) }}%</span
         ><span>{{ data.members.length }} 只已跟踪ETF</span></div
       >
       <details
-        ><summary>周频统计明细</summary
+        ><summary>日频统计明细</summary
         ><div class="scroll"
           ><table
             ><thead
               ><tr
-                ><th>周末交易日</th><th>交易日数</th
-                ><th v-for="m in data.members" :key="m.code">{{ m.name }}</th
-                ><th>合计（亿元）</th><th>ETF周成交额（估算，亿元）</th><th>指数周涨跌（%）</th
+                ><th>交易日</th><th v-for="m in data.members" :key="m.code">{{ m.name }}</th
+                ><th>合计（亿元）</th><th>ETF日成交额（估算，亿元）</th><th>指数日涨跌（%）</th
                 ><th>指数收盘</th></tr
               ></thead
             ><tbody
-              ><tr v-for="r in [...data.weekly].reverse()" :key="r.date"
-                ><td>{{ r.date }}{{ r.partialWeek ? '（本周）' : '' }}</td
-                ><td>{{ r.sessions }}</td
+              ><tr v-for="r in [...data.daily].reverse()" :key="r.date"
+                ><td>{{ r.date }}</td
                 ><td v-for="f in r.funds" :key="f.code">{{ amount(f.value) }}</td
                 ><td>{{ amount(r.total) }}</td
                 ><td>{{ amount(r.turnoverYi) }}</td
@@ -80,20 +78,18 @@
   import { researchRequest } from '@/api/hedgeResearch';
   import FinancingChart, { type FinanceLine, type FinanceRow } from './FinancingChart.vue';
 
-  interface Week {
+  interface Day {
     date: string;
-    sessions: number;
     indexClose: string | null;
     total: string | null;
     turnoverYi: string | null;
     indexReturnPct: string | null;
-    partialWeek: boolean;
     funds: Array<{ code: string; name: string; value: string | null }>;
   }
   interface Broad {
     options: Array<{ key: string; label: string }>;
     members: Array<{ code: string; name: string }>;
-    weekly: Week[];
+    daily: Day[];
     marketCapRatio: {
       reason: string;
       rows: Array<FinanceRow & { ratioPct: string; etfCapYi: string; indexCapYi: string }>;
@@ -144,11 +140,10 @@
   );
   const rows = computed<FinanceRow[]>(
     () =>
-      data.value?.weekly.map((r) => ({
+      data.value?.daily.map((r) => ({
         date: r.date,
         index: r.indexClose,
         total: r.total,
-        partialWeek: r.partialWeek,
         ...Object.fromEntries(r.funds.map((f) => [f.code, f.value])),
       })) || [],
   );
@@ -164,7 +159,7 @@
     })),
     { key: 'index', name: label.value, color: '#171717', unit: '点', right: true },
   ]);
-  const latest = computed(() => data.value?.weekly.at(-1));
+  const latest = computed(() => data.value?.daily.at(-1));
   const amount = (v: unknown) =>
     v == null ? '—' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 </script>

@@ -72,6 +72,49 @@ def weekly_summary(members, index_rows):
     return result
 
 
+def daily_summary(members, index_rows):
+    """One row per actual index session; missing fund observations remain NULL."""
+    prices = {r["date"]: r.get("close") for r in index_rows}
+    by_fund = [{r["date"]: r for r in m["series"]} for m in members]
+    result = []
+    previous = None
+
+    def total(funds, field):
+        values = [number(f[field]) for f in funds]
+        return str(sum(values)) if values and all(v is not None for v in values) else None
+
+    for day in sorted(prices):
+        funds = []
+        for member, lookup in zip(members, by_fund, strict=True):
+            row = lookup.get(day, {})
+            flow = number(row.get("flow_yi"))
+            turnover = number(row.get("etf_qfq_turnover_est_yi"))
+            funds.append(
+                {
+                    "code": member["meta"]["code"],
+                    "name": member["meta"]["name"],
+                    "value": str(flow) if flow is not None else None,
+                    "turnoverYi": str(turnover) if turnover is not None else None,
+                }
+            )
+
+        close = number(prices[day])
+        result.append(
+            {
+                "date": day,
+                "indexClose": prices[day],
+                "funds": funds,
+                "total": total(funds, "value"),
+                "turnoverYi": total(funds, "turnoverYi"),
+                "indexReturnPct": str((close / previous - 1) * 100)
+                if previous and previous > 0 and close is not None
+                else None,
+            }
+        )
+        previous = close
+    return result
+
+
 def broad_etfs(key):
     universe = read("universe").get("data", [])
     candidates = [m for m in universe if m.get("dashboard_eligible") and index_key(m) == key]
@@ -81,6 +124,7 @@ def broad_etfs(key):
             "options": options,
             "key": key,
             "weekly": [],
+            "daily": [],
             "members": [],
             "status": "no_data",
             "marketCapRatio": {
@@ -97,6 +141,7 @@ def broad_etfs(key):
         "key": key,
         "members": [m["meta"] for m in data["members"]],
         "weekly": weekly_summary(data["members"], index),
+        "daily": daily_summary(data["members"], index),
         "sources": data["sources"],
         "status": data["sources"]["groupMarket"]["status"],
         "scope": "tracked_etfs_only",

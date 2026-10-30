@@ -91,6 +91,45 @@ def spread_rows(prices):
     return rows
 
 
+def minute_quote(n, category, at):
+    e = event(n, category=category, at=at)
+    e["kind"] = "quote_sample"
+    e["payload"] = {
+        "symbol": "BTCUSDT",
+        "category": category,
+        "bid": "101" if category == "linear" else "100",
+        "ask": "102" if category == "linear" else "101",
+        "samplingIntervalMs": 60000,
+    }
+    return e
+
+
+def test_minute_quotes_never_pair_previous_minute_or_fabricate_duration():
+    from app.strategy_research_projection import second_statistics, spread_chart
+
+    d = Deriver()
+    rows = []
+    for i, minute in enumerate((0, 2)):
+        first = d.consume(minute_quote(i * 2 + 1, "linear", T + timedelta(minutes=minute)))
+        assert not any(r["kind"] == "spread" for r in first)
+        rows.extend(
+            r
+            for r in d.consume(
+                minute_quote(i * 2 + 2, "spot", T + timedelta(minutes=minute, milliseconds=50))
+            )
+            if r["kind"] == "spread"
+        )
+    assert len(rows) == 2 and all(r["samplingIntervalMs"] == 60000 for r in rows)
+    points = seconds_series(rows)
+    assert len(points) == 2 and all(r["validDurationMs"] == 0 for r in points)
+    stats = second_statistics(points, points)
+    assert stats["sampleCount"] == 2 and stats["sampling"] == "observed_1m_points"
+    assert stats["validDurationMs"] == "0"
+    assert any(p["value"][1] is None for p in spread_chart(points)[0]["data"])
+    with pytest.raises(ValueError, match="分钟采样"):
+        run_experiment(rows, params())
+
+
 def params(**overrides):
     p = {
         "pairId": "funding-btc",
@@ -576,3 +615,32 @@ def test_bad_history_keeps_quality_without_blocking_raw_publication():
     assert len(result) == 2 and all("numeric_invalid" in r["quality"] for r in result)
     assert result[1]["close"] == "-1"
     assert not d.state["quotes"]
+
+
+def test_mt5_native_offset_requires_live_same_session_evidence():
+    raw = event(1, at=T)
+    raw["kind"] = "mt5_batch"
+    stamp = int(T.timestamp() * 1000)
+    raw["payload"] = {
+        "symbol": "XAUUSD.s",
+        "server": "fixture",
+        "account": "mt5-owner",
+        "timeConversionVersion": "mt5-observed-utc-offset.v1",
+        "nativeClockEvidence": {
+            "methodVersion": "mt5-observed-utc-offset.v1",
+            "account": "mt5-owner",
+            "symbol": "XAUUSD.S",
+            "samples": 3,
+            "collectorSessionId": "session",
+            "nativeUtcOffsetMs": 10800000,
+            "measuredMonotonicNs": str(stamp * 1000000 - 1000000000),
+            "maxAgeNs": "30000000000",
+        },
+        "ticks": [{"time_msc": str(stamp + 10800000), "bid": "100", "ask": "101"}],
+    }
+    quote = Deriver().consume(raw)[0]
+    assert quote["sourceTimeMs"] == str(stamp)
+    assert quote["nativeSourceTimeMs"] == str(stamp + 10800000)
+    assert "clock_unverified" not in quote["quality"]
+    raw["payload"]["nativeClockEvidence"]["collectorSessionId"] = "other-session"
+    assert "clock_unverified" in Deriver().consume(raw)[0]["quality"]

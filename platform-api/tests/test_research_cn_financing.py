@@ -2,9 +2,41 @@ from decimal import Decimal
 
 import pytest
 
-from app.research_cn_financing import weekly_summary
+from app.research_cn_financing import daily_summary, weekly_summary
 
 pytestmark = pytest.mark.unit
+
+
+def test_daily_preserves_sessions_negative_flow_and_missing_member():
+    index = [
+        {"date": "2026-10-09", "close": "100"},
+        {"date": "2026-10-12", "close": "110"},
+        {"date": "2026-10-13", "close": "99"},
+    ]
+    members = [
+        {
+            "meta": {"code": "a", "name": "A"},
+            "series": [
+                {"date": "2026-10-12", "flow_yi": "1.25", "etf_qfq_turnover_est_yi": "2.1"},
+                {"date": "2026-10-13", "flow_yi": "-0.25", "etf_qfq_turnover_est_yi": "3.1"},
+            ],
+        },
+        {
+            "meta": {"code": "b", "name": "B"},
+            "series": [
+                {"date": "2026-10-12", "flow_yi": "-2.5", "etf_qfq_turnover_est_yi": "1.1"},
+            ],
+        },
+    ]
+    rows = daily_summary(members, index)
+    assert [r["date"] for r in rows] == [r["date"] for r in index]
+    assert rows[0]["total"] is None and rows[0]["indexReturnPct"] is None
+    assert rows[1]["total"] == "-1.25"
+    assert rows[1]["turnoverYi"] == "3.2"
+    assert Decimal(rows[1]["indexReturnPct"]) == 10
+    assert Decimal(rows[2]["indexReturnPct"]) == -10
+    assert rows[2]["funds"][0]["value"] == "-0.25"
+    assert rows[2]["total"] is None and rows[2]["turnoverYi"] is None
 
 
 def test_weekly_uses_actual_sessions_and_keeps_missing_member_null():

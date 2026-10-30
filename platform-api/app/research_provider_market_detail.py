@@ -182,6 +182,7 @@ class MarketDetailProvider:
             metadata = quote_meta.get(row.id, {})
             if market_id == "us" and row.name == row.id and metadata.get("name"):
                 row.name = metadata["name"]
+            row.quality_flags.extend(metadata.get("quote_quality_flags", []))
             row.currency = metadata.get("currency")
             row.price_kind = metadata.get("price_kind", "observation")
             row.as_of = metadata.get("as_of") or row.as_of
@@ -272,6 +273,31 @@ class MarketDetailProvider:
             if not value.is_finite():
                 continue
             points[datetime.fromtimestamp(timestamp, tz=timezone).date().isoformat()] = value
+        # Yahoo can publish the regular-session close quote before populating
+        # its final daily candle. Admit that native quote only at the matching
+        # completed session boundary, never a last intraday/after-hours price.
+        quote_flags = []
+        regular_end = ((meta.get("currentTradingPeriod") or {}).get("regular") or {}).get("end")
+        quote_time = meta.get("regularMarketTime")
+        if (
+            timestamps
+            and quote_time
+            and regular_end
+            and meta.get("instrumentType") != "CRYPTOCURRENCY"
+            and regular_end <= datetime.now(UTC).timestamp()
+            and regular_end <= quote_time <= regular_end + 60
+        ):
+            quote_day = datetime.fromtimestamp(quote_time, tz=timezone).date().isoformat()
+            candle_day = datetime.fromtimestamp(timestamps[-1], tz=timezone).date().isoformat()
+            if quote_day == candle_day and quote_day not in points:
+                close_quote = (
+                    Decimal(str(meta.get("regularMarketPrice")))
+                    if meta.get("regularMarketPrice") is not None
+                    else None
+                )
+                if close_quote is not None and close_quote.is_finite() and close_quote > 0:
+                    points[quote_day] = close_quote
+                    quote_flags.append("daily_close_from_regular_session_close_quote")
         ordered = sorted(points.items())
         today = datetime.now(timezone).date().isoformat()
         latest_day = ordered[-1][0] if ordered else None
@@ -294,6 +320,7 @@ class MarketDetailProvider:
                 "name": meta.get("longName") or meta.get("shortName"),
                 "as_of": as_of,
                 "price_kind": "intraday" if open_bar else "close",
+                "quote_quality_flags": quote_flags,
             },
         )
 

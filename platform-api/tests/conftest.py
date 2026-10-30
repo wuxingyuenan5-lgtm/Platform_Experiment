@@ -47,6 +47,7 @@ def isolated_settings(monkeypatch, tmp_path):
     settings = get_settings()
     for name in type(settings).model_fields:
         monkeypatch.setattr(settings, name, getattr(settings, name))
+    settings.strategy_research_database_path = None
     settings.runtime_base_url = "http://127.0.0.1:1"
     settings.database_path = str(tmp_path / "platform.db")
     settings.strategy_research_enabled = False

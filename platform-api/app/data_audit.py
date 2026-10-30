@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import math
 import sqlite3
 import time
+import zlib
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -20,8 +22,20 @@ from app import monitor_health, runtime_transport
 from app.auth import require_permission
 from app.config import get_settings
 from app.data_audit_calendar import calendar_snapshot, refresh_calendar
-from app.database_connection import connection, read_only_connection
+from app.database_connection import connection, database_path, read_only_connection
 from app.production_monitoring import SCHEMA_SQL as ALERT_SCHEMA
+
+
+def encode_report(report):
+    data = json.dumps(report, ensure_ascii=False).encode("utf-8")
+    return "zlib:" + base64.b64encode(zlib.compress(data, level=6)).decode("ascii")
+
+
+def decode_report(value):
+    if value.startswith("zlib:"):
+        value = zlib.decompress(base64.b64decode(value[5:])).decode("utf-8")
+    return json.loads(value)
+
 
 INTERVAL = 300
 LOG = logging.getLogger(__name__)
@@ -51,7 +65,8 @@ account_valuation_rates runtime_order_terminals cross_spread_open_triggers accou
 research_strategy_parts research_strategy_capture research_strategy_experiments
 research_strategy_drafts strategy_management_projection research_strategy_projection
 research_strategy_projection_cursor research_strategy_candle_cursor research_strategy_price_capture
-funding_basis_projection_cursor data_audit_runs data_audit_calendar""".split()
+funding_basis_projection_cursor data_audit_runs data_audit_calendar
+ data_audit_history_changes data_audit_history_cursor data_audit_history_findings""".split()
 )
 SNAPSHOTS = {
     "stock_pool",
@@ -214,28 +229,38 @@ def crowding_checks(payload, market_dates):
     return result
 
 
-def a_share_archive_check(db: sqlite3.Connection) -> AuditCheck:
+def a_share_archive_check(db: sqlite3.Connection, *, since=None) -> AuditCheck:
     """Validate the owned archive without applying snapshot freshness rules."""
+    recent = " WHERE trade_date>=?" if since else ""
+    args = (since,) if since else ()
     market_rows = db.execute(
         """SELECT universe_key,COUNT(*) AS rows,MIN(trade_date) AS earliest,
         MAX(trade_date) AS latest,
         SUM(CASE WHEN quality_status NOT IN ('ready','stale') THEN 1 ELSE 0 END) AS invalid
-        FROM research_a_share_market_archive GROUP BY universe_key"""
+        FROM research_a_share_market_archive"""
+        + recent
+        + " GROUP BY universe_key",
+        args,
     ).fetchall()
     price_rows = db.execute(
         """SELECT instrument_code,COUNT(*) AS rows,MIN(trade_date) AS earliest,
         MAX(trade_date) AS latest,
         SUM(CASE WHEN close IS NULL OR CAST(close AS REAL) <= 0 THEN 1 ELSE 0 END) AS missing,
         SUM(CASE WHEN quality_status NOT IN ('ready','stale') THEN 1 ELSE 0 END) AS invalid
-        FROM research_a_share_price_history GROUP BY instrument_code"""
+        FROM research_a_share_price_history"""
+        + recent
+        + " GROUP BY instrument_code",
+        args,
     ).fetchall()
     conflict_count = db.execute(
         "SELECT COUNT(*) AS n FROM research_a_share_archive_conflicts "
-        "WHERE reason != 'premature_close_corrected'"
+        "WHERE reason != 'premature_close_corrected'" + (" AND observed_at>=?" if since else ""),
+        args,
     ).fetchone()["n"]
     corrected_count = db.execute(
         "SELECT COUNT(*) AS n FROM research_a_share_archive_conflicts "
-        "WHERE reason = 'premature_close_corrected'"
+        "WHERE reason = 'premature_close_corrected'" + (" AND observed_at>=?" if since else ""),
+        args,
     ).fetchone()["n"]
     markets = {row["universe_key"]: dict(row) for row in market_rows}
     prices = {row["instrument_code"]: dict(row) for row in price_rows}
@@ -275,15 +300,46 @@ def a_share_archive_check(db: sqlite3.Connection) -> AuditCheck:
         missingCloses=missing_closes,
         conflicts=conflict_count,
         correctedConflicts=corrected_count,
+        scope="recent_window" if since else "all_stored_archive",
+        windowStart=since,
         rule="历史归档按独立品种保留来源、NULL与冲突，不套用短周期快照时效",
     )
 
 
-def inspect_database(now, *, deep=False):
+def history_inventory(db):
+    """Seek dataset boundaries; never count the full intraday archive online."""
+    result = {}
+    previous = None
+    while True:
+        row = db.execute(
+            "SELECT dataset FROM research_a_share_history "
+            + ("WHERE dataset>? " if previous is not None else "")
+            + "ORDER BY dataset LIMIT 1",
+            (previous,) if previous is not None else (),
+        ).fetchone()
+        if row is None:
+            return result
+        name = row[0]
+        first = db.execute(
+            "SELECT observed_at FROM research_a_share_history WHERE dataset=? "
+            "ORDER BY observed_at LIMIT 1",
+            (name,),
+        ).fetchone()
+        last = db.execute(
+            "SELECT observed_at,fetched_at FROM research_a_share_history WHERE dataset=? "
+            "ORDER BY observed_at DESC,fetched_at DESC LIMIT 1",
+            (name,),
+        ).fetchone()
+        result[name] = dict(dataset=name, start=first[0], end=last[0], fetched=last[1])
+        previous = name
+
+
+def inspect_database(now):
     checks = []
     with read_only_connection() as db:
         # Bound database work; a timeout is unverified, not success. No long writer lock.
-        deadline = time.monotonic() + (12 if deep else 8)
+        deadline = time.monotonic() + 2
+        db.execute("PRAGMA busy_timeout=250")
         db.set_progress_handler(lambda: int(time.monotonic() > deadline), 10000)
         tables = [
             r[0]
@@ -305,7 +361,8 @@ def inspect_database(now, *, deep=False):
                 scope="全表结构/外键；事件驱动表不设置每日新增要求",
             )
         )
-        checks.append(a_share_archive_check(db))
+        window_start = (now - timedelta(days=90)).date().isoformat()
+        checks.append(a_share_archive_check(db, since=window_start))
         snapshots = {
             r["dataset"]: dict(r)
             for r in db.execute("SELECT * FROM research_a_share_dataset_snapshots")
@@ -416,12 +473,7 @@ def inspect_database(now, *, deep=False):
                     message="市场数据不完整：" + str(payload.get("status")),
                 )
             checks.append(item)
-        groups = {
-            r["dataset"]: dict(r)
-            for r in db.execute("""SELECT dataset, COUNT(*) AS rows,
-            MIN(observed_at) AS start, MAX(observed_at) AS end, MAX(fetched_at) AS fetched
-            FROM research_a_share_history GROUP BY dataset""")
-        }
+        groups = history_inventory(db)
         for name in sorted(set(HISTORY) | set(groups)):
             row = groups.get(name)
             if name in LEGACY:
@@ -463,7 +515,7 @@ def inspect_database(now, *, deep=False):
                         now,
                         historyStart=row["start"],
                         sourceDate=row["end"],
-                        rows=row["rows"],
+                        rows=row.get("rows"),
                     )
                 )
         # A cross-table check is useful but cannot replace an independent exchange calendar.
@@ -498,19 +550,23 @@ def inspect_database(now, *, deep=False):
         dates = {
             r[0][:10]
             for r in db.execute(
-                "SELECT observed_at FROM research_a_share_history WHERE dataset='market'"
+                "SELECT DISTINCT observed_at FROM research_a_share_history "
+                "WHERE dataset='market' AND observed_at>=?",
+                (window_start,),
             )
         }
         # Global MAX would hide gold stopping while BTC continues to update.
         for asset in ["btc", "gold"]:
             for interval in ["15m", "1h", "4h"]:
                 latest = db.execute(
-                    "SELECT MAX(observed_at) FROM research_a_share_history "
+                    "SELECT observed_at FROM research_a_share_history "
                     "WHERE dataset='cumulative_volatility' "
                     "AND json_extract(payload_json,'$.asset')=? "
-                    "AND json_extract(payload_json,'$.interval')=?",
+                    "AND json_extract(payload_json,'$.interval')=? "
+                    "ORDER BY observed_at DESC LIMIT 1",
                     (asset, interval),
-                ).fetchone()[0]
+                ).fetchone()
+                latest = latest[0] if latest is not None else None
                 checks.append(
                     freshness(
                         "volatility." + asset + "." + interval,
@@ -553,14 +609,20 @@ def inspect_database(now, *, deep=False):
                 actual = {
                     r[0][:10]
                     for r in db.execute(
-                        "SELECT DISTINCT observed_at FROM research_a_share_history WHERE dataset=?",
-                        (dataset,),
+                        "SELECT DISTINCT observed_at FROM research_a_share_history "
+                        "WHERE dataset=? AND observed_at>=?",
+                        (dataset, window_start),
                     )
                 }
                 expected = {
                     d
                     for d in calendar["days"]
-                    if (min(actual) if actual else cutoff.isoformat()) <= d <= cutoff.isoformat()
+                    if max(
+                        window_start,
+                        (groups.get(dataset) or {}).get("start", cutoff.isoformat())[:10],
+                    )
+                    <= d
+                    <= cutoff.isoformat()
                 }
                 missing_days = sorted(expected - actual)
                 checks.append(
@@ -572,6 +634,8 @@ def inspect_database(now, *, deep=False):
                         f"缺失 {len(missing_days)} 个交易日",
                         missingDates=missing_days[:50],
                         checkedDays=len(expected),
+                        scope="recent_90_days",
+                        windowStart=window_start,
                         source=calendar["source"],
                     )
                 )
@@ -619,9 +683,16 @@ def inspect_database(now, *, deep=False):
             if row["error_code"]:
                 item.update(status="error", message="策略投影失败")
             checks.append(item)
-        parts = [dict(r) for r in db.execute("SELECT path,last_at FROM research_strategy_parts")]
+    from app.strategy_research_database import read_only_connection as research_read
+
+    with research_read() as research_db:
+        parts = [
+            dict(r) for r in research_db.execute("SELECT path,last_at FROM research_strategy_parts")
+        ]
     # File checks outside SQLite read transaction. Do not hash terabytes every five minutes.
-    root = Path(get_settings().strategy_research_path).resolve()
+    from app.strategy_research_repository import root_path
+
+    root = root_path()
     missing = [p["path"] for p in parts if not (root / p["path"]).is_file()]
     checks.append(
         check(
@@ -635,45 +706,6 @@ def inspect_database(now, *, deep=False):
         )
     )
     return checks
-
-
-def inspect_structure():
-    results = []
-    for key, sql in [
-        ("integrity", "PRAGMA quick_check(10)"),
-        ("foreign_keys", "PRAGMA foreign_key_check"),
-    ]:
-        try:
-            with read_only_connection() as db:
-                deadline = time.monotonic() + 2
-                db.set_progress_handler(
-                    lambda deadline=deadline: int(time.monotonic() > deadline), 10000
-                )
-                rows = [list(r) for r in db.execute(sql).fetchmany(20)]
-            healthy = rows == [["ok"]] if key == "integrity" else not rows
-            results.append(
-                check(
-                    "database." + key,
-                    "全库完整性 · " + key,
-                    "平台数据库",
-                    "healthy" if healthy else "error",
-                    "检查通过" if healthy else "发现完整性异常",
-                    evidence=rows,
-                )
-            )
-        except sqlite3.Error as exc:
-            results.append(
-                check(
-                    "database." + key,
-                    "全库完整性 · " + key,
-                    "平台数据库",
-                    "warning",
-                    "未完成深度检查，避免长时间占用业务数据库",
-                    reason=type(exc).__name__,
-                    budgetSeconds=2,
-                )
-            )
-    return results
 
 
 def inspect_artifacts(now):
@@ -694,6 +726,16 @@ def inspect_artifacts(now):
                     f"登记 {len(series)} 条序列",
                 )
             )
+            active_contracts = {
+                r.get("seriesId") for r in document.get("groups", {}).get("shfeGoldCurve", [])
+            }
+            historical_contracts = {
+                r.get("seriesId")
+                for r in document.get("groups", {}).get("shfeGoldCurveHistory", [])
+            }
+            archived_contracts = (
+                historical_contracts - active_contracts if active_contracts else set()
+            )
             for series_row in series:
                 series_id = series_row.get("seriesId", "unknown")
                 status = series_row.get("status")
@@ -705,6 +747,32 @@ def inspect_artifacts(now):
                             "研究文件库",
                             "info",
                             "外部参考入口，不是平台持久数据",
+                        )
+                    )
+                    continue
+                if series_id in archived_contracts:
+                    results.append(
+                        check(
+                            key + "." + series_id,
+                            series_row.get("label", series_id),
+                            "研究文件库",
+                            "info",
+                            "不在来源当前合约清单；保留历史，不要求日更",
+                            sourceDate=series_row.get("observationDate"),
+                            reason="archived_contract",
+                        )
+                    )
+                    continue
+                if "source_discontinued" in series_row.get("qualityFlags", []):
+                    results.append(
+                        check(
+                            key + "." + series_id,
+                            series_row.get("label", series_id),
+                            "研究文件库",
+                            "warning",
+                            "来源已停止维护；保留历史数据，不能视为当前持仓",
+                            sourceDate=series_row.get("observationDate"),
+                            reason="source_discontinued",
                         )
                     )
                     continue
@@ -738,6 +806,12 @@ def inspect_artifacts(now):
                     "status"
                 ] != "error":
                     item.update(status="warning", message="来源未就绪或声明数据陈旧")
+                if "upstream_empty_table" in series_row.get("qualityFlags", []):
+                    item.update(
+                        status="error",
+                        message="来源当日报表为空；保留上次有效观测",
+                        reason="upstream_empty_table",
+                    )
                 results.append(item)
         except Exception as exc:
             results.append(
@@ -814,7 +888,7 @@ def source_check(source, value, now):
         if result["status"] == "healthy":
             result.update(status="info", message="MT5 交易时段已关闭，本次扫描无新报价")
         return result
-    if source == "history:mt5" and status == "range_scanned":
+    if source in {"history:mt5", "mt5:recovery"} and status == "range_scanned":
         return check(
             key,
             source,
@@ -824,6 +898,11 @@ def source_check(source, value, now):
             sourceStatus=status,
             through=value.get("target"),
         )
+    if status == "up_to_date" and value.get("lastCheckedAtMs") is not None:
+        if int(value.get("through", -1)) >= int(value.get("expectedClosedThroughMs", 0)):
+            timestamp = datetime.fromtimestamp(
+                int(value["lastCheckedAtMs"]) / 1000, UTC
+            ).isoformat()
     if timestamp is None and value.get("lastReceivedAtMs") is not None:
         try:
             timestamp = datetime.fromtimestamp(
@@ -1062,7 +1141,7 @@ def persist_report(checks, now):
         ).fetchone()
     if previous:
         current = {item["key"] for item in checks}
-        for item in json.loads(previous[0])["checks"]:
+        for item in decode_report(previous[0])["checks"]:
             if (
                 item["key"] in {"database.integrity", "database.foreign_keys"}
                 and item["key"] not in current
@@ -1088,7 +1167,7 @@ def persist_report(checks, now):
     with connection() as db:
         db.execute(
             "INSERT INTO data_audit_runs(checked_at,report_json) VALUES (?,?)",
-            (report["checkedAt"], json.dumps(report, ensure_ascii=False)),
+            (report["checkedAt"], encode_report(report)),
         )
         # Retain 30 days of audit evidence; business facts are never changed.
         db.execute(
@@ -1132,10 +1211,10 @@ def persist_report(checks, now):
     return report
 
 
-def run_audit(*, deep=False):
+def run_audit():
     now = datetime.now(UTC)
     try:
-        checks = inspect_database(now, deep=deep)
+        checks = inspect_database(now)
         checks.append(check("database.scan", "数据库审计执行", "平台数据库"))
     except Exception as exc:
         LOG.exception("Data audit database scan did not complete")
@@ -1151,8 +1230,85 @@ def run_audit(*, deep=False):
         ]
     checks.extend(inspect_runtime(now))
     checks.extend(inspect_artifacts(now))
-    if deep:
-        checks.extend(inspect_structure())
+    from app.data_audit_history import inspect_changes, inspect_stock_returns, read_full_report
+
+    changes = inspect_changes(now)
+    checks.append(
+        check(
+            "history.incremental",
+            "历史新增与修订检查",
+            "数据有效性",
+            changes["status"],
+            "增量检查完成" if changes["status"] == "healthy" else "增量检查有异常、积压或未完成",
+            **{k: v for k, v in changes.items() if k != "status"},
+        )
+    )
+    returns = inspect_stock_returns()
+    checks.append(
+        check(
+            "calculations.stock_returns",
+            "股票池5日/20日收益复算",
+            "计算一致性",
+            returns["status"],
+            "已复算本轮可用收益" if returns["status"] == "healthy" else "收益复算异常或未完成",
+            **{k: v for k, v in returns.items() if k != "status"},
+        )
+    )
+    try:
+        full = read_full_report()
+    except (OSError, ValueError):
+        full = None
+    if full and Path(full.get("source", "")).resolve() != database_path().resolve():
+        full = None
+    baseline = full if full and full.get("complete") else (full or {}).get("lastComplete")
+    if baseline and Path(baseline.get("source", "")).resolve() != database_path().resolve():
+        baseline = None
+    full_status = (full or {}).get("status", "warning")
+    if full_status == "running":
+        full_status = "warning"
+    if baseline and baseline.get("status") == "error" and not (full or {}).get("complete"):
+        full_status = "error"
+    if baseline and (age_seconds(baseline.get("finishedAt"), now) or 0) > 8 * 86400:
+        full_status = "warning" if full_status != "error" else "error"
+    checks.append(
+        check(
+            "history.full",
+            "历史全量副本核对",
+            "历史核对",
+            full_status,
+            "副本核对完成" if full and full.get("complete") else "尚未完成本轮全量副本核对",
+            report=full,
+            observedAt=(baseline or {}).get("snapshotAt"),
+            fetched=(full or {}).get("finishedAt"),
+            independentSourceValuesVerified=False,
+            originalDatabasePhysicalIntegrityVerified=False,
+        )
+    )
+    for key, field in [("integrity", "integrity"), ("foreign_keys", "foreignKeyViolations")]:
+        evidence = (baseline or {}).get(field)
+        healthy = evidence == [["ok"]] if key == "integrity" else evidence == []
+        structure_status = (
+            "error"
+            if evidence is not None and not healthy
+            else "healthy"
+            if healthy
+            and baseline
+            and (age_seconds(baseline.get("finishedAt"), now) or 0) <= 8 * 86400
+            else "warning"
+        )
+        checks.append(
+            check(
+                "database." + key,
+                "研究副本结构 · " + key,
+                "平台数据库",
+                structure_status,
+                "副本结构检查通过" if healthy else "副本结构检查未通过或未完成",
+                evidence=evidence,
+                observedAt=(baseline or {}).get("snapshotAt"),
+                fetched=(baseline or {}).get("finishedAt"),
+                snapshotAt=(baseline or {}).get("snapshotAt"),
+            )
+        )
     return persist_report(checks, now)
 
 
@@ -1170,7 +1326,7 @@ def read_report():
             )
         ]
     report: dict[str, Any] = (
-        json.loads(row[0]) if row else dict(checkedAt=None, checks=[], summary={})
+        decode_report(row[0]) if row else dict(checkedAt=None, checks=[], summary={})
     )
     age = age_seconds(report["checkedAt"], datetime.now(UTC))
     report.update(monitorStale=age is None or age > INTERVAL * 3, alerts=alerts)
@@ -1187,11 +1343,9 @@ async def lifespan(_):
     await asyncio.to_thread(ensure_alert_schema)
 
     async def monitor():
-        last_deep = None
         while True:
             try:
                 monitor_health.begin("data_audit")
-                day = datetime.now(UTC).date()
                 if get_settings().research_refresh_enabled:
                     try:
                         await asyncio.to_thread(refresh_calendar)
@@ -1199,8 +1353,10 @@ async def lifespan(_):
                         LOG.warning(
                             "Independent calendar refresh failed; audit reports coverage explicitly"
                         )
-                await asyncio.to_thread(run_audit, deep=last_deep != day)
-                last_deep = day
+                await asyncio.to_thread(run_audit)
+                from app.data_audit_history import launch_full_audit_if_due
+
+                await asyncio.to_thread(launch_full_audit_if_due, datetime.now(UTC))
                 monitor_health.finish("data_audit")
             except asyncio.CancelledError:
                 raise

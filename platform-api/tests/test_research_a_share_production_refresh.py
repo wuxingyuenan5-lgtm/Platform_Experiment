@@ -80,3 +80,12 @@ def test_periodic_worker_retries_after_unexpected_refresh_exception(monkeypatch)
 
     assert calls == 2
     assert sleeps == 1
+
+
+def test_polling_wakes_at_daily_start_and_close_confirmation_boundary():
+    from app.research_a_share_refresh import _next_refresh_delay
+
+    assert _next_refresh_delay("not_due", 900, datetime(2026, 10, 29, 7, 9, 30, tzinfo=UTC)) == 30
+    assert _next_refresh_delay("partial", 900, datetime(2026, 10, 29, 8, 14, 45, tzinfo=UTC)) == 15
+    assert _next_refresh_delay("partial", 900, datetime(2026, 10, 29, 8, 16, tzinfo=UTC)) == 900
+    assert _next_refresh_delay("ready", 900, datetime(2026, 10, 29, 8, 14, 45, tzinfo=UTC)) == 900

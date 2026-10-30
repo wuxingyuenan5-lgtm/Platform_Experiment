@@ -37,6 +37,9 @@
       <label><input v-model="followRecent" type="checkbox" />跟随最新窗口</label>
       <button type="button" @click="showStatus = !showStatus">采集状态</button>
     </header>
+    <p
+      >新增买卖报价与价差按分钟采样，价格历史保留一分钟K线；分钟内触价与50档深度回放不在采样数据覆盖范围内。</p
+    >
     <p v-if="error" role="alert">{{ error }}</p>
     <p v-if="latest?.data?.quality?.length" role="status">
       当前样本限制：{{ latest.data.quality.map(qualityLabel).join('、') }}

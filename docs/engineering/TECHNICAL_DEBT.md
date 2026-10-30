@@ -44,10 +44,10 @@ This register contains only unresolved work with a concrete risk and trigger. Co
 
 ## TD-009 — Windows local multi-service start/stop lifecycle governance
 
-- **Status:** active, deferred to next development stage.
-- **Risk:** local Platform Web, Platform API, execution runtime and legacy comparison frontend can leave stale listener processes, ambiguous port ownership or misleading health state after repeated starts and stops.
-- **Scope:** process identity verification, port conflict handling, residual process cleanup, repeated start/stop idempotence, new/old version parallel operation, logs and diagnostics.
-- **Trigger:** before declaring local lifecycle management complete or promoting a one-command Windows operator workflow.
+- **Status:** local managed lifecycle implemented; continuous-operation and another full-host restart acceptance remain pending.
+- **Risk:** isolated recovery and short healthy samples do not prove long-running ownership, resource use or broker reconnection after a host restart.
+- **Scope:** existing dev-platform/watchdog/supervisor/pulse ownership, bounded recovery and logs; operating rules belong to [Runbook](../operations/RUNBOOK.md), current acceptance to the [strategy stage](../workstreams/strategy-module-architecture.md).
+- **Trigger:** extend validation when a reproduced lifecycle fault or the existing long-running acceptance requires it; do not rebuild the completed local lifecycle framework.
 - **Protected rule:** do not stop unrelated Node, Python or PowerShell processes by name or port alone; verify ownership before stopping.
 ## TD-010 - Global risk and notification message source
 

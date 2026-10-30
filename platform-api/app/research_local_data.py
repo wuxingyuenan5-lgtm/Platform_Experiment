@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any, cast
 
 from app.research_provider_errors import ResearchProviderError
@@ -15,10 +16,22 @@ def hedge_board_data_root() -> Path:
     return Path(configured) if configured else DEFAULT_HEDGE_BOARD_DATA_ROOT
 
 
+def _resolved_path(value: Path) -> Path:
+    resolved = value.resolve()
+    # Windows may return the extended prefix only for a not-yet-created child.
+    # Compare equivalent canonical paths without weakening the root boundary.
+    name = str(resolved)
+    if name.startswith("\\\\?\\UNC\\"):
+        return Path("\\\\" + name[8:])
+    if name.startswith("\\\\?\\"):
+        return Path(name[4:])
+    return resolved
+
+
 def local_json_revision(relative_path: str) -> tuple[str, int, int, int] | None:
     """Identify atomic producer replacements without reading their full histories."""
-    root = hedge_board_data_root().resolve()
-    path = (root / relative_path).resolve()
+    root = _resolved_path(hedge_board_data_root())
+    path = _resolved_path(root / relative_path)
     if root != path and root not in path.parents:
         raise ResearchProviderError("local_data_path_outside_root")
     try:
@@ -29,8 +42,8 @@ def local_json_revision(relative_path: str) -> tuple[str, int, int, int] | None:
 
 
 def read_local_json(relative_path: str) -> dict[str, Any]:
-    root = hedge_board_data_root().resolve()
-    path = (root / relative_path).resolve()
+    root = _resolved_path(hedge_board_data_root())
+    path = _resolved_path(root / relative_path)
     if root != path and root not in path.parents:
         raise ResearchProviderError("local_data_path_outside_root")
     try:
@@ -48,11 +61,23 @@ def read_local_json(relative_path: str) -> dict[str, Any]:
 
 def write_local_json(relative_path: str, payload: dict[str, Any]) -> None:
     """Atomically publish a validated research artifact under the data root."""
-    root = hedge_board_data_root().resolve()
-    path = (root / relative_path).resolve()
+    root = _resolved_path(hedge_board_data_root())
+    path = _resolved_path(root / relative_path)
     if root != path and root not in path.parents:
         raise ResearchProviderError("local_data_path_outside_root")
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    # Concurrent source requests must not share a deterministic .tmp name.
+    with NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=path.name + ".",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        temporary = Path(handle.name)
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+    try:
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
