@@ -193,13 +193,13 @@ def test_concurrent_cross_execute_has_one_dispatch(monkeypatch, tmp_path) -> Non
 
     original_create_trade_command = execution_batches.create_trade_command
 
-    def controlled_create_trade_command(request):
+    def controlled_create_trade_command(request, *, recorder=None):
         nonlocal calls
         calls += 1
         if calls == 1:
             first_dispatch_started.set()
             assert release_first_dispatch.wait(timeout=5)
-        return original_create_trade_command(request)
+        return original_create_trade_command(request, recorder=recorder)
 
     monkeypatch.setattr(execution_batches, "create_trade_command", controlled_create_trade_command)
     instruction = _cross_instruction("cross-resource-concurrent")

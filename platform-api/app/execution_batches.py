@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from sqlite3 import Connection, OperationalError
@@ -21,6 +22,11 @@ from app.execution_risk import (
     initialize_batch_risk,
     record_filled_leg,
 )
+from app.execution_steps import BLOCKED
+from app.execution_steps import FAILED
+from app.execution_steps import PASSED
+from app.execution_steps import StepRecorder
+from app.execution_steps import active_recorder
 from app.schemas import (
     BatchLegResponse,
     CreateExecutionBatchRequest,
@@ -33,6 +39,7 @@ from app.trade_commands import create_trade_command, validate_trade_command_cata
 CROSS_SPREAD_STRATEGY_KEY = "cross_venue_spread"
 BYBIT_LEG_ROLE = "bybit_leg"
 MT5_LEG_ROLE = "mt5_leg"
+logger = logging.getLogger(__name__)
 GLOBAL_LEASE_STATUSES = (
     "pending",
     "executing",
@@ -135,17 +142,32 @@ def resolve_strategy_key(request: CreateExecutionBatchRequest) -> str:
     return row["strategy_key"]
 
 
-def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBatchResponse:
-    if request.idempotency_key is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Execution batch requires idempotencyKey",
-        )
-    if request.strategy_instance_id is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Execution batch requires strategyInstanceId",
-        )
+def create_execution_batch(
+    request: CreateExecutionBatchRequest,
+    *,
+    recorder: StepRecorder | None = None,
+) -> ExecutionBatchResponse:
+    steps = recorder if recorder is not None else active_recorder() or StepRecorder()
+    with steps.step(
+        "BATCH_REQUEST_VALIDATED",
+        payload={
+            "strategyInstanceId": request.strategy_instance_id,
+            "strategyKey": request.strategy_key,
+            "direction": request.direction,
+            "idempotencyKey": request.idempotency_key,
+            "legCount": len(request.legs),
+        },
+    ):
+        if request.idempotency_key is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Execution batch requires idempotencyKey",
+            )
+        if request.strategy_instance_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Execution batch requires strategyInstanceId",
+            )
 
     strategy_key = resolve_strategy_key(request)
     default_account_id = request.account_id or request.legs[0].account_id
@@ -167,30 +189,144 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             quantity=leg.quantity,
             price=leg.price,
         )
-        validate_trade_command_catalog(command_request)
+        try:
+            validate_trade_command_catalog(command_request)
+        except HTTPException as exc:
+            steps.block(
+                "BATCH_REQUEST_VALIDATED",
+                reason_code="LEG_CATALOG_INVALID",
+                detail=str(exc.detail),
+                status_code=exc.status_code,
+                payload={"legRole": leg.role, "accountId": leg_account_id},
+            )
+            raise
         command_requests.append((leg.role, command_request))
         account_ids.append(leg_account_id)
+    steps.record(
+        "BATCH_REQUEST_VALIDATED",
+        payload={"legs": ",".join(role for role, _ in command_requests)},
+    )
 
-    assert_execution_allowed(request.strategy_instance_id, account_ids)
-    for account_id in set(account_ids):
-        assert_live_account_execution_allowed(account_id, request.strategy_instance_id)
+    with steps.step(
+        "BATCH_RISK_PREFLIGHT",
+        payload={"strategyInstanceId": request.strategy_instance_id},
+    ):
+        assert_execution_allowed(request.strategy_instance_id, account_ids)
+    for account_id in sorted(set(account_ids)):
+        with steps.step(
+            "BATCH_ACCOUNT_AUTHORIZED",
+            payload={"accountId": account_id, "strategyInstanceId": request.strategy_instance_id},
+        ):
+            assert_live_account_execution_allowed(
+                account_id,
+                request.strategy_instance_id,
+                recorder=steps,
+            )
 
     batch_id = str(uuid4())
     created_at = now_iso()
     execute_batch_id: str | None = None
-    with connection() as db:
-        db.execute("BEGIN IMMEDIATE")
-        existing = db.execute(
-            "SELECT id, status FROM execution_batches WHERE idempotency_key = ?",
-            (request.idempotency_key,),
-        ).fetchone()
-        if existing is not None:
-            existing_id = existing["id"]
-            assert_batch_request_matches_in_connection(db, existing_id, request)
-            if existing["status"] == "pending":
+    idempotency_state = "new"
+    claim_stage = "BATCH_IDEMPOTENCY_CHECKED"
+    existing_id: str | None = None
+    try:
+        with connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            existing = db.execute(
+                "SELECT id, status FROM execution_batches WHERE idempotency_key = ?",
+                (request.idempotency_key,),
+            ).fetchone()
+            if existing is not None:
+                existing_id = existing["id"]
+                idempotency_state = "replayed"
+                claim_stage = "BATCH_RESOURCES_CLAIMED"
+                assert_batch_request_matches_in_connection(db, existing_id, request)
+                if existing["status"] == "pending":
+                    _claim_batch_execution_resources(
+                        db,
+                        batch_id=existing_id,
+                        strategy_instance_id=request.strategy_instance_id,
+                        legs=request.legs,
+                        default_account_id=default_account_id,
+                    )
+                    claimed = db.execute(
+                        """
+                        UPDATE execution_batches
+                        SET status = 'executing', updated_at = ?
+                        WHERE id = ? AND status = 'pending'
+                        """,
+                        (created_at, existing_id),
+                    )
+                    if claimed.rowcount == 1:
+                        execute_batch_id = existing_id
+            else:
+                claim_stage = "BATCH_RESOURCES_CLAIMED"
+                blocking_batch = _find_blocking_batch_for_resources(
+                    db,
+                    [(leg.account_id or default_account_id, leg.symbol) for leg in request.legs],
+                )
+                if blocking_batch is not None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Active execution batch blocks new strategy instruction: "
+                            f"{blocking_batch['id']} ({blocking_batch['status']})"
+                        ),
+                    )
+                existing_id = None
+                db.execute(
+                    """
+                    INSERT INTO execution_batches (
+                        id, idempotency_key, strategy_instance_id, account_id,
+                        strategy_key, direction, status,
+                        requires_manual_intervention, failure_reason, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        batch_id,
+                        request.idempotency_key,
+                        request.strategy_instance_id,
+                        default_account_id,
+                        strategy_key,
+                        request.direction,
+                        "pending",
+                        0,
+                        None,
+                        created_at,
+                        created_at,
+                    ),
+                )
+                for sequence, leg in enumerate(request.legs, start=1):
+                    db.execute(
+                        """
+                        INSERT INTO execution_batch_legs (
+                            id, batch_id, sequence, role, account_id, instrument_id, symbol, side,
+                            order_type, quantity, price, order_id, status,
+                            failure_reason, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            str(uuid4()),
+                            batch_id,
+                            sequence,
+                            leg.role,
+                            leg.account_id or default_account_id,
+                            leg.instrument_id,
+                            leg.symbol,
+                            leg.side,
+                            leg.order_type,
+                            format(leg.quantity, "f"),
+                            format(leg.price, "f") if leg.price is not None else None,
+                            None,
+                            "pending",
+                            None,
+                            created_at,
+                            created_at,
+                        ),
+                    )
                 _claim_batch_execution_resources(
                     db,
-                    batch_id=existing_id,
+                    batch_id=batch_id,
                     strategy_instance_id=request.strategy_instance_id,
                     legs=request.legs,
                     default_account_id=default_account_id,
@@ -201,101 +337,48 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                     SET status = 'executing', updated_at = ?
                     WHERE id = ? AND status = 'pending'
                     """,
-                    (created_at, existing_id),
+                    (created_at, batch_id),
                 )
-                if claimed.rowcount == 1:
-                    execute_batch_id = existing_id
-        else:
-            blocking_batch = _find_blocking_batch_for_resources(
-                db,
-                [(leg.account_id or default_account_id, leg.symbol) for leg in request.legs],
-            )
-            if blocking_batch is not None:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "Active execution batch blocks new strategy instruction: "
-                        f"{blocking_batch['id']} ({blocking_batch['status']})"
-                    ),
-                )
-            existing_id = None
-            db.execute(
-                """
-                INSERT INTO execution_batches (
-                    id, idempotency_key, strategy_instance_id, account_id,
-                    strategy_key, direction, status,
-                    requires_manual_intervention, failure_reason, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    batch_id,
-                    request.idempotency_key,
-                    request.strategy_instance_id,
-                    default_account_id,
-                    strategy_key,
-                    request.direction,
-                    "pending",
-                    0,
-                    None,
-                    created_at,
-                    created_at,
-                ),
-            )
-            for sequence, leg in enumerate(request.legs, start=1):
-                db.execute(
-                    """
-                    INSERT INTO execution_batch_legs (
-                        id, batch_id, sequence, role, account_id, instrument_id, symbol, side,
-                        order_type, quantity, price, order_id, status,
-                        failure_reason, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        str(uuid4()),
-                        batch_id,
-                        sequence,
-                        leg.role,
-                        leg.account_id or default_account_id,
-                        leg.instrument_id,
-                        leg.symbol,
-                        leg.side,
-                        leg.order_type,
-                        format(leg.quantity, "f"),
-                        format(leg.price, "f") if leg.price is not None else None,
-                        None,
-                        "pending",
-                        None,
-                        created_at,
-                        created_at,
-                    ),
-                )
-            _claim_batch_execution_resources(
-                db,
-                batch_id=batch_id,
-                strategy_instance_id=request.strategy_instance_id,
-                legs=request.legs,
-                default_account_id=default_account_id,
-            )
-            claimed = db.execute(
-                """
-                UPDATE execution_batches
-                SET status = 'executing', updated_at = ?
-                WHERE id = ? AND status = 'pending'
-                """,
-                (created_at, batch_id),
-            )
-            if claimed.rowcount != 1:
-                raise HTTPException(
-                    status_code=409,
-                    detail="New execution batch could not be claimed for dispatch",
-                )
-            execute_batch_id = batch_id
+                if claimed.rowcount != 1:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="New execution batch could not be claimed for dispatch",
+                    )
+                execute_batch_id = batch_id
+    except HTTPException as exc:
+        steps.block(
+            claim_stage,
+            reason_code=(
+                "BATCH_BLOCKED_BY_ACTIVE_BATCH"
+                if "blocks new strategy instruction" in str(exc.detail)
+                else "BATCH_CLAIM_REJECTED"
+            ),
+            detail=str(exc.detail),
+            status_code=exc.status_code,
+            payload={"idempotencyKey": request.idempotency_key},
+        )
+        raise
 
     if execute_batch_id is None:
         assert existing_id is not None
-        return get_execution_batch(existing_id)
+        steps.bind(batch_id=existing_id)
+        steps.record(
+            "BATCH_IDEMPOTENCY_CHECKED",
+            payload={"state": "replayed_without_dispatch", "batchId": existing_id},
+        )
+        return _finish_batch(steps, existing_id)
 
     batch_id = execute_batch_id
+    steps.bind(batch_id=batch_id)
+    steps.record(
+        "BATCH_RESOURCES_CLAIMED",
+        payload={
+            "batchId": batch_id,
+            "idempotencyState": idempotency_state,
+            "legCount": len(command_requests),
+        },
+    )
+    _capture_pre_submit_snapshots(steps, batch_id, account_ids)
     initialize_batch_risk(batch_id, request.strategy_instance_id)
     filled_count = 0
 
@@ -304,6 +387,13 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             deadline_ok, deadline_reason = check_leg_deadline(batch_id)
             if not deadline_ok:
                 reason = deadline_reason or "Execution leg deadline exceeded"
+                steps.record(
+                    "BATCH_LEG_DEADLINE",
+                    BLOCKED,
+                    reason_code="LEG_DEADLINE_EXCEEDED",
+                    reason_detail=reason,
+                    payload={"legRole": role},
+                )
                 update_leg_status(batch_id, role, "blocked", failure_reason=reason)
                 update_batch_status(
                     batch_id,
@@ -312,10 +402,12 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                     requires_manual_intervention=True,
                 )
                 handle_batch_failure(batch_id, reason)
-                return get_execution_batch(batch_id)
+                return _finish_batch(steps, batch_id)
+            steps.record("BATCH_LEG_DEADLINE", payload={"legRole": role})
 
         try:
-            assert_execution_allowed(request.strategy_instance_id, account_ids)
+            with steps.step("BATCH_RISK_PREFLIGHT", payload={"legRole": role}):
+                assert_execution_allowed(request.strategy_instance_id, account_ids)
         except HTTPException as exc:
             reason = str(exc.detail)
             status = "manual_intervention" if filled_count else "failed"
@@ -327,15 +419,27 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                 requires_manual_intervention=status == "manual_intervention",
             )
             handle_batch_failure(batch_id, reason)
-            return get_execution_batch(batch_id)
+            return _finish_batch(steps, batch_id)
 
+        steps.record(
+            "BATCH_LEG_SUBMITTING",
+            payload={"legRole": role, "commandIdempotencyKey": command_request.idempotency_key},
+        )
         update_leg_status(batch_id, role, "submitting")
         try:
-            command = create_trade_command(command_request)
+            command = create_trade_command(command_request, recorder=steps)
         except HTTPException as exc:
             reason = str(exc.detail)
             unknown_order_id = _result_unknown_order_for_command(command_request.idempotency_key)
             if unknown_order_id is not None:
+                steps.record(
+                    "BATCH_LEG_RESULT",
+                    BLOCKED,
+                    reason_code="RESULT_UNKNOWN",
+                    reason_detail=reason,
+                    status_code=exc.status_code,
+                    payload={"legRole": role, "orderId": unknown_order_id},
+                )
                 update_leg_status(
                     batch_id,
                     role,
@@ -350,8 +454,16 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                     requires_manual_intervention=True,
                 )
                 handle_batch_failure(batch_id, reason)
-                return get_execution_batch(batch_id)
+                return _finish_batch(steps, batch_id)
             status = "manual_intervention" if filled_count else "failed"
+            steps.record(
+                "BATCH_LEG_RESULT",
+                FAILED,
+                reason_code="LEG_COMMAND_REJECTED",
+                reason_detail=reason,
+                status_code=exc.status_code,
+                payload={"legRole": role, "batchStatus": status},
+            )
             update_leg_status(batch_id, role, "failed", failure_reason=reason)
             update_batch_status(
                 batch_id,
@@ -360,8 +472,21 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                 requires_manual_intervention=status == "manual_intervention",
             )
             handle_batch_failure(batch_id, reason)
-            return get_execution_batch(batch_id)
+            return _finish_batch(steps, batch_id)
 
+        steps.record(
+            "BATCH_LEG_RESULT",
+            PASSED if command.status == "filled" else BLOCKED,
+            reason_code=None if command.status == "filled" else "LEG_STATUS_INCOMPLETE",
+            reason_detail=(
+                None if command.status == "filled" else f"Command status {command.status}"
+            ),
+            payload={
+                "legRole": role,
+                "commandStatus": command.status,
+                "orderId": command.platform_order_id,
+            },
+        )
         update_leg_status(
             batch_id,
             role,
@@ -390,6 +515,13 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                     )
                 except ValueError as exc:
                     reason = str(exc)
+                    steps.record(
+                        "BATCH_HEDGE_RESIZED",
+                        FAILED,
+                        reason_code="HEDGE_RESIZE_REJECTED",
+                        reason_detail=reason,
+                        payload={"legRole": MT5_LEG_ROLE, "bybitOrderId": command.platform_order_id},
+                    )
                     update_leg_status(
                         batch_id,
                         MT5_LEG_ROLE,
@@ -403,7 +535,18 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                         requires_manual_intervention=True,
                     )
                     handle_batch_failure(batch_id, reason)
-                    return get_execution_batch(batch_id)
+                    return _finish_batch(steps, batch_id)
+                steps.record(
+                    "BATCH_HEDGE_RESIZED",
+                    payload={
+                        "bybitOrderId": command.platform_order_id,
+                        "mt5HedgeQuantity": (
+                            format(command_requests[index + 1][1].quantity, "f")
+                            if index + 1 < len(command_requests)
+                            else None
+                        ),
+                    },
+                )
 
             if terminal_partial:
                 # The order retains its actual partial-fill status and original
@@ -414,6 +557,13 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             risk_ok, risk_reason = record_filled_leg(batch_id)
             if not risk_ok and filled_count < len(command_requests):
                 reason = risk_reason or "Residual exposure policy blocked the next leg"
+                steps.record(
+                    "BATCH_RISK_SETTLED",
+                    BLOCKED,
+                    reason_code="RESIDUAL_EXPOSURE_BLOCKED",
+                    reason_detail=reason,
+                    payload={"filledLegs": filled_count, "legRole": role},
+                )
                 update_batch_status(
                     batch_id,
                     "manual_intervention",
@@ -421,7 +571,7 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
                     requires_manual_intervention=True,
                 )
                 handle_batch_failure(batch_id, reason)
-                return get_execution_batch(batch_id)
+                return _finish_batch(steps, batch_id)
             if filled_count < len(command_requests):
                 update_batch_status(batch_id, "partially_executed")
             continue
@@ -435,6 +585,18 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             "result_unknown",
         }
         status = "manual_intervention" if filled_count or uncertain else "failed"
+        steps.record(
+            "BATCH_LEG_RESULT",
+            BLOCKED if uncertain else FAILED,
+            reason_code="LEG_STATUS_INCOMPLETE",
+            reason_detail=reason,
+            payload={
+                "legRole": role,
+                "commandStatus": command.status,
+                "orderId": command.platform_order_id,
+                "batchStatus": status,
+            },
+        )
         update_leg_status(
             batch_id,
             role,
@@ -449,13 +611,40 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             requires_manual_intervention=status == "manual_intervention",
         )
         handle_batch_failure(batch_id, reason)
-        return get_execution_batch(batch_id)
+        return _finish_batch(steps, batch_id)
 
     risk = complete_batch_risk(batch_id)
     if risk.risk_status == "clear":
+        steps.record(
+            "BATCH_RISK_SETTLED",
+            payload={
+                "riskStatus": risk.risk_status,
+                "filledLegs": filled_count,
+                "residualNotional": (
+                    str(risk.max_residual_notional)
+                    if getattr(risk, "max_residual_notional", None) is not None
+                    else None
+                ),
+            },
+        )
         update_batch_status(batch_id, "hedged")
     else:
         reason = risk.risk_reason or "Batch finished with unresolved residual exposure"
+        steps.record(
+            "BATCH_RISK_SETTLED",
+            BLOCKED,
+            reason_code="RISK_RESIDUAL_UNRESOLVED",
+            reason_detail=reason,
+            payload={
+                "riskStatus": risk.risk_status,
+                "filledLegs": filled_count,
+                "residualNotional": (
+                    str(risk.max_residual_notional)
+                    if getattr(risk, "max_residual_notional", None) is not None
+                    else None
+                ),
+            },
+        )
         update_batch_status(
             batch_id,
             "manual_intervention",
@@ -463,7 +652,102 @@ def create_execution_batch(request: CreateExecutionBatchRequest) -> ExecutionBat
             requires_manual_intervention=True,
         )
         handle_batch_failure(batch_id, reason)
-    return get_execution_batch(batch_id)
+    return _finish_batch(steps, batch_id)
+
+
+def _finish_batch(steps: StepRecorder, batch_id: str) -> ExecutionBatchResponse:
+    """Read the persisted batch back and record its terminal step."""
+
+    batch = get_execution_batch(batch_id)
+    detail = batch.failure_reason or next(
+        (leg.failure_reason for leg in batch.legs if leg.failure_reason),
+        None,
+    )
+    payload = {
+        "batchId": batch.batch_id,
+        "status": batch.status,
+        "requiresManualIntervention": batch.requires_manual_intervention,
+        "legStatuses": ",".join(f"{leg.role}:{leg.status}" for leg in batch.legs),
+    }
+    if batch.status in {"hedged", "completed"}:
+        steps.record("BATCH_FINAL", PASSED, payload=payload)
+    elif batch.status in {"failed", "manual_intervention"}:
+        steps.record(
+            "BATCH_FINAL",
+            FAILED,
+            reason_code="BATCH_TERMINAL_FAILURE",
+            reason_detail=detail or f"Batch finished with status {batch.status}",
+            payload=payload,
+        )
+    else:
+        steps.record(
+            "BATCH_FINAL",
+            BLOCKED,
+            reason_code="BATCH_NOT_COMPLETED",
+            reason_detail=detail or f"Batch finished with status {batch.status}",
+            payload=payload,
+        )
+    _project_execution_record(steps, batch)
+    return batch
+
+
+def _capture_pre_submit_snapshots(
+    steps: StepRecorder, batch_id: str, account_ids: list[str]
+) -> None:
+    """Record what each leg account looked like before the first dispatch."""
+
+    from app.execution_records import capture_account_state
+
+    # The batch-time snapshot is best-effort evidence. When it cannot run (for
+    # example a replay whose recorder is bound elsewhere) the detail view falls
+    # back to the balance series, so this stays a debug line, never a warning.
+    logger.debug(
+        "pre-submit snapshot hook batch=%s accounts=%s trace=%s enabled=%s",
+        batch_id,
+        account_ids,
+        steps.trace_id,
+        steps.enabled,
+    )
+    for account_id in sorted(set(account_ids)):
+        try:
+            capture_account_state(
+                account_id=account_id,
+                phase="pre_submit",
+                batch_id=batch_id,
+                trace_id=steps.trace_id,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("pre-submit snapshot failed for %s", account_id)
+
+
+def _project_execution_record(steps: StepRecorder, batch: ExecutionBatchResponse) -> None:
+    """Freeze this batch into the durable execution record and account snapshot.
+
+    Projection is evidence-only: any failure here is logged and swallowed so a
+    bookkeeping problem can never turn a filled trade into an error response.
+    """
+
+    from app.execution_records import capture_account_state, sync_execution_record
+
+    logger.debug(
+        "execution record hook batch=%s status=%s legs=%s trace=%s",
+        batch.batch_id,
+        batch.status,
+        len(batch.legs),
+        steps.trace_id,
+    )
+    try:
+        sync_execution_record(batch.batch_id, trace_id=steps.trace_id)
+        account_id = next((leg.account_id for leg in batch.legs if leg.account_id), None)
+        if account_id:
+            capture_account_state(
+                account_id=account_id,
+                phase="final",
+                batch_id=batch.batch_id,
+                trace_id=steps.trace_id,
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("execution record projection hook failed for %s", batch.batch_id)
 
 
 def _confirmed_terminal_chase_fill(order_id: str) -> bool:

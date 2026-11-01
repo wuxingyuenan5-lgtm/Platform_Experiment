@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from app.database import connection
+from app.execution_steps import StepRecorder
 from app.order_execution_intents import get_order_execution_intent
 from app.runtime_contracts import CrossSpreadGuardV1
 from app.schemas import CreateOrderRequest, CreateTradeCommandRequest, TradeCommandResponse
@@ -76,7 +77,11 @@ def validate_trade_command_catalog(request: CreateTradeCommandRequest) -> None:
             )
 
 
-def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResponse:
+def create_trade_command(
+    request: CreateTradeCommandRequest,
+    *,
+    recorder: StepRecorder | None = None,
+) -> TradeCommandResponse:
     existing = find_trade_command_by_idempotency_key(request.idempotency_key)
     if existing is not None:
         assert_trade_command_request_matches(existing, request)
@@ -149,7 +154,7 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
             ),
         )
 
-    return _submit_claimed_command(request, trade_command_id)
+    return _submit_claimed_command(request, trade_command_id, recorder=recorder)
 
 
 def retry_unsubmitted_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResponse:
@@ -182,7 +187,10 @@ def retry_unsubmitted_trade_command(request: CreateTradeCommandRequest) -> Trade
 
 
 def _submit_claimed_command(
-    request: CreateTradeCommandRequest, trade_command_id: str
+    request: CreateTradeCommandRequest,
+    trade_command_id: str,
+    *,
+    recorder: StepRecorder | None = None,
 ) -> TradeCommandResponse:
     intent = get_order_execution_intent(request.idempotency_key)
     cross_spread_guard = None
@@ -223,6 +231,9 @@ def _submit_claimed_command(
             position_id=intent.position_id,
             execution_policy=intent.execution_policy,
             cross_spread_guard=cross_spread_guard,
+            recorder=(
+                recorder.child(command_id=trade_command_id) if recorder is not None else None
+            ),
         )
     except HTTPException:
         _synchronize_dispatch_failure(trade_command_id, fallback="rejected")

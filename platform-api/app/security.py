@@ -9,6 +9,8 @@ from fastapi import HTTPException
 from app import runtime_transport
 from app.config import get_settings
 from app.database import connection
+from app.execution_steps import DISABLED_RECORDER
+from app.execution_steps import StepRecorder
 from app.schemas import (
     CredentialReferenceResponse,
     ExchangeConnectivityResponse,
@@ -101,175 +103,255 @@ def enforce_order_safety(
     side: str | None = None,
     order_type: str | None = None,
     command_id: str | None = None,
+    recorder: StepRecorder | None = None,
 ) -> None:
-    account = get_account_security_row(account_id)
-    if account is None:
-        raise HTTPException(status_code=404, detail="Account not found")
+    """Every gate records one timeline row, including the rejecting one.
 
-    if not _account_is_order_eligible(account["status"], account["environment"]):
-        raise HTTPException(status_code=403, detail="Account is not active")
+    ``recorder`` is optional so existing call sites keep working; without it the
+    gates behave exactly as before and write nothing.
+    """
 
-    credential_ref = account["credential_ref"]
-    if credential_ref is not None and not str(credential_ref).startswith("secret://"):
-        raise HTTPException(status_code=403, detail="Account credential reference is unsafe")
+    steps = recorder if recorder is not None else DISABLED_RECORDER
+    order_payload = {
+        "accountId": account_id,
+        "instrumentId": instrument_id,
+        "quantity": str(quantity),
+        "price": str(price) if price is not None else None,
+        "symbol": symbol,
+        "side": side,
+        "orderType": order_type,
+    }
 
-    instrument = get_instrument_security_row(instrument_id)
-    if instrument is None:
-        raise HTTPException(status_code=404, detail="Instrument not found")
-    if instrument["contract_version"] is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Instrument has no active contract specification",
-        )
+    with steps.step("GATE_ACCOUNT_LOOKUP", payload={"accountId": account_id}):
+        account = get_account_security_row(account_id)
+        if account is None:
+            raise HTTPException(status_code=404, detail="Account not found")
+
+    with steps.step(
+        "GATE_ACCOUNT_ELIGIBLE",
+        payload={"status": account["status"], "environment": account["environment"]},
+    ):
+        if not _account_is_order_eligible(account["status"], account["environment"]):
+            raise HTTPException(status_code=403, detail="Account is not active")
+
+    with steps.step("GATE_CREDENTIAL_REFERENCE"):
+        credential_ref = account["credential_ref"]
+        if credential_ref is not None and not str(credential_ref).startswith("secret://"):
+            raise HTTPException(status_code=403, detail="Account credential reference is unsafe")
+
+    with steps.step("GATE_INSTRUMENT_LOOKUP", payload={"instrumentId": instrument_id}):
+        instrument = get_instrument_security_row(instrument_id)
+        if instrument is None:
+            raise HTTPException(status_code=404, detail="Instrument not found")
+
+    with steps.step("GATE_CONTRACT_SPEC", payload={"instrumentType": instrument["instrument_type"]}):
+        if instrument["contract_version"] is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Instrument has no active contract specification",
+            )
 
     specification = dict(instrument)
     if account["environment"] == LIVE_ENVIRONMENT and instrument["instrument_type"] in {
         "crypto_spot",
         "crypto_perp",
     }:
-        if not get_settings().live_trading_enabled:
-            raise HTTPException(403, "Live trading is disabled by global safety switch")
+        with steps.step("GATE_LIVE_SWITCH", payload={"phase": "crypto_instrument"}):
+            if not get_settings().live_trading_enabled:
+                raise HTTPException(403, "Live trading is disabled by global safety switch")
         category = "spot" if instrument["instrument_type"] == "crypto_spot" else "linear"
-        try:
-            response = runtime_transport.get(
-                f"{get_settings().runtime_base_url}/venue/instruments/{symbol}",
-                params={
-                    "accountId": account_id,
-                    "instrumentType": instrument["instrument_type"],
-                    "category": category,
-                },
-            )
-            response.raise_for_status()
-            native = response.json()
-            if (
-                any(
-                    native.get(field) != value
-                    for field, value in (
-                        ("accountId", account_id),
-                        ("symbol", symbol),
-                        ("instrumentType", instrument["instrument_type"]),
-                        ("category", category),
-                        ("dataQualityState", "complete"),
-                    )
+        with steps.step(
+            "GATE_NATIVE_SPEC",
+            payload={"symbol": symbol, "category": category},
+        ) as native_step:
+            try:
+                response = runtime_transport.get(
+                    f"{get_settings().runtime_base_url}/venue/instruments/{symbol}",
+                    params={
+                        "accountId": account_id,
+                        "instrumentType": instrument["instrument_type"],
+                        "category": category,
+                    },
                 )
-                or str(native.get("status", "")).lower() != "trading"
-            ):
-                raise ValueError("Native specification identity or state is invalid")
-            for target, field in (
-                ("min_order_quantity", "minQuantity"),
-                ("quantity_step", "quantityStep"),
-                ("price_tick", "priceTick"),
-            ):
-                value = Decimal(str(native[field]))
-                if not value.is_finite() or value <= 0:
-                    raise ValueError("Native specification quantity or price is invalid")
-                specification[target] = value
-        except (httpx.HTTPError, KeyError, TypeError, ValueError, ArithmeticError) as exc:
-            raise HTTPException(409, "Native order specification is unavailable") from exc
+                response.raise_for_status()
+                native = response.json()
+                if (
+                    any(
+                        native.get(field) != value
+                        for field, value in (
+                            ("accountId", account_id),
+                            ("symbol", symbol),
+                            ("instrumentType", instrument["instrument_type"]),
+                            ("category", category),
+                            ("dataQualityState", "complete"),
+                        )
+                    )
+                    or str(native.get("status", "")).lower() != "trading"
+                ):
+                    raise ValueError("Native specification identity or state is invalid")
+                for target, field in (
+                    ("min_order_quantity", "minQuantity"),
+                    ("quantity_step", "quantityStep"),
+                    ("price_tick", "priceTick"),
+                ):
+                    value = Decimal(str(native[field]))
+                    if not value.is_finite() or value <= 0:
+                        raise ValueError("Native specification quantity or price is invalid")
+                    specification[target] = value
+            except (httpx.HTTPError, KeyError, TypeError, ValueError, ArithmeticError) as exc:
+                raise HTTPException(409, "Native order specification is unavailable") from exc
+            if native_step is not None:
+                native_step.note(
+                    nativeStatus=native.get("status"),
+                    minQuantity=str(specification["min_order_quantity"]),
+                    quantityStep=str(specification["quantity_step"]),
+                    priceTick=str(specification["price_tick"]),
+                )
 
     min_order_quantity = Decimal(specification["min_order_quantity"])
     quantity_step = Decimal(specification["quantity_step"])
     price_tick = Decimal(specification["price_tick"])
 
-    if quantity < min_order_quantity:
-        raise HTTPException(status_code=422, detail="Order quantity is below minimum")
-    if quantity_step <= 0 or quantity % quantity_step != 0:
-        raise HTTPException(
-            status_code=422,
-            detail="Order quantity is not aligned to quantity step",
-        )
-    if price is not None and (price_tick <= 0 or price % price_tick != 0):
-        raise HTTPException(
-            status_code=422,
-            detail="Order price is not aligned to price tick",
-        )
+    with steps.step(
+        "GATE_MIN_QUANTITY",
+        payload={"quantity": str(quantity), "minQuantity": str(min_order_quantity)},
+    ):
+        if quantity < min_order_quantity:
+            raise HTTPException(status_code=422, detail="Order quantity is below minimum")
+    with steps.step("GATE_QUANTITY_STEP", payload={"quantityStep": str(quantity_step)}):
+        if quantity_step <= 0 or quantity % quantity_step != 0:
+            raise HTTPException(
+                status_code=422,
+                detail="Order quantity is not aligned to quantity step",
+            )
+    with steps.step(
+        "GATE_PRICE_TICK",
+        payload={
+            "price": str(price) if price is not None else None,
+            "priceTick": str(price_tick),
+        },
+    ):
+        if price is not None and (price_tick <= 0 or price % price_tick != 0):
+            raise HTTPException(
+                status_code=422,
+                detail="Order price is not aligned to price tick",
+            )
 
     if account["environment"] != LIVE_ENVIRONMENT:
         return
 
     settings = get_settings()
-    if not settings.live_trading_enabled:
-        raise HTTPException(
-            status_code=403,
-            detail="Live trading is disabled by global safety switch",
-        )
-    if None in {strategy_instance_id, symbol, side, order_type, command_id}:
-        raise HTTPException(
-            status_code=403,
-            detail="Live order lacks a strategy and command identity boundary",
-        )
+    with steps.step("GATE_LIVE_SWITCH_FINAL", payload=order_payload.copy()):
+        if not settings.live_trading_enabled:
+            raise HTTPException(
+                status_code=403,
+                detail="Live trading is disabled by global safety switch",
+            )
+    with steps.step("GATE_LIVE_IDENTITY"):
+        if None in {strategy_instance_id, symbol, side, order_type, command_id}:
+            raise HTTPException(
+                status_code=403,
+                detail="Live order lacks a strategy and command identity boundary",
+            )
 
-    assert_live_account_execution_allowed(account_id, str(strategy_instance_id))
+    assert_live_account_execution_allowed(
+        account_id,
+        str(strategy_instance_id),
+        recorder=steps,
+    )
 
 
-def assert_live_account_execution_allowed(account_id: str, strategy_instance_id: str) -> None:
+def assert_live_account_execution_allowed(
+    account_id: str,
+    strategy_instance_id: str,
+    *,
+    recorder: StepRecorder | None = None,
+) -> None:
     """Shared batch preflight and last-moment per-order live account checks."""
-    account = get_account_security_row(account_id)
-    if account is None:
-        raise HTTPException(404, "Account not found")
+
+    steps = recorder if recorder is not None else DISABLED_RECORDER
+    with steps.step(
+        "GATE_ACCOUNT_LOOKUP",
+        payload={"accountId": account_id, "phase": "live_preflight"},
+    ):
+        account = get_account_security_row(account_id)
+        if account is None:
+            raise HTTPException(404, "Account not found")
     if account["environment"] != LIVE_ENVIRONMENT:
         return
-    if not get_settings().live_trading_enabled:
-        raise HTTPException(403, "Live trading is disabled by global safety switch")
+    with steps.step("GATE_LIVE_SWITCH_FINAL", payload={"phase": "live_preflight"}):
+        if not get_settings().live_trading_enabled:
+            raise HTTPException(403, "Live trading is disabled by global safety switch")
     from app.execution_risk import assert_execution_allowed
     from app.venue_reconciliation_repository import effective_venue_event
     from app.venue_reconciliation_repository import ensure_schema as ensure_reconciliation_schema
 
-    assert_execution_allowed(str(strategy_instance_id), [account_id])
+    with steps.step(
+        "GATE_RESIDUAL_EXPOSURE",
+        payload={"strategyInstanceId": strategy_instance_id, "accountId": account_id},
+    ):
+        assert_execution_allowed(str(strategy_instance_id), [account_id])
+
     ensure_reconciliation_schema()
     with connection() as db:
-        binding = db.execute(
-            """
-            SELECT 1 FROM strategy_account_bindings
-            WHERE strategy_instance_id = ? AND account_id = ?
-              AND status = 'active' AND capability = 'trade_and_read'
-            """,
-            (strategy_instance_id, account_id),
-        ).fetchone()
-        if binding is None:
-            raise HTTPException(
-                status_code=403, detail="Account has no active strategy trading binding"
-            )
-        differences = db.execute(
-            """
-            SELECT rd.* FROM reconciliation_differences rd
-            JOIN venue_reconciliation_runs vr ON vr.id = rd.run_id
-            WHERE vr.strategy_instance_id = ? AND vr.account_id = ?
-              AND rd.status IN ('open', 'accepted')
-              AND NOT (
-                  rd.status = 'accepted' AND rd.difference_type = 'missing_external'
-                  AND EXISTS (
-                      SELECT 1 FROM orders o
-                      WHERE o.id = rd.local_reference AND o.status = 'rejected'
+        with steps.step(
+            "GATE_STRATEGY_BINDING",
+            payload={"strategyInstanceId": strategy_instance_id},
+        ):
+            binding = db.execute(
+                """
+                SELECT 1 FROM strategy_account_bindings
+                WHERE strategy_instance_id = ? AND account_id = ?
+                  AND status = 'active' AND capability = 'trade_and_read'
+                """,
+                (strategy_instance_id, account_id),
+            ).fetchone()
+            if binding is None:
+                raise HTTPException(
+                    status_code=403, detail="Account has no active strategy trading binding"
+                )
+        with steps.step("GATE_RECONCILIATION"):
+            differences = db.execute(
+                """
+                SELECT rd.* FROM reconciliation_differences rd
+                JOIN venue_reconciliation_runs vr ON vr.id = rd.run_id
+                WHERE vr.strategy_instance_id = ? AND vr.account_id = ?
+                  AND rd.status IN ('open', 'accepted')
+                  AND NOT (
+                      rd.status = 'accepted' AND rd.difference_type = 'missing_external'
+                      AND EXISTS (
+                          SELECT 1 FROM orders o
+                          WHERE o.id = rd.local_reference AND o.status = 'rejected'
+                      )
                   )
-              )
-            """,
-            (strategy_instance_id, account_id),
-        ).fetchall()
-        for difference in differences:
-            if (
-                difference["status"] == "accepted"
-                and difference["difference_type"] == "timestamp_mismatch"
-                and difference["entity_type"] == "venue_event"
-            ):
-                # Use the same exact-receipt, time-only evidence as ingestion.
-                # Acceptance alone never waives an amount or identity conflict.
-                try:
-                    original = json.loads(difference["local_value_json"])
-                    corrected = json.loads(difference["external_value_json"])
-                    event_type = str(difference["external_reference"]).split(":", 1)[0]
-                    if (
-                        original.get("accountId") == account_id
-                        and original != corrected
-                        and effective_venue_event(db, account_id, event_type, original) == corrected
-                    ):
-                        continue
-                except (ValueError, TypeError, AttributeError):
-                    pass  # Invalid accepted evidence remains a blocking difference.
-            raise HTTPException(
-                status_code=423,
-                detail="Outstanding open or accepted reconciliation differences exist",
-            )
+                """,
+                (strategy_instance_id, account_id),
+            ).fetchall()
+            for difference in differences:
+                if (
+                    difference["status"] == "accepted"
+                    and difference["difference_type"] == "timestamp_mismatch"
+                    and difference["entity_type"] == "venue_event"
+                ):
+                    # Use the same exact-receipt, time-only evidence as ingestion.
+                    # Acceptance alone never waives an amount or identity conflict.
+                    try:
+                        original = json.loads(difference["local_value_json"])
+                        corrected = json.loads(difference["external_value_json"])
+                        event_type = str(difference["external_reference"]).split(":", 1)[0]
+                        if (
+                            original.get("accountId") == account_id
+                            and original != corrected
+                            and effective_venue_event(db, account_id, event_type, original)
+                            == corrected
+                        ):
+                            continue
+                    except (ValueError, TypeError, AttributeError):
+                        pass  # Invalid accepted evidence remains a blocking difference.
+                raise HTTPException(
+                    status_code=423,
+                    detail="Outstanding open or accepted reconciliation differences exist",
+                )
 
 
 def _account_is_order_eligible(status: str, environment: str) -> bool:

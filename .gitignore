@@ -1,5 +1,8 @@
 ﻿# Local secrets
 platform-api/app.db
+# Root .env is generated from .env.example by setup-platform.ps1; never commit it.
+/.env
+*.env.bak-*
 execution-runtime/.env
 platform-web/.env
 projects/risk-control/data-service/bitget-data-service/bybitapi.txt

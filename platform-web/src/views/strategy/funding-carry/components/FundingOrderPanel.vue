@@ -4,8 +4,16 @@
       <div class="selector-chip"
         ><span>标的</span><strong>{{ strategyLabel }}</strong></div
       >
-      <button type="button" class="refresh-btn" @click="$emit('refresh')">刷新行情</button>
+      <div class="topbar-actions">
+        <span v-if="busy" class="busy-chip"> <i class="busy-dot"></i>{{ busyTitle }} </span>
+        <button type="button" class="refresh-btn" :disabled="busy" @click="$emit('refresh')"
+          >刷新行情</button
+        >
+      </div>
     </header>
+    <div v-if="busy" class="progress-track" role="progressbar" aria-label="指令执行中">
+      <span class="progress-track__bar"></span>
+    </div>
 
     <div class="funding-upper-grid">
       <section class="panel quote-panel">
@@ -102,9 +110,20 @@
           <p v-else>{{ stateLabel(workspaceState) }}</p>
           <p v-if="failureReason" class="error-text">{{ failureMessage(failureReason) }}</p>
         </div>
+        <ExecutionStepTimeline
+          :timeline="executionTimeline"
+          :loading="executionTimelineLoading"
+          :trace-id="executionTraceId"
+          @refresh="$emit('refresh-timeline')"
+        />
       </section>
 
       <section class="panel order-panel">
+        <div v-if="busy" class="panel-busy" role="status" aria-live="polite">
+          <span class="panel-busy__spinner"></span>
+          <strong>{{ busyTitle }}</strong>
+          <small>{{ busyHint }}</small>
+        </div>
         <div class="panel-title"><h3>套利执行指令</h3></div>
         <section class="embedded-funding">
           <div class="panel-title"><h3>开仓资金</h3></div>
@@ -119,11 +138,13 @@
           </div>
         </section>
         <div class="stage-tabs">
-          <button type="button" :class="{ active: stage === 'open' }" @click="stage = 'open'"
+          <button type="button" :class="{ active: stage === 'open' }" @click="switchStage('open')"
             >开仓</button
           >
-          <button type="button" :class="{ active: stage === 'close' }" @click="stage = 'close'"
-            >平仓</button
+          <button type="button" :class="{ active: stage === 'close' }" @click="switchStage('close')"
+            >平仓<span v-if="closableGroupsCount" class="tab-badge">{{
+              closableGroupsCount
+            }}</span></button
           >
         </div>
 
@@ -239,13 +260,16 @@
               <p v-if="context?.openSizing?.reason" class="error-text">{{
                 context.openSizing.reason
               }}</p>
+              <p v-else-if="openBlockedMessage" class="blocked-hint">{{ openBlockedMessage }}</p>
             </section>
           </div>
           <button
             class="submit-btn submit-btn--green"
+            :class="{ 'is-blocked': !canSubmit || !!pendingDraft }"
             type="button"
-            :disabled="!canSubmit || submitting"
-            @click="$emit('submit-open')"
+            :aria-disabled="!canSubmit || !!pendingDraft"
+            :disabled="submitting"
+            @click="handleSubmitOpen"
           >
             {{ submitting ? '提交中' : `${executionPolicyLabel}开仓` }}
           </button>
@@ -291,8 +315,23 @@
                       ></td
                     >
                   </tr>
-                  <tr v-if="!activeGroups.length"
-                    ><td colspan="6" class="empty-cell">暂无活动组合</td></tr
+                  <tr v-if="positionsLoading && !activeGroups.length">
+                    <td colspan="6" class="empty-cell">
+                      <span class="inline-loading"
+                        ><i class="spinner-dot"></i>正在读取活动组合…</span
+                      >
+                    </td>
+                  </tr>
+                  <tr v-else-if="!activeGroups.length"
+                    ><td colspan="6" class="empty-cell"
+                      >暂无活动组合（开仓成交后会出现在这里）
+                      <button
+                        type="button"
+                        class="flat-action flat-action--tiny"
+                        @click="$emit('refresh')"
+                        >重新读取</button
+                      ></td
+                    ></tr
                   >
                 </tbody>
               </table>
@@ -316,8 +355,9 @@
                 v-for="fraction in [25, 50, 75, 100]"
                 :key="fraction"
                 type="button"
-                :disabled="!selectedCloseInstructionId || submitting || !!pendingDraft"
-                @click="$emit('select-close-fraction', fraction)"
+                :class="{ 'is-blocked': !!fractionBlockedReason(fraction) }"
+                :aria-disabled="!!fractionBlockedReason(fraction)"
+                @click="handleFraction(fraction)"
               >
                 {{ fraction === 100 ? '全部平仓' : `${fraction}%` }}
               </button>
@@ -325,11 +365,14 @@
             <p class="execution-hint"
               >比例按剩余可平数量计算，并按永续数量步长向下取整；可直接输入部分平仓数量。</p
             >
+            <p v-if="closeBlockedMessage" class="blocked-hint">{{ closeBlockedMessage }}</p>
             <button
               class="submit-btn submit-btn--red"
+              :class="{ 'is-blocked': !canClose || !!pendingDraft }"
               type="button"
-              :disabled="!canClose || submitting || !selectedCloseInstructionId"
-              @click="$emit('submit-close')"
+              :aria-disabled="!canClose || !!pendingDraft"
+              :disabled="submitting"
+              @click="handleSubmitClose"
             >
               {{ submitting ? '提交中' : `${executionPolicyLabel}平仓` }}
             </button>
@@ -347,7 +390,12 @@
             ></thead
           >
           <tbody>
-            <tr v-for="item in executionGroups" :key="item.instructionId">
+            <tr
+              v-for="item in executionGroups"
+              :key="item.instructionId"
+              :class="{ 'row-clickable': !!item.batchId }"
+              @click="openRecord(item)"
+            >
               <td>{{ item.perpetualSymbol }} / {{ item.spotSymbol }}</td>
               <td>{{ item.hedgedQuantity }}</td>
               <td
@@ -358,7 +406,14 @@
               <td>{{ item.fees ?? '--' }}</td>
               <td>{{ stateLabel(item.status) }}</td>
             </tr>
-            <tr v-if="!executionGroups.length"
+            <tr v-if="positionsLoading && !executionGroups.length"
+              ><td colspan="6" class="empty-cell"
+                ><span class="inline-loading"
+                  ><i class="spinner-dot"></i>正在读取执行记录…</span
+                ></td
+              ></tr
+            >
+            <tr v-else-if="!executionGroups.length"
               ><td colspan="6" class="empty-cell">暂无执行记录</td></tr
             >
           </tbody>
@@ -495,7 +550,12 @@
                   @saved="$emit('refresh')"
               /></td>
             </tr>
-            <tr v-if="!activeGroups.length"
+            <tr v-if="positionsLoading && !activeGroups.length"
+              ><td colspan="10" class="empty-cell"
+                ><span class="inline-loading"><i class="spinner-dot"></i>正在读取持仓…</span></td
+              ></tr
+            >
+            <tr v-else-if="!activeGroups.length"
               ><td colspan="10" class="empty-cell">暂无真实 Funding 持仓</td></tr
             >
           </tbody>
@@ -507,12 +567,19 @@
 
 <script setup lang="ts">
   import { computed, ref, watch } from 'vue';
+  import { useRouter } from 'vue-router';
   import Decimal from 'decimal.js';
+  import { message } from 'ant-design-vue';
   import { useUserStore } from '@/store/modules/user';
   import FundingBasisPanel from './FundingBasisPanel.vue';
   import FundingExitSettings from './FundingExitSettings.vue';
+  import ExecutionStepTimeline from './ExecutionStepTimeline.vue';
   import { closeFundingAbnormalOpen, recoverFundingClose } from '@/api/platform/fundingWorkspace';
-  import type { FundingExecutionPolicy } from '../composables/fundingExecutionRecovery';
+  import {
+    isFundingAutoPollingState,
+    type FundingExecutionPolicy,
+  } from '../composables/fundingExecutionRecovery';
+  import type { ExecutionTimeline } from '@/api/platform/executionSteps';
 
   const props = defineProps<{
     context: Record<string, any> | null;
@@ -531,6 +598,10 @@
     selectedCloseInstructionId: string;
     selectedCloseGroup: Record<string, any> | null;
     canSubmit: boolean;
+    executionTimeline: ExecutionTimeline | null;
+    executionTimelineLoading: boolean;
+    executionTraceId: string | null;
+    positionsLoading?: boolean;
   }>();
 
   const emit = defineEmits<{
@@ -545,6 +616,7 @@
     (event: 'refresh'): void;
     (event: 'select-symbol', perpetualSymbol: string, spotSymbol: string): void;
     (event: 'select-close-instruction', instructionId: string): void;
+    (event: 'refresh-timeline'): void;
   }>();
 
   const stage = ref<'open' | 'close'>('open');
@@ -562,6 +634,31 @@
       ? '保留原指令，等待核对'
       : '正在恢复同一指令',
   );
+  /** Any in-flight instruction: submitting, or a dispatched draft still polling. */
+  const busy = computed(
+    () =>
+      props.submitting ||
+      (!!props.pendingDraft &&
+        (props.workspaceState === 'loading' || isFundingAutoPollingState(props.workspaceState))),
+  );
+  const busyTitle = computed(() => {
+    if (props.submitting) return '正在提交指令';
+    const state = props.workspaceState;
+    if (state === 'accepted') return '指令已受理，等待执行';
+    if (state === 'executing') return '正在执行两腿撮合';
+    if (state === 'reconciling') return '正在核对成交与费用';
+    if (state === 'partially_hedged') return '已部分对冲，继续执行';
+    return '正在确认指令结果';
+  });
+  const busyHint = computed(() =>
+    props.submitting
+      ? '请求已发出，等待交易网关回执。'
+      : '执行链路未走完，页面会自动刷新；如需人工介入请先等待结果返回。',
+  );
+  const closableGroupsCount = computed(
+    () => activeGroups.value.filter((item) => hasClosableQuantity(item)).length,
+  );
+
   const estimatedNotional = computed(() => {
     try {
       const amount = new Decimal(String(props.context?.openSizing?.estimatedNotional ?? ''));
@@ -598,6 +695,16 @@
     props.positionGroups.filter((item) => item.lifecycleState !== 'history' && item.isAbnormal),
   );
   const user = useUserStore();
+  const router = useRouter();
+
+  function openRecord(item: Record<string, any>) {
+    const target = item.batchId;
+    if (!target) return;
+    void router.push({
+      name: 'StrategyExecutionRecordDetail',
+      params: { recordId: String(target) },
+    });
+  }
   const canTrade = computed(() => user.authentication?.user.role === 'ceo');
   const pendingAbnormal = ref<string | null>(null);
   const abnormalSubmitting = ref(false);
@@ -773,6 +880,113 @@
     } catch {
       return false;
     }
+  }
+
+  function positive(value: string): boolean {
+    try {
+      return new Decimal(value || '0').gt(0);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Why the open button cannot be pressed, in priority order. */
+  const openBlockedMessage = computed(() => {
+    if (props.canSubmit) return null;
+    if (props.pendingDraft) return '当前有待确认指令，请等待其结束后再提交。';
+    if (props.submitting) return '正在提交，请稍候。';
+    if (!props.context) return '行情与交易规则加载中，请稍候。';
+    if (props.context?.controlledLiveReadiness?.ready !== true) return readinessLabel.value;
+    if (props.executionPolicy === 'fok' && !positive(props.perpetualLimitPriceInput))
+      return '限价 FOK 需要先填写永续限价。';
+    const sizing = props.context?.openSizing;
+    if (sizing?.valid !== true) return sizing?.reason ?? '当前数量不满足交易规则。';
+    const target = String(sizing?.perpetualQuantity ?? '');
+    if (!positive(props.quantityInput)) return '请输入永续目标数量。';
+    try {
+      if (!new Decimal(props.quantityInput).eq(target))
+        return `目标数量需等于配平后的永续数量 ${target}（受数量步长与最小下单量约束）。`;
+    } catch {
+      return '目标数量格式不正确。';
+    }
+    return null;
+  });
+
+  /** Why the close button cannot be pressed, in priority order. */
+  const closeBlockedMessage = computed(() => {
+    if (props.canClose) return null;
+    if (props.pendingDraft) return '当前有待确认指令，请等待其结束后再提交。';
+    if (props.submitting) return '正在提交，请稍候。';
+    if (props.context?.controlledLiveReadiness?.ready !== true) return readinessLabel.value;
+    if (!props.selectedCloseInstructionId) return '请先在活动组合表格中点「选择」。';
+    const group = props.selectedCloseGroup;
+    if (!group) return '正在读取该组合的可平数量，请稍候。';
+    if (group.spotFeeAdjusted && group.remainingSpotQuantity == null)
+      return '现货实际到账和手续费尚未核实，请等成交费用同步后再平仓。';
+    if (!positive(props.closeQuantityInput)) return '请输入平仓数量，或点选下方比例。';
+    try {
+      const quantity = new Decimal(props.closeQuantityInput);
+      const step = new Decimal(props.context?.quantityStep?.perpetual ?? '0');
+      const minimum = new Decimal(props.context?.minimumQuantity?.perpetual ?? '0');
+      if (step.gt(0) && !quantity.mod(step).eq(0)) return `数量需为 ${step.toString()} 的整数倍。`;
+      if (minimum.gt(0) && quantity.lt(minimum)) return `最小平仓数量为 ${minimum.toString()}。`;
+      const remaining = new Decimal(group.remainingClosableQuantity ?? '0');
+      if (quantity.gt(remaining)) return `超过剩余可平 ${remaining.toString()}。`;
+    } catch {
+      return '平仓数量格式不正确。';
+    }
+    return null;
+  });
+
+  /** Why a 25/50/75/100 button cannot produce a tradable quantity. */
+  function fractionBlockedReason(percent: number): string | null {
+    if (props.submitting) return '正在提交，请稍候。';
+    if (props.pendingDraft) return '当前有待确认指令，请等待其结束后再提交。';
+    if (!props.selectedCloseInstructionId)
+      return '请先在下方活动组合表格点击「选择」，再按比例平仓。';
+    const group = props.selectedCloseGroup;
+    if (!group) return '正在读取该组合的可平数量，请稍候。';
+    try {
+      const remaining = new Decimal(group.remainingClosableQuantity ?? '0');
+      if (!remaining.gt(0)) return '该组合当前没有剩余可平数量。';
+      const step = new Decimal(props.context?.quantityStep?.perpetual ?? '0');
+      if (!step.gt(0)) return '交易规则尚未加载完成，请稍候再试。';
+      const quantity = remaining.times(percent).div(100).div(step).floor().times(step);
+      if (!quantity.gt(0))
+        return `剩余可平 ${remaining.toString()} 不足 ${percent}% 的一个步长（${step.toString()}），请改用「全部平仓」或直接输入数量。`;
+    } catch {
+      return '数量计算失败，请直接输入平仓数量。';
+    }
+    return null;
+  }
+
+  function handleFraction(percent: number) {
+    const reason = fractionBlockedReason(percent);
+    if (reason) {
+      message.warning(reason);
+      return;
+    }
+    emit('select-close-fraction', percent);
+  }
+  function handleSubmitOpen() {
+    if (openBlockedMessage.value) {
+      message.warning(openBlockedMessage.value);
+      return;
+    }
+    emit('submit-open');
+  }
+  function handleSubmitClose() {
+    if (closeBlockedMessage.value) {
+      message.warning(closeBlockedMessage.value);
+      return;
+    }
+    emit('submit-close');
+  }
+  function switchStage(next: 'open' | 'close') {
+    if (stage.value === next) return;
+    stage.value = next;
+    // Positions arrive on a 3s poll; opening the tab should not wait for it.
+    if (next === 'close') emit('refresh');
   }
 </script>
 
@@ -1115,6 +1329,182 @@
     cursor: not-allowed;
   }
 
+  .topbar-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .busy-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    height: 38px;
+    border: 1px solid var(--strategy-accent-ring, #adc6ff);
+    border-radius: 10px;
+    background: var(--strategy-accent-soft, #f0f5ff);
+    color: var(--strategy-accent-strong, #1d39c4);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .busy-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentcolor;
+    animation: busy-pulse 1s ease-in-out infinite;
+  }
+
+  .progress-track {
+    position: relative;
+    overflow: hidden;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--strategy-border-soft, #eef1f6);
+  }
+
+  .progress-track__bar {
+    position: absolute;
+    top: 0;
+    left: -40%;
+    width: 40%;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2f54eb, #69b1ff);
+    animation: progress-slide 1.2s ease-in-out infinite;
+  }
+
+  .order-panel {
+    position: relative;
+  }
+
+  .panel-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 10px;
+    padding: 24px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(1.5px);
+    text-align: center;
+    /* Keep the card readable and interactive: the submit handlers already
+       refuse to fire while an instruction is in flight, and blocking the whole
+       panel would hide the position table for the duration of the trade. */
+    pointer-events: none;
+  }
+
+  .panel-busy strong {
+    font-size: 15px;
+  }
+
+  .panel-busy small {
+    max-width: 320px;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .panel-busy__spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid rgba(47, 84, 235, 0.16);
+    border-top-color: #2f54eb;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+
+  .inline-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .spinner-dot {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(47, 84, 235, 0.2);
+    border-top-color: #2f54eb;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+
+  .blocked-hint {
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #fffbe6;
+    color: #ad6800;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .submit-btn.is-blocked {
+    filter: grayscale(0.65);
+    opacity: 0.55;
+  }
+
+  .submit-btn.is-blocked:hover {
+    opacity: 0.7;
+  }
+
+  .close-fractions button.is-blocked {
+    opacity: 0.5;
+  }
+
+  .tab-badge {
+    display: inline-flex;
+    min-width: 18px;
+    height: 18px;
+    margin-left: 6px;
+    padding: 0 5px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    background: var(--strategy-accent-soft, #f0f5ff);
+    color: var(--strategy-accent-strong, #1d39c4);
+    font-size: 11px;
+  }
+
+  .flat-action--tiny {
+    height: 26px;
+    margin-left: 8px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes busy-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  @keyframes progress-slide {
+    0% {
+      left: -40%;
+    }
+
+    100% {
+      left: 100%;
+    }
+  }
+
   .funding-close-shell {
     display: grid;
     gap: 14px;
@@ -1167,6 +1557,14 @@
   }
 
   tr.selected {
+    background: var(--strategy-surface-selected);
+  }
+
+  tr.row-clickable {
+    cursor: pointer;
+  }
+
+  tr.row-clickable:hover {
     background: var(--strategy-surface-selected);
   }
 

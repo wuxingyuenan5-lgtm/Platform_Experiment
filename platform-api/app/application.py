@@ -18,6 +18,7 @@ from app.disaster_recovery import router as disaster_recovery_router
 from app.eod_reconciliation_routes import router as eod_reconciliation_router
 from app.execution_risk import configure_trade_command_port
 from app.execution_risk import router as execution_risk_router
+from app.execution_steps import ExecutionTraceMiddleware
 from app.financial_ai_routes import router as financial_ai_router
 from app.financial_facts import router as financial_facts_router
 from app.live_trading_sessions import router as live_trading_sessions_router
@@ -111,6 +112,7 @@ def create_application() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Execution-Trace-Id"],
     )
 
     application.include_router(create_system_router(settings, PLATFORM_VERSION))
@@ -145,6 +147,7 @@ def create_application() -> FastAPI:
 
     application.add_middleware(AuthenticationMiddleware)
     application.add_middleware(UserNoStoreMiddleware)
+    application.add_middleware(ExecutionTraceMiddleware)
     return application
 
 

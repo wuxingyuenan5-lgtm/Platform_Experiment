@@ -449,6 +449,27 @@ def test_mt5_live_adapter_passes_terminal_path_positionally(tmp_path, monkeypatc
     assert kwargs["timeout"] == 8000
 
 
+def test_mt5_initialize_carries_credentials(tmp_path, monkeypatch) -> None:
+    configure_mt5_secret(monkeypatch)
+    get_settings().journal_path = str(tmp_path / "mt5-init-credentials.db")
+    initialize_journal()
+    fake_mt5 = FakeRuntimeMt5()
+    monkeypatch.setattr("app.mt5_connection.maintain_background_terminal", lambda *a, **kw: None)
+    monkeypatch.setitem(sys.modules, "MetaTrader5", fake_mt5)
+    monkeypatch.setattr("app.mt5_live_adapter.platform.system", lambda: "Windows")
+    settings = runtime_settings(write_enabled=False)
+    settings.mt5_terminal_path = "C:/MT5/terminal64.exe"
+
+    Mt5LiveAdapter(settings).list_balances("account-mt5")
+
+    # Build 6286 only answers the IPC handshake when initialize carries the
+    # account, so the credentials travel with the very first SDK call.
+    _args, kwargs = fake_mt5.initialize_calls[0]
+    assert kwargs["login"] == 123456
+    assert kwargs["password"] == "not-exposed"
+    assert kwargs["server"] == "Broker-Live"
+
+
 def test_mt5_live_adapter_rejects_wrong_runtime_server(tmp_path, monkeypatch) -> None:
     configure_mt5_secret(monkeypatch)
     get_settings().journal_path = str(tmp_path / "mt5-identity.db")

@@ -1225,6 +1225,141 @@ PLATFORM_MIGRATIONS += (
 )
 
 
+# Execution step timeline. One row per stage of one order/batch attempt,
+# including attempts that a safety gate rejected before an order row existed.
+# It is append-only: nothing in the trading path updates or deletes these rows.
+PLATFORM_MIGRATIONS += (
+    Migration(
+        version=46,
+        name="execution-step-timeline",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS execution_steps (
+                id TEXT PRIMARY KEY,
+                trace_id TEXT NOT NULL,
+                batch_id TEXT,
+                order_id TEXT,
+                command_id TEXT,
+                sequence INTEGER NOT NULL,
+                stage TEXT NOT NULL,
+                status TEXT NOT NULL,
+                reason_code TEXT,
+                reason_detail TEXT,
+                status_code INTEGER,
+                duration_ms INTEGER,
+                payload_json TEXT,
+                occurred_at TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_steps_trace
+            ON execution_steps(trace_id, occurred_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_steps_batch
+            ON execution_steps(batch_id, occurred_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_steps_order
+            ON execution_steps(order_id, occurred_at)
+            """,
+        ),
+    ),
+    Migration(
+        version=47,
+        name="execution-records",
+        statements=(
+            # One row per execution batch (a single open or a single close) across
+            # every strategy line. The table is a durable projection of the
+            # execution evidence that already lives in batches, legs, orders and
+            # venue events, so history stays readable after the fact.
+            """
+            CREATE TABLE IF NOT EXISTS execution_records (
+                id TEXT PRIMARY KEY,
+                strategy_key TEXT NOT NULL,
+                strategy_instance_id TEXT,
+                batch_id TEXT NOT NULL,
+                instruction_id TEXT,
+                action TEXT NOT NULL,
+                direction TEXT,
+                status TEXT NOT NULL,
+                failure_reason TEXT,
+                trace_id TEXT,
+                primary_symbol TEXT,
+                primary_quantity TEXT,
+                primary_average_price TEXT,
+                total_fees TEXT,
+                fee_currency TEXT,
+                notional TEXT,
+                leg_count INTEGER NOT NULL DEFAULT 0,
+                filled_leg_count INTEGER NOT NULL DEFAULT 0,
+                leg_details_json TEXT,
+                risk_json TEXT,
+                related_record_id TEXT,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                duration_ms INTEGER,
+                projected_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_records_batch
+            ON execution_records(batch_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_records_strategy
+            ON execution_records(strategy_key, started_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_records_status
+            ON execution_records(status, started_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_records_instruction
+            ON execution_records(instruction_id)
+            """,
+            # Point-in-time account state around a submission. Unlike
+            # account_venue_snapshots (one overwritten row per account), this is
+            # append-only so "what did the account look like then" survives.
+            """
+            CREATE TABLE IF NOT EXISTS execution_account_snapshots (
+                id TEXT PRIMARY KEY,
+                trace_id TEXT,
+                batch_id TEXT,
+                instruction_id TEXT,
+                account_id TEXT NOT NULL,
+                phase TEXT NOT NULL,
+                currency TEXT,
+                balance TEXT,
+                available TEXT,
+                equity TEXT,
+                position_count INTEGER,
+                positions_json TEXT,
+                payload_json TEXT,
+                quality_state TEXT,
+                captured_at TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_account_snapshots_batch
+            ON execution_account_snapshots(batch_id, phase)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_execution_account_snapshots_trace
+            ON execution_account_snapshots(trace_id, captured_at)
+            """,
+            # Per-fill fees were only aggregated into the PnL ledger, which made
+            # them unrecoverable per order. Keep the native receipt on the fill.
+            "ALTER TABLE fills ADD COLUMN fee TEXT",
+            "ALTER TABLE fills ADD COLUMN fee_currency TEXT",
+            "ALTER TABLE fills ADD COLUMN fee_quality TEXT",
+        ),
+    ),
+)
+
+
 def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 

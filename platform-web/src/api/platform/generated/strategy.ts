@@ -1335,6 +1335,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/trading/execution-records': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Durable open/close execution records across every strategy line */
+    get: operations['execution_records_api_v1_trading_execution_records_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/trading/execution-records/{record_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Full open/close chain for one execution record */
+    get: operations['execution_record_detail_api_v1_trading_execution_records__record_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/trading/execution-steps': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Ordered execution timeline for one trace, batch or order */
+    get: operations['execution_step_timeline_api_v1_trading_execution_steps_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/trading/fills': {
     parameters: {
       query?: never;
@@ -1695,9 +1746,9 @@ export interface components {
        */
       orderType: 'market' | 'limit';
       /** Price */
-      price?: string | null;
+      price?: number | string | null;
       /** Quantity */
-      quantity: string;
+      quantity: number | string;
       /** Role */
       role: string;
       /**
@@ -1798,7 +1849,7 @@ export interface components {
        * Principal
        * @default 0
        */
-      principal: string;
+      principal: number | string;
       /**
        * Product
        * @default self_funded
@@ -1877,7 +1928,7 @@ export interface components {
     /** CreateInternalCapitalTransferRequest */
     CreateInternalCapitalTransferRequest: {
       /** Amount */
-      amount: string;
+      amount: number | string;
       /**
        * Direction
        * @enum {string}
@@ -1898,9 +1949,9 @@ export interface components {
        */
       orderType: 'market' | 'limit';
       /** Price */
-      price?: string | null;
+      price?: number | string | null;
       /** Quantity */
-      quantity: string;
+      quantity: number | string;
       /**
        * Side
        * @enum {string}
@@ -1948,9 +1999,9 @@ export interface components {
        */
       orderType: 'market' | 'limit';
       /** Price */
-      price?: string | null;
+      price?: number | string | null;
       /** Quantity */
-      quantity: string;
+      quantity: number | string;
       /**
        * Side
        * @enum {string}
@@ -2162,17 +2213,17 @@ export interface components {
       /** Stoplosslimitstrategy */
       stopLossLimitStrategy?: ('fok' | 'post_only_chase' | 'market') | null;
       /** Stoplossmaxadversespread */
-      stopLossMaxAdverseSpread?: string | null;
+      stopLossMaxAdverseSpread?: number | string | null;
       /** Stoplossspread */
-      stopLossSpread?: string | null;
+      stopLossSpread?: number | string | null;
       /** Takeprofitexecutionmode */
       takeProfitExecutionMode?: ('market' | 'limit') | null;
       /** Takeprofitlimitstrategy */
       takeProfitLimitStrategy?: ('fok' | 'post_only_chase' | 'market') | null;
       /** Takeprofitmaxadversespread */
-      takeProfitMaxAdverseSpread?: string | null;
+      takeProfitMaxAdverseSpread?: number | string | null;
       /** Takeprofitspread */
-      takeProfitSpread?: string | null;
+      takeProfitSpread?: number | string | null;
     };
     /** CrossSpreadHistoryPointResponse */
     CrossSpreadHistoryPointResponse: {
@@ -2193,7 +2244,7 @@ export interface components {
     /** CrossSpreadLeverageRequest */
     CrossSpreadLeverageRequest: {
       /** Leverage */
-      leverage: string;
+      leverage: number | string;
     };
     /** CrossSpreadLeverageResponse */
     CrossSpreadLeverageResponse: {
@@ -2253,7 +2304,7 @@ export interface components {
       /** Idempotencykey */
       idempotencyKey?: string | null;
       /** Limitspread */
-      limitSpread?: string | null;
+      limitSpread?: number | string | null;
       /**
        * Limitstrategy
        * @default fok
@@ -2264,9 +2315,9 @@ export interface components {
        * Maxadversespread
        * @default 0
        */
-      maxAdverseSpread: string;
+      maxAdverseSpread: number | string;
       /** Quantityoz */
-      quantityOz?: string | null;
+      quantityOz?: number | string | null;
     };
     /** CrossSpreadMarketCommandRequest */
     CrossSpreadMarketCommandRequest: {
@@ -2278,7 +2329,7 @@ export interface components {
       /** Idempotencykey */
       idempotencyKey?: string | null;
       /** Quantityoz */
-      quantityOz: string;
+      quantityOz: number | string;
     };
     /** CrossSpreadMarketOpenRequest */
     CrossSpreadMarketOpenRequest: {
@@ -2296,7 +2347,7 @@ export interface components {
       /** Idempotencykey */
       idempotencyKey?: string | null;
       /** Limitspread */
-      limitSpread?: string | null;
+      limitSpread?: number | string | null;
       /**
        * Limitstrategy
        * @default fok
@@ -2307,9 +2358,9 @@ export interface components {
        * Maxadversespread
        * @default 0
        */
-      maxAdverseSpread: string;
+      maxAdverseSpread: number | string;
       /** Quantityoz */
-      quantityOz: string;
+      quantityOz: number | string;
       /**
        * Stoplossexecutionmode
        * @default market
@@ -2326,9 +2377,9 @@ export interface components {
        * Stoplossmaxadversespread
        * @default 0
        */
-      stopLossMaxAdverseSpread: string;
+      stopLossMaxAdverseSpread: number | string;
       /** Stoplossspread */
-      stopLossSpread?: string | null;
+      stopLossSpread?: number | string | null;
       /**
        * Takeprofitexecutionmode
        * @default market
@@ -2345,9 +2396,9 @@ export interface components {
        * Takeprofitmaxadversespread
        * @default 0
        */
-      takeProfitMaxAdverseSpread: string;
+      takeProfitMaxAdverseSpread: number | string;
       /** Takeprofitspread */
-      takeProfitSpread?: string | null;
+      takeProfitSpread?: number | string | null;
     };
     /** CrossSpreadMetricsResponse */
     CrossSpreadMetricsResponse: {
@@ -2527,7 +2578,7 @@ export interface components {
       /** Exitplanid */
       exitPlanId?: string | null;
       /** Quantityoz */
-      quantityOz: string;
+      quantityOz: number | string;
     };
     /** CrossSpreadPreflightResponse */
     CrossSpreadPreflightResponse: {
@@ -2763,9 +2814,9 @@ export interface components {
        */
       direction: 'buy_spread' | 'sell_spread';
       /** Entrythreshold */
-      entryThreshold: string;
+      entryThreshold: number | string;
       /** Exittarget */
-      exitTarget: string;
+      exitTarget: number | string;
       /**
        * Methodversion
        * @constant
@@ -2777,7 +2828,7 @@ export interface components {
        */
       pairId: 'cross-gold' | 'funding-btc';
       /** Quantity */
-      quantity: string;
+      quantity: number | string;
     };
     /** EconomicEventResponse */
     EconomicEventResponse: {
@@ -2980,7 +3031,7 @@ export interface components {
       /** Maxlegdelayseconds */
       maxLegDelaySeconds: number;
       /** Maxresidualnotional */
-      maxResidualNotional: string;
+      maxResidualNotional: number | string;
     };
     /** Experiment */
     Experiment: {
@@ -3002,11 +3053,11 @@ export interface components {
        */
       direction: 'buy_spread' | 'sell_spread';
       /** Entrythreshold */
-      entryThreshold: string;
+      entryThreshold: number | string;
       /** Entrythresholds */
       entryThresholds?: (number | string)[];
       /** Exittarget */
-      exitTarget: string;
+      exitTarget: number | string;
       /** Exittargets */
       exitTargets?: (number | string)[];
       /**
@@ -3058,7 +3109,7 @@ export interface components {
       /** Quantities */
       quantities?: (number | string)[];
       /** Quantity */
-      quantity: string;
+      quantity: number | string;
       /** Riskpnl */
       riskPnl?: (number | string) | null;
       /**
@@ -3379,7 +3430,7 @@ export interface components {
        */
       observedAt: string;
       /** Rate */
-      rate: string;
+      rate: number | string;
     };
     /** FundingExecutionContextResponse */
     FundingExecutionContextResponse: {
@@ -3461,9 +3512,9 @@ export interface components {
       /** Expectedrevision */
       expectedRevision: number;
       /** Stoplossspread */
-      stopLossSpread?: string | null;
+      stopLossSpread?: number | string | null;
       /** Takeprofitspread */
-      takeProfitSpread?: string | null;
+      takeProfitSpread?: number | string | null;
     };
     /** FundingExitPlanResponse */
     FundingExitPlanResponse: {
@@ -3504,15 +3555,15 @@ export interface components {
        */
       executionPolicy: 'market' | 'fok' | 'post_only_chase';
       /** Expectedperpetualquantity */
-      expectedPerpetualQuantity?: string | null;
+      expectedPerpetualQuantity?: number | string | null;
       /** Idempotencykey */
       idempotencyKey: string;
       /** Perpetuallimitprice */
-      perpetualLimitPrice?: string | null;
+      perpetualLimitPrice?: number | string | null;
       /** Perpetualsymbol */
       perpetualSymbol: string;
       /** Quantity */
-      quantity: string;
+      quantity: number | string;
       /** Spotsymbol */
       spotSymbol: string;
       /** Targetopeninstructionid */
@@ -3530,7 +3581,7 @@ export interface components {
       /** Perpetualsymbol */
       perpetualSymbol: string;
       /** Quantity */
-      quantity: string;
+      quantity: number | string;
       /** Spotsymbol */
       spotSymbol: string;
     };
@@ -3893,9 +3944,9 @@ export interface components {
       /** Idempotencykey */
       idempotencyKey: string;
       /** Maxdailynotional */
-      maxDailyNotional: string;
+      maxDailyNotional: number | string;
       /** Maxordernotional */
-      maxOrderNotional: string;
+      maxOrderNotional: number | string;
       /** Ordertypes */
       orderTypes: ('market' | 'limit')[];
       /**
@@ -4409,9 +4460,9 @@ export interface components {
       /** Replacementinstrumentid */
       replacementInstrumentId?: string | null;
       /** Replacementprice */
-      replacementPrice?: string | null;
+      replacementPrice?: number | string | null;
       /** Replacementquantity */
-      replacementQuantity?: string | null;
+      replacementQuantity?: number | string | null;
       /** Replacementside */
       replacementSide?: ('buy' | 'sell') | null;
       /** Replacementsymbol */
@@ -4486,9 +4537,9 @@ export interface components {
        */
       direction: 'buy_spread' | 'sell_spread';
       /** Entryspread */
-      entrySpread: string;
+      entrySpread: number | string;
       /** Exitspread */
-      exitSpread: string;
+      exitSpread: number | string;
       /** Funding */
       funding?: components['schemas']['FundingEvent'][];
       /**
@@ -4516,7 +4567,7 @@ export interface components {
        */
       pairId: 'cross-gold' | 'funding-btc';
       /** Quantity */
-      quantity: string;
+      quantity: number | string;
       /** Swap */
       swap?: components['schemas']['SwapEvent'][];
       /**
@@ -4961,7 +5012,7 @@ export interface components {
        */
       at: string;
       /** Contractsize */
-      contractSize: string;
+      contractSize: number | string;
       /** Currency */
       currency: string;
       /**
@@ -4970,7 +5021,7 @@ export interface components {
        */
       effectiveFrom: string;
       /** Longrate */
-      longRate?: string | null;
+      longRate?: number | string | null;
       /**
        * Mode
        * @enum {string}
@@ -4986,7 +5037,7 @@ export interface components {
       /** Rollovermultiplier */
       rolloverMultiplier: number;
       /** Shortrate */
-      shortRate?: string | null;
+      shortRate?: number | string | null;
     };
     /** TradeCommandResponse */
     TradeCommandResponse: {
@@ -7832,6 +7883,115 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RiskActionResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  execution_records_api_v1_trading_execution_records_get: {
+    parameters: {
+      query?: {
+        strategyKey?: string | null;
+        action?: string | null;
+        status?: string | null;
+        symbol?: string | null;
+        startedFrom?: string | null;
+        startedTo?: string | null;
+        limit?: number;
+        offset?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  execution_record_detail_api_v1_trading_execution_records__record_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        record_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  execution_step_timeline_api_v1_trading_execution_steps_get: {
+    parameters: {
+      query?: {
+        traceId?: string | null;
+        batchId?: string | null;
+        orderId?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': {
+            [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */

@@ -36,6 +36,26 @@ const strategy: AppRouteModule = {
         roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
       },
     },
+    {
+      path: 'execution-records',
+      name: 'StrategyExecutionRecords',
+      component: () => import('@/views/strategy/execution-history/index.vue'),
+      meta: {
+        title: '交易执行记录',
+        icon: 'ant-design:profile-outlined',
+        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+      },
+    },
+    {
+      path: 'execution-records/:recordId',
+      name: 'StrategyExecutionRecordDetail',
+      component: () => import('@/views/strategy/execution-history/detail.vue'),
+      meta: {
+        title: '执行记录详情',
+        hideMenu: true,
+        roles: [RoleEnum.ADMIN, RoleEnum.EMPLOYEE],
+      },
+    },
   ],
 };
 

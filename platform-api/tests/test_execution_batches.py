@@ -355,7 +355,7 @@ def test_global_claim_allows_only_one_concurrent_strategy_batch_before_commands(
     command_keys: list[str] = []
     command_lock = Lock()
 
-    def result_unknown_command(request) -> TradeCommandResponse:
+    def result_unknown_command(request, *, recorder=None) -> TradeCommandResponse:
         with command_lock:
             command_keys.append(request.idempotency_key)
         timestamp = datetime.now(UTC)

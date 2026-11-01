@@ -296,6 +296,10 @@ VG_RUNTIME_BYBIT_INSTRUMENT_MAP=XAUTUSDT=instrument_xaut_usdt
 VG_RUNTIME_MT5_INSTRUMENT_MAP=XAUUSD+=instrument_xauusd_mt5
 ```
 
+Bybit Instrument Map 支持按市场区分同名现货与永续，键为 `SYMBOL|CATEGORY`（如 `BTCUSDT|spot`、`BTCUSDT|linear`），回退顺序为 `SYMBOL|CATEGORY` → `SYMBOL|INSTRUMENT_TYPE` → `SYMBOL`。
+
+当主机到 `api.bybit.com` 的出口必须经代理时，用 `VG_RUNTIME_BYBIT_PROXY_URL` 显式声明（例：`http://127.0.0.1:7890`）。该值写入 Bybit 会话，不依赖启动进程的 `HTTP(S)_PROXY` 环境，保证服务被守护进程重启后出口不变。
+
 约束：
 
 - 一个 Account 只能属于一个 Adapter。

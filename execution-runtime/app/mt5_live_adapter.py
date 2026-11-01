@@ -791,11 +791,37 @@ class Mt5LiveAdapter:
             background=self._provider is None,
             timeout=timeout_ms,
             portable=self.settings.mt5_terminal_portable,
+            **self._initialize_credentials(),
         )
         if not initialized:
             raise GatewayConfigurationError(f"MT5 initialize failed: {mt5.last_error()}")
         self._initialized = True
         return mt5
+
+    def _initialize_credentials(self) -> dict[str, Any]:
+        """Credentials for the initialize call on current Terminal builds.
+
+        Terminal build 6286 only answers the IPC handshake when the initialize
+        call carries the account credentials: a bare initialize against an
+        already-authorised Terminal still fails with (-10005, 'IPC timeout'),
+        while the same call with login/password/server succeeds in about a
+        second. Older builds tolerated the bare call followed by login(), so
+        the credentials stay optional and a unresolvable reference falls back
+        to the previous two-step behaviour.
+        """
+        try:
+            secret = self._secret()
+        except GatewayConfigurationError:
+            return {}
+        try:
+            login = int(secret["LOGIN"])
+        except (KeyError, TypeError, ValueError):
+            return {}
+        return {
+            "login": login,
+            "password": secret["PASSWORD"],
+            "server": secret["SERVER"],
+        }
 
     def recover_read_transport(self) -> bool:
         """Reset one broken IPC session inside its serialized, fixed-account worker."""
@@ -814,6 +840,7 @@ class Mt5LiveAdapter:
             background=self._provider is None,
             timeout=int(self.settings.mt5_check_timeout_seconds * 1000),
             portable=self.settings.mt5_terminal_portable,
+            **self._initialize_credentials(),
         )
         if not initialized:
             raise GatewayConfigurationError("MT5 read IPC recovery failed")

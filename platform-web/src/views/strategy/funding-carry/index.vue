@@ -25,6 +25,10 @@
         :selected-close-instruction-id="selectedCloseInstructionId"
         :selected-close-group="selectedCloseGroup"
         :can-submit="canSubmit"
+        :execution-timeline="executionTimeline"
+        :execution-timeline-loading="executionTimelineLoading"
+        :execution-trace-id="executionTraceId"
+        :positions-loading="positionsLoading"
         @update:notional-input="notionalInput = $event"
         @update:quantity-input="quantityInput = $event"
         @update:close-quantity-input="closeQuantityInput = $event"
@@ -36,6 +40,7 @@
         @select-symbol="handleExecutionSymbolUpdate"
         @select-close-instruction="selectCloseInstruction"
         @select-close-fraction="selectCloseFraction"
+        @refresh-timeline="refreshExecutionTimeline()"
       />
     </template>
   </div>
@@ -72,6 +77,7 @@
     error,
     context,
     positionGroups,
+    positionsLoading,
     pendingDraft,
     activeInstruction,
     workspaceState,
@@ -84,6 +90,10 @@
     selectedCloseGroup,
     canSubmit,
     canClose,
+    executionTraceId,
+    executionTimeline,
+    executionTimelineLoading,
+    refreshExecutionTimeline,
     refreshAll,
     submit,
     selectSymbol,
@@ -94,7 +104,7 @@
   function applyResearchDraft(draft: components['schemas']['DraftRequest']) {
     if (submitting.value || pendingDraft.value || draft.direction !== 'sell_spread') return;
     selectSymbol('BTCUSDT', 'BTCUSDT');
-    quantityInput.value = draft.quantity;
+    quantityInput.value = String(draft.quantity);
     void refreshAll();
   }
 

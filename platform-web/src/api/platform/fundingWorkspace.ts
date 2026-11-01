@@ -50,8 +50,16 @@ export async function getFundingPositionGroups(
 
 export async function submitFundingInstruction(
   input: components['schemas']['FundingInstructionRequest'],
+  options?: { traceId?: string },
 ): Promise<FundingWorkspaceResponse> {
-  return strategyData(await api.POST('/api/v1/trading/funding/instructions', { body: input }));
+  return strategyData(
+    await api.POST('/api/v1/trading/funding/instructions', {
+      body: input,
+      headers: options?.traceId
+        ? { 'X-Execution-Trace-Id': options.traceId }
+        : undefined,
+    }),
+  );
 }
 
 export async function getFundingInstructionWorkspace(

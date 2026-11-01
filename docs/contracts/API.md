@@ -167,6 +167,35 @@ POST /api/v1/trading/execution-batches/{batchId}/risk-actions
 
 每条 Leg 生成独立 TradeCommand。Kill Switch、腿间延迟、残留敞口和 RiskAction 均可审计、幂等并 fail-closed。
 
+### 执行步骤时间线
+
+```http
+GET /api/v1/trading/execution-steps?traceId=... | ?batchId=... | ?orderId=...
+```
+
+每次开平仓从准入到终态都写入 `execution_steps`（只追加，不更新、不删除）。被闸门拦下的请求同样留痕，即使它没有生成订单行。
+
+- 调用方提交时可带 `X-Execution-Trace-Id`；响应头同名字段回显。未带时服务端生成，一次请求共用一个 trace，多条 Leg 共享同一 trace 并按 `sequence` 交错。
+- 返回 `summary`（`outcome`、`blockedStage`、`blockedReasonCode`、`totalDurationMs`）与按 `sequence` 排序的 `steps`。
+- `status` 取值 `passed | blocked | failed | info`；`reasonCode` 稳定可聚合，`reasonDetail` 保留上游原始文案。
+- 阶段名（`stage`）与中文标签（`stageLabel`）由服务端给出，前端不维护副本。
+- 写入 fail-open：时间线写失败绝不影响下单结果，只记一条告警日志。
+
+### 执行记录（历史交易）
+
+```http
+GET /api/v1/trading/execution-records?strategyKey=&action=&status=&symbol=&startedFrom=&startedTo=&limit=&offset=
+GET /api/v1/trading/execution-records/{recordId}
+```
+
+`execution_records` 是批次级投影：一次开仓或一次平仓一行，覆盖资金套利（`funding_arbitrage`）与跨所价差（`cross_venue_spread`）两条策略线。字段包含策略、动作、方向、状态、主腿标的/成交数量/均价、名义金额、手续费合计与币种、两腿完成度、开始/结束时间与耗时、关联的开平仓记录 ID。
+
+- 列表接口按 `started_at` 倒序，支持策略线、动作、状态、标的模糊匹配与时间范围过滤；`limit` 上限 200。查询时会先补齐尚未投影或已过期的批次，保证刚完成的交易也能立即出现在列表里。
+- 详情接口接受 `recordId` 或 `batchId`，并实时重算：返回 `record`、`batch`、`instruction`（含 `requestedParameters` / `executionPlan`）、`legs`、`orders`、`fills`、`accountSnapshots`、`timeline`（与执行步骤时间线同结构）以及 `relatedRecord`（开仓↔平仓互指）。
+- 投影与快照写入均 fail-open：记账失败只写日志，绝不改变下单结果。
+- `accountSnapshots` 记录 `pre_submit` 与 `final` 两个时点的账户状态（可用、权益、持仓数量、数据质量）。快照取自平台已同步的交易所账户快照，不额外发起网络调用，`qualityState` 表明该快照的新鲜度。若该批次没有过程快照（旧批次或钩子未触发），接口回退到 `balance_snapshots` 时间序列：取批次开始前最近一条与结束后最近一条，并以 `derivedFrom: "balance_snapshots"` 标注，`positionCount` 为 `null`（余额序列不含持仓明细）。
+- 手续费口径：运行时成交确认只带价格与数量，`fee` 由账户历史同步写入的交易所原生回执（`venue_account_events.event_type = 'trade_fill'` 中的 `execFee`）按「平台订单号 + 最近成交时间」回填，`fee_quality = 'reported'`；只回填空值，不覆盖已有原生值。因为现货买入手续费以基础币计，`totalFees` / `feeCurrency` 只汇总计价币（优先 USDT），每腿另给 `feeCurrency` 与 `feeBreakdown`，混币种相加会失真。
+
 ## 9. Order、Fill 与未知结果
 
 ```http

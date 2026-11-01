@@ -992,6 +992,22 @@ def _resolve_pair(
     raise HTTPException(status_code=404, detail="Funding symbol pair is unavailable")
 
 
+def _runtime_error_detail(response: httpx.Response) -> str:
+    """Keep the runtime's own rejection reason visible to the operator."""
+    try:
+        payload = response.json()
+    except ValueError:
+        return f"HTTP {response.status_code}"
+    if isinstance(payload, dict) and payload.get("detail"):
+        detail = payload["detail"]
+        if isinstance(detail, list):
+            detail = "; ".join(
+                str(item.get("msg") or item) for item in detail if item is not None
+            )
+        return f"HTTP {response.status_code}: {str(detail)[:300]}"
+    return f"HTTP {response.status_code}"
+
+
 def _runtime_get(path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any] | list[Any]:
     settings = get_settings()
     try:
@@ -1002,6 +1018,11 @@ def _runtime_get(path: str, *, params: dict[str, Any] | None = None) -> dict[str
         )
         response.raise_for_status()
         return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Funding runtime read failed for {path}: {_runtime_error_detail(exc.response)}",
+        ) from exc
     except (httpx.HTTPError, ValueError) as exc:
         raise HTTPException(
             status_code=502,

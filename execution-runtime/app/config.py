@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     bybit_settle_coin: str = "USDT"
     bybit_contract_symbol: str = "XAUTUSDT"
     bybit_demo_mode: bool = False
+    # Bybit egress proxy. This host cannot reach api.bybit.com directly, and a
+    # supervisor restart must not depend on the launching shell's environment.
+    bybit_proxy_url: str = ""
     bybit_recv_window: int = 20000
     bybit_timestamp_offset_ms: int = 0
     bybit_check_timeout_seconds: float = 8.0

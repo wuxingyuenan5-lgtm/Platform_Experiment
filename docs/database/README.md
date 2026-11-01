@@ -185,3 +185,21 @@ Migration 43 adds `idx_research_history_audit_cover` on `research_a_share_histor
 Migration 44 adds date/window indexes and the audit-owned `data_audit_history_changes`, `data_audit_history_cursor` and `data_audit_history_findings` tables. Research-history insert, value/source/key revision and deletion triggers record changes in the same business transaction; fetch-only timestamp updates produce no change. The consumer validates bounded batches outside its short write transaction, then atomically commits findings and its cursor. Migration 45 timestamps the journal for retention: consumed entries are kept at least seven days for concurrent research-copy replay, with bounded pruning. Existing history predating installation is covered only by the separate full baseline, not implicitly by an empty change queue.
 
 `data_audit_history.py` owns these rebuildable audit records and the private research-table copy/report. A failed copy or scan cannot replace the last completed snapshot; source identity and baseline age are checked when results are consumed. Full scans never open account or execution tables. The research copy is not a full business backup and its structure check does not prove original-database physical integrity. Rollback preserves additive tables and triggers or uses a forward migration; applied migration SQL/checksums must not be edited. No source observations, trading facts, authentication policies, journal mode or synchronous settings change. Scheduling and coverage boundaries are owned by the [Runbook](../operations/RUNBOOK.md#persisted-audit-results).
+
+## Execution step timeline migration 46
+
+Migration 46 adds `execution_steps`, an append-only table owned by `app/execution_steps.py`. One row is written per execution stage for one attempt: `trace_id`, optional `batch_id` / `order_id` / `command_id`, a per-trace `sequence`, `stage`, `status` (`passed`, `blocked`, `failed`, `info`), stable `reason_code`, original `reason_detail`, `status_code`, `duration_ms`, a small `payload_json` context and `occurred_at`. Three indexes cover trace, batch and order lookups.
+
+The rows are diagnostic evidence, not trading state: the trading path never reads them back and the recorder is fail-open, so a failed write cannot change an order outcome. Rejected attempts are recorded even when no order row exists, which is why the table has no foreign key to `orders`. `GET /api/v1/trading/execution-steps` returns the ordered timeline; retention follows the same local maintenance window as other operational logs.
+
+## Execution record migration 47
+
+Migration 47 makes the full open/close chain durable and queryable instead of leaving it to be re-joined from six tables at read time.
+
+`execution_records` holds one row per execution batch across both strategy lines. It stores the strategy key, action, direction, status, primary-leg symbol/quantity/average price, fee total and currency, notional, leg counts, ordered leg details, the batch risk row, the owning instruction, the correlated trace id and a peer record id that links a close back to its open (and vice versa). A unique index on `batch_id` makes projection idempotent; `app/execution_records.py` upserts and is fail-open, so a projection error can never change an order outcome. Rows are refreshed when a batch reaches a terminal stage and again whenever the list or detail endpoint runs, which covers a crashed worker or an interrupted recovery.
+
+`execution_account_snapshots` is append-only and keyed by `trace_id` / `batch_id` / `instruction_id` / `account_id` / `phase`. It complements `account_venue_snapshots`, which keeps exactly one overwritten row per account and therefore cannot answer "what did the account look like when this trade was sent". The snapshot is derived from the last synced venue payload rather than a new venue call, so `quality_state` reports how fresh that source was.
+
+`fills` gains `fee`, `fee_currency` and `fee_quality`. Per-fill fees were previously only aggregated into the account PnL ledger, which made them unrecoverable per order; the native receipt now backfills the column when the row was first created by a Runtime confirmation that carried no fee.
+
+The tables are additive. Rollback is a forward migration, not an edit to applied SQL: projection can simply be stopped without touching trading facts.

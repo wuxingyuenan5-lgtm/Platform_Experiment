@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth import require_principal
@@ -27,7 +27,10 @@ from app.execution_batches import (
     get_execution_batch,
     list_execution_batches,
 )
+from app.execution_records import get_execution_record_detail, list_execution_records
 from app.execution_schemas import FundingMarketCommandRequest
+from app.execution_steps import StepRecorder
+from app.execution_steps import list_execution_steps
 from app.funding import submit_funding_market_command
 from app.schemas import (
     CreateExecutionBatchRequest,
@@ -114,6 +117,19 @@ class FundingCloseRecoveryRequest(BaseModel):
     idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=128)
 
 
+def execution_recorder(http_request: Request) -> StepRecorder:
+    """Reuse the caller supplied trace id so failures stay queryable.
+
+    The browser generates ``X-Execution-Trace-Id`` before submitting, which lets
+    it fetch the timeline even when the request never produced a batch or order.
+    """
+
+    trace_id = (http_request.headers.get("X-Execution-Trace-Id") or "").strip()
+    if trace_id and len(trace_id) <= 128:
+        return StepRecorder(trace_id=trace_id)
+    return StepRecorder()
+
+
 def create_trading_router(api_prefix: str) -> APIRouter:
     router = APIRouter()
 
@@ -140,9 +156,9 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         deprecated=True,
         summary="Compatibility order endpoint; use TradeCommand or ExecutionBatch",
     )
-    def create_order(request: CreateOrderRequest) -> OrderResponse:
+    def create_order(request: CreateOrderRequest, http_request: Request) -> OrderResponse:
         reject_controlled_account_legacy_order(request.account_id)
-        return submit_order(request)
+        return submit_order(request, recorder=execution_recorder(http_request))
 
     @router.post(
         f"{api_prefix}/trading/orders/{{order_id}}/reconcile",
@@ -158,11 +174,17 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         response_model=ExecutionBatchResponse,
         tags=["trading"],
     )
-    def create_batch(request: CreateExecutionBatchRequest) -> ExecutionBatchResponse:
+    def create_batch(
+        request: CreateExecutionBatchRequest,
+        http_request: Request,
+    ) -> ExecutionBatchResponse:
         reject_controlled_strategy_write_bypass(
             request.strategy_instance_id, strategy_key=request.strategy_key
         )
-        return create_execution_batch(request)
+        return create_execution_batch(
+            request,
+            recorder=execution_recorder(http_request),
+        )
 
     @router.get(
         f"{api_prefix}/trading/cross-spread/snapshot",
@@ -385,9 +407,12 @@ def create_trading_router(api_prefix: str) -> APIRouter:
         response_model=TradeCommandResponse,
         tags=["trading"],
     )
-    def create_command(request: CreateTradeCommandRequest) -> TradeCommandResponse:
+    def create_command(
+        request: CreateTradeCommandRequest,
+        http_request: Request,
+    ) -> TradeCommandResponse:
         reject_controlled_strategy_write_bypass(request.strategy_instance_id)
-        return create_trade_command(request)
+        return create_trade_command(request, recorder=execution_recorder(http_request))
 
     @router.get(
         f"{api_prefix}/trading/commands/{{trade_command_id}}",
@@ -451,5 +476,60 @@ def create_trading_router(api_prefix: str) -> APIRouter:
     )
     def get_batch(batch_id: str) -> ExecutionBatchResponse:
         return get_execution_batch(batch_id)
+
+    @router.get(
+        f"{api_prefix}/trading/execution-steps",
+        tags=["trading"],
+        summary="Ordered execution timeline for one trace, batch or order",
+    )
+    def execution_step_timeline(
+        trace_id: str | None = Query(default=None, alias="traceId"),
+        batch_id: str | None = Query(default=None, alias="batchId"),
+        order_id: str | None = Query(default=None, alias="orderId"),
+        limit: int = Query(default=500, ge=1, le=2000),
+    ) -> dict[str, object]:
+        return list_execution_steps(
+            trace_id=trace_id,
+            batch_id=batch_id,
+            order_id=order_id,
+            limit=limit,
+        )
+
+    @router.get(
+        f"{api_prefix}/trading/execution-records",
+        tags=["trading"],
+        summary="Durable open/close execution records across every strategy line",
+    )
+    def execution_records(
+        strategy_key: str | None = Query(default=None, alias="strategyKey"),
+        action: str | None = Query(default=None),
+        status: str | None = Query(default=None),
+        symbol: str | None = Query(default=None),
+        started_from: str | None = Query(default=None, alias="startedFrom"),
+        started_to: str | None = Query(default=None, alias="startedTo"),
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+    ) -> dict[str, object]:
+        return list_execution_records(
+            strategy_key=strategy_key,
+            action=action,
+            status=status,
+            symbol=symbol,
+            started_from=started_from,
+            started_to=started_to,
+            limit=limit,
+            offset=offset,
+        )
+
+    @router.get(
+        f"{api_prefix}/trading/execution-records/{{record_id}}",
+        tags=["trading"],
+        summary="Full open/close chain for one execution record",
+    )
+    def execution_record_detail(record_id: str) -> dict[str, object]:
+        detail = get_execution_record_detail(record_id)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="Execution record not found")
+        return detail
 
     return router

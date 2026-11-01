@@ -103,3 +103,36 @@ def test_clock_calibration_uses_post_response_sample_for_asymmetric_paths():
     # The latest local sample keeps signed requests behind the venue when the
     # response path is slower in one direction.
     assert offset == -50
+
+
+def test_client_carries_configured_egress_proxy(monkeypatch):
+    proxy = "http://127.0.0.1:7890"
+    monkeypatch.setattr(
+        bybit_connection,
+        "resolve_secret_reference",
+        lambda *_args, **_kwargs: {"API_KEY": "offline-key", "SECRET": "offline-secret"},
+    )
+    monkeypatch.setattr(BybitConnections, "_sync_clock", lambda *args: None)
+    manager = BybitConnections(
+        Settings(_env_file=None, bybit_account_ids="first", bybit_proxy_url=proxy)
+    )
+    try:
+        client = manager.client("first")
+        assert client.client.proxies["http"] == proxy
+        assert client.client.proxies["https"] == proxy
+    finally:
+        manager.close()
+
+
+def test_client_keeps_ambient_proxy_policy_when_unset(monkeypatch):
+    monkeypatch.setattr(
+        bybit_connection,
+        "resolve_secret_reference",
+        lambda *_args, **_kwargs: {"API_KEY": "offline-key", "SECRET": "offline-secret"},
+    )
+    monkeypatch.setattr(BybitConnections, "_sync_clock", lambda *args: None)
+    manager = BybitConnections(Settings(_env_file=None, bybit_account_ids="first"))
+    try:
+        assert manager.client("first").client.proxies == {}
+    finally:
+        manager.close()

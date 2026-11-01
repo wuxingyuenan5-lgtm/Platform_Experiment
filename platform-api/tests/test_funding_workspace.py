@@ -650,3 +650,23 @@ def test_large_catalog_matches_pairs_without_quadratic_scan(monkeypatch):
     assert all(pair["spotSymbol"] == pair["perpetualSymbol"] for pair in pairs)
     assert {pair["baseAsset"] for pair in pairs} == {f"PERF{i}" for i in range(248)}
     assert steps[0] < 200_000
+
+
+def test_runtime_read_failure_keeps_runtime_rejection_reason(monkeypatch) -> None:
+    import httpx
+
+    request = httpx.Request("GET", "http://127.0.0.1:8100/venue/quotes/BTCUSDT")
+    response = httpx.Response(
+        503,
+        json={"detail": "Account is not mapped to a live adapter"},
+        request=request,
+    )
+
+    def reject(*args, **kwargs):
+        raise httpx.HTTPStatusError("rejected", request=request, response=response)
+
+    monkeypatch.setattr(funding_workspace.runtime_transport, "get", reject)
+    with pytest.raises(HTTPException) as caught:
+        funding_workspace._runtime_get("/venue/quotes/BTCUSDT")
+    assert caught.value.status_code == 502
+    assert "Account is not mapped to a live adapter" in str(caught.value.detail)

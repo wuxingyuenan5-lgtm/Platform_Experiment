@@ -292,7 +292,9 @@ def test_batch_checks_second_account_before_dispatching_first_leg(admission, mon
     # Install a real blocking Difference on the second leg's live account.
     test_unresolved_reconciliation_still_blocks_without_live_session(admission, "open")
     calls = []
-    monkeypatch.setattr(execution_batches, "create_trade_command", lambda r: calls.append(r))
+    monkeypatch.setattr(
+        execution_batches, "create_trade_command", lambda r, **_kwargs: calls.append(r)
+    )
     monkeypatch.setattr(execution_batches, "validate_trade_command_catalog", lambda r: None)
     with connection() as db:
         other = db.execute("SELECT id FROM accounts WHERE id!=? LIMIT 1", (ACCOUNT,)).fetchone()[0]

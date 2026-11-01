@@ -141,6 +141,11 @@ class BybitConnections:
             session.headers.update(client.client.headers)
             client.client.close()
             client.client = session
+            proxy = self.settings.bybit_proxy_url.strip()
+            if proxy:
+                # Explicit egress proxy: the session must not fall back to
+                # whatever HTTP(S)_PROXY the launching process happened to hold.
+                session.proxies.update({"http": proxy, "https": proxy})
             try:
                 self._sync_clock(_helpers, client)
             except Exception:

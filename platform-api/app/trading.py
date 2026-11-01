@@ -26,7 +26,12 @@ def decimal_text(value: Decimal) -> str:
     return format(value, "f")
 
 
-def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> OrderResponse:
+def submit_order(
+    request: CreateOrderRequest,
+    command_id: str | None = None,
+    *,
+    recorder=None,
+) -> OrderResponse:
     """Compatibility entry point for the deprecated raw order endpoint."""
 
     from app.trade_command_execution import submit_order_through_runtime
@@ -35,6 +40,7 @@ def submit_order(request: CreateOrderRequest, command_id: str | None = None) -> 
         request,
         mode="legacy",
         command_id=command_id,
+        recorder=recorder,
     )
 
 

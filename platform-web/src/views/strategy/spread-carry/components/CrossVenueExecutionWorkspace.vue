@@ -200,9 +200,9 @@
   } = useCrossVenueExecutionWorkspace();
   function applyResearchDraft(draft: components['schemas']['DraftRequest']) {
     if (submitLoading.value || confirmVisible.value) return;
-    qtyInput.value = draft.quantity;
-    triggerSpreadInput.value = draft.entryThreshold;
-    takeProfitSpreadInput.value = draft.exitTarget;
+    qtyInput.value = String(draft.quantity);
+    triggerSpreadInput.value = String(draft.entryThreshold);
+    takeProfitSpreadInput.value = String(draft.exitTarget);
     prepareOpenDraft(draft.direction === 'buy_spread' ? 'long' : 'short');
   }
   function openAbnormalClose(planId: string) {

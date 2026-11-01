@@ -22,6 +22,11 @@ import {
   type FundingWorkspaceResponse,
 } from '@/api/platform/fundingWorkspace';
 import {
+  getExecutionTimeline,
+  newExecutionTraceId,
+  type ExecutionTimeline,
+} from '@/api/platform/executionSteps';
+import {
   clearFundingDraft,
   isFundingAutoPollingState,
   isFundingTerminalState,
@@ -82,6 +87,25 @@ export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) 
   const activeInstruction = ref<Record<string, unknown> | null>(null);
   const activeWorkspace = ref<Record<string, unknown> | null>(null);
   const pendingDraft = ref<FundingPendingDraft | null>(readCurrentDraft());
+  const executionTraceId = ref<string | null>(null);
+  const executionTimeline = ref<ExecutionTimeline | null>(null);
+  const executionTimelineLoading = ref(false);
+  let timelineRequest = 0;
+
+  async function refreshExecutionTimeline(traceId?: string | null) {
+    const target = traceId ?? executionTraceId.value;
+    if (!target) return;
+    const attempt = ++timelineRequest;
+    executionTimelineLoading.value = true;
+    try {
+      const timeline = await getExecutionTimeline({ traceId: target });
+      if (attempt === timelineRequest && !disposed) executionTimeline.value = timeline;
+    } catch {
+      // The timeline is diagnostic evidence only; never surface it as a trade error.
+    } finally {
+      if (attempt === timelineRequest) executionTimelineLoading.value = false;
+    }
+  }
 
   const readiness = computed(
     () => (context.value?.controlledLiveReadiness ?? {}) as Record<string, unknown>,
@@ -186,6 +210,7 @@ export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) 
           !submitting.value,
       ),
       refetchInterval: 3_000,
+      refetchOnMount: 'always',
     },
     strategyQueryClient,
   );
@@ -210,6 +235,10 @@ export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) 
       contextReady.value = next.dataQualityState === 'complete';
       error.value = null;
     },
+    // A cached response from an earlier visit is delivered synchronously on
+    // mount; without `immediate` the page would render as empty until the next
+    // poll produced a *new* object.
+    { immediate: true },
   );
   watch(
     contextInputs,
@@ -233,17 +262,24 @@ export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) 
           !submitting.value,
       ),
       refetchInterval: 3_000,
+      refetchOnMount: 'always',
     },
     strategyQueryClient,
   );
-  watch(positionsQuery.data, (next) => {
-    if (!next) return;
-    positionGroups.value = next;
-    if (selectedCloseInstructionId.value && !selectedCloseGroup.value) {
-      selectedCloseInstructionId.value = '';
-      closeQuantityInput.value = '';
-    }
-  });
+  watch(
+    positionsQuery.data,
+    (next) => {
+      if (!next) return;
+      positionGroups.value = next;
+      if (selectedCloseInstructionId.value && !selectedCloseGroup.value) {
+        selectedCloseInstructionId.value = '';
+        closeQuantityInput.value = '';
+      }
+    },
+    // Same reason as the context watcher: a cached list must be painted on
+    // entry instead of waiting for the first poll.
+    { immediate: true },
+  );
 
   const instructionQuery = useQuery(
     {
@@ -394,23 +430,32 @@ export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) 
       return;
     }
     error.value = null;
+    // The trace id is created here so the timeline stays queryable even when the
+    // submission never produces an instruction or execution batch.
+    const traceId = newExecutionTraceId();
+    executionTraceId.value = traceId;
+    executionTimeline.value = null;
     try {
       writeFundingDraft(draft);
       pendingDraft.value = draft;
-      const response = await submitFundingInstruction({
-        action,
-        idempotencyKey: draft.idempotencyKey,
-        perpetualSymbol: draft.perpetualSymbol,
-        spotSymbol: draft.spotSymbol,
-        quantity: draft.quantity,
-        expectedPerpetualQuantity: draft.expectedPerpetualQuantity,
-        executionPolicy: draft.executionPolicy,
-        perpetualLimitPrice: draft.perpetualLimitPrice,
-        targetOpenInstructionId: draft.targetOpenInstructionId,
-      });
+      const response = await submitFundingInstruction(
+        {
+          action,
+          idempotencyKey: draft.idempotencyKey,
+          perpetualSymbol: draft.perpetualSymbol,
+          spotSymbol: draft.spotSymbol,
+          quantity: draft.quantity,
+          expectedPerpetualQuantity: draft.expectedPerpetualQuantity,
+          executionPolicy: draft.executionPolicy,
+          perpetualLimitPrice: draft.perpetualLimitPrice,
+          targetOpenInstructionId: draft.targetOpenInstructionId,
+        },
+        { traceId },
+      );
       if (disposed || sessionGeneration !== strategySession.value.generation) return;
       applyInstructionResponse(response);
       instructionPollAttempt.value = 0;
+      await refreshExecutionTimeline(traceId);
       return response;
     } catch (caught) {
       error.value = caught instanceof Error ? caught.message : '提交结果待确认，请恢复原指令';
@@ -434,6 +479,7 @@ export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) 
           }
         }
       }
+      await refreshExecutionTimeline(traceId);
     } finally {
       submitting.value = false;
     }
@@ -516,6 +562,7 @@ export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) 
   return {
     loading,
     submitting,
+    positionsLoading: computed(() => positionsQuery.isFetching.value),
     error: computed(
       () =>
         error.value ||
@@ -536,6 +583,10 @@ export function useFundingWorkspace(executionVisible: Ref<boolean> = ref(true)) 
     activeWorkspace,
     pendingDraft,
     readiness,
+    executionTraceId,
+    executionTimeline,
+    executionTimelineLoading,
+    refreshExecutionTimeline,
     symbolOptions,
     workspaceState,
     canSubmit,

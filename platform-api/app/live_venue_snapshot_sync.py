@@ -405,6 +405,48 @@ def _ensure_fill_order_row(
     )
 
 
+def _fee_text(fill: dict[str, object]) -> str | None:
+    raw = fill.get("fee")
+    if raw is None or raw == "":
+        return None
+    try:
+        return str(_as_decimal(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def _fee_currency(fill: dict[str, object]) -> str | None:
+    raw = fill.get("currency") or fill.get("feeCurrency")
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
+
+
+def _fee_quality(fill: dict[str, object]) -> str | None:
+    raw = fill.get("feeCurrencyQuality")
+    return str(raw) if raw is not None else None
+
+
+def _attach_native_fee(db, rows, fill: dict[str, object]) -> None:
+    """Backfill the native fee onto an already persisted fill row."""
+
+    fee = _fee_text(fill)
+    if fee is None:
+        return
+    for row in rows:
+        try:
+            if row["fee"] not in (None, ""):
+                continue
+        except (IndexError, KeyError):
+            continue
+        db.execute(
+            "UPDATE fills SET fee = ?, fee_currency = ?, fee_quality = ? "
+            "WHERE id = ? AND (fee IS NULL OR fee = '')",
+            (fee, _fee_currency(fill), _fee_quality(fill), row["id"]),
+        )
+
+
 def _persist_fills(
     db,
     account_id: str,
@@ -468,7 +510,13 @@ def _persist_fills(
                 != datetime.fromisoformat(str(fill["occurredAt"]).replace("Z", "+00:00"))
             ):
                 raise ValueError("Venue fill identity conflicts with existing financial data")
-        if existing or requested is not None:
+        if existing:
+            # The fill row may already exist from a Runtime confirmation that
+            # never carried a fee. Native receipts are the authoritative source
+            # for the fee, so backfill it instead of discarding the receipt.
+            _attach_native_fee(db, existing, fill)
+            continue
+        if requested is not None:
             # Native receipts are retained in venue_account_events for management.
             # They must not append deltas to the execution path's confirmations.
             continue
@@ -477,8 +525,8 @@ def _persist_fills(
             """
             INSERT OR IGNORE INTO fills (
                 id, order_id, account_id, instrument_id, side, quantity, price, occurred_at,
-                origin, source, external_fill_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'venue_execution', ?, ?)
+                origin, source, external_fill_id, fee, fee_currency, fee_quality
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'venue_execution', ?, ?, ?, ?, ?)
             """,
             (
                 fill_id,
@@ -491,6 +539,9 @@ def _persist_fills(
                 str(fill.get("occurredAt") or _iso_now()),
                 str(fill.get("source") or "runtime"),
                 native_id,
+                _fee_text(fill),
+                _fee_currency(fill),
+                _fee_quality(fill),
             ),
         )
         if cursor.rowcount and cursor.rowcount > 0:
