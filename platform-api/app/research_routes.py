@@ -31,8 +31,11 @@ from app.research_data_schemas import (
     StockSnapshotResponse,
 )
 from app.research_equity_observatory import read_equity_observatory
+from app.research_etf_observation import read_observation as etf_observation
 from app.research_etf_tracking import catalog as etf_catalog
 from app.research_etf_tracking import detail as etf_detail
+from app.research_mutual_funds import overview as mutual_fund_overview
+from app.research_mutual_funds import detail as mutual_fund_detail
 from app.research_gold import analyst_page, read_gold
 from app.research_hk_share_refresh import refresh_hk_share_research
 from app.research_macro_narratives import read_macro_narratives
@@ -126,6 +129,45 @@ def _cache_header(response: Response, seconds: int) -> None:
     response.headers["Cache-Control"] = f"private, max-age={seconds}, stale-if-error=3600"
 
 
+@router.get("/equity/ai")
+def ai_industry(_: ResearchPrincipal):
+    from app.research_ai import read_ai
+
+    return JSONResponse(content=read_ai(), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/a-share/market-monitor")
+def cn_market_monitor(_: ResearchPrincipal, section: str | None = Query(default=None, pattern="^(risk|breadth|macroValue|valuation)$")):
+    from app.research_cn_monitor import read_monitor
+    from app.research_cn_context import read_context
+
+    return JSONResponse(content=jsonable_encoder(read_context(section), custom_encoder={Decimal: str}) if section else read_monitor(), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/macro/liquidity-lens")
+def macro_liquidity_lens(_: ResearchPrincipal):
+    from app.research_liquidity_lens import read_liquidity_lens
+
+    return JSONResponse(content=jsonable_encoder(read_liquidity_lens(), custom_encoder={Decimal: str}), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/equity/history-risk")
+def equity_history_risk(_: ResearchPrincipal, instrument: str = Query(default="spy", pattern="^(spy|ndx|dow|soxx|xlk)$")):
+    from app.research_history_risk import read_history_risk
+
+    return JSONResponse(content=jsonable_encoder(read_history_risk(instrument), custom_encoder={Decimal: str}), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/equity/ai/{ticker}")
+def ai_company(ticker: str, _: ResearchPrincipal):
+    from app.research_ai import read_ai
+
+    try:
+        return JSONResponse(content=read_ai(ticker.upper()), headers={"Cache-Control": "no-store"})
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+
+
 @router.get("/cross-asset")
 def cross_asset(_: ResearchPrincipal, days: int = Query(default=90, ge=30, le=180)):
     return jsonable_encoder(read_cross_asset(days), custom_encoder={Decimal: str})
@@ -169,6 +211,32 @@ def a_share_broad_etfs(key: str, _: ResearchPrincipal, response: Response):
         raise HTTPException(422, detail="Unsupported broad index")
     response.headers["Cache-Control"] = "no-store"
     return broad_etfs(key)
+
+
+@router.get("/a-share/etf-observation")
+def a_share_etf_observation(_: ResearchPrincipal, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return etf_observation()
+
+
+@router.get("/a-share/mutual-funds")
+def a_share_mutual_funds(_: ResearchPrincipal, response: Response, period: str | None = None):
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return mutual_fund_overview(period)
+    except ValueError as exc:
+        raise HTTPException(422, detail="Report period unavailable") from exc
+
+
+@router.get("/a-share/mutual-funds/{code}")
+def a_share_mutual_fund(code: str, _: ResearchPrincipal, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return mutual_fund_detail(code)
+    except ValueError as exc:
+        raise HTTPException(422, detail="Invalid fund code") from exc
+    except KeyError as exc:
+        raise HTTPException(404, detail="Fund not collected") from exc
 
 
 @router.get("/a-share/etf-tracking")

@@ -1,0 +1,91 @@
+<div class="wrap">
+  <header class="top">
+    <h1>20只重点ETF资金观测看板</h1>
+    <nav>
+      <a href="#etf-observation-part1">① 盘中分钟观测</a>
+      <a href="#etf-observation-part2">② 托底信号对比</a>
+      <a href="#etf-observation-part3">③ 日度资金全景</a>
+    </nav>
+  </header>
+
+  <section class="part" id="etf-observation-part1">
+    <h2 class="pt">第一部分 · 盘中分钟观测</h2>
+    <div class="status">
+      <span class="tag" id="tagDate">--</span>
+      <span class="tag" id="tagUpdate">未加载</span>
+      <span class="tag" id="tagCountdown" style="display: none"></span>
+      <button id="btnRefresh" type="button">立即刷新</button>
+      <button id="btnPause" type="button">暂停自动刷新</button>
+    </div>
+    <section class="chart-wrap"><div id="chart"></div></section>
+    <section class="chart-wrap"><div class="chart" id="chartCum"></div></section>
+    <h2 class="pt" style="margin-top: 18px">20大ETF放量案例</h2>
+    <section class="chart-wrap"><div class="chart" id="chartTypCase"></div></section>
+    <section class="chart-wrap"><div class="chart" id="chartTypNorm"></div></section>
+    <section class="table-wrap">
+      <h2>单只ETF当日表现（按成交额降序，条形背景按成交额相对最大值比例）</h2>
+      <div class="tscroll">
+        <table>
+          <thead
+            ><tr>
+              <th>代码</th><th>名称</th><th class="num">当日成交额(亿)</th><th class="num">占比</th
+              ><th class="num">涨跌幅</th>
+            </tr></thead
+          >
+          <tbody id="etfTable"></tbody>
+        </table>
+      </div>
+    </section>
+    <footer>
+      口径说明：柱状图为20只ETF每分钟二级市场成交金额加总；折线为上证综指分钟收盘点位，虚线为上一交易日收盘。横轴为
+      09:30~15:00 全时段。<br />
+      典型日内走势对照：放量案例日 = 单日净流入（申赎口径）&gt; 100亿元的交易日，常态日 =
+      其余交易日；上证综指为相对当日开盘涨跌幅均值。昨日与近20日累计均线由5分钟历史插值得到，非逐分钟原始观测。<br />
+    </footer>
+  </section>
+
+  <section class="part" id="etf-observation-part2">
+    <h2 class="pt">第二部分 · ETF托底信号</h2>
+    <div class="sub"
+      >托底日 = 单日净流入 &gt; 100亿（申赎口径），剔除 2024-09-24~10-18 狂热申购窗与
+      2026-01-14~01-30 及 02-02/13/26 抛售窗，<span id="supportCount"></span> ｜ 成交额图蓝柱 /
+      净流入图红柱=托底日，黄柱=近期交易日 ｜ 虚线=最新柱的数值水平线</div
+    >
+    <div class="status">
+      <span class="tag live" id="tagAmt">--</span>
+      <span class="tag" id="tagNf">--</span>
+    </div>
+    <section class="chart-wrap"><div class="chart" id="chartAmt"></div></section>
+    <section class="chart-wrap"><div class="chart" id="chartNf"></div></section>
+    <footer>
+      方法说明：成交额图 = 托底日 + 最近3个交易日（今日为实时值）；净流入图 = 托底日 +
+      最近2个已公布日。虚线为最新柱数值的水平引导线，高度即最新值，可直接对照历史托底日柱高判断所处位置。<br />
+    </footer>
+  </section>
+
+  <section class="part" id="etf-observation-part3">
+    <h2 class="pt">第三部分 · 日度资金全景</h2>
+    <div class="sub"
+      ><span id="dailyRange"></span>｜柱：20只ETF日度成交额 /
+      净流入（申赎口径）｜线：上证综指收盘</div
+    >
+    <section class="chart-wrap"><div class="chart" id="chartDAmt"></div></section>
+    <section class="chart-wrap"><div class="chart" id="chartDNf"></div></section>
+    <section class="chart-wrap"><div class="chart" id="chartBroad"></div></section>
+    <section class="table-wrap">
+      <h2
+        >最近一个月 · 各类宽基ETF日度净流入（亿元，红=净申购 /
+        绿=净赎回，颜色深浅按当列相对大小）</h2
+      >
+      <div class="tscroll"><table id="broadTable"></table></div>
+    </section>
+    <footer>
+      口径说明：<br />
+      · 20只ETF日度成交额与净流入（申赎口径 = 当日份额变动×单位净值）历史序列。<br />
+      · 全市场宽基ETF日度净流入按跟踪指数堆积：沪深300 / 中证500 / 中证1000 / 中证A500 / 创业板指 /
+      创业板50 / 科创50 / 双创50 / 上证50 / 中证2000 / 国证2000 /
+      其他宽基，共12类；右轴黑线为2026年以来累计净流入。<br />
+      · 数据区间 <span id="broadRange"></span>。<br />
+    </footer>
+  </section>
+</div>

@@ -12,13 +12,15 @@
       </section>
 
       <ResearchWorkspace :pages="pages" :active="activeView" :label="boardLabel">
-        <EquityObservatoryPanel
+        <template
           v-if="
             activeCategory === 'us' && ['themes', 'valuation', 'structure'].includes(activeView)
           "
-          market="us"
-          :view="activeView"
-        />
+        >
+          <EquityObservatoryPanel market="us" :view="activeView" />
+          <HistoryRiskPanel v-if="activeView === 'structure'" />
+        </template>
+        <AiIndustryPanel v-else-if="activeCategory === 'us' && activeView === 'ai'" />
         <MarketTerminalPage
           v-else-if="isTerminalCategory && activeTerminalConfig"
           :config="activeTerminalConfig"
@@ -111,6 +113,8 @@
   const EquityObservatoryPanel = defineAsyncComponent(
     () => import('./components/EquityObservatoryPanel.vue'),
   );
+  const AiIndustryPanel = defineAsyncComponent(() => import('./ai/AiIndustryPanel.vue'));
+  const HistoryRiskPanel = defineAsyncComponent(() => import('./components/HistoryRiskPanel.vue'));
   const route = useRoute();
   const boardLabel = computed(
     () =>
@@ -128,6 +132,7 @@
       return [
         { key: 'overview', label: '大盘表现' },
         { key: 'themes', label: '主题与行业' },
+        { key: 'ai', label: 'AI产业' },
         { key: 'valuation', label: '估值' },
         { key: 'structure', label: '结构与风险' },
         { key: 'rotation', label: '板块轮动' },

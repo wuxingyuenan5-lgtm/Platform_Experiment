@@ -6,13 +6,23 @@
         ><h3>{{ title }}</h3
         ><div class="range-buttons" role="group" :aria-label="`${title}历史范围`"
           ><button
-            v-for="size in frequency === 'monthly' ? [36, 60, 0] : [60, 90, 0]"
+            v-for="size in frequency === 'quarterly'
+              ? [4, 12, 0]
+              : frequency === 'monthly'
+              ? [36, 60, 0]
+              : [60, 90, 0]"
             :key="size"
             type="button"
             :aria-pressed="preset === size"
             :class="{ active: preset === size }"
             @click="setPreset(size)"
-            >{{ size ? `近${size}${frequency === 'monthly' ? '期' : '日'}` : '全部' }}</button
+            >{{
+              size
+                ? `近${size}${
+                    frequency === 'quarterly' ? '季' : frequency === 'monthly' ? '期' : '日'
+                  }`
+                : '全部'
+            }}</button
           ></div
         ></header
       >
@@ -193,8 +203,15 @@
       <footer
         >{{ shownDates[0] || '—' }} — {{ shownDates.at(-1) || '—'
         }}<span
-          >{{ shownDates.length }}{{ frequency === 'monthly' ? '期（月度）' : '个交易日' }} ·
-          空缺数据不连线</span
+          >{{ shownDates.length
+          }}{{
+            frequency === 'quarterly'
+              ? '期（季度）'
+              : frequency === 'monthly'
+              ? '期（月度）'
+              : '个交易日'
+          }}
+          · 空缺数据不连线</span
         ></footer
       >
     </article>
@@ -227,7 +244,7 @@
     title: string;
     yLabel: string;
     rightLabel?: string;
-    frequency?: 'monthly';
+    frequency?: 'monthly' | 'quarterly';
     precision?: number;
     initialWindow?: number;
     dates: string[];
@@ -251,7 +268,9 @@
   });
   const chartExpanded = ref(false);
   const { height: viewportHeight } = useWindowSize();
-  const defaultWindow = props.initialWindow ?? (props.frequency === 'monthly' ? 60 : 90);
+  const defaultWindow =
+    props.initialWindow ??
+    (props.frequency === 'quarterly' ? 12 : props.frequency === 'monthly' ? 60 : 90);
   const preset = ref<number | null>(defaultWindow);
   const startIndex = ref(0);
   const endIndex = ref(0);
@@ -587,6 +606,8 @@
   }
   function formatDateLabel(value: string | undefined) {
     if (!value) return '—';
+    if (props.frequency === 'quarterly')
+      return `${value.slice(0, 4)}Q${Math.ceil(Number(value.slice(5, 7)) / 3)}`;
     if (props.frequency === 'monthly') return value.slice(0, 7);
     return value.length > 10 ? value.slice(5, 16).replace('T', ' ') : value.slice(5);
   }

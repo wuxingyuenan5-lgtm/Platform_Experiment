@@ -1,9 +1,10 @@
 """Index valuation charts built from separately attributed source series."""
 
 import json
+import sqlite3
 import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -20,6 +21,17 @@ CN_CHARTS = [
     ("000016", "上证50"),
     ("399006", "创业板指"),
     ("000688", "科创50"),
+    ("000905", "中证500"),
+    ("000852", "中证1000"),
+    ("000906", "中证800"),
+    ("399303", "国证2000"),
+    ("000015", "上证红利"),
+    ("399324", "深证红利"),
+    ("000010", "上证180"),
+    ("000009", "上证380"),
+    ("000903", "中证100"),
+    ("000922", "中证红利"),
+    ("000510", "中证A500"),
 ]
 
 
@@ -193,13 +205,14 @@ try:
     login=c.start()
     if login.ErrorCode: raise RuntimeError('Choice login:'+str(login.ErrorCode))
     result=c.csd(
-        '000300.SH,000016.SH,399006.SZ,000688.SH',
-        'CLOSE,PETTM,PBMRQ,PSTTM,PCFTTM,DIVIDENDYIELDTTM',sys.argv[1],sys.argv[2],
+        sys.argv[3],
+        'CLOSE,PETTM,PELYR,PBMRQ,PSTTM,PCFTTM,DIVIDENDYIELDTTM',sys.argv[1],sys.argv[2],
         'Period=1,AdjustFlag=1,Order=1,Market=CNSESH,FillData=0,'
         'DelType=1,RowIndex=2,RECVtimeout=60,Ispandas=1')
     if not isinstance(result,pd.DataFrame): raise RuntimeError('Choice csd:'+str(result.ErrorCode))
     records=[]
-    fields={'CLOSE':'close','PETTM':'pe','PBMRQ':'pb','PSTTM':'ps','PCFTTM':'pcf','DIVIDENDYIELDTTM':'dividend'}
+    fields={'CLOSE':'close','PETTM':'pe','PELYR':'peLyr','PBMRQ':'pb',
+            'PSTTM':'ps','PCFTTM':'pcf','DIVIDENDYIELDTTM':'dividend'}
     for column in fields: result[column]=pd.to_numeric(result[column],errors='coerce')
     for day,row in result.iterrows():
         record={'date':str(day)[:10].replace('/','-'),'code':row['CODES']}
@@ -207,6 +220,8 @@ try:
                        for col,field in fields.items()})
         records.append(record)
     print(json.dumps({'ok':True,'records':records},allow_nan=False))
+except Exception as exc:
+    print(json.dumps({'ok':False,'error':str(exc)}))
 finally:c.stop()
 """
 
@@ -217,22 +232,39 @@ def collect_choice_indices():
     now = datetime.now(UTC)
     keys = ["choice_index_" + code for code, _ in CN_CHARTS]
     old = {key: read_artifact("sources/" + key) for key in keys}
-    if all(
-        d.get("fetchedAt") and now - datetime.fromisoformat(d["fetchedAt"]) < timedelta(hours=20)
-        for d in old.values()
-    ):
+    due = [
+        (code, name)
+        for code, name in CN_CHARTS
+        if choice_source_due(old["choice_index_" + code], now)
+    ]
+    if not due:
         return old
     local_now = datetime.now(ZoneInfo("Asia/Shanghai"))
     end = local_now.date()
     if (local_now.hour, local_now.minute) < (16, 15):
         end -= timedelta(days=1)
-    # Clamp the anniversary for a leap-day observation.
-    import calendar
+    while end.weekday() >= 5:
+        end -= timedelta(days=1)
+    # Reuse the exchange calendar if available; do not query holiday gaps.
+    try:
+        from app.data_audit_calendar import calendar_snapshot
+        from app.database_connection import read_only_connection
 
-    start = end.replace(
-        year=end.year - 3, day=min(end.day, calendar.monthrange(end.year - 3, end.month)[1])
-    )
-    start += timedelta(days=1)
+        with read_only_connection() as db:
+            calendar = calendar_snapshot(db, local_now.date().isoformat())
+        if calendar:
+            end = date.fromisoformat(max(d for d in calendar["days"] if d <= end.isoformat()))
+    except (ValueError, RuntimeError, OSError, sqlite3.Error):
+        pass
+    due = [
+        (code, name)
+        for code, name in due
+        if old["choice_index_" + code].get("schemaVersion") != 2
+        or old["choice_index_" + code].get("observationDate", "") < end.isoformat()
+    ]
+    if not due:
+        return old
+    start = choice_window_start(old, due, end)
     try:
         child = subprocess.run(
             [
@@ -241,6 +273,11 @@ def collect_choice_indices():
                 CHOICE_CHILD,
                 start.isoformat(),
                 end.isoformat(),
+                ",".join(
+                    code
+                    + (".CSI" if code == "000510" else ".SZ" if code.startswith("399") else ".SH")
+                    for code, _ in due
+                ),
             ],
             cwd=Path.home() / ".choice/EMQuantAPI_Python/python3",
             capture_output=True,
@@ -250,19 +287,29 @@ def collect_choice_indices():
             timeout=90,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-        payload = next(
-            json.loads(line) for line in child.stdout.splitlines() if line.startswith('{"ok": true')
-        )
+        messages = [
+            json.loads(line) for line in child.stdout.splitlines() if line.startswith('{"ok":')
+        ]
+        if not messages:
+            raise RuntimeError("Choice child failed: " + child.stderr[-500:])
+        payload = messages[-1]
+        if not payload.get("ok"):
+            raise RuntimeError(payload.get("error", "Choice query failed"))
         digest = archive("choice_index_valuation", json.dumps(payload).encode(), now.isoformat())
-        for code, name in CN_CHARTS:
+        for code, name in due:
             rows = [
                 {k: v for k, v in r.items() if k != "code"}
                 for r in payload["records"]
                 if r["code"].split(".")[0] == code and r["close"] is not None
             ]
-            if not rows:
-                raise ValueError("Choice index history empty")
             key = "choice_index_" + code
+            if not rows:
+                old[key].update(
+                    status="stale" if old[key].get("rows") else "error",
+                    attemptedAt=now.isoformat(),
+                    error="Choice index history empty",
+                )
+                continue
             merged = {r["date"]: r for r in old[key].get("rows", [])}
             merged.update({r["date"]: r for r in rows})
             rows = [merged[d] for d in sorted(merged)]
@@ -275,17 +322,54 @@ def collect_choice_indices():
                 fetchedAt=now.isoformat(),
                 observationDate=rows[-1]["date"],
                 rawSha256=digest,
+                schemaVersion=2,
             )
     except Exception as exc:
-        for d in old.values():
+        for code, _ in due:
+            d = old["choice_index_" + code]
             d.update(
                 status="stale" if d.get("rows") else "error",
                 attemptedAt=now.isoformat(),
-                error=type(exc).__name__,
+                error=type(exc).__name__ + ": " + str(exc)[:600],
             )
     for key, d in old.items():
         publish_artifact("sources/" + key, d)
     return old
+
+
+def choice_window_start(old, due, end):
+    """Testing bootstrap <=30 calendar days; existing histories are incremental."""
+    floor = end - timedelta(days=29)
+    starts = []
+    for code, _ in due:
+        document = old["choice_index_" + code]
+        latest = document.get("observationDate") or max(
+            (row["date"] for row in document.get("rows", [])), default=None
+        )
+        start = date.fromisoformat(latest) + timedelta(days=1) if latest else floor
+        # A new metric needs a small bootstrap, never another full history pull.
+        if document.get("schemaVersion") != 2:
+            start = floor
+        starts.append(max(floor, min(start, end)))
+    return min(starts)
+
+
+def choice_source_due(document, now):
+    attempt = document.get("attemptedAt")
+    retry_hours = 20 if "10001029" in document.get("error", "") else 1
+    if attempt and document.get("status") != "ready":
+        if timedelta(0) <= now - datetime.fromisoformat(attempt) < timedelta(hours=retry_hours):
+            return False
+    fetched = document.get("fetchedAt")
+    local = now.astimezone(ZoneInfo("Asia/Shanghai"))
+    close = local.replace(hour=16, minute=15, second=0, microsecond=0)
+    if fetched and local >= close and datetime.fromisoformat(fetched) < close:
+        return True
+    return not (
+        document.get("schemaVersion") == 2
+        and fetched
+        and timedelta(0) <= now - datetime.fromisoformat(fetched) < timedelta(hours=20)
+    )
 
 
 def build_valuation_charts(sources, market):
@@ -320,6 +404,7 @@ def build_valuation_charts(sources, market):
                     ("ps", "PS TTM"),
                     ("pcf", "PCF TTM"),
                     ("dividend", "股息率 TTM"),
+                    ("peLyr", "静态 PE LYR"),
                 ]
             ]
             prices = [

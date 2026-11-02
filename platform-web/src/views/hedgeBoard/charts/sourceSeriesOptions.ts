@@ -72,6 +72,10 @@ export function buildSourceCurveOptions(
 }
 
 const UNITS: Record<string, string> = {
+  thousand_units_saar: '千套（季调年率）',
+  units_saar: '套（季调年率）',
+  months: '个月',
+  jpy_billion_2015: '十亿日元（2015年不变价）',
   basis_points: 'bp',
   thousand_persons: '千人',
   percent: '%',

@@ -88,6 +88,16 @@
               :refresh-key="refreshKey"
               @ready="restoreScroll"
             />
+            <MarketMonitorPanel
+              v-else-if="activePage === 'monitor'"
+              :refresh-key="refreshKey"
+              @ready="restoreScroll"
+            />
+            <MutualFundPanel
+              v-else-if="activePage === 'funds'"
+              :refresh-key="refreshKey"
+              @ready="restoreScroll"
+            />
             <EquityObservatoryPanel
               v-else
               market="cn"
@@ -132,6 +142,10 @@
     () => import('./components/DomesticFinancingPanel.vue'),
   );
   const EtfTrackingPanel = defineAsyncComponent(() => import('./components/EtfTrackingPanel.vue'));
+  const MutualFundPanel = defineAsyncComponent(() => import('./components/MutualFundPanel.vue'));
+  const MarketMonitorPanel = defineAsyncComponent(
+    () => import('./components/MarketMonitorPanel.vue'),
+  );
 
   const router = useRouter();
   const route = useRoute();
@@ -140,8 +154,10 @@
     { key: 'overview', label: '市场总览', short: '总览' },
     { key: 'themes', label: '主题与行业', short: '主题' },
     { key: 'valuation', label: '估值', short: '估值' },
+    { key: 'monitor', label: '市场监测', short: '监测' },
     { key: 'crowding', label: '拥挤度', short: '拥挤' },
     { key: 'etf', label: 'ETF跟踪', short: 'ETF' },
+    { key: 'funds', label: '公募持仓', short: '公募' },
     { key: 'financing', label: '两融与衍生品', short: '两融' },
     { key: 'stocks', label: '股票池', short: '股票' },
     { key: 'hk', label: '港股观察', short: '港股' },

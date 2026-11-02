@@ -180,6 +180,8 @@ export interface IndexValuationChart {
     source?: string;
     sourceUrl?: string;
     status: string;
+    description?: string;
+    prices?: Array<{ date: string; value: EquityValue }>;
     history: Array<{ date: string; value: EquityValue }>;
   }>;
 }

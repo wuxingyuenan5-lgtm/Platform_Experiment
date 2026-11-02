@@ -73,6 +73,8 @@
               'widget-card--reference': widget.kind === 'external-link',
               'widget-card--expandable': widget.kind !== 'external-link',
               'widget-card--wide':
+                widget.localKey === 'macro-liquidity-lens' ||
+                widget.localKey === 'macro-economic-pulse' ||
                 widget.localKey === 'macro-global-m2' ||
                 widget.localKey === 'macro-fed-balance-structure' ||
                 widget.localKey === 'macro-fed-assets' ||
@@ -100,7 +102,15 @@
                   <h5>{{ resolveWidgetTitle(widget.localKey, widget.title) }}</h5>
                 </div>
                 <p
-                  v-if="widget.region === '中国' || widget.localKey === 'macro-net-liquidity'"
+                  v-if="
+                    widget.region === '中国' ||
+                    widget.region === '日本' ||
+                    widget.region === '欧元区' ||
+                    widget.region === '全球' ||
+                    ['macro-net-liquidity', 'macro-nfci-details', 'macro-us-confidence'].includes(
+                      widget.localKey || '',
+                    )
+                  "
                   class="research-definition"
                   >{{ widget.subtitle }}</p
                 >

@@ -8,11 +8,29 @@ The research-data capability supports the hedge-fund dashboard with read-only pu
 
 ## A-share ETF tracking
 
+ETF跟踪首页包含参考 `https://etf-fund-flow-board.app.workbuddy.host/` 的三部分资金观测：九张图表（分钟成交额/指数、累计成交额、两类典型放量案例、托底成交额/净流入、日度成交额/净流入、宽基分类堆积/累计）、两张明细表，以及图例、缩放、暂停/恢复、页内导航和柱状区间求和。原有宽基周频、市值占比、逐只ETF/披露在上方直接展示，新增资金观测额外放在下方，不将原有整块内容折叠；原有申赎历史自身的展开/收起行为保留。新增内容仅适配平台容器宽度和响应式布局，字体、颜色和图表配置沿用参考站，样本数与日期按实际数据生成；产品页面不展示参考站署名、参考链接、复制或本地实现说明；数据来源与原始归档保留在后台。
+
+`GET /api/v1/research/a-share/etf-observation` 需要 `research.read`，只读本地文件且使用no-store。API研究lifespan内的独立任务负责采集：交易时段按60秒窗口、非交易时段六小时窗口；已知节假日与午休不分钟轮询，失败非交易时段五分钟重试。参考站data.js严格按JSON数据解析，不执行下载脚本，六小时检查一次。原文、来源URL、SHA-256与UTC取得时间保存在数据根目录raw/research/etf-observation，投影在public/v1/etf-observation，逐交易日分时快照在history/research/etf-observation。日期倒退、历史截断、身份/数组错位、分类合计不符、非法数值或HTML标签不能替换有效历史；分时失败独立保留上次数据和原日期，不影响日度图。参考站是第三方转发/整理源，不代表独立基金披露核验。
+
+分时须取得全部20只ETF与上证综指，同日按分钟对齐，缺少成员的分钟留空，累计曲线不跨缺口。成交额为二级市场交易金额，日度净流入为参考源申赎估算（份额变化×净值），不混入原有前复权价格估算。昨日/近20日累计基准由参考站5分钟历史插值生成，并在图旁注明。11月2日实采留存743个日度日期（2023-10-09至2026-10-30）、12类宽基及21个标的分时；分类合计用Decimal核对并允许分项舍入容差。独立原值准确性与下次交易日无人值守更新仍须后续观察。
+
 `GET /research/a-share/etf-tracking` and `GET /research/a-share/etf-tracking/{code}` require `research.read`, use `no-store`, and read local artifacts only. The existing research-enabled API lifespan owns the worker: successful full refreshes are gated for six hours; partial/failed batches retry after one hour, with four concurrent public requests and a 25-second request timeout. Source: `https://wangwang-etf.com/data/` public universe, ETF series, index-turnover and margin JSON. This is a third-party read model, not independently verified issuer disclosure. Unsupported daily instruments and missing optional margin series remain unavailable.
 
 Artifacts live under `HEDGE_BOARD_DATA_ROOT/public/v1/etf-tracking`; validated responses are atomically published with URL, retrieval/attempt timestamps and SHA-256. Exact response text is retained by content hash. HTML returned with HTTP 200, invalid identities/dates and regressing latest observation dates cannot replace a valid series; failures retain the prior data with `stale`, or `no_data` if absent. Reads and writes share a process lock. The background worker has a single in-process refresh owner.
 
 Disclosure report date is independent of quote, share and margin dates. Source qfq prices and shares use the current adjusted share basis. Estimated flow in CNY 100 million equals the change in adjusted shares in 100 million units multiplied by qfq average price; absent average uses qfq close, identified per row. Turnover is also the source's estimate. Decimal computations are serialized as strings. The flow is not attributed to any particular holder. Expanding historical percentiles use observations available as of each row, require 60 valid samples, and use absolute share/flow magnitudes. Group sums cover only eligible catalog members of the same mapped index (or display category when no index is mapped), match exact dates and are null unless every member has the metric. Summed share counts are quantity indicators, not monetary exposure. Group daily returns are turnover-weighted and require every member to have both return and turnover; group percentiles use the same expanding, minimum-60-observation rules. Detail responses include each eligible group member's enriched history and margin rows. Weekly/monthly/three-month summaries use 5/21/63 trading sessions and the close immediately before the window; insufficient history leaves totals unavailable. Financing period totals require every market session in the selected window; balance changes require a prior balance and an observation on the window end date. Index financing uses current constituents, not historical point-in-time membership; dates and source coverage remain visible.
+
+## 公募持仓（2026-11-02）
+
+**当前状态：暂停更新。** 2026-11-02 Owner明确要求搁置本模块，停止所有公募数据抓取、补采与定时更新。研究 lifespan 不再启动公募采集任务；`refresh_batch`（包括命令行入口）返回 `paused`，周期入口直接退出。页面和API只读取已经留存的数据，并显示暂停更新；保留数据、进度和实现，未完成的首次全量补采不再推进。只有Owner以后明确要求恢复时才重新启用，不因重启平台或进入披露月份自动恢复。
+
+A股研究的「公募持仓」经 `GET /research/a-share/mutual-funds?period=YYYY-MM-DD` 和 `GET /research/a-share/mutual-funds/{code}` 读取本地研究投影，沿用 `research.read` 和 `no-store`；浏览器刷新不触发外部取数。来源为天天基金公开目录、资产配置、行业配置、规模申赎、股票持仓及定期报告索引。目录当前范围为普通股票型、偏股混合与灵活配置，不含指数、QDII、债券及FOF；同名份额优先A类代表，汇总另按已取得的法律全称去重。此目录归并并非官方组合映射，当前分类与存续目录不能当作历史成分。
+
+采集实现保留但当前停用：四个并发基金、每请求20秒，每批100个并持久化进度；原设计按披露月份每日、其他月份每周复查，失败字段组独立重试。上述频率当前均不执行。投影位于 `HEDGE_BOARD_DATA_ROOT/public/v1/mutual-funds`，内容哈希原始响应及URL/UTC取得时间位于 `raw/research/mutual-funds`。各字段组失败保留原日期与最后有效值；回退日期、无效身份/单位和非有限数值不能覆盖有效数据。首次全量补采未完成，留存数据继续显示partial与实际覆盖数量，不称全市场统计完成。
+
+金融值以Decimal计算、字符串输出；金额与份额保留第三方来源精度（资产/申赎表常以亿元/亿份两位小数，不能冒充原基金报告的元/份精度）。股票仓位及行业配置占基金净资产，按同日有效净资产加权；缺少字段不补零。持仓市值/占比推算分母与资产表净资产偏差超过2%的组合不参与汇总。行业权重之和与股票仓位偏差超过1个百分点的表不参与行业汇总；A股证监会行业与港股来源分类分开，港股同一行业代码的中文名称变体归一。因原始市值单位在两地不同，行业聚合使用披露权重而不直接相加市值。缺少可核验的同期基准时不生成超低配。
+
+季度环比仅使用两期共同组合；历史曲线显示各期可用样本，不能视为固定全市场历史。季度重仓汇总固定各期前十大，完整中报/年报列表只在单基金详情展示；首次取得本年及上年股票明细，资产和规模历史保留来源可用全部日期。股数环比仅比较同一基金两期均披露的同一证券，未经送转等调整，不能等同主动买卖；新增披露或退出前十大不代表建仓或清仓。申赎仅展示代表份额的来源数量，不估算资金金额。报告期末、公告日期和采集时间分开，经理字段为当前资料，经理观点通过原始报告链接查看。已按华夏基金000001三季报抽核仓位78.21%、中际旭创190,000股/153,603,600元及规模申赎舍入关系；这不是逐基金全量原值审计。
 
 ## Runtime flow
 
@@ -898,8 +916,75 @@ A股最新快照未确认收盘，或沪深300基准收盘历史未到快照日�
 
 轮询等待以原15:10启动点和16:15收盘确认点为边界缩短，避免固定15分钟间隔跨过边界后再多等一轮；边界之后仍沿用既有间隔。2026-10-29实跑于16:15:00启动、16:18:38结束，状态partial：收盘报价确认已满足，但股票池143只的新浪前复权日线仍截至28日；不以未复权报价拼接复权历史。
 
+### 2026-11-02 宏观经济细项与跨地区观察
+
+宏观经济页增加中、美、欧、日重点经济数据一览、美国初请/续请、JOLTS、耐用品及核心资本品订单、住房销售/开工/许可、房贷与库存月数、密歇根信心，以及欧元区增长/就业/ZEW、德国工业、日本增长/就业/工业和制造业/服务业PMI对照。通胀页增加欧元区HICP、日本全国及东京CPI。风险偏好页增加NFCI风险、信贷、杠杆标准化子指数；这些子指数不是可加总的贡献项，不堆叠或相加冒充总指数。
+
+生产归属仍为platform-data既有研究扩展任务：`macro_article.py`复用FRED、Eurostat原始归档和独立失败保留，当前公开源不足的海外月度指标使用已核实代码的Choice EDB补充，遵守三年授权窗口，日期按北京时间计算；不使用预测代码替代实际数据。完整原始/标准历史保存在既有数据根目录，dashboard是限定窗口的投影，正常同步至DuckDB。公共初请/续请历史始于1967年，订单始于1992年，多项住房历史始于1959—1963年。成屋销售公开分发窗口目前只有13个月，因此同比仅有一个有效点；不能补零或拼接未经核实口径。密歇根公开数据延迟一个月。
+
+环比/同比用精确相邻日历月或季度作基期，Decimal计算后发布，内部缺口保留；日本GDP环比为非年化。Eurostat GDP使用EA20、失业率使用EA21，分别标注，不视为完全相同样本。经济一览按观测期月份显示，季度值不前向填充；颜色仅比较自身最近36期，较上期为数值差。历史月份选择截断后续观测及配色参照，不能据此视为当时可得数据：来源包含修订后的最新版本。EPFR、Revelio、银行卡消费及完整政策OIS路径尚无已接入的授权连续源，不新增猜测曲线。
+
 ### 2026-10-29 A股收盘历史主源替换
 
 A股个股日线收盘生产改为腾讯原生 `newfqkline` 前复权请求，替代新浪主源；港股原生端点保持原路径。每次取回完整300点窗口，按日期排序、保留Decimal和 `tencent-qfq-daily` 来源，不拿当天未复权快照追加到旧复权窗口。腾讯在没有调整的证券上可返回 `day` 而非 `qfqday`，按上游 stock_zh_a_hist_tx 语义解析同一次显式qfq请求，不另发未复权请求。主题附加股票归档及存储历史重读也保留来源。此前新浪主源说明仅记录当时实现，现由本条替代。
 
 真实生产18:23:21至18:23:49以ready结束，143只股票池全部为29日、腾讯前复权来源；独立重算286个5日/20日收益与发布值一致，143只当天历史收盘与收盘快照一致。主题与市场观察均到29日。全295代码探测有1个非股票池目录代码仅返回旧日期，仍不前推日期、不伪造当日数据。43项定向回归通过；单日实采不能证明未来长期稳定性。
+
+### 2026-11-02 美股AI产业
+
+美股独立子页 `/hedge-board/us?view=ai` 覆盖28家公司：云、芯片/存储、服务器/网络、电力/数据中心、软件/数据、安全；按资本投入、需求兑现、现金回报与信用融资组织。`GET /api/v1/research/equity/ai` 返回比较表与图表投影，`/{ticker}` 返回单家公司财年/季度历史，沿用 `research.read`，均仅读本地文件，不在GET请求中访问上游。单家公司、经营指标或CDS失败互相隔离，成功历史与原观测日期保留。
+
+生产由 `research_ai.run_periodic` 在既有 `research_refresh_enabled` 开关下独立运行；五分钟检查本地到期状态，SEC companyfacts、Stock Analysis公开财报与经营指标每天采集，CDS每四小时采集，失败一小时后重试。两线程限制公司并发，独立OS文件锁防止重叠生产。原始响应按时间与SHA256归档至数据根 `raw/equity/ai/`；Decimal金额以USD原值字符串保存，投影和公司历史位于 `public/v1/equity/ai/`，每日投影留存在 `history/research/ai/`。原始响应可复核，不读取付费隐藏状态或绕过访问限制。
+
+SEC仅使用已申报10-K/10-Q及修订文件的USD事实。单季现金流由同一财年起点相邻累计值差分，优先直接报告的单季；所有指标须与该收入季度的起止日期完全一致。TTM要求四个连续完整季度，任何输入缺失则该项TTM留空。同比需真实同比季度，基期非正时不计算百分比。历史是最新申报版本，可能包含重述，不声称时点无前视。CEG合同收入不含部分非合同收入，使用合并总收入标签而非合同收入子项。
+
+现金Capex优先PPE购建支出，部分公司只披露ProductiveAssets（含软件/无形资产），必须保留标签与范围说明。FCF=经营现金流−现金Capex；租赁非现金新增资产与本金偿付分列，不把它们自动相加冒充公司口头Capex口径。四大云厂商只汇总起止日期完全相同的完整季度，缺一项不补零，不称为纯AI投入。不同财季公司的最新值分别标注日期。
+
+ARR、RPO、cRPO、云/数据中心/订阅收入、订单积压、留存率、客户数量等保持各自单位和含义，不能把年化收入运行率、ARR阈值客户数量或RPO当作ARR金额。经营表仅读取公开HTML；指标记录日期、单位、来源及历史，YTD项目保留累计定义。Salesforce的Agentforce与Data360 ARR存在包含关系，Q2 FY27口径扩展，原文约数/超过界限保留，不重复加总。财报收入、经营现金流和Capex用Stock Analysis同一财年值复核，差异超过1%单列，不静默替换SEC；82项初次共同年度值一致，不代表所有经营指标原值均已独立核验。
+
+CDS目前仅Oracle、NVIDIA公开数据：来源为allofthesewords对DTCC SEC public tape的第三方整理，约五年USD高级公司CDS，以明确报告的成交运行利差日中位数及成交笔数展示。排除全部upfront模型上下界、固定票息和无报告利差的日期；稀疏成交用真实时间散点，不前向填充或冒充连续交易商收盘报价。源日期/覆盖元数据须与记录一致，保留DTCC及整理页面链接。这不是对原始逐笔DTCC记录的独立全量复验。EQIX/DLR等专有标签缺项保留缺值，过旧财报标记待更新；CDS两家公司不能代表全产业信用风险。
+
+
+### 2026-11-02 指数估值比较与测试补充窗口
+
+既有指数估值单图保留，增加观察日、3/5/10年及全部窗口的历史分位、最低/中位/最高和20%/80%分位值；指数比较默认收起，支持代码/名称搜索、按分位升降序排序与点击切换到同一张走势图。A股目录扩至15个常用指数，静态PE LYR独立于滚动PE TTM，保留PB MRQ、PS TTM、PCF TTM、股息率TTM。指数价格仍为对应指数黑线，不以ETF价格替代。没有接入数据或样本不足时显示缺值，不补零。
+
+主源PE历史与补充源各自保留原生定义，不把中证PE1、历史TTM与Choice估值混接。Choice采用DelType=1、FillData=0及不复权指数收盘；000510使用已核实的.CSI后缀。历史分位采用中位秩，常数历史为50%；估值非正值不进入分位分母，零股息率保留。日/月/季频按有效观察日期的中位间隔识别，分别至少252/36/12点；年频至少5点。日期先去重排序，窗口以统一观察日的日历周年截断，闰日向月末收敛；观察日后的值不参与极值、分位或图表。该历史仍是来源最新修订版本，观察日筛选不构成当时已可得数据保证。比较表各单元格保留实际日期和样本数，不能把3年缓存误称完整10年历史。
+
+按Owner测试额度约束，本模块不再为扩展指标整段回拉多年度Choice历史：首次或新字段补充最多30个日历日，已有字段从本地最新观察日次日增量补齐，过长缺口同样限制到近30日；已有多年度缓存原样复用。只查询到期或缺少新收盘日的代码；同一已闭市交易日已存储时不请求。失败至少一小时退避，10001029额度拒绝至少20小时退避，不允许五分钟后台轮询重复消耗。正常收盘后可补当天缺失记录，不因早上检查而延迟一整天。缺口更长不自动扩大回补范围。额度实际使用量须以Choice账户统计为准，不能以返回记录数宣称计费流量。GET继续只读本地，不触发SDK。相关本地原始与标准历史按现有研究归档保存。
+
+### 2026-11-02 A股市场监测
+
+`GET /research/a-share/market-monitor` 仅以 research.read 权限读取本地 `public/v1/equity/cn-monitor.json`，不触发外部请求。后台独立循环按来源20小时刷新，失败1小时后重试、保留有效旧值，原始响应以 SHA256 归档到 raw/equity/legu_*。无 Choice 调用。公开来源包括4板块股息率、3类基金估算仓位、全A财报增速中位数和31个申万一级行业6项季度同比增速、公开30交易日行业拥挤度。滚动窗口保留已采历史、同日修订覆盖；缺值不填零。
+
+基金估算仓位与公募实际定期披露仓位分开；来源页面的停止更新标记与接口日期不一致，展示实际有效日期，平衡混合型序列当前止于2025-12-12。全A交易集中度的公开有效值止于2026-08-13，后续空日期不表示已更新。行业拥挤度为等权换手率分位、成交额占比分位，不构造合成指标。景气度为财报同比增速中位数（净利润、营业收入、营业利润、营业总收入、利润总额、ROE同比增长率），行业表为最新及前一报告期；变化为两个同比数之差、单位pp，不当作单季环比。全A季度历史72期；行业公开表只留最新两期，不能声称已补齐行业长期历史。风格复用既有ETF代理价格与同交易日基准口径，不重复采集计算。
+
+股息率仅在来源确有配套收盘价时显示价格线及右轴。对相邻有效值之间单日相对变化超过35%、次日相对前日回到10%以内的孤立突变，界面显示待复核日期；该规则只是质量提示，原值、零值和原始响应均不修改。当前四板块均命中2026-10-27。13份归档响应重解析与本地投影一致、186个行业指标的变化列已按Decimal核算，6项定向测试及新增页面类型检查通过。外部数据原值的独立权威复核和长期定时运行仍需观察。
+
+### 2026-11-02 股债性价比、市场宽度与宏观估值
+
+A股市场监测新增三类，既有五类及原有页面保留。同一只读接口增加受限 section=risk/breadth/macroValue，按分类加载，避免初始页面携带全部长历史。breadth、macroValue 读取独立本地投影 cn-monitor-breadth / cn-monitor-macroValue；独立后台按来源20小时刷新、失败1小时退避，失败保留原历史及错误状态，归档 raw/equity/legu_context_*。未新增Choice网络请求。
+
+股债性价比复用已存Choice指数估值（沪深300、上证50、中证500）及中债/财政部10年国债收益率。静态PE LYR和滚动PE TTM分别计算，盈利收益率=100/PE（%），股债差=盈利收益率-同日国债收益率（pp），PE<=0或任一输入缺失不计算；严格同日匹配，不用其他日收益率填充。该计算是盈利收益率差，不是预期超额收益估计；既有Choice与中证历史TTM口径不拼接。GET仅本地读取和计算，不调用SDK。
+
+市场宽度增加全部A股、沪深300、上证50、中证500破净比例，数量/有效统计样本分母按来源保留，计算count/total*100；不把负净资产计作破净。全A站上5/20/60日均线比例和20/60/120日新高新低数量使用公开可取得的历史，净新高为同日高点数减低点数。当前公开均线及新高新低指标有效值止于2026-10-09，其后仅有价格；卡片和页面明确显示有效日期和缺口，不用股票池样本冒充全A或补零。
+
+总市值/GDP使用来源提供的A股总市值及年度GDP（同为亿元），换算比值百分数；总市值覆盖上、深、北，配套指数为沪深300。GDP页面描述使用上年度全年值，但历史版本及发布时间未经点时验证，不作为无前视偏差回测输入。公开历史自2005年起。
+
+本轮发现来源存在少数同日重复记录：相同字段合并，不同有效值冲突的字段留空并标记conflictFields；不随意采用首条/末条、平均或让单字段冲突丢弃整段历史。原始响应全量保留；依赖冲突分母的比值为空、不相关字段仍保留。原始日期按来源留存，非完整交易日历审计结果。新增定向回归覆盖重复/冲突、精确除法、百分比单位、缺值/零值、同日配对与来源失败隔离。
+
+### 2026-11-02 历史收益风险与美元流动性透镜
+
+美股结构与风险新增独立历史分析；`GET /research/equity/history-risk?instrument=spy|ndx|dow|soxx|xlk`仅以research.read读取本地Yahoo日收盘，不触发网络或Choice。按dataset+entity_code定位并限制40,000行；标准迁移46增加复合索引，连接读取后即关闭。分析缓存以完整日期/收盘输入和当年为键，同日修订会失效。SPY自1993年、NDX自1985年，其余标的按真实样本起点展示，不借用不同指数拼接。收益为价格收益、不含现金分红再投资。样本回撤=收盘/截至当日样本最高收盘-1；恢复为首次达到原高点的观察日，持续时长为日历日。年度收益用前一年最后收盘作基准，年度最大回撤亦包含该基准；首年缺基准为空，当前年及边界不足年标为部分。5年滚动价格年化采用周年前最近7日内有效收盘及实际日历长度；20/60个收益观察波动用样本标准差乘sqrt(252)。非正价格、缺值及超过7日间隔不计算跨缺口单日收益，波动重新累积。此规则不替代完整交易所日历审计。
+
+宏观流动性新增`GET /research/macro/liquidity-lens`，只读既有标准序列。Fed资产、TGA和ONRRP按共同观察日精确匹配，卡片量值同步到该日；净流动性=资产-TGA-RRP。贡献分别为Δ资产、-ΔTGA、-ΔRRP，和必须等于净变化；四周变化要求恰好28日前存在共同观察，不前值填充。全部金额归一为十亿美元并验证原单位；其他融资价格与市场反馈保留各自真实日期。697个共同观察值与既有净流动性序列一致。近5年历史位置用有效样本中位秩且至少52点；短线为最近30个有效观察，不标作30天。Fed负债占比仅为储备/TGA/ONRRP除以Fed总资产，不称商业银行现金缓冲；不构造未获完整系数和校准的DLI合成分数。单指标失败独立保留缺失状态。两接口禁浏览器缓存，数据权限沿用research.read；页面失败彼此隔离。
+
+23项分析及迁移测试通过；五标的回撤、81,576个波动窗口和697个净流动性点按本地输入独立复算一致。该结果不证明所有外部原始历史或交易日历完整性，也不等价于复制参考站专有指数。
+
+### 2026-11-02 乐咕指数PE统计补齐
+
+A股估值保留既有中证/Choice序列，另以`market-monitor?section=valuation`独立读取本地`cn-monitor-valuation`。后台复用独立context循环，按20小时来源刷新、失败1小时退避；公开PE请求间隔1秒，维护时可按来源key定向补采，不触发Choice或VIP日频请求。原始响应沿`raw/equity/legu_context_pe_*`归档，失败保留旧值，同日修订覆盖。
+
+接入10指数：沪深300、上证50、中证500、中证1000、中证800、上证180、上证380、中证100、上证红利、深证红利。每个指数保留总市值法、等权平均、中位数的静态LYR/滚动TTM六种独立口径；总市值法为总市值/利润合计，等权和中位数按来源剔除亏损、暂停上市和PE>300样本。公开历史主要为月频，截至2026-10-30，共2,366个日期。不得和既有日频或其他来源口径混接；切换公开PE时黑色价格线使用同来源指数收盘与真实日期。非正PE不进入估值分位，非正价格留空并标记invalidFields，不令有效PE整段失效；12个早期深证红利零价已如此处理。重复冲突仍按字段留空，原始值可回溯。
+
+图表支持原始/每周末次/每月末次观察，周按周一分桶、月按自然月，保留实际最后观察日及缺值；不造周五/月末日期、不插值。统计卡和历史分位始终按所选窗口的原始有效观察，图表采样不会改变分位。估值图表的缩放状态按标的/指标/范围/采样/观察日隔离，切换10年或历史观察日不继承其他配置的缩放范围，避免统计窗口与初始可见区间不一致。月频本地分位与来源日频全历史分位不同，界面说明保持明确。此次13项后台与8项图表统计测试、聚焦类型检查通过；10份原始响应SHA核对及16,562个数值字段重解析与投影一致，60组十年历史分位与样本数由Decimal独立复算并与实际前端统计函数一致。该核对不替代指数成分股原始利润/市值的全量权威重建。

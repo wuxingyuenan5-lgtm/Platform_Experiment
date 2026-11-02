@@ -477,13 +477,16 @@
       ],
       "view_owner": "platform-web/src/views/hedgeBoard/macro/index.vue",
       "frontend_services": [
-        "platform-web/src/api/hedgeResearch.ts"
+        "platform-web/src/api/hedgeResearch.ts",
+        "platform-web/src/api/marketAnalytics.ts"
       ],
       "api_endpoints": [
-        "/api/v1/research/macro/expectations"
+        "/api/v1/research/macro/expectations",
+        "/api/v1/research/macro/liquidity-lens"
       ],
       "application_services": [
-        "platform-api/app/research_service.py"
+        "platform-api/app/research_service.py",
+        "platform-api/app/research_liquidity_lens.py"
       ],
       "repository_or_provider": [
         "platform-api/app/research_providers.py",
@@ -535,14 +538,27 @@
         "HedgeGlobalBoard"
       ],
       "view_owner": "platform-web/src/views/hedgeBoard/index.vue",
-      "frontend_services": [],
-      "api_endpoints": [],
-      "application_services": [],
+      "frontend_services": [
+        "platform-web/src/api/hedgeResearch.ts",
+        "platform-web/src/api/marketAnalytics.ts"
+      ],
+      "api_endpoints": [
+        "/api/v1/research/equity/ai",
+        "/api/v1/research/equity/ai/{ticker}",
+        "/api/v1/research/equity/history-risk"
+      ],
+      "application_services": [
+        "platform-api/app/research_ai.py",
+        "platform-api/app/research_history_risk.py"
+      ],
       "repository_or_provider": [
         "external:tradingview-widgets",
-        "platform-web/src/views/hedgeBoard/nativeData/dashboardClean.ts"
+        "platform-web/src/views/hedgeBoard/nativeData/dashboardClean.ts",
+        "platform-api/app/research_ai_financials.py",
+        "platform-api/app/research_ai_sources.py",
+        "platform-api/app/research_ai_catalog.py"
       ],
-      "real_data_source": "TradingView public widgets; static design widgets are isolated and disclosed",
+      "real_data_source": "TradingView public widgets; static design widgets are isolated and disclosed; AI: SEC companyfacts, issuer disclosures, public Stock Analysis financial/operating tables, explicitly reported DTCC CDS via third-party aggregation",
       "permissions": [
         "research.read"
       ],
@@ -552,7 +568,7 @@
         "employee",
         "member"
       ],
-      "refresh": "provider widget refresh",
+      "refresh": "provider widget refresh; AI: daily SEC/statements/operating metrics, four-hour CDS; independent local read models and last-good retention",
       "as_of": "provider-defined",
       "timezone": "provider-defined",
       "currency": "mixed",
@@ -581,23 +597,35 @@
       ],
       "view_owner": "platform-web/src/views/hedgeBoard/aShare/index.vue",
       "frontend_services": [
+        "platform-web/src/api/mutualFunds.ts",
         "platform-web/src/api/hedgeResearch.ts",
-        "platform-web/src/api/platform/researchWatchlist.ts"
+        "platform-web/src/api/platform/researchWatchlist.ts",
+        "platform-web/src/api/cnMarketMonitor.ts"
       ],
       "api_endpoints": [
         "/api/v1/research/a-share/dashboard",
+        "/api/v1/research/a-share/etf-observation",
+        "/api/v1/research/a-share/mutual-funds",
+        "/api/v1/research/a-share/mutual-funds/{code}",
         "/api/v1/research/a-share/stocks/{code}/snapshot",
-        "/api/v1/me/research-watchlist"
+        "/api/v1/me/research-watchlist",
+        "/api/v1/research/a-share/market-monitor"
       ],
       "application_services": [
         "platform-api/app/research_service.py",
-        "platform-api/app/research_watchlist_service.py"
+        "platform-api/app/research_etf_observation.py",
+        "platform-api/app/research_mutual_funds.py",
+        "platform-api/app/research_mutual_fund_refresh.py",
+        "platform-api/app/research_watchlist_service.py",
+        "platform-api/app/research_cn_monitor.py",
+        "platform-api/app/research_cn_context.py"
       ],
       "repository_or_provider": [
         "platform-api/app/research_providers.py",
+        "platform-api/app/research_mutual_fund_sources.py",
         "platform-api/app/research_watchlist_repository.py"
       ],
-      "real_data_source": "AKShare adapters and platform watchlist",
+      "real_data_source": "AKShare adapters, platform watchlist; ETF observation public reference histories/minute quotes retained locally; Eastmoney active equity mutual fund directory/disclosure archives retained locally; Legu public breadth/market-cap-GDP histories and same-date equity earnings yield minus local ChinaBond 10Y yield",
       "permissions": [
         "research.read"
       ],

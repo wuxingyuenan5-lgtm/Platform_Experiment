@@ -22,6 +22,7 @@ from app.config import get_settings
 from app.research_a_share_repository import finish_refresh, start_refresh
 from app.research_cumulative_volatility import refresh_cumulative_volatility
 from app.research_equity_observatory import run_periodic as run_equity_periodic
+from app.research_etf_observation import run_periodic as run_etf_observation_periodic
 from app.research_etf_tracking import run_periodic as run_etf_periodic
 from app.research_fedwatch import METHODOLOGY
 from app.research_macro_expectations_refresh import refresh_macro_expectations
@@ -316,6 +317,16 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     market_task = asyncio.create_task(_run_market_periodic())
     equity_task = asyncio.create_task(run_equity_periodic())
     etf_task = asyncio.create_task(run_etf_periodic())
+    etf_observation_task = asyncio.create_task(run_etf_observation_periodic())
+    from app.research_ai import run_periodic as run_ai_periodic
+
+    ai_task = asyncio.create_task(run_ai_periodic())
+    from app.research_cn_monitor import run_periodic as run_cn_monitor_periodic
+
+    cn_monitor_task = asyncio.create_task(run_cn_monitor_periodic())
+    from app.research_cn_context import run_periodic as run_cn_context_periodic
+
+    cn_context_task = asyncio.create_task(run_cn_context_periodic())
     try:
         yield
     finally:
@@ -323,7 +334,21 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         market_task.cancel()
         equity_task.cancel()
         etf_task.cancel()
-        await asyncio.gather(task, market_task, equity_task, etf_task, return_exceptions=True)
+        etf_observation_task.cancel()
+        ai_task.cancel()
+        cn_monitor_task.cancel()
+        cn_context_task.cancel()
+        await asyncio.gather(
+            task,
+            market_task,
+            equity_task,
+            etf_task,
+            etf_observation_task,
+            ai_task,
+            cn_monitor_task,
+            cn_context_task,
+            return_exceptions=True,
+        )
 
 
 async def _run_market_periodic() -> None:
@@ -347,6 +372,7 @@ async def _run_periodic(interval_seconds: float) -> None:
             pass
         try:
             from app.research_polymarket_fomc import refresh_fomc
+
             await asyncio.to_thread(refresh_fomc)
         except Exception:
             logging.getLogger(__name__).exception("FOMC refresh failed")

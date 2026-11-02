@@ -1,339 +1,348 @@
 <template>
-  <section id="a-share-etf-tracking" class="etf-panel">
-    <BroadEtfPanel :refresh-key="refreshKey" />
-    <header class="etf-heading"
-      ><div><span class="eyebrow">ETF MONITOR</span><h2>机构持仓与 ETF 跟踪</h2></div
-      ><button :disabled="loading || detailLoading" @click="refresh()">刷新数据</button></header
-    >
-    <div class="selector-bar">
-      <select v-model="category" aria-label="ETF分类"
-        ><option value="">全部分类</option
-        ><option v-for="g in groups" :key="g">{{ g }}</option></select
+  <div class="etf-tracking-workspace">
+    <section id="a-share-etf-tracking" class="etf-panel">
+      <BroadEtfPanel :refresh-key="refreshKey" />
+      <header class="etf-heading"
+        ><div><span class="eyebrow">ETF MONITOR</span><h2>机构持仓与 ETF 跟踪</h2></div
+        ><button :disabled="loading || detailLoading" @click="refresh()">刷新数据</button></header
       >
-      <input v-model="query" aria-label="搜索ETF" placeholder="名称 / 代码" />
-      <select v-model="selected" aria-label="选择ETF" class="fund-select"
-        ><option v-if="!filtered.some((i) => i.code === selected)" :value="selected">{{
-          detail?.meta.name || selected
-        }}</option
-        ><option v-for="i in filtered" :key="i.code" :value="i.code"
-          >{{ i.name }} · {{ i.code }}</option
-        ></select
-      >
-      <button
-        :aria-pressed="favorites.includes(selected)"
-        :aria-label="favorites.includes(selected) ? '取消当前ETF自选' : '加入当前ETF自选'"
-        class="star"
-        @click="toggleFavorite(selected)"
-        >{{ favorites.includes(selected) ? '★' : '☆' }}</button
-      >
-      <label><input v-model="onlyFavorites" type="checkbox" /> 仅自选</label
-      ><span class="muted">{{ filtered.length }} 个标的</span>
-      <button @click="showHoldings = !showHoldings" :aria-expanded="showHoldings"
-        >持仓一览 {{ showHoldings ? '收起' : '展开' }}</button
-      >
-    </div>
-    <div v-if="showHoldings" class="holdings table-scroll"
-      ><table
-        ><thead
-          ><tr
-            ><th>自选</th><th>ETF</th><th>分类</th><th>披露占比</th><th>披露规模（亿元）</th
-            ><th>报告期</th></tr
-          ></thead
-        ><tbody
-          ><tr v-for="i in filtered" :key="i.code" :class="{ selected: i.code === selected }"
-            ><td
-              ><button
-                @click="toggleFavorite(i.code)"
-                :aria-label="`${favorites.includes(i.code) ? '取消自选' : '加入自选'}${i.code}`"
-                >{{ favorites.includes(i.code) ? '★' : '☆' }}</button
-              ></td
-            ><td
-              ><button class="text-button" @click="selected = i.code"
-                >{{ i.name }} <small>{{ i.code }}</small></button
-              ></td
-            ><td>{{ i.display_group }}</td
-            ><td>{{ fmt(i.latest_combined_ratio_pct) }}%</td
-            ><td>{{ fmt(i.latest_combined_value_yi) }}</td
-            ><td>{{ i.latest_report_date }}</td></tr
-          ><tr v-if="!filtered.length"><td colspan="6">暂无符合条件的标的</td></tr></tbody
-        ></table
-      ></div
-    >
-    <p v-if="error" role="alert" class="notice">{{ error }}</p
-    ><p v-if="loading || detailLoading" role="status">正在读取 ETF 数据…</p>
-    <template v-if="detail">
-      <div class="fund-heading"
-        ><h3
-          >{{ detail.meta.name }} <small>{{ detail.meta.code }}</small></h3
-        ><span>{{ detail.groupLabel }}</span
-        ><span v-if="detail.sources.market.status !== 'ready'" class="notice"
-          >行情更新失败 · 保留上次数据</span
+      <div class="selector-bar">
+        <select v-model="category" aria-label="ETF分类"
+          ><option value="">全部分类</option
+          ><option v-for="g in groups" :key="g">{{ g }}</option></select
+        >
+        <input v-model="query" aria-label="搜索ETF" placeholder="名称 / 代码" />
+        <select v-model="selected" aria-label="选择ETF" class="fund-select"
+          ><option v-if="!filtered.some((i) => i.code === selected)" :value="selected">{{
+            detail?.meta.name || selected
+          }}</option
+          ><option v-for="i in filtered" :key="i.code" :value="i.code"
+            >{{ i.name }} · {{ i.code }}</option
+          ></select
+        >
+        <button
+          :aria-pressed="favorites.includes(selected)"
+          :aria-label="favorites.includes(selected) ? '取消当前ETF自选' : '加入当前ETF自选'"
+          class="star"
+          @click="toggleFavorite(selected)"
+          >{{ favorites.includes(selected) ? '★' : '☆' }}</button
+        >
+        <label><input v-model="onlyFavorites" type="checkbox" /> 仅自选</label
+        ><span class="muted">{{ filtered.length }} 个标的</span>
+        <button @click="showHoldings = !showHoldings" :aria-expanded="showHoldings"
+          >持仓一览 {{ showHoldings ? '收起' : '展开' }}</button
+        >
+      </div>
+      <div v-if="showHoldings" class="holdings table-scroll"
+        ><table
+          ><thead
+            ><tr
+              ><th>自选</th><th>ETF</th><th>分类</th><th>披露占比</th><th>披露规模（亿元）</th
+              ><th>报告期</th></tr
+            ></thead
+          ><tbody
+            ><tr v-for="i in filtered" :key="i.code" :class="{ selected: i.code === selected }"
+              ><td
+                ><button
+                  @click="toggleFavorite(i.code)"
+                  :aria-label="`${favorites.includes(i.code) ? '取消自选' : '加入自选'}${i.code}`"
+                  >{{ favorites.includes(i.code) ? '★' : '☆' }}</button
+                ></td
+              ><td
+                ><button class="text-button" @click="selected = i.code"
+                  >{{ i.name }} <small>{{ i.code }}</small></button
+                ></td
+              ><td>{{ i.display_group }}</td
+              ><td>{{ fmt(i.latest_combined_ratio_pct) }}%</td
+              ><td>{{ fmt(i.latest_combined_value_yi) }}</td
+              ><td>{{ i.latest_report_date }}</td></tr
+            ><tr v-if="!filtered.length"><td colspan="6">暂无符合条件的标的</td></tr></tbody
+          ></table
         ></div
       >
-      <div class="workspace">
-        <main class="chart-column">
-          <div class="metrics"
-            ><div
-              ><span>最新交易日</span
-              ><strong class="date-value">{{ latest?.date || '—' }}</strong></div
-            ><div
-              ><span>价格（元）</span><strong>{{ fmt(latest?.etf_qfq_close, 3) }}</strong
-              ><small :class="tone(latest?.return_pct)"
-                >{{ signed(latest?.return_pct) }}%</small
-              ></div
-            ><div
-              ><span>成交额（亿元）</span
-              ><strong>{{ fmt(latest?.etf_qfq_turnover_est_yi) }}</strong></div
-            ><div
-              ><span>总份额（亿份）</span
-              ><strong>{{ fmt(latest?.qfq_total_units_yi) }}</strong></div
-            ><div
-              ><span>披露持仓占比</span
-              ><strong>{{ fmt(detail.meta.latest_combined_ratio_pct) }}%</strong
-              ><small>{{ detail.meta.latest_report_date }}</small></div
-            ><div
-              ><span>披露规模（亿元）</span
-              ><strong>{{ fmt(detail.meta.latest_combined_value_yi) }}</strong
-              ><small>{{ detail.meta.latest_report_date }}</small></div
-            ></div
-          >
-          <div class="periods"
-            ><button v-for="(p, i) in summaries" :key="p.count" @click="setPeriod(p.count)"
-              ><span
-                >{{ ['近一周', '近一月', '近三月'][i] }} <small>{{ p.count }} 个交易日</small></span
-              ><strong :class="tone(p.change)">{{ signed(p.change) }}<em>%</em></strong
-              ><div
-                >成交 <b>{{ fmt(p.turnover) }}</b> 亿
-                <span
-                  >净申赎 <b :class="tone(p.flow)">{{ signed(p.flow) }}</b> 亿</span
-                ></div
-              ></button
-            ></div
-          >
-          <div class="window-controls">
-            <div class="window-heading"
-              ><strong>历史走势</strong><span>{{ start }} — {{ end }}</span
-              ><label><input v-model="tooltip" type="checkbox" /> 悬浮数据</label></div
-            >
-            <form @submit.prevent="applyDates(false)" class="date-form"
-              ><input
-                v-model="draftStart"
-                type="date"
-                aria-label="ETF开始日期"
-                :min="dates[0]"
-                :max="dates.at(-1)"
-              /><span>至</span
-              ><input
-                v-model="draftEnd"
-                type="date"
-                aria-label="ETF结束日期"
-                :min="dates[0]"
-                :max="dates.at(-1)"
-              /><button type="submit">应用</button
-              ><button type="button" @click="setThreeYears">3年</button
-              ><button type="button" @click="setPeriod(0)">全部</button
-              ><button type="button" @click="latestWindow">最新</button></form
-            >
-            <div class="range-track"
-              ><div class="range-selection" :style="rangeStyle"></div
-              ><input
-                type="range"
-                min="0"
-                :max="Math.max(0, dates.length - 1)"
-                :value="startIndex"
-                aria-label="图表起始位置"
-                @input="slide($event, true)" /><input
-                type="range"
-                min="0"
-                :max="Math.max(0, dates.length - 1)"
-                :value="endIndex"
-                aria-label="图表结束位置"
-                @input="slide($event, false)"
-            /></div>
-            <div class="range-labels"
-              ><span>{{ dates[0] }}</span
-              ><span>{{ dates.at(-1) }}</span></div
-            ><p v-if="dateError" role="alert" class="notice">{{ dateError }}</p>
-          </div>
-          <EtfLinkedCharts
-            :detail="detail"
-            :start="start"
-            :end="end"
-            :tooltip="tooltip"
-            @range="setRange"
-          />
-        </main>
-        <aside
-          class="trend-panel"
-          :class="{ fullscreen }"
-          :aria-label="`${detail.groupLabel}趋势表`"
-          @keydown.esc="fullscreen = false"
+      <p v-if="error" role="alert" class="notice">{{ error }}</p
+      ><p v-if="loading || detailLoading" role="status">正在读取 ETF 数据…</p>
+      <template v-if="detail">
+        <div class="fund-heading"
+          ><h3
+            >{{ detail.meta.name }} <small>{{ detail.meta.code }}</small></h3
+          ><span>{{ detail.groupLabel }}</span
+          ><span v-if="detail.sources.market.status !== 'ready'" class="notice"
+            >行情更新失败 · 保留上次数据</span
+          ></div
         >
-          <header
-            ><div
-              ><h3>{{ detail.groupLabel }} · 趋势表</h3><p>分组合计与各 ETF 每日变化</p></div
-            ><button
-              @click="fullscreen = !fullscreen"
-              :aria-label="fullscreen ? '退出趋势表全屏' : '趋势表全屏'"
-              >{{ fullscreen ? '退出全屏' : '全屏' }}</button
-            ></header
-          >
-          <form class="date-form" @submit.prevent="applyDates(true)"
-            ><input v-model="trendDraftStart" type="date" aria-label="趋势表开始日期" /><span
-              >至</span
-            ><input v-model="trendDraftEnd" type="date" aria-label="趋势表结束日期" /><button
-              type="submit"
-              >应用</button
-            ><button type="button" @click="resetTrend">近一周</button></form
-          >
-          <p v-if="trendError" role="alert" class="notice">{{ trendError }}</p>
-          <div class="trend-summary"
-            ><div
-              ><span>区间净申赎（亿元）</span
-              ><strong :class="tone(trendFlow)">{{ signed(trendFlow) }}</strong></div
-            ><div
-              ><span>占指数成交额</span
-              ><strong :class="tone(trendRatio)">{{ signed(trendRatio) }}%</strong></div
-            ><div
-              ><span>成交额（亿元）</span
-              ><b>{{ fmt(total(trendGroup, 'etf_qfq_turnover_est_yi')) }}</b></div
-            ><div
-              ><span>最大单日净申赎</span
-              ><b :class="tone(maxFlow)">{{ signed(maxFlow) }} 亿</b></div
-            ></div
-          >
-          <div class="financing-summary"
-            ><span>融资 · {{ detail.margin.at(-1)?.date || '暂无数据' }}</span
-            ><div
-              ><span>当前 ETF 净买入 / 余额变化</span
-              ><b
-                >{{ signed(total(trendMargin, 'financing_net_buy_yi')) }} /
-                {{
-                  signed(balanceChange(detail.margin, trendStart, trendEnd, 'financing_balance_yi'))
-                }}
-                亿</b
+        <div class="workspace">
+          <main class="chart-column">
+            <div class="metrics"
+              ><div
+                ><span>最新交易日</span
+                ><strong class="date-value">{{ latest?.date || '—' }}</strong></div
+              ><div
+                ><span>价格（元）</span><strong>{{ fmt(latest?.etf_qfq_close, 3) }}</strong
+                ><small :class="tone(latest?.return_pct)"
+                  >{{ signed(latest?.return_pct) }}%</small
+                ></div
+              ><div
+                ><span>成交额（亿元）</span
+                ><strong>{{ fmt(latest?.etf_qfq_turnover_est_yi) }}</strong></div
+              ><div
+                ><span>总份额（亿份）</span
+                ><strong>{{ fmt(latest?.qfq_total_units_yi) }}</strong></div
+              ><div
+                ><span>披露持仓占比</span
+                ><strong>{{ fmt(detail.meta.latest_combined_ratio_pct) }}%</strong
+                ><small>{{ detail.meta.latest_report_date }}</small></div
+              ><div
+                ><span>披露规模（亿元）</span
+                ><strong>{{ fmt(detail.meta.latest_combined_value_yi) }}</strong
+                ><small>{{ detail.meta.latest_report_date }}</small></div
               ></div
-            ><div
-              ><span>指数成分股净买入 / 余额变化</span
-              ><b
-                >{{ signed(total(trendIndexMargin, 'index_financing_net_buy_yi')) }} /
-                {{
-                  signed(
-                    balanceChange(
-                      detail.groupMargin,
-                      trendStart,
-                      trendEnd,
-                      'index_financing_balance_yi',
-                    ),
-                  )
-                }}
-                亿</b
+            >
+            <div class="periods"
+              ><button v-for="(p, i) in summaries" :key="p.count" @click="setPeriod(p.count)"
+                ><span
+                  >{{ ['近一周', '近一月', '近三月'][i] }}
+                  <small>{{ p.count }} 个交易日</small></span
+                ><strong :class="tone(p.change)">{{ signed(p.change) }}<em>%</em></strong
+                ><div
+                  >成交 <b>{{ fmt(p.turnover) }}</b> 亿
+                  <span
+                    >净申赎 <b :class="tone(p.flow)">{{ signed(p.flow) }}</b> 亿</span
+                  ></div
+                ></button
               ></div
-            ></div
+            >
+            <div class="window-controls">
+              <div class="window-heading"
+                ><strong>历史走势</strong><span>{{ start }} — {{ end }}</span
+                ><label><input v-model="tooltip" type="checkbox" /> 悬浮数据</label></div
+              >
+              <form @submit.prevent="applyDates(false)" class="date-form"
+                ><input
+                  v-model="draftStart"
+                  type="date"
+                  aria-label="ETF开始日期"
+                  :min="dates[0]"
+                  :max="dates.at(-1)"
+                /><span>至</span
+                ><input
+                  v-model="draftEnd"
+                  type="date"
+                  aria-label="ETF结束日期"
+                  :min="dates[0]"
+                  :max="dates.at(-1)"
+                /><button type="submit">应用</button
+                ><button type="button" @click="setThreeYears">3年</button
+                ><button type="button" @click="setPeriod(0)">全部</button
+                ><button type="button" @click="latestWindow">最新</button></form
+              >
+              <div class="range-track"
+                ><div class="range-selection" :style="rangeStyle"></div
+                ><input
+                  type="range"
+                  min="0"
+                  :max="Math.max(0, dates.length - 1)"
+                  :value="startIndex"
+                  aria-label="图表起始位置"
+                  @input="slide($event, true)" /><input
+                  type="range"
+                  min="0"
+                  :max="Math.max(0, dates.length - 1)"
+                  :value="endIndex"
+                  aria-label="图表结束位置"
+                  @input="slide($event, false)"
+              /></div>
+              <div class="range-labels"
+                ><span>{{ dates[0] }}</span
+                ><span>{{ dates.at(-1) }}</span></div
+              ><p v-if="dateError" role="alert" class="notice">{{ dateError }}</p>
+            </div>
+            <EtfLinkedCharts
+              :detail="detail"
+              :start="start"
+              :end="end"
+              :tooltip="tooltip"
+              @range="setRange"
+            />
+          </main>
+          <aside
+            class="trend-panel"
+            :class="{ fullscreen }"
+            :aria-label="`${detail.groupLabel}趋势表`"
+            @keydown.esc="fullscreen = false"
           >
-          <div class="trend-caption"
-            ><span>{{ trendStart }} — {{ trendEnd }}</span
-            ><span
-              ><i class="legend-hot"></i> ≥90分位 <i class="legend-cool"></i> ≤10分位</span
-            ></div
-          >
-          <div class="trend-table table-scroll"
+            <header
+              ><div
+                ><h3>{{ detail.groupLabel }} · 趋势表</h3><p>分组合计与各 ETF 每日变化</p></div
+              ><button
+                @click="fullscreen = !fullscreen"
+                :aria-label="fullscreen ? '退出趋势表全屏' : '趋势表全屏'"
+                >{{ fullscreen ? '退出全屏' : '全屏' }}</button
+              ></header
+            >
+            <form class="date-form" @submit.prevent="applyDates(true)"
+              ><input v-model="trendDraftStart" type="date" aria-label="趋势表开始日期" /><span
+                >至</span
+              ><input v-model="trendDraftEnd" type="date" aria-label="趋势表结束日期" /><button
+                type="submit"
+                >应用</button
+              ><button type="button" @click="resetTrend">近一周</button></form
+            >
+            <p v-if="trendError" role="alert" class="notice">{{ trendError }}</p>
+            <div class="trend-summary"
+              ><div
+                ><span>区间净申赎（亿元）</span
+                ><strong :class="tone(trendFlow)">{{ signed(trendFlow) }}</strong></div
+              ><div
+                ><span>占指数成交额</span
+                ><strong :class="tone(trendRatio)">{{ signed(trendRatio) }}%</strong></div
+              ><div
+                ><span>成交额（亿元）</span
+                ><b>{{ fmt(total(trendGroup, 'etf_qfq_turnover_est_yi')) }}</b></div
+              ><div
+                ><span>最大单日净申赎</span
+                ><b :class="tone(maxFlow)">{{ signed(maxFlow) }} 亿</b></div
+              ></div
+            >
+            <div class="financing-summary"
+              ><span>融资 · {{ detail.margin.at(-1)?.date || '暂无数据' }}</span
+              ><div
+                ><span>当前 ETF 净买入 / 余额变化</span
+                ><b
+                  >{{ signed(total(trendMargin, 'financing_net_buy_yi')) }} /
+                  {{
+                    signed(
+                      balanceChange(detail.margin, trendStart, trendEnd, 'financing_balance_yi'),
+                    )
+                  }}
+                  亿</b
+                ></div
+              ><div
+                ><span>指数成分股净买入 / 余额变化</span
+                ><b
+                  >{{ signed(total(trendIndexMargin, 'index_financing_net_buy_yi')) }} /
+                  {{
+                    signed(
+                      balanceChange(
+                        detail.groupMargin,
+                        trendStart,
+                        trendEnd,
+                        'index_financing_balance_yi',
+                      ),
+                    )
+                  }}
+                  亿</b
+                ></div
+              ></div
+            >
+            <div class="trend-caption"
+              ><span>{{ trendStart }} — {{ trendEnd }}</span
+              ><span
+                ><i class="legend-hot"></i> ≥90分位 <i class="legend-cool"></i> ≤10分位</span
+              ></div
+            >
+            <div class="trend-table table-scroll"
+              ><table
+                ><thead
+                  ><tr
+                    ><th>日期 / ETF</th><th title="分组涨跌幅按当日成交额加权">涨跌幅</th
+                    ><th>成交额<small>亿元 / 分位</small></th
+                    ><th>份额变化<small>亿份 / 分位</small></th
+                    ><th>净申赎<small>亿元 / 分位</small></th
+                    ><th>占指数<small>成交额 %</small></th
+                    ><th>融资净买入<small>亿元</small></th></tr
+                  ></thead
+                ><tbody v-for="block in trendBlocks" :key="block.code"
+                  ><tr class="group-heading"
+                    ><th colspan="7"
+                      ><button v-if="block.code !== 'group'" @click="selected = block.code"
+                        >{{ block.name }} <small>{{ block.code }}</small></button
+                      ><span v-else>{{ block.name }} · 合计</span
+                      ><small>{{ block.rows.length }} 个交易日</small></th
+                    ></tr
+                  ><tr v-for="r in block.rows" :key="r.date"
+                    ><td>{{ r.date.slice(5) }}</td
+                    ><td :class="tone(r.return_pct)">{{ signed(r.return_pct) }}%</td
+                    ><td
+                      >{{ fmt(r.etf_qfq_turnover_est_yi)
+                      }}<small :class="rankClass(r.etf_qfq_turnover_est_yi_percentile)">{{
+                        rank(r.etf_qfq_turnover_est_yi_percentile)
+                      }}</small></td
+                    ><td :class="tone(r.qfq_delta_units_yi)"
+                      >{{ signed(r.qfq_delta_units_yi, 3)
+                      }}<small :class="rankClass(r.qfq_delta_units_yi_percentile)">{{
+                        rank(r.qfq_delta_units_yi_percentile)
+                      }}</small></td
+                    ><td :class="tone(r.flow_yi)"
+                      >{{ signed(r.flow_yi)
+                      }}<small :class="rankClass(r.flow_yi_percentile)">{{
+                        rank(r.flow_yi_percentile)
+                      }}</small></td
+                    ><td :class="tone(r.flow_to_index_pct)">{{ signed(r.flow_to_index_pct) }}</td
+                    ><td :class="tone(r.financing_net_buy_yi)">{{
+                      signed(r.financing_net_buy_yi)
+                    }}</td></tr
+                  ><tr v-if="!block.rows.length"><td colspan="7">区间内暂无数据</td></tr></tbody
+                ></table
+              ></div
+            >
+          </aside>
+        </div>
+        <details class="method"
+          ><summary>持仓披露与数据口径</summary
+          ><p
+            >来源：<a href="https://wangwang-etf.com/" target="_blank" rel="noopener noreferrer"
+              >汪汪 ETF</a
+            >公开数据。持仓为报告期快照；日度份额变动不能归因于特定投资者。价格与份额使用来源调整口径，成交额与净申赎金额为估算值。</p
+          ><p
+            >净申赎金额 = 调整后份额变化 ×
+            前复权均价；均价缺失时采用前复权收盘价。分位为截至当日的历史排名，至少 60
+            个有效观测；份额与净申赎按绝对值排名。分组合计须覆盖全部成员，涨跌幅按成交额加权。区间数据不完整时不显示合计。</p
+          ><div class="table-scroll"
             ><table
               ><thead
                 ><tr
-                  ><th>日期 / ETF</th><th title="分组涨跌幅按当日成交额加权">涨跌幅</th
-                  ><th>成交额<small>亿元 / 分位</small></th
-                  ><th>份额变化<small>亿份 / 分位</small></th
-                  ><th>净申赎<small>亿元 / 分位</small></th
-                  ><th>占指数<small>成交额 %</small></th
-                  ><th>融资净买入<small>亿元</small></th></tr
+                  ><th>报告期</th><th>汇金 / 证金合计占比</th><th>披露规模（亿元）</th></tr
                 ></thead
-              ><tbody v-for="block in trendBlocks" :key="block.code"
-                ><tr class="group-heading"
-                  ><th colspan="7"
-                    ><button v-if="block.code !== 'group'" @click="selected = block.code"
-                      >{{ block.name }} <small>{{ block.code }}</small></button
-                    ><span v-else>{{ block.name }} · 合计</span
-                    ><small>{{ block.rows.length }} 个交易日</small></th
-                  ></tr
-                ><tr v-for="r in block.rows" :key="r.date"
-                  ><td>{{ r.date.slice(5) }}</td
-                  ><td :class="tone(r.return_pct)">{{ signed(r.return_pct) }}%</td
-                  ><td
-                    >{{ fmt(r.etf_qfq_turnover_est_yi)
-                    }}<small :class="rankClass(r.etf_qfq_turnover_est_yi_percentile)">{{
-                      rank(r.etf_qfq_turnover_est_yi_percentile)
-                    }}</small></td
-                  ><td :class="tone(r.qfq_delta_units_yi)"
-                    >{{ signed(r.qfq_delta_units_yi, 3)
-                    }}<small :class="rankClass(r.qfq_delta_units_yi_percentile)">{{
-                      rank(r.qfq_delta_units_yi_percentile)
-                    }}</small></td
-                  ><td :class="tone(r.flow_yi)"
-                    >{{ signed(r.flow_yi)
-                    }}<small :class="rankClass(r.flow_yi_percentile)">{{
-                      rank(r.flow_yi_percentile)
-                    }}</small></td
-                  ><td :class="tone(r.flow_to_index_pct)">{{ signed(r.flow_to_index_pct) }}</td
-                  ><td :class="tone(r.financing_net_buy_yi)">{{
-                    signed(r.financing_net_buy_yi)
-                  }}</td></tr
-                ><tr v-if="!block.rows.length"><td colspan="7">区间内暂无数据</td></tr></tbody
+              ><tbody
+                ><tr v-for="d in detail.disclosures" :key="d.report_date"
+                  ><td>{{ d.report_date }}</td
+                  ><td>{{ fmt(d.combined_ratio_pct) }}%</td
+                  ><td>{{ fmt(d.combined_value_yi) }}</td></tr
+                ></tbody
               ></table
             ></div
-          >
-        </aside>
-      </div>
-      <details class="method"
-        ><summary>持仓披露与数据口径</summary
-        ><p
-          >来源：<a href="https://wangwang-etf.com/" target="_blank" rel="noopener noreferrer"
-            >汪汪 ETF</a
-          >公开数据。持仓为报告期快照；日度份额变动不能归因于特定投资者。价格与份额使用来源调整口径，成交额与净申赎金额为估算值。</p
-        ><p
-          >净申赎金额 = 调整后份额变化 ×
-          前复权均价；均价缺失时采用前复权收盘价。分位为截至当日的历史排名，至少 60
-          个有效观测；份额与净申赎按绝对值排名。分组合计须覆盖全部成员，涨跌幅按成交额加权。区间数据不完整时不显示合计。</p
-        ><div class="table-scroll"
-          ><table
-            ><thead
-              ><tr><th>报告期</th><th>汇金 / 证金合计占比</th><th>披露规模（亿元）</th></tr></thead
-            ><tbody
-              ><tr v-for="d in detail.disclosures" :key="d.report_date"
-                ><td>{{ d.report_date }}</td
-                ><td>{{ fmt(d.combined_ratio_pct) }}%</td
-                ><td>{{ fmt(d.combined_value_yi) }}</td></tr
-              ></tbody
-            ></table
-          ></div
-        ></details
-      >
-      <section class="flow-history">
-        <button
-          type="button"
-          class="flow-history-toggle"
-          :aria-expanded="showFlowCharts"
-          aria-controls="etf-flow-history"
-          :aria-label="showFlowCharts ? '收起ETF申赎历史' : '展开ETF申赎历史'"
-          @click="showFlowCharts = !showFlowCharts"
-          ><strong>ETF申赎历史</strong><span>{{ showFlowCharts ? '收起' : '展开' }}</span></button
+          ></details
         >
-        <div v-if="showFlowCharts" id="etf-flow-history">
-          <EtfLinkedCharts
-            flows-only
-            :detail="detail"
-            :start="start"
-            :end="end"
-            :tooltip="tooltip"
-            @range="setRange"
-          />
-        </div>
-      </section>
-    </template>
-  </section>
+        <section class="flow-history">
+          <button
+            type="button"
+            class="flow-history-toggle"
+            :aria-expanded="showFlowCharts"
+            aria-controls="etf-flow-history"
+            :aria-label="showFlowCharts ? '收起ETF申赎历史' : '展开ETF申赎历史'"
+            @click="showFlowCharts = !showFlowCharts"
+            ><strong>ETF申赎历史</strong><span>{{ showFlowCharts ? '收起' : '展开' }}</span></button
+          >
+          <div v-if="showFlowCharts" id="etf-flow-history">
+            <EtfLinkedCharts
+              flows-only
+              :detail="detail"
+              :start="start"
+              :end="end"
+              :tooltip="tooltip"
+              @range="setRange"
+            />
+          </div>
+        </section>
+      </template>
+    </section>
+    <EtfObservationPanel />
+  </div>
 </template>
 
 <script setup lang="ts">
+  import EtfObservationPanel from './EtfObservationPanel.vue';
   import BroadEtfPanel from './BroadEtfPanel.vue';
   import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
   import {
@@ -646,6 +655,12 @@
 <style scoped>
   :global(.a-share-page-content) {
     overflow: clip;
+  }
+
+  .etf-tracking-workspace {
+    display: grid;
+    min-width: 0;
+    gap: 24px;
   }
 
   .etf-panel {

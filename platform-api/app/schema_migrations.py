@@ -1229,6 +1229,18 @@ def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+PLATFORM_MIGRATIONS += (
+    Migration(
+        version=46,
+        name="research-history-instrument-lookup",
+        statements=(
+            "CREATE INDEX IF NOT EXISTS idx_research_history_instrument "
+            "ON research_a_share_history(dataset, entity_code, observed_at)",
+        ),
+    ),
+)
+
+
 def validate_migrations(migrations: tuple[Migration, ...]) -> None:
     versions = [migration.version for migration in migrations]
     names = [migration.name for migration in migrations]

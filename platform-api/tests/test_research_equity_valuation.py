@@ -149,6 +149,36 @@ def test_cn_uses_same_index_price_and_keeps_valuation_sources_separate():
     assert chart["metrics"][1]["history"] == [{"date": "2026-10-22", "value": "1.5"}]
 
 
+def test_choice_test_bootstrap_is_small_and_existing_history_incremental():
+    from datetime import date
+
+    from app.research_equity_valuation import choice_window_start
+
+    due = [("000300", "沪深300")]
+    end = date(2026, 11, 2)
+    assert choice_window_start({"choice_index_000300": {}}, due, end) == date(2026, 10, 4)
+    old = {"choice_index_000300": {"schemaVersion": 2, "observationDate": "2026-10-30"}}
+    assert choice_window_start(old, due, end) == date(2026, 10, 31)
+    old["choice_index_000300"]["observationDate"] = "2020-01-01"
+    assert choice_window_start(old, due, end) == date(2026, 10, 4)
+
+
+def test_choice_quota_failure_cannot_retry_every_background_tick():
+    from datetime import UTC, datetime, timedelta
+
+    from app.research_equity_valuation import choice_source_due
+
+    now = datetime(2026, 11, 2, tzinfo=UTC)
+    doc = {
+        "status": "error",
+        "attemptedAt": (now - timedelta(hours=2)).isoformat(),
+        "error": "RuntimeError: Choice csd:10001029",
+    }
+    assert not choice_source_due(doc, now)
+    doc["attemptedAt"] = (now - timedelta(hours=21)).isoformat()
+    assert choice_source_due(doc, now)
+
+
 def test_choice_refresh_accumulates_history_and_failure_keeps_lkg(monkeypatch):
     import copy
     import json
@@ -175,6 +205,9 @@ def test_choice_refresh_accumulates_history_and_failure_keeps_lkg(monkeypatch):
 
     def run(*args, **kwargs):
         assert "force" not in args[0][2].lower()
+        from datetime import date
+
+        assert (date.fromisoformat(args[0][4]) - date.fromisoformat(args[0][3])).days < 30
         return SimpleNamespace(stdout=json.dumps({"ok": True, "records": records}))
 
     monkeypatch.setattr(valuation.subprocess, "run", run)

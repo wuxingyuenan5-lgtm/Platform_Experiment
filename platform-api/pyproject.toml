@@ -8,6 +8,7 @@ version = "0.11.4"
 description = "Platform API modular monolith"
 requires-python = ">=3.12"
 dependencies = [
+  "beautifulsoup4>=4.12,<5",
   "pyarrow>=20,<24",
   "akshare>=1.18.64,<2.0",
   "argon2-cffi>=25.1,<26.0",

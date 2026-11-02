@@ -48,6 +48,8 @@ const TreasuryComparisonPanel = lazyPanel(
   () => import('../components/TreasuryComparisonPanel.vue'),
 );
 const MacroSeriesChart = lazyPanel(() => import('./MacroSeriesChart'));
+const MacroEconomicPulse = lazyPanel(() => import('../macro/MacroEconomicPulse.vue'));
+const LiquidityLensPanel = lazyPanel(() => import('../macro/LiquidityLensPanel.vue'));
 const BitcoinHalvingPanel = lazyPanel(() => import('../components/BitcoinHalvingPanel.vue'));
 const GoldOpenInterestPanel = lazyPanel(() => import('../components/GoldOpenInterestPanel.vue'));
 const UrpdPanel = lazyPanel(() => import('../components/UrpdPanel.vue'));
@@ -269,6 +271,31 @@ export default defineComponent({
   setup(props) {
     return () => {
       try {
+        const articleGroups: Partial<Record<LocalWidgetKey, string>> = {
+          'macro-us-claims': 'usClaims',
+          'macro-us-job-openings': 'usJobOpenings',
+          'macro-us-orders': 'usOrders',
+          'macro-us-orders-momentum': 'usOrdersMomentum',
+          'macro-us-housing-sales': 'usHousingSales',
+          'macro-us-housing-construction': 'usHousingConstruction',
+          'macro-us-housing-financing': 'usHousingFinancing',
+          'macro-us-confidence': 'usConsumerConfidence',
+          'macro-nfci-details': 'financialConditionDetails',
+          'macro-europe-growth': 'europeGrowth',
+          'macro-europe-inflation': 'europeInflation',
+          'macro-europe-confidence': 'europeConfidence',
+          'macro-japan-growth': 'japanGrowth',
+          'macro-japan-industrial': 'japanIndustrial',
+          'macro-germany-industrial': 'germanyIndustrial',
+          'macro-japan-inflation': 'japanInflation',
+          'macro-tokyo-inflation': 'tokyoInflation',
+          'macro-global-manufacturing-pmi': 'manufacturingPmiComparison',
+          'macro-global-services-pmi': 'servicesPmiComparison',
+        };
+        if (props.widget.localKey === 'macro-economic-pulse') return h(MacroEconomicPulse);
+        if (props.widget.localKey === 'macro-liquidity-lens') return h(LiquidityLensPanel);
+        const articleGroup = articleGroups[props.widget.localKey!];
+        if (articleGroup) return h(MacroSeriesChart, { groupId: articleGroup });
         const key = props.widget.localKey as LocalWidgetKey;
         switch (key) {
           case 'macro-fed-balance-structure':

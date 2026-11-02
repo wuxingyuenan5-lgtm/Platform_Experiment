@@ -7,6 +7,27 @@
   | 'external-link';
 
 export type LocalWidgetKey =
+  | 'macro-liquidity-lens'
+  | 'macro-economic-pulse'
+  | 'macro-us-claims'
+  | 'macro-us-job-openings'
+  | 'macro-us-orders'
+  | 'macro-us-orders-momentum'
+  | 'macro-us-housing-sales'
+  | 'macro-us-housing-construction'
+  | 'macro-us-housing-financing'
+  | 'macro-us-confidence'
+  | 'macro-nfci-details'
+  | 'macro-europe-growth'
+  | 'macro-europe-inflation'
+  | 'macro-europe-confidence'
+  | 'macro-japan-growth'
+  | 'macro-japan-industrial'
+  | 'macro-germany-industrial'
+  | 'macro-japan-inflation'
+  | 'macro-tokyo-inflation'
+  | 'macro-global-manufacturing-pmi'
+  | 'macro-global-services-pmi'
   | 'macro-nyfed-repo'
   | 'macro-discount-window'
   | 'macro-funding-spreads'
@@ -162,7 +183,7 @@ export type LocalWidgetKey =
   | 'eia-products-stocks';
 
 export interface WidgetConfig {
-  region?: '美国' | '中国';
+  region?: '美国' | '中国' | '欧元区' | '日本' | '全球';
   kind: WidgetKind;
   title: string;
   subtitle: string;
@@ -482,6 +503,41 @@ export const researchModules: ResearchModule[] = [
           ),
           localChart('美国失业率', 'BLS · 月度 · 季调 · %', 'macro-us-unemployment'),
           localChart('初请失业金四周均值', 'Initial Claims 4W MA', 'macro-growth-labor'),
+          localChart('初请与续请失业金', '美国劳工部 · 周度 · 季调', 'macro-us-claims', {
+            sourceUrl: 'https://www.dol.gov/ui/data.pdf',
+          }),
+          localChart('JOLTS 职位空缺', 'BLS · 月度 · 季调', 'macro-us-job-openings', {
+            sourceUrl: 'https://www.bls.gov/jlt/',
+          }),
+          localChart(
+            '耐用品与核心资本品订单',
+            '美国人口普查局 · 季调 · 百万美元',
+            'macro-us-orders',
+            { sourceUrl: 'https://www.census.gov/manufacturing/m3/' },
+          ),
+          localChart(
+            '订单与资本开支动能 · 环比',
+            '核心资本品为非国防资本品剔除飞机',
+            'macro-us-orders-momentum',
+          ),
+          localChart(
+            '住房销售 · 同比',
+            '新屋 / 成屋 · 季调年率的同比变化',
+            'macro-us-housing-sales',
+          ),
+          localChart(
+            '新屋开工与营建许可 · 同比',
+            '美国人口普查局 · 季调年率的同比变化',
+            'macro-us-housing-construction',
+          ),
+          localChart(
+            '住房融资成本与库存',
+            '30年固定抵押贷款利率 / 新屋可售月数',
+            'macro-us-housing-financing',
+          ),
+          localChart('密歇根大学消费者信心', 'FRED 按来源要求延迟一个月', 'macro-us-confidence', {
+            sourceUrl: 'https://fred.stlouisfed.org/series/UMCSENT',
+          }),
           localChart(
             '美国企业盈利预期 · SPF',
             '企业税后利润预测中位数：当季 / 4季度后 · 季调年率',
@@ -700,6 +756,12 @@ export const researchModules: ResearchModule[] = [
             sourceUrl: 'https://www.cboe.com/tradable-products/vix/vix-historical-data',
           }),
           localChart('美国金融状况指数', 'Chicago Fed NFCI', 'macro-nfci', { height: 360 }),
+          localChart(
+            '金融条件 · 风险、信贷与杠杆',
+            '标准化子指数，不是可相加的贡献值；正值表示较历史均值偏紧',
+            'macro-nfci-details',
+            { sourceUrl: 'https://www.chicagofed.org/research/data/nfci/current-data' },
+          ),
         ],
       },
     ],
@@ -1303,3 +1365,92 @@ for (const section of researchModules.find((module) => module.id === 'macro')!.s
     })),
   );
 }
+
+const macroSections = researchModules.find((module) => module.id === 'macro')!.sections;
+macroSections
+  .find((section) => section.id === 'macro-liquidity')!
+  .widgets.unshift(localChart('美元流动性透镜', '', 'macro-liquidity-lens', { height: 860 }));
+const macroEconomy = macroSections.find((section) => section.id === 'macro-growth')!;
+macroEconomy.widgets.unshift(
+  localChart('重点经济数据一览', '', 'macro-economic-pulse', { height: 660 }),
+);
+macroEconomy.widgets.push(
+  {
+    ...localChart('欧元区增长与就业', 'GDP环比非年化；失业率使用EA21口径', 'macro-europe-growth', {
+      sourceUrl: 'https://ec.europa.eu/eurostat/',
+    }),
+    region: '欧元区',
+  },
+  {
+    ...localChart('ZEW 经济预期', '调查扩散指数', 'macro-europe-confidence', {
+      sourceUrl:
+        'https://www.zew.de/en/publications/zew-expertises-research-reports/research-reports/business-cycle/zew-financial-market-survey',
+    }),
+    region: '欧元区',
+  },
+  {
+    ...localChart('德国工业生产 · 同比', 'Eurostat · 工作日调整', 'macro-germany-industrial', {
+      sourceUrl: 'https://ec.europa.eu/eurostat/',
+    }),
+    region: '欧元区',
+  },
+  {
+    ...localChart('日本增长与就业', '实际GDP环比非年化 / 季调失业率', 'macro-japan-growth', {
+      sourceUrl: 'https://www.esri.cao.go.jp/en/sna/menu.html',
+    }),
+    region: '日本',
+  },
+  {
+    ...localChart('日本工业生产', '季调指数 · 2020=100', 'macro-japan-industrial', {
+      sourceUrl: 'https://www.meti.go.jp/english/statistics/tyo/iip/',
+    }),
+    region: '日本',
+  },
+  {
+    ...localChart(
+      '主要经济体制造业 PMI',
+      '美国ISM / 中国官方 / 印度 · 50为荣枯线',
+      'macro-global-manufacturing-pmi',
+    ),
+    region: '全球',
+  },
+  {
+    ...localChart(
+      '服务业 PMI 对照',
+      '美国ISM / 印度 · 50为荣枯线；中国非制造业另含建筑业，独立展示',
+      'macro-global-services-pmi',
+    ),
+    region: '全球',
+  },
+);
+macroSections
+  .find((section) => section.id === 'macro-inflation')!
+  .widgets.push(
+    {
+      ...localChart(
+        '欧元区 HICP 与核心通胀',
+        '核心剔除能源、食品、烟酒',
+        'macro-europe-inflation',
+        { sourceUrl: 'https://ec.europa.eu/eurostat/web/hicp' },
+      ),
+      region: '欧元区',
+    },
+    {
+      ...localChart(
+        '日本 CPI 与核心通胀',
+        '日本核心口径剔除生鲜食品，仍含能源',
+        'macro-japan-inflation',
+        { sourceUrl: 'https://www.stat.go.jp/english/data/cpi/' },
+      ),
+      region: '日本',
+    },
+    {
+      ...localChart(
+        '东京 CPI 与核心通胀',
+        '东京地区先行观测，非日本全国值',
+        'macro-tokyo-inflation',
+        { sourceUrl: 'https://www.stat.go.jp/english/data/cpi/' },
+      ),
+      region: '日本',
+    },
+  );
