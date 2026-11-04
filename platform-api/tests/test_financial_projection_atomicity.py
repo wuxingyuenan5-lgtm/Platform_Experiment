@@ -4,7 +4,8 @@ from threading import Event, current_thread
 import pytest
 
 from app import financial_fact_repository as repository
-from app import financial_facts, financial_projection_service as service
+from app import financial_facts
+from app import financial_projection_service as service
 from app.database import connection, initialize_database
 from app.financial_fact_schemas import CreateFinancialFactRequest
 

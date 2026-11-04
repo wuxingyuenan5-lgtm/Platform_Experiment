@@ -91,7 +91,9 @@ def batch_payload(direction: str) -> dict[str, object]:
     }
 
 
-@pytest.mark.parametrize("changed", [{"quantity": "2"}, {"symbol": "ETHUSDT"}, {"symbol": "btcusdt"}])
+@pytest.mark.parametrize("changed", [
+    {"quantity": "2"}, {"symbol": "ETHUSDT"}, {"symbol": "btcusdt"},
+])
 def test_trade_command_key_cannot_be_reused_for_different_payload(
     monkeypatch, changed,
     tmp_path: Path,
@@ -177,7 +179,9 @@ def test_execution_batch_key_cannot_be_reused_for_different_payload(
 pytestmark = pytest.mark.usefixtures("generic_trading_instance")
 
 
-@pytest.mark.parametrize("changed", [{"quantity": "2"}, {"side": "sell"}, {"price": "101"}, {"symbol": "ETHUSDT"}])
+@pytest.mark.parametrize("changed", [
+    {"quantity": "2"}, {"side": "sell"}, {"price": "101"}, {"symbol": "ETHUSDT"},
+])
 def test_unknown_command_rejects_changed_retry_after_restart_without_new_effects(
     monkeypatch, changed
 ):

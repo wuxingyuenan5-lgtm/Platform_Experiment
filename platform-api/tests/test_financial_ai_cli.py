@@ -12,8 +12,9 @@ from app.auth import Principal, require_principal
 from app.main import app
 
 
-@pytest.mark.parametrize("role", ["guest", "viewer", "member", "employee"])
-def test_readers_cannot_invoke_machine_cli_but_can_use_api(monkeypatch, role):
+@pytest.mark.parametrize("role, api_allowed", [("guest", False), ("viewer", True),
+                                              ("member", False), ("employee", True)])
+def test_readers_cannot_invoke_machine_cli_but_can_use_api(monkeypatch, role, api_allowed):
     calls = []
 
     async def stream(request):
@@ -31,8 +32,10 @@ def test_readers_cannot_invoke_machine_cli_but_can_use_api(monkeypatch, role):
                            json=payload["connection"]).status_code == 403
         assert not calls
         payload["connection"] = {"mode": "api"}
-        assert client.post("/api/v1/financial-ai/chat", json=payload).status_code == 200
-        assert calls == ["api"]
+        assert client.post("/api/v1/financial-ai/chat", json=payload).status_code == (
+            200 if api_allowed else 403
+        )
+        assert calls == (["api"] if api_allowed else [])
     finally:
         app.dependency_overrides.pop(require_principal, None)
 
@@ -134,6 +137,8 @@ def test_real_process_is_reaped_when_stream_stops(monkeypatch, stop):
                 await pending
         else:
             error = json.loads(await anext(stream))
+            while error["type"] == "delta":
+                error = json.loads(await anext(stream))
             assert error["type"] == "error"
             assert processes[0][0].returncode is not None
             await stream.aclose()
@@ -144,7 +149,8 @@ def test_real_process_is_reaped_when_stream_stops(monkeypatch, stop):
 
 
 def test_nonzero_exit_does_not_expose_stderr_credentials(monkeypatch):
-    fake_cli(monkeypatch, "import sys; sys.stdin.read(); sys.stderr.write('secret-key'); sys.exit(2)")
+    fake_cli(monkeypatch,
+             "import sys; sys.stdin.read(); sys.stderr.write('secret-key'); sys.exit(2)")
 
     async def run():
         return [event async for event in cli.cli_stream("codex", "facts")]
