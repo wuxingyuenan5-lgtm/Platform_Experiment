@@ -11,13 +11,24 @@
         "Dashboard"
       ],
       "view_owner": "platform-web/src/views/dashboard/index.vue",
-      "frontend_services": [],
-      "api_endpoints": [],
-      "application_services": [],
-      "repository_or_provider": [
-        "platform-web/src/views/dashboard/index.vue"
+      "frontend_services": [
+        "platform-web/src/api/workspace.ts"
       ],
-      "real_data_source": "not-configured: dashboard aggregate owners",
+      "api_endpoints": [
+        "GET /api/v1/me/workspace/cards",
+        "PUT /api/v1/me/workspace/cards",
+        "GET /api/v1/research/chart-catalog",
+        "GET /api/v1/research/chart-series/{series_id}"
+      ],
+      "application_services": [
+        "platform-api/app/personal_workspace.py",
+        "platform-api/app/research_chart_catalog.py"
+      ],
+      "repository_or_provider": [
+        "platform-api/app/database_connection.py",
+        "platform-api/app/research_local_data.py"
+      ],
+      "real_data_source": "account-owned user_workspace_documents; existing shared canonical research series; embedded modules retain their original data owners",
       "permissions": [
         "dashboard.read"
       ],
@@ -27,7 +38,7 @@
         "employee",
         "member"
       ],
-      "refresh": "none",
+      "refresh": "account save with optimistic rowVersion; source-backed reads on demand",
       "as_of": "required-when-ready",
       "timezone": "Asia/Shanghai",
       "currency": "mixed",
@@ -482,11 +493,13 @@
       ],
       "api_endpoints": [
         "/api/v1/research/macro/expectations",
-        "/api/v1/research/macro/liquidity-lens"
+        "/api/v1/research/macro/liquidity-lens",
+        "/api/v1/research/reference-boards/liquidity"
       ],
       "application_services": [
         "platform-api/app/research_service.py",
-        "platform-api/app/research_liquidity_lens.py"
+        "platform-api/app/research_liquidity_lens.py",
+        "platform-api/app/research_reference_boards.py"
       ],
       "repository_or_provider": [
         "platform-api/app/research_providers.py",
@@ -545,11 +558,13 @@
       "api_endpoints": [
         "/api/v1/research/equity/ai",
         "/api/v1/research/equity/ai/{ticker}",
-        "/api/v1/research/equity/history-risk"
+        "/api/v1/research/equity/history-risk",
+        "/api/v1/research/reference-boards/stocks"
       ],
       "application_services": [
         "platform-api/app/research_ai.py",
-        "platform-api/app/research_history_risk.py"
+        "platform-api/app/research_history_risk.py",
+        "platform-api/app/research_reference_boards.py"
       ],
       "repository_or_provider": [
         "external:tradingview-widgets",

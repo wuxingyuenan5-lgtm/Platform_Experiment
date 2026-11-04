@@ -1,5 +1,15 @@
 <template>
-  <section class="observation-panel" aria-label="20只重点ETF资金观测">
+  <section
+    class="observation-panel"
+    :aria-label="
+      {
+        daily: '全市场宽基与重点ETF资金全景',
+        intraday: '盘中ETF监测',
+        heatmap: '宽基月度资金表',
+        support: '历史大额申购信号对照',
+      }[mode]
+    "
+  >
     <p v-if="loading" role="status">正在读取 ETF 资金观测…</p>
     <p v-if="error" class="observation-notice" role="status"
       >{{ error }}<button @click="load">重试</button></p
@@ -11,17 +21,56 @@
 
 <script setup lang="ts">
   import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
-  import { researchRequest } from '@/api/hedgeResearch';
+  import { getEtfObservation, type ObservationSnapshot } from '@/api/etfObservation';
   import layout from './etfObservation/layout.html?raw';
   import { mountEtfObservation } from './etfObservation/renderer';
   import './etfObservation/reference.css';
 
-  interface ObservationSnapshot {
-    reference: Record<string, any>;
-    live: { klines?: Record<string, any[]>; hq?: { data?: { diff?: any[] } } };
-    sources: Record<string, { status: string; retrievedAt: string; observationDate?: string }>;
-  }
+  const props = withDefaults(
+    defineProps<{ mode?: 'daily' | 'intraday' | 'heatmap' | 'support' }>(),
+    { mode: 'intraday' },
+  );
   const host = ref<HTMLElement>();
+  function prepareLayout(element: HTMLElement) {
+    element.innerHTML = layout;
+    element.querySelector('.top')?.remove();
+    const keep = ['daily', 'heatmap'].includes(props.mode)
+      ? ['etf-observation-part3']
+      : props.mode === 'support'
+      ? ['etf-observation-part2']
+      : ['etf-observation-part1'];
+    element.querySelectorAll<HTMLElement>('.part').forEach((part) => {
+      if (!keep.includes(part.id)) part.remove();
+    });
+    function fold(label: string, nodes: Element[]) {
+      if (!nodes.length) return;
+      const box = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = label;
+      box.append(summary);
+      nodes[0].before(box);
+      nodes.forEach((node) => box.append(node));
+    }
+    const chart = (id: string) => element.querySelector('#' + id)?.closest('.chart-wrap');
+    if (props.mode === 'intraday') {
+      element.querySelector('#etf-observation-part1 > .pt')?.remove();
+      fold(
+        '历史放量案例与常态日对照',
+        [chart('chartTypCase'), chart('chartTypNorm')].filter(Boolean) as Element[],
+      );
+    } else if (props.mode === 'daily') {
+      element.querySelector('#etf-observation-part3 > .pt')!.textContent =
+        '全市场宽基与重点ETF资金全景 · 日度资金';
+      element.querySelector('#broadTable')?.closest('.table-wrap')?.remove();
+    } else if (props.mode === 'heatmap') {
+      element
+        .querySelectorAll('.chart-wrap, .part > .pt, .part > .sub, footer')
+        .forEach((node) => node.remove());
+    } else {
+      element.querySelector('#etf-observation-part2 > .pt')!.textContent = '历史大额申购信号对照';
+    }
+    element.querySelectorAll('footer').forEach((footer) => fold('统计口径', [footer]));
+  }
   const loading = ref(true),
     error = ref('');
   const snapshot = shallowRef<ObservationSnapshot>();
@@ -29,24 +78,20 @@
     active = true;
   let lastRead = 0;
   let pending: Promise<ObservationSnapshot> | undefined;
-  const controller = new AbortController();
   const provenance = computed(() => {
     const data = snapshot.value;
     if (!data) return '';
     const dates = data.reference.dailyData?.dates || [];
     const source = data.sources.live;
-    return `日度资金截至 ${dates.at(-1) || '暂无数据'} · 分时截至 ${
-      source?.observationDate || data.reference.initData?.date || '暂无数据'
-    }${source?.status !== 'ready' ? ' · 分时来源更新失败，保留原日期数据' : ''}`;
+    if (props.mode !== 'intraday') return `日度资金截至 ${dates.at(-1) || '暂无数据'}`;
+    return `分时截至 ${source?.observationDate || data.reference.initData?.date || '暂无数据'}${
+      source?.status !== 'ready' ? ' · 分时来源更新失败，保留原日期数据' : ''
+    }`;
   });
   async function read(force = false): Promise<ObservationSnapshot> {
     if (!force && snapshot.value && Date.now() - lastRead < 1000) return snapshot.value;
     if (!pending) {
-      pending = researchRequest<ObservationSnapshot>({
-        method: 'GET',
-        url: '/research/a-share/etf-observation',
-        signal: controller.signal,
-      })
+      pending = getEtfObservation()
         .then((data) => {
           if (active) {
             snapshot.value = data;
@@ -89,8 +134,10 @@
       await nextTick();
       dispose?.();
       if (host.value) {
-        host.value.innerHTML = layout;
-        dispose = mountEtfObservation(host.value, structuredClone(data.reference), request);
+        prepareLayout(host.value);
+        dispose = mountEtfObservation(host.value, structuredClone(data.reference), request, {
+          live: props.mode === 'intraday',
+        });
       }
     } catch (cause) {
       if (active) error.value = cause instanceof Error ? cause.message : 'ETF资金观测暂不可用';
@@ -101,12 +148,24 @@
   onMounted(load);
   onBeforeUnmount(() => {
     active = false;
-    controller.abort();
     dispose?.();
   });
 </script>
 
 <style scoped>
+  .observation-panel :deep(details) {
+    margin: 14px 0;
+    padding: 12px;
+    border: 1px solid #dbe4ee;
+    border-radius: 8px;
+  }
+
+  .observation-panel :deep(summary) {
+    color: #3d5067;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
   .observation-panel {
     min-width: 0;
   }

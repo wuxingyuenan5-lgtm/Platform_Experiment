@@ -50,13 +50,13 @@
               >正在读取{{ pageTitle }}…</p
             >
             <template v-if="activePage === 'overview'">
-              <AShareLegacyTerminalSection :dashboard="dashboard" />
               <AShareMarketOverviewSection
                 :dashboard="dashboard"
                 :refresh-key="refreshKey"
                 @query="selectedCode = $event"
                 @ready="restoreScroll"
-              />
+                ><AShareLegacyTerminalSection :dashboard="dashboard"
+              /></AShareMarketOverviewSection>
             </template>
             <template v-else-if="activePage === 'crowding'">
               <EquityObservatoryPanel
@@ -88,11 +88,6 @@
               :refresh-key="refreshKey"
               @ready="restoreScroll"
             />
-            <MarketMonitorPanel
-              v-else-if="activePage === 'monitor'"
-              :refresh-key="refreshKey"
-              @ready="restoreScroll"
-            />
             <MutualFundPanel
               v-else-if="activePage === 'funds'"
               :refresh-key="refreshKey"
@@ -104,6 +99,12 @@
               :view="activePage"
               :refresh-key="refreshKey"
               @ready="restoreScroll"
+            />
+            <MarketMonitorPanel
+              v-for="section in studySections[activePage] || []"
+              :key="section"
+              :section="section"
+              :refresh-key="refreshKey"
             />
           </div>
         </main>
@@ -154,14 +155,22 @@
     { key: 'overview', label: '市场总览', short: '总览' },
     { key: 'themes', label: '主题与行业', short: '主题' },
     { key: 'valuation', label: '估值', short: '估值' },
-    { key: 'monitor', label: '市场监测', short: '监测' },
     { key: 'crowding', label: '拥挤度', short: '拥挤' },
     { key: 'etf', label: 'ETF跟踪', short: 'ETF' },
-    { key: 'funds', label: '公募持仓', short: '公募' },
     { key: 'financing', label: '两融与衍生品', short: '两融' },
     { key: 'stocks', label: '股票池', short: '股票' },
     { key: 'hk', label: '港股观察', short: '港股' },
+    { key: 'funds', label: '公募持仓', short: '公募' },
   ];
+  const studySections: Record<
+    string,
+    Array<'dividend' | 'fund' | 'growth' | 'crowding' | 'risk' | 'breadth' | 'macroValue'>
+  > = {
+    overview: ['breadth'],
+    valuation: ['dividend', 'growth', 'macroValue'],
+    funds: ['fund'],
+    crowding: ['crowding', 'risk'],
+  };
   const activePage = computed(
     () => pages.find((p) => p.key === route.query.view)?.key || 'overview',
   );

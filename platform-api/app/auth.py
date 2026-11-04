@@ -298,6 +298,8 @@ def enforce_assurance(
 
 
 def permission_for_request(method: str, path: str) -> str:
+    if path.startswith("/api/v1/me/workspace/"):
+        return "profile.read_self" if method.upper() in {"GET", "HEAD"} else "profile.update_self"
     normalized_method = method.upper()
     if normalized_method == "POST" and path == "/api/v1/research/strategies/scenario":
         return "research.read"

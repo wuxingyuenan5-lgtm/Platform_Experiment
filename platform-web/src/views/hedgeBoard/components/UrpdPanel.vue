@@ -31,7 +31,7 @@
   const number = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 8 });
   useDashboardRefresh(async () => {
     try {
-      series.value = (await getCryptoDashboardV1()).groups.urpd ?? [];
+      series.value = (await getCryptoDashboardV1(['urpd'])).groups.urpd ?? [];
       if (
         !series.value.length ||
         rows.value.some(

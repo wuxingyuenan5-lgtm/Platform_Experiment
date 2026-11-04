@@ -25,6 +25,10 @@ const lazyPanel = (loader: AsyncComponentLoader) =>
     delay: 0,
   });
 
+const RollingCorrelationPanel = lazyPanel(
+  () => import('../components/RollingCorrelationPanel.vue'),
+);
+
 const CryptoMarketDetailPanel = lazyPanel(
   () => import('../components/CryptoMarketDetailPanel.vue'),
 );
@@ -49,7 +53,7 @@ const TreasuryComparisonPanel = lazyPanel(
 );
 const MacroSeriesChart = lazyPanel(() => import('./MacroSeriesChart'));
 const MacroEconomicPulse = lazyPanel(() => import('../macro/MacroEconomicPulse.vue'));
-const LiquidityLensPanel = lazyPanel(() => import('../macro/LiquidityLensPanel.vue'));
+const NetLiquidityPanel = lazyPanel(() => import('../macro/NetLiquidityPanel.vue'));
 const BitcoinHalvingPanel = lazyPanel(() => import('../components/BitcoinHalvingPanel.vue'));
 const GoldOpenInterestPanel = lazyPanel(() => import('../components/GoldOpenInterestPanel.vue'));
 const UrpdPanel = lazyPanel(() => import('../components/UrpdPanel.vue'));
@@ -293,7 +297,6 @@ export default defineComponent({
           'macro-global-services-pmi': 'servicesPmiComparison',
         };
         if (props.widget.localKey === 'macro-economic-pulse') return h(MacroEconomicPulse);
-        if (props.widget.localKey === 'macro-liquidity-lens') return h(LiquidityLensPanel);
         const articleGroup = articleGroups[props.widget.localKey!];
         if (articleGroup) return h(MacroSeriesChart, { groupId: articleGroup });
         const key = props.widget.localKey as LocalWidgetKey;
@@ -429,7 +432,7 @@ export default defineComponent({
           case 'macro-treasury-issuance':
             return h(MacroSeriesChart, { groupId: 'treasuryIssuance', unitLabel: 'USD' });
           case 'macro-net-liquidity':
-            return h(MacroSeriesChart, { groupId: 'netLiquidity', unitLabel: 'USD million' });
+            return h(NetLiquidityPanel);
           case 'macro-nfci':
             return h(MacroSeriesChart, { groupId: 'financialConditions', unitLabel: 'index' });
           case 'macro-vix':
@@ -566,6 +569,10 @@ export default defineComponent({
             return h(SeasonalityPanel, { asset: 'btc' });
           case 'crypto-halving-cycles':
             return h(BitcoinHalvingPanel);
+          case 'crypto-correlation-ndx':
+            return h(RollingCorrelationPanel, { benchmark: 'ndx' });
+          case 'crypto-correlation-xau':
+            return h(RollingCorrelationPanel, { benchmark: 'xau' });
           case 'gold-borrow-fee':
             return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'gldBorrow' });
           case 'crypto-coinbase-premium':

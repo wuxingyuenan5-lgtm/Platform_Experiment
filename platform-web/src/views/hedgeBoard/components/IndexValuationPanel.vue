@@ -92,7 +92,7 @@
     <a v-if="metric?.sourceUrl" :href="metric.sourceUrl" target="_blank" rel="noopener noreferrer"
       >{{ metric.source }} ↗</a
     >
-    <details class="index-comparison"
+    <details class="index-comparison" :open="initialComparisonOpen"
       ><summary>指数估值比较</summary
       ><div class="comparison-toolbar"
         ><input v-model="query" aria-label="搜索估值指数" placeholder="名称 / 代码" /><label
@@ -157,7 +157,7 @@
     type ValuationCadence,
   } from './indexValuationStats';
 
-  const props = defineProps<{ charts: IndexValuationChart[] }>();
+  const props = defineProps<{ charts: IndexValuationChart[]; initialComparisonOpen?: boolean }>();
   const distribution = shallowRef<MarketMonitor>();
   const distributionError = ref('');
   const cadence = ref<ValuationCadence>('observation');

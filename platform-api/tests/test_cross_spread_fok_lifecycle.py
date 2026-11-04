@@ -15,8 +15,18 @@ from app.cross_spread_exit_schemas import (
 from app.cross_spread_limit_policy import CrossSpreadFokPrice
 from app.execution_schemas import ExecutionBatchResponse
 from app.schemas import CrossSpreadSnapshotResponse
+from app.database import connection, initialize_database
 
 NOW = datetime(2026, 7, 26, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def executable_venue_inputs(monkeypatch, cross_native_specs):
+    initialize_database()
+    monkeypatch.setattr("app.cross_spread.get_cross_spread_snapshot", available_snapshot)
+    # Position reconciliation has separate native-ticket coverage. These unit
+    # cases exercise plan claims and FOK outcomes after a verified long position.
+    monkeypatch.setattr(synthetic_service, "assert_close_positions", lambda plan: Decimal("1"))
 
 
 def batch_response(batch_id: str, *, status: str) -> ExecutionBatchResponse:
@@ -76,6 +86,7 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
     return CrossSpreadSnapshotResponse.model_validate(
         {
             "status": "available",
+            "executionState": "executable",
             "bybit": {
                 "venue": "bybit",
                 "symbol": "XAUTUSDT",
@@ -87,6 +98,8 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
                     "currency": "USDT",
                 },
                 "positions": [],
+                "openAllowed": True,
+                "closeAllowed": True,
             },
             "mt5": {
                 "venue": "mt5",
@@ -99,6 +112,8 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
                     "currency": "USD",
                 },
                 "positions": [],
+                "openAllowed": True,
+                "closeAllowed": True,
             },
             "longSpread": "-0.8",
             "shortSpread": "-1.0",
@@ -108,7 +123,7 @@ def available_snapshot() -> CrossSpreadSnapshotResponse:
     )
 
 
-def test_non_executable_limit_rejects_before_any_batch_submission(monkeypatch) -> None:
+def test_non_executable_limit_persists_trigger_without_any_batch_submission(monkeypatch) -> None:
     monkeypatch.setattr(
         synthetic_service.market_helpers,
         "_assert_open_execution_resolved",
@@ -133,8 +148,7 @@ def test_non_executable_limit_rejects_before_any_batch_submission(monkeypatch) -
     )
     get_settings().cross_spread_limit_hedge_reserve_price = Decimal("0")
 
-    with pytest.raises(HTTPException) as exc_info:
-        synthetic_service.open_cross_spread_market(
+    result = synthetic_service.open_cross_spread_market(
             CrossSpreadMarketOpenRequest(
                 direction="LONG_SPREAD",
                 quantityOz="1",
@@ -145,8 +159,14 @@ def test_non_executable_limit_rejects_before_any_batch_submission(monkeypatch) -
             )
         )
 
-    assert exc_info.value.status_code == 409
-    assert "no order was submitted" in str(exc_info.value.detail)
+    assert result.execution_batch is None
+    assert result.exit_plan is None
+    assert result.pending_trigger.status == "pending"
+    assert result.pending_trigger.limit_spread == Decimal("-1.0")
+    with connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM cross_spread_open_triggers").fetchone()[0] == 1
+        for table in ("strategy_instructions", "execution_batches", "trade_commands", "orders"):
+            assert db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
 
 
 def test_clean_fok_close_no_fill_releases_plan_back_to_active(monkeypatch) -> None:

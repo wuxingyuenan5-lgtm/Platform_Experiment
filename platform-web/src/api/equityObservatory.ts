@@ -330,9 +330,10 @@ export interface EquityObservatory {
   }>;
 }
 
-export const getEquityObservatory = (market: 'cn' | 'us', signal?: AbortSignal) =>
+export const getEquityObservatory = (market: 'cn' | 'us', signal?: AbortSignal, view?: string) =>
   researchRequest<EquityObservatory>({
     method: 'GET',
     url: `/research/equity-observatory/${market}`,
+    params: view ? { view } : undefined,
     signal,
   });

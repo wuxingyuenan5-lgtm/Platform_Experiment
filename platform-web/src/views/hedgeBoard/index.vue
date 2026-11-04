@@ -12,12 +12,14 @@
       </section>
 
       <ResearchWorkspace :pages="pages" :active="activeView" :label="boardLabel">
+        <LiquidityDashboard v-if="activeCategory === 'macro' && activeView === 'macro-liquidity'" />
         <template
           v-if="
             activeCategory === 'us' && ['themes', 'valuation', 'structure'].includes(activeView)
           "
         >
           <EquityObservatoryPanel market="us" :view="activeView" />
+          <Sp500ResearchPanel v-if="activeView === 'structure'" />
           <HistoryRiskPanel v-if="activeView === 'structure'" />
         </template>
         <AiIndustryPanel v-else-if="activeCategory === 'us' && activeView === 'ai'" />
@@ -114,6 +116,10 @@
     () => import('./components/EquityObservatoryPanel.vue'),
   );
   const AiIndustryPanel = defineAsyncComponent(() => import('./ai/AiIndustryPanel.vue'));
+  const LiquidityDashboard = defineAsyncComponent(() => import('./macro/LiquidityDashboard.vue'));
+  const Sp500ResearchPanel = defineAsyncComponent(
+    () => import('./components/Sp500ResearchPanel.vue'),
+  );
   const HistoryRiskPanel = defineAsyncComponent(() => import('./components/HistoryRiskPanel.vue'));
   const route = useRoute();
   const boardLabel = computed(

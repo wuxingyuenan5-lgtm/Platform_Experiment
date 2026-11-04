@@ -73,7 +73,6 @@
               'widget-card--reference': widget.kind === 'external-link',
               'widget-card--expandable': widget.kind !== 'external-link',
               'widget-card--wide':
-                widget.localKey === 'macro-liquidity-lens' ||
                 widget.localKey === 'macro-economic-pulse' ||
                 widget.localKey === 'macro-global-m2' ||
                 widget.localKey === 'macro-fed-balance-structure' ||

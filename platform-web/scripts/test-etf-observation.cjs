@@ -6,17 +6,18 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const dir = path.resolve(__dirname, '../src/views/hedgeBoard/aShare/components/etfObservation');
 
-function mount() {
+function mount(options={}) {
   const nodes = new Map();
   function node(id) {
     if (nodes.has(id)) return nodes.get(id);
-    const value = {id, style:{}, events:{}, textContent:'', innerHTML:'', clientHeight:420,
+    const value = {id, style:{}, events:{}, textContent:'', innerHTML:'', clientHeight:420, clientWidth:800, parentElement:null,
       addEventListener(type, fn) { this.events[type] = fn; },
       removeEventListener(type) { delete this.events[type]; },
       appendChild(child) { (this.children ||= []).push(child); },
       getBoundingClientRect: () => ({left:0, top:0}),
       parentNode:{style:{},children:[],appendChild(child){this.children.push(child);}, getBoundingClientRect:()=>({left:0,top:0})},
     };
+    if ((options.hidden||[]).includes(id)) value.parentElement={tagName:'DETAILS',open:false,parentElement:null};
     nodes.set(id, value); return value;
   }
   const charts = new Map();
@@ -28,8 +29,9 @@ function mount() {
     clearInterval(id){timers.delete(id);},clearTimeout(id){timers.delete(id);},
     addEventListener(type,fn){const rows=listeners.get(type)||[];rows.push(fn);listeners.set(type,rows);},
     removeEventListener(type,fn){listeners.set(type,(listeners.get(type)||[]).filter(item=>item!==fn));}};
-  const root = {querySelector:selector=>node(selector.match(/id="([^"]+)"/)[1]),
-    querySelectorAll:()=>[...charts.keys()].map(node),addEventListener(){},removeEventListener(){}};
+  const rootEvents={};
+  const root = {querySelector:selector=>{ const id=selector.match(/id="([^"]+)"/)[1];return (options.absent||[]).includes(id)?null:node(id); },
+    querySelectorAll:()=>[...charts.keys()].map(node),addEventListener(type,fn){rootEvents[type]=fn;},removeEventListener(type){delete rootEvents[type];}};
   const exports={};
   const code=ts.transpileModule(fs.readFileSync(path.join(dir,'renderer.js'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   vm.runInNewContext(code,{exports,require:name=>name.includes('echarts/components')?{}:{default:engine},
@@ -41,8 +43,8 @@ function mount() {
     dailyData:{dates:['2026-10-29','2026-10-30'],amount:[2,3],netflow:[101,1],idx:[3000,3001]},
     typData:{slots:['09:45'],supAmt:[2],supIdx:[1],norAmt:[1],norIdx:[0]},
     broadData:{dates:['2026-10-29','2026-10-30'],cats:['沪深300'],colors:['#123456'],series:{'沪深300':[1,-1]},total:[1,-1],totalCum:[1,0]}};
-  const dispose=exports.mountEtfObservation(root,data,()=>new Promise(()=>{}));
-  return {charts,nodes,timers,listeners,dispose};
+  const dispose=exports.mountEtfObservation(root,data,()=>new Promise(()=>{}),options.rendererOptions);
+  return {charts,nodes,timers,listeners,dispose,rootEvents};
 }
 
 test('all nine reference charts mount and all timers/listeners/instances dispose', () => {
@@ -74,3 +76,24 @@ test('pause and resume are scoped to this ETF board', () => {
   state.dispose();
 });
 
+
+test('folded historical charts initialize only when opened and do not duplicate on reopening',()=>{
+ const state=mount({hidden:['chartTypCase','chartTypNorm']});assert.equal(state.charts.has('chartTypCase'),false);
+ state.nodes.get('chartTypCase').parentElement.open=true;
+ state.rootEvents.toggle();assert.equal(state.charts.size,9);const chart=state.charts.get('chartTypCase');state.rootEvents.toggle();assert.equal(state.charts.get('chartTypCase'),chart);
+ state.dispose();assert.equal(state.rootEvents.toggle,undefined);
+});
+test('daily-only view creates no intraday charts or polling timers',()=>{
+ const state=mount({absent:['chart','chartCum','chartAmt','chartNf','chartTypCase','chartTypNorm']});
+ assert.equal(state.charts.size,3);assert.equal(state.timers.size,0);state.dispose();
+});
+
+
+test('history-only support charts do not poll intraday data',()=>{
+ const state=mount({absent:['chart','chartCum','chartDAmt','chartDNf','chartBroad','broadTable','chartTypCase','chartTypNorm'],rendererOptions:{live:false}});
+ assert.equal(state.charts.size,2);assert.equal(state.timers.size,0);state.dispose();
+});
+test('table-only view renders broad flows without mounting any chart',()=>{
+ const state=mount({absent:['chart','chartCum','chartAmt','chartNf','chartDAmt','chartDNf','chartBroad','chartTypCase','chartTypNorm']});
+ assert.equal(state.charts.size,0);assert.equal(state.timers.size,0);assert.match(state.nodes.get('broadTable').innerHTML,/沪深300/);assert.match(state.nodes.get('broadTable').innerHTML,/-1.00/);state.dispose();
+});

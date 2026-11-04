@@ -136,7 +136,7 @@
   useDashboardRefresh(async () => {
     const results = await Promise.allSettled([
       goldRequest<GoldPositions>('gold-positioning'),
-      getCommodityDashboardV1(),
+      getCommodityDashboardV1(['goldDrivers']),
     ]);
     if (results[0].status === 'fulfilled') {
       data.value = results[0].value;

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
-from sqlite3 import Row
+from sqlite3 import Connection, Row
 from uuid import uuid4
 
 from app import financial_fact_repository as repository
@@ -44,12 +44,20 @@ def rebuild_account_instrument_projection(
     instrument_id: str,
 ) -> None:
     repository.ensure_schema()
+    with repository.projection_transaction() as db:
+        _rebuild_account_instrument_projection(strategy_instance_id, account_id, instrument_id, db)
+
+
+def _rebuild_account_instrument_projection(
+    strategy_instance_id: str, account_id: str, instrument_id: str, db: Connection,
+) -> None:
     if not account_id or not instrument_id:
         return
     facts = repository.list_projection_fact_rows(
         strategy_instance_id,
         account_id,
         instrument_id,
+        db=db,
     )
     if not facts:
         return
@@ -124,6 +132,7 @@ def rebuild_account_instrument_projection(
         fact_count=len(facts),
         data_quality_state=quality,
         updated_at=updated_at,
+        db=db,
     )
 
 
@@ -131,26 +140,29 @@ def rebuild_strategy_financials(
     strategy_instance_id: str,
 ) -> FinancialProjectionRebuildResponse:
     repository.ensure_schema()
-    fact_count, pairs = repository.prepare_strategy_rebuild(strategy_instance_id)
+    with repository.projection_transaction() as db:
+        fact_count, pairs = repository.prepare_strategy_rebuild(strategy_instance_id, db=db)
 
-    for pair in pairs:
-        rebuild_account_instrument_projection(
-            strategy_instance_id,
-            pair["account_id"],
-            pair["instrument_id"],
+        for pair in pairs:
+            _rebuild_account_instrument_projection(
+                strategy_instance_id,
+                pair["account_id"],
+                pair["instrument_id"],
+                db,
+            )
+
+        completed_at_text = now_iso()
+        completed_at = datetime.fromisoformat(completed_at_text)
+        repository.record_projection_rebuild_audit(
+            audit_event_id=str(uuid4()),
+            strategy_instance_id=strategy_instance_id,
+            details_json=json.dumps(
+                {"rebuiltPairCount": len(pairs), "factCount": fact_count},
+                sort_keys=True,
+            ),
+            created_at=completed_at_text,
+            db=db,
         )
-
-    completed_at_text = now_iso()
-    completed_at = datetime.fromisoformat(completed_at_text)
-    repository.record_projection_rebuild_audit(
-        audit_event_id=str(uuid4()),
-        strategy_instance_id=strategy_instance_id,
-        details_json=json.dumps(
-            {"rebuiltPairCount": len(pairs), "factCount": fact_count},
-            sort_keys=True,
-        ),
-        created_at=completed_at_text,
-    )
     return FinancialProjectionRebuildResponse(
         strategyInstanceId=strategy_instance_id,
         rebuiltPairCount=len(pairs),

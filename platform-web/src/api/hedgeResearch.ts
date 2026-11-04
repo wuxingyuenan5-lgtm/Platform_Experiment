@@ -440,13 +440,17 @@ export interface MacroDashboardResponse {
   optionExposure?: Record<string, OptionExposureSnapshot>;
 }
 
-const loadDashboard = (key: string, url: string) =>
-  loadDashboardSnapshot(key, getUserSystemCsrfToken(), () =>
-    researchRequest<MacroDashboardResponse>({
-      method: 'GET',
-      url,
-      headers: { 'Cache-Control': 'no-cache' },
-    }),
+const loadDashboard = (key: string, url: string, groups?: string[]) =>
+  loadDashboardSnapshot(
+    key + ':' + [...(groups || [])].sort().join(','),
+    getUserSystemCsrfToken(),
+    () =>
+      researchRequest<MacroDashboardResponse>({
+        method: 'GET',
+        url,
+        params: groups?.length ? { groups: [...new Set(groups)].sort().join(',') } : undefined,
+        headers: { 'Cache-Control': 'no-cache' },
+      }),
   );
 
 const SESSION_INVALIDATION_CODES = new Set([
@@ -616,12 +620,14 @@ export const getCrossAssetComparison = (days: number) =>
     params: { days },
   });
 
-export const getMacroDashboardV1 = () => loadDashboard('macro', '/research/macro/dashboard-v1');
+export const getMacroDashboardV1 = (groups?: string[]) =>
+  loadDashboard('macro', '/research/macro/dashboard-v1', groups);
 
-export const getCommodityDashboardV1 = () =>
-  loadDashboard('commodity', '/research/commodity/dashboard-v1');
+export const getCommodityDashboardV1 = (groups?: string[]) =>
+  loadDashboard('commodity', '/research/commodity/dashboard-v1', groups);
 
-export const getCryptoDashboardV1 = () => loadDashboard('crypto', '/research/crypto/dashboard-v1');
+export const getCryptoDashboardV1 = (groups?: string[]) =>
+  loadDashboard('crypto', '/research/crypto/dashboard-v1', groups);
 
 export interface FedWatchMeeting {
   date: string;

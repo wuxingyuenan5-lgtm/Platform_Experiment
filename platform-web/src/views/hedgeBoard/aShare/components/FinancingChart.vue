@@ -1,8 +1,8 @@
 <template>
-  <ChartExpand :title="title">
-    <article class="financing-chart">
+  <component :is="embedded ? 'div' : ChartExpand" :title="embedded ? undefined : title">
+    <article class="financing-chart" :class="{ 'is-embedded': embedded }">
       <header
-        ><h3>{{ title }}</h3
+        ><h3 v-if="!embedded">{{ title }}</h3
         ><div class="ranges"
           ><button
             v-for="p in [90, 365, 1095, 0]"
@@ -24,7 +24,7 @@
         :aria-label="`${title}，可拖动下方时间范围并悬浮查看数值`"
       ></div>
     </article>
-  </ChartExpand>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -51,6 +51,8 @@
     rows: FinanceRow[];
     lines: FinanceLine[];
     note?: string;
+    embedded?: boolean;
+    bounds?: [number, number];
   }>();
   const element = ref<HTMLDivElement | null>(null);
   const chart = useECharts(element as Ref<HTMLDivElement>, 'light');
@@ -124,6 +126,8 @@
           position: i ? 'right' : 'left',
           show: !i || !!right,
           scale: !props.lines.some((l) => !!l.right === !!i && l.bar),
+          min: !i ? props.bounds?.[0] : undefined,
+          max: !i ? props.bounds?.[1] : undefined,
           splitLine: { show: !i, lineStyle: { color: '#e8eef5' } },
           axisLabel: { color: '#71869e' },
         })),
@@ -159,6 +163,12 @@
 </script>
 
 <style scoped>
+  .financing-chart.is-embedded {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
   .financing-chart {
     margin: 14px 0;
     padding: 18px;

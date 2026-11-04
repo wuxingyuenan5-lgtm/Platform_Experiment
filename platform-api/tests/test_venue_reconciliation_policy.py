@@ -13,7 +13,9 @@ def test_external_order_status_mappings_preserve_update_and_comparison_contracts
     assert external_order_update_status("rejected") == "rejected"
     assert external_order_update_status("canceled") == "canceled"
     assert external_order_update_status("unknown") == "result_unknown"
-    assert external_order_update_status("filled") is None
+    assert external_order_update_status("filled") == "filled"
+    assert external_order_update_status("partially_filled") == "partially_filled"
+    assert external_order_update_status("unexpected") is None
     assert expected_order_status("filled") == "filled"
     assert expected_order_status("unexpected") == "result_unknown"
 

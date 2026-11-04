@@ -55,6 +55,18 @@ class MacroDashboardResponse(ResearchApiModel):
     option_distribution: dict[str, Any] = Field(default_factory=dict)
     option_exposure: dict[str, OptionExposureSnapshot] = Field(default_factory=dict)
 
+    def select_groups(self, groups: str | None) -> MacroDashboardResponse:
+        if groups is None:
+            return self
+        selected = set(groups.split(","))
+        # Share the immutable observations with the validated provider cache; do not
+        # copy or serialize unrelated histories for an individual chart request.
+        return self.model_copy(update={
+            "groups": {key: value for key, value in self.groups.items() if key in selected},
+            "option_distribution": self.option_distribution if "optionDistribution" in selected else {},
+            "option_exposure": self.option_exposure if "optionExposure" in selected else {},
+        })
+
     def apply_freshness(self, now: datetime | None = None) -> None:
         """Recheck observation age even when the producer leaves a valid old file.
 

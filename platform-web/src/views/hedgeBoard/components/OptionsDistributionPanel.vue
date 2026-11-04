@@ -152,7 +152,7 @@
   );
   onMounted(async () => {
     try {
-      const d = await getCryptoDashboardV1();
+      const d = await getCryptoDashboardV1(['optionDistribution']);
       rows.value = d.optionDistribution?.rows ?? [];
       asOf.value = d.optionDistribution?.asOf ?? '';
     } catch (e) {

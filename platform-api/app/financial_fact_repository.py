@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager, nullcontext
 from decimal import Decimal
-from sqlite3 import Row
+from sqlite3 import Connection, Row
 from typing import Literal
 
 from app.database import connection
@@ -288,12 +289,21 @@ def list_financial_facts(
     return [financial_fact_from_row(row) for row in rows]
 
 
+@contextmanager
+def projection_transaction() -> Iterator[Connection]:
+    """Serialize the fact snapshot and atomic projection publication across processes."""
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        yield db
+
+
 def list_projection_fact_rows(
     strategy_instance_id: str,
     account_id: str,
     instrument_id: str,
+    *, db: Connection | None = None,
 ) -> list[Row]:
-    with connection() as db:
+    with (connection() if db is None else nullcontext(db)) as db:
         return db.execute(
             """
             SELECT * FROM financial_facts
@@ -326,8 +336,9 @@ def save_formal_projection(
     fact_count: int,
     data_quality_state: str,
     updated_at: str,
+    db: Connection | None = None,
 ) -> None:
-    with connection() as db:
+    with (connection() if db is None else nullcontext(db)) as db:
         if has_trade:
             db.execute(
                 """
@@ -390,8 +401,10 @@ def save_formal_projection(
         )
 
 
-def prepare_strategy_rebuild(strategy_instance_id: str) -> tuple[int, list[Row]]:
-    with connection() as db:
+def prepare_strategy_rebuild(
+    strategy_instance_id: str, *, db: Connection | None = None,
+) -> tuple[int, list[Row]]:
+    with (connection() if db is None else nullcontext(db)) as db:
         fact_count_row = db.execute(
             "SELECT COUNT(*) AS count FROM financial_facts WHERE strategy_instance_id = ?",
             (strategy_instance_id,),
@@ -426,8 +439,9 @@ def record_projection_rebuild_audit(
     strategy_instance_id: str,
     details_json: str,
     created_at: str,
+    db: Connection | None = None,
 ) -> None:
-    with connection() as db:
+    with (connection() if db is None else nullcontext(db)) as db:
         db.execute(
             """
             INSERT INTO audit_events (

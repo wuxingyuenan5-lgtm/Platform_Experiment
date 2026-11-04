@@ -316,7 +316,7 @@
         <article class="card"
           ><h3>CDS · 信用违约掉期</h3
           ><p class="definition"
-            >约5年、美元高级公司CDS；只绘制明确报告的成交运行利差（日中位数），散点表示有成交的日期。不是连续收盘报价，未把固定票息或模型估值当作成交价格。</p
+            >约5年、美元高级公司CDS；按真实日期连接已报告成交利差（日中位数），圆点为实际观测，中间连线只作走势引导，不代表缺失日期的收盘报价。</p
           ><div class="two-column"
             ><article v-for="c in data.cds" :key="c.ticker"
               ><div class="cds-head"
@@ -336,7 +336,7 @@
                       key: 'value',
                       name: c.ticker + ' CDS',
                       color: c.ticker === 'ORCL' ? '#d97706' : '#2563eb',
-                      scatter: true,
+                      observedLine: true,
                     },
                   ]"
                   unit="bp" /></Safe></article></div

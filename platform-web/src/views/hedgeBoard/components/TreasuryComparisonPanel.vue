@@ -52,7 +52,7 @@
   const label = (id: string) => TREASURY_LINES.find((l) => l[0] === id)?.[1] || id;
   useDashboardRefresh(async () => {
     try {
-      const dashboard = await getMacroDashboardV1();
+      const dashboard = await getMacroDashboardV1(['treasuryComparison']);
       series.value = dashboard.groups.treasuryComparison || [];
       error.value = series.value.length ? '' : '美债历史暂不可用';
     } catch {

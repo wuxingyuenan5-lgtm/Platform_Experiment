@@ -105,6 +105,7 @@
         <IndexValuationPanel
           v-if="data.sectionStatus?.valuation !== 'error'"
           :charts="data.valuationCharts || []"
+          :initial-comparison-open="market === 'cn'"
         />
       </WidgetErrorBoundary>
 
@@ -458,10 +459,10 @@
     loading.value = true;
     error.value = false;
     try {
-      const result = await getEquityObservatory(props.market, controller.signal);
+      const result = await getEquityObservatory(props.market, controller.signal, props.view);
       if (current === sequence) {
         data.value = result;
-        snapshots.set(`equity:${props.market}`, result);
+        snapshots.set(`equity:${props.market}:${props.view || 'all'}`, result);
       }
     } catch {
       if (current === sequence) error.value = true;
@@ -473,9 +474,11 @@
     }
   }
   watch(
-    () => [props.market, props.refreshKey],
+    () => [props.market, props.refreshKey, props.view],
     (_value, previous) => {
-      const cached = !previous && snapshots.get<EquityObservatory>(`equity:${props.market}`);
+      const cached =
+        !previous &&
+        snapshots.get<EquityObservatory>(`equity:${props.market}:${props.view || 'all'}`);
       if (cached) {
         data.value = cached;
         emit('ready');

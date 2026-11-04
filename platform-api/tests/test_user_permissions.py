@@ -44,7 +44,7 @@ def test_ceo_browser_permissions_are_explicit_and_business_scoped() -> None:
     assert "live_session:revoke" in permissions
     assert "reconciliation:review" in permissions
     assert "trade:submit" not in permissions
-    assert "risk:manage" not in permissions
+    assert "risk:manage" in permissions
 
 
 @pytest.mark.unit

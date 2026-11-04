@@ -50,6 +50,9 @@ def isolated_settings(monkeypatch, tmp_path):
     settings.strategy_research_database_path = None
     settings.runtime_base_url = "http://127.0.0.1:1"
     settings.database_path = str(tmp_path / "platform.db")
+    # Generic API tests must not start unrelated source collectors during lifespan.
+    # Collector lifecycle tests can explicitly opt in with isolated provider I/O.
+    settings.research_refresh_enabled = False
     settings.strategy_research_enabled = False
     settings.strategy_research_path = str(tmp_path / "strategy-research")
     settings.choice_csd_enabled = False
@@ -82,6 +85,20 @@ def isolated_test_network(monkeypatch):
         return connect_ex(sock, address)
 
     monkeypatch.setattr(socket.socket, "connect_ex", isolated_connect_ex)
+
+
+@pytest.fixture
+def cross_native_specs(monkeypatch):
+    """Supply valid native specs at the Runtime boundary, retaining admission checks."""
+    from tests.test_cross_spread import _live_specification
+
+    def specification(*, account_id, symbol):
+        return _live_specification(
+            account_id=account_id, symbol=symbol,
+            venue="mt5_live" if "mt5" in account_id else "bybit_live",
+        )
+
+    monkeypatch.setattr("app.cross_spread.get_instrument_specification", specification)
 
 
 @pytest.fixture

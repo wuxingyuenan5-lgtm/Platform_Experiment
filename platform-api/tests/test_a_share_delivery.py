@@ -31,6 +31,14 @@ def research_db(tmp_path, monkeypatch):
     initialize_database()
     with connection() as db:
         db.execute(
+            "INSERT INTO data_audit_calendar VALUES('CN',?,?,?)",
+            (
+                datetime.now(UTC).isoformat(),
+                json.dumps([str(point.observed_at) for point in AShareFixtureProvider.history(CODES[0])]),
+                "fixture://exchange-sessions",
+            ),
+        )
+        db.execute(
             "INSERT INTO research_a_share_pool_config VALUES(1,?,1,?)",
             (json.dumps(CODES), datetime.now(UTC).isoformat()),
         )
@@ -228,6 +236,47 @@ def test_publication_is_atomic_and_failed_run_remains_observable(research_db, mo
     assert repository.read_stock_pool()["meta"]["status"] == "stale"
 
 
+def test_cancelled_refresh_preserves_publication_and_releases_single_flight(
+    research_db, monkeypatch
+):
+    assert asyncio.run(refresh.refresh_a_share_research(force=True)) == "ready"
+    with connection() as db:
+        previous = [tuple(row) for row in db.execute(
+            "SELECT * FROM research_a_share_dataset_snapshots ORDER BY dataset"
+        )]
+    original = research_db._check
+
+    async def interrupt_and_retry():
+        entered = asyncio.Event()
+        blocked = asyncio.Event()
+
+        async def block(_module):
+            entered.set()
+            await blocked.wait()
+
+        monkeypatch.setattr(research_db, "_check", block)
+        task = asyncio.create_task(refresh.refresh_a_share_research(force=True))
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=5)
+            assert await refresh.refresh_a_share_research(force=True) == "busy"
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        status = repository.read_refresh_status()
+        assert status["status"] == "error"
+        assert status["errorCode"] == "refresh_interrupted"
+        with connection() as db:
+            assert [tuple(row) for row in db.execute(
+                "SELECT * FROM research_a_share_dataset_snapshots ORDER BY dataset"
+            )] == previous
+        monkeypatch.setattr(research_db, "_check", original)
+        assert await refresh.refresh_a_share_research(force=True) == "ready"
+        assert repository.read_refresh_status()["status"] == "ready"
+
+    asyncio.run(interrupt_and_retry())
+
+
 def test_partial_index_refresh_preserves_prior_series_and_marks_missing_counts(
     research_db, monkeypatch
 ):
@@ -243,7 +292,7 @@ def test_partial_index_refresh_preserves_prior_series_and_marks_missing_counts(
     dashboard = repository.read_dashboard()
     assert len(dashboard.market_detail.data) == 8
     assert dashboard.market_detail.meta.status == "partial"
-    assert "机器人" in dashboard.market_detail.meta.message
+    assert all(code in dashboard.market_detail.meta.message for code in ("931071", "931238", "932082", "H30590"))
     assert dashboard.breadth.data["limitUp"] is None
     assert dashboard.breadth.data["limitDown"] is None
 

@@ -133,11 +133,11 @@ def test_projection_rebuild_preserves_component_attribution(
     ]
     captured: dict[str, object] = {}
     monkeypatch.setattr(service.repository, "ensure_schema", lambda: None)
-    monkeypatch.setattr(service.repository, "list_projection_fact_rows", lambda *_: facts)
+    monkeypatch.setattr(service.repository, "list_projection_fact_rows", lambda *_, **__: facts)
     monkeypatch.setattr(
         service.repository,
         "save_formal_projection",
-        lambda **kwargs: captured.update(kwargs),
+        lambda **kwargs: captured.update({k: v for k, v in kwargs.items() if k != "db"}),
     )
 
     service.rebuild_account_instrument_projection(STRATEGY_ID, ACCOUNT_ID, INSTRUMENT_ID)
@@ -203,11 +203,11 @@ def test_projection_rebuild_propagates_incomplete_quality(
     ]
     captured: dict[str, object] = {}
     monkeypatch.setattr(service.repository, "ensure_schema", lambda: None)
-    monkeypatch.setattr(service.repository, "list_projection_fact_rows", lambda *_: facts)
+    monkeypatch.setattr(service.repository, "list_projection_fact_rows", lambda *_, **__: facts)
     monkeypatch.setattr(
         service.repository,
         "save_formal_projection",
-        lambda **kwargs: captured.update(kwargs),
+        lambda **kwargs: captured.update({k: v for k, v in kwargs.items() if k != "db"}),
     )
 
     service.rebuild_account_instrument_projection(STRATEGY_ID, ACCOUNT_ID, INSTRUMENT_ID)
@@ -231,12 +231,12 @@ def test_strategy_rebuild_preserves_pair_order_counts_and_audit(
     monkeypatch.setattr(
         service.repository,
         "prepare_strategy_rebuild",
-        lambda *_: (7, pairs),
+        lambda *_, **__: (7, pairs),
     )
     monkeypatch.setattr(
         service,
-        "rebuild_account_instrument_projection",
-        lambda strategy_id, account_id, instrument_id: rebuilt.append(
+        "_rebuild_account_instrument_projection",
+        lambda strategy_id, account_id, instrument_id, db: rebuilt.append(
             (strategy_id, account_id, instrument_id)
         ),
     )
@@ -245,7 +245,7 @@ def test_strategy_rebuild_preserves_pair_order_counts_and_audit(
     monkeypatch.setattr(
         service.repository,
         "record_projection_rebuild_audit",
-        lambda **kwargs: audit.update(kwargs),
+        lambda **kwargs: audit.update({k: v for k, v in kwargs.items() if k != "db"}),
     )
 
     response = service.rebuild_strategy_financials(STRATEGY_ID)

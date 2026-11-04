@@ -327,6 +327,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     from app.research_cn_context import run_periodic as run_cn_context_periodic
 
     cn_context_task = asyncio.create_task(run_cn_context_periodic())
+    from app.research_reference_boards import run_periodic as run_reference_periodic
+    reference_task = asyncio.create_task(run_reference_periodic())
     try:
         yield
     finally:
@@ -338,6 +340,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         ai_task.cancel()
         cn_monitor_task.cancel()
         cn_context_task.cancel()
+        reference_task.cancel()
         await asyncio.gather(
             task,
             market_task,
@@ -347,6 +350,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             ai_task,
             cn_monitor_task,
             cn_context_task,
+            reference_task,
             return_exceptions=True,
         )
 

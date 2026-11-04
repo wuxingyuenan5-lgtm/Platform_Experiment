@@ -125,6 +125,8 @@ def test_partial_refresh_keeps_missing_symbol_stale(db, monkeypatch):
     ],
 )
 def test_artifact_failure_marks_cached_values_stale(monkeypatch, module, provider_class):
+    revision = [1]
+    monkeypatch.setattr(module, "local_json_revision", lambda _: ("fixture", revision[0], 1, 1))
     payload = {
         "schemaVersion": "1.0",
         "status": "ready",
@@ -154,6 +156,7 @@ def test_artifact_failure_marks_cached_values_stale(monkeypatch, module, provide
         raise ResearchProviderError("missing")
 
     monkeypatch.setattr(module, "read_local_json", fail)
+    revision[0] += 1
     retained = asyncio.run(provider.get())
     assert retained.status == "stale"
     assert retained.groups["test"][0].is_stale

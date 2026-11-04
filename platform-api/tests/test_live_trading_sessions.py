@@ -55,6 +55,7 @@ def configure_live(monkeypatch, tmp_path: Path) -> None:
 
 def make_account_live() -> None:
     with connection() as db:
+        db.execute("UPDATE strategy_instances SET trading_mode='live' WHERE id=?", (STRATEGY_ID,))
         db.execute(
             """
             UPDATE accounts
@@ -102,7 +103,6 @@ def order_payload(key: str) -> dict[str, str]:
 
 def test_legacy_session_history_does_not_claim_normal_live_orders(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
-    monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, settings: True)
     with TestClient(app) as client:
         make_account_live()
         payload = session_payload()
@@ -144,7 +144,7 @@ def test_legacy_session_history_does_not_claim_normal_live_orders(monkeypatch, t
             headers=headers("trader-token"),
             json=order_payload("live-command-approved-001"),
         )
-        assert order.status_code == 200
+        assert order.status_code == 200, order.text
         assert order.json()["status"] == "result_unknown"
 
         with connection() as db:
@@ -223,7 +223,6 @@ def test_founder_demo_ceo_can_request_self_approve_and_revoke_minimum_size_accep
 
 def test_live_order_without_approved_session_reaches_runtime(monkeypatch, tmp_path: Path) -> None:
     configure_live(monkeypatch, tmp_path)
-    monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, settings: True)
     def runtime_unavailable(*args, **kwargs):
         raise httpx.ConnectError("isolated runtime unavailable")
     monkeypatch.setattr("app.runtime_transport.post", runtime_unavailable)
@@ -234,7 +233,7 @@ def test_live_order_without_approved_session_reaches_runtime(monkeypatch, tmp_pa
             headers=headers("trader-token"),
             json=order_payload("live-command-without-session"),
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text
         assert response.json()["status"] == "result_unknown"
 
 
@@ -312,7 +311,6 @@ def test_live_order_claim_ignores_legacy_session_notional_caps(
     monkeypatch, tmp_path: Path
 ) -> None:
     configure_live(monkeypatch, tmp_path)
-    monkeypatch.setattr("app.auth.has_ceo_trade_authority", lambda principal, settings: True)
     with TestClient(app) as client:
         make_account_live()
         requested = client.post(
@@ -340,7 +338,7 @@ def test_live_order_claim_ignores_legacy_session_notional_caps(
             headers=headers("trader-token"),
             json=payload,
         )
-        assert order.status_code == 200
+        assert order.status_code == 200, order.text
         assert order.json()["status"] == "result_unknown"
 
         with connection() as db:

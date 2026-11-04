@@ -27,7 +27,10 @@ test('mixed units keep independent axes, native dates, gaps and exact tooltip va
   assert.match(tooltip, /2026-01-01\nPrice\n123\.123456789 USD/);
   assert.match(tooltip, /2026-01-02\nRate\n0 %/);
   assert.equal(result.useUTC, true);
-  assert.equal(result.dataZoom[0].filterMode, 'none');
+  // Filter the visible window so both price axes rescale when history is dragged.
+  assert.equal(result.dataZoom[0].filterMode, 'filter');
+  assert.equal(result.yAxis[0].scale, true);
+  assert.equal(result.yAxis[1].scale, true);
 });
 
 test('one genuine observation remains a visible point', () => {

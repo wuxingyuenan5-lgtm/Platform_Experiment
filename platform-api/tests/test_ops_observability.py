@@ -1,10 +1,13 @@
 from pathlib import Path
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.main import app
+
+pytestmark = pytest.mark.usefixtures("generic_trading_instance")
 
 
 def test_reconciliation_summary_reports_unknown_orders_and_manual_batches(
@@ -26,8 +29,8 @@ def test_reconciliation_summary_reports_unknown_orders_and_manual_batches(
 
     payload = {
         "idempotencyKey": "ops-manual-batch-001",
-        "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
-        "strategyKey": "funding_arbitrage",
+        "strategyInstanceId": "strategy_generic_pipeline_test",
+        "strategyKey": "strategy_generic_pipeline_test",
         "direction": "manual_intervention_case",
         "accountId": "account_sim_usdt",
         "legs": [
@@ -71,7 +74,7 @@ def test_audit_events_are_queryable_after_trade_command(tmp_path: Path) -> None:
 
     payload = {
         "idempotencyKey": "audit-command-001",
-        "strategyInstanceId": "strategy_funding_arbitrage_instance_default",
+        "strategyInstanceId": "strategy_generic_pipeline_test",
         "accountId": "account_sim_usdt",
         "instrumentId": "instrument_btc_usdt",
         "symbol": "BTCUSDT",

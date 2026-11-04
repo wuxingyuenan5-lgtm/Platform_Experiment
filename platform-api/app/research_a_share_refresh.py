@@ -438,7 +438,9 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
         member = member_by_code.get(code)
         observed = _quote_date(quote)
         aligned = bool(history and observed and str(history[-1].observed_at) == observed)
-        status = "ready" if aligned and quote.return_pct is not None else "partial"
+        status = (
+            "ready" if aligned and code in histories and quote.return_pct is not None else "partial"
+        )
         if observed and trade_date and observed < trade_date:
             status = "stale"
         stock_rows.append(
@@ -476,13 +478,28 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
     return stock_rows, stock_history
 
 
+def _stale_index_codes(rows: list[Any], trade_date: str) -> list[str]:
+    latest = {}
+    for row in rows:
+        raw = row.model_dump(mode="json", by_alias=True) if hasattr(row, "model_dump") else row
+        days = [str(point.get("observedAt", "")) for point in raw.get("history", [])]
+        latest[raw.get("code")] = max(days, default="")
+    return [code for code, _, _ in INDEX_DEFINITIONS[:8] if latest.get(code, "") != trade_date]
+
+
 async def refresh_a_share_research(*, force: bool = False) -> str:
     """Collect once, then atomically publish snapshots, histories and run status."""
     if not force and not _scheduled_refresh_due():
         return "not_due"
     today = datetime.now(_CHINA).date().isoformat()
     latest = read_refresh_status()
-    if not force and latest and latest["status"] == "ready" and latest["targetTradeDate"] == today:
+    if (
+        not force
+        and latest
+        and latest["status"] == "ready"
+        and latest["targetTradeDate"] == today
+        and not _stale_index_codes(read_dataset("market_detail") or [], today)
+    ):
         return "up_to_date"
     if _REFRESH_LOCK.locked():
         return "busy"
@@ -546,6 +563,11 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 else []
             )
             trade_date = max(dated) if dated else None
+            if trade_date and isinstance(indices, list):
+                stale_indices = _stale_index_codes(indices, trade_date)
+                if stale_indices:
+                    dashboard.market_detail.meta.status = "partial"
+                    dashboard.market_detail.meta.message = "指数未取得同日收盘历史：" + "、".join(stale_indices)
             dashboard.shenwan.meta.source_timestamp = (
                 datetime.fromisoformat(trade_date).replace(hour=15, tzinfo=_CHINA)
                 if trade_date

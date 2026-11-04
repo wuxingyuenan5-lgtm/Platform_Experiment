@@ -122,6 +122,68 @@ def test_refresh_clock_rejects_future_attempt():
     )
 
 
+@pytest.mark.parametrize("failure", ["mixed_minute_days", "reset_quotes", "missing_quote"])
+def test_incoherent_etf_basket_keeps_last_good_native_session(tmp_path, monkeypatch, failure):
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 3, 1, 31, tzinfo=UTC)
+
+    monkeypatch.setenv("HEDGE_BOARD_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(etf, "datetime", Clock)
+    monkeypatch.setattr(etf, "_trading_window", lambda _: False)
+    old = {
+        "data": {"klines": {"sh000001": [{"day": "2026-11-02 15:00:00", "close": "3.123456"}]}},
+        "status": "ready", "observationDate": "2026-11-02",
+        "retrievedAt": "2026-11-02T07:00:00Z", "sourceUrl": etf.SOURCE,
+    }
+    etf.write_local_json(etf.ROOT + "live.json", copy.deepcopy(old))
+    real_client = httpx.Client
+
+    def transport(request):
+        if request.url.path == "/data.js":
+            return httpx.Response(200, text=text(reference()))
+        if request.url.path == "/api/kline":
+            day = "2026-11-02 15:00:00" if failure else "2026-11-03 09:31:00"
+            if failure == "mixed_minute_days" and request.url.params["symbol"] == etf.SYMBOLS[-1]:
+                day = "2026-11-03 09:31:00"
+            return httpx.Response(200, json=[{"day": day, "close": "3.123456", "amount": "100.10"}])
+        assert request.url.path == "/api/hq"
+        rows = [{"f12": s[2:], "f14": s, "f2": "3.123456", "f3": 0, "f6": 100, "f18": 3}
+                for s in etf.SYMBOLS]
+        if failure == "reset_quotes":
+            rows[-1]["f6"] = 0
+        if failure == "missing_quote":
+            rows.pop()
+        return httpx.Response(200, json={"data": {"diff": rows}})
+
+    monkeypatch.setattr(
+        etf.httpx, "Client", lambda **kwargs: real_client(transport=httpx.MockTransport(transport))
+    )
+    assert etf.refresh(force=True) == "partial"
+    current = etf._read("live")
+    assert current["status"] == "stale"
+    assert current["error"] == "ValueError"
+    assert current["data"] == old["data"]
+    assert current["retrievedAt"] == old["retrievedAt"]
+    assert current["observationDate"] == old["observationDate"]
+    assert etf._read("reference")["status"] == "ready"
+    assert not (tmp_path / "history/research/etf-observation/2026-11-03.json").exists()
+    projection = etf.read_observation()
+    assert projection["live"] == old["data"]
+    assert projection["sources"]["live"]["status"] == "stale"
+    assert projection["sources"]["live"]["observationDate"] == "2026-11-02"
+    # A coherent next response must succeed: rejecting every basket is not a valid fix.
+    failure = None
+    assert etf.refresh(force=True) == "ready"
+    recovered = etf.read_observation()
+    assert recovered["sources"]["live"]["status"] == "ready"
+    assert recovered["sources"]["live"]["observationDate"] == "2026-11-03"
+    assert recovered["live"] != old["data"]
+    assert set(recovered["live"]["klines"]) == set(etf.SYMBOLS)
+    assert (tmp_path / "history/research/etf-observation/2026-11-03.json").exists()
+
+
 def test_endpoint_requires_permission_and_reads_only_local(tmp_path, monkeypatch):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient

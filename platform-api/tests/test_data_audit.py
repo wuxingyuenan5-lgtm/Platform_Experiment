@@ -282,3 +282,20 @@ def test_history_inventory_seeks_boundaries_without_archive_scan():
     assert result["new_dataset"]["fetched"] == "latest"
     assert "rows" not in result["intraday"]
     db.close()
+
+
+def test_weekly_released_daily_fx_uses_publication_tolerance(monkeypatch):
+    from app import research_local_data
+    now = datetime(2026, 11, 2, 17, tzinfo=UTC)
+    row = {"seriesId": "eurusd", "label": "EUR/USD", "frequency": "daily_weekly_release",
+        "retrievedAt": "2026-10-27T03:04:13Z", "observationDate": "2026-10-23", "status": "ready"}
+    monkeypatch.setattr(research_local_data, "read_local_json", lambda _: {"groups": {"majorFx": [row]}})
+    checks = audit.inspect_artifacts(now)
+    fx = [c for c in checks if c["key"] == "artifact.macro.eurusd"][0]
+    assert fx["status"] == "healthy"
+    late = [c for c in audit.inspect_artifacts(datetime(2026, 11, 7, 17, tzinfo=UTC)) if c["key"] == fx["key"]][0]
+    assert late["status"] == "warning"
+    row["isStale"] = True
+    assert [c for c in audit.inspect_artifacts(now) if c["key"] == fx["key"]][0]["status"] == "warning"
+    row["retrievedAt"] = "2026-10-01T00:00:00Z"
+    assert [c for c in audit.inspect_artifacts(now) if c["key"] == fx["key"]][0]["status"] == "error"

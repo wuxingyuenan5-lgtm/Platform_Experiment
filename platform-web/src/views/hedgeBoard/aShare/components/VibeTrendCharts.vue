@@ -9,7 +9,7 @@
       :series="marketSeries"
     />
     <VibeTimeChart
-      v-if="mode !== 'crowding'"
+      v-if="mode !== 'crowding' && showBreadth"
       title="市场宽度"
       y-label="（上涨－下跌）/（上涨＋下跌）× 100%"
       :dates="dates"
@@ -76,6 +76,7 @@
   };
   const props = defineProps<{
     mode?: 'overview' | 'crowding';
+    showBreadth?: boolean;
     rows: HistoryRow[];
     crowdingRows?: CrowdingRow[];
     innovationRows?: InnovationRow[];

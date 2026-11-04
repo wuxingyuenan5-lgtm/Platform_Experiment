@@ -10,7 +10,9 @@
       >
       <div class="view-tabs" role="group" aria-label="观察视角"
         ><button :aria-pressed="mode === 'themes'" @click="mode = 'themes'">投资主线</button
-        ><button :aria-pressed="mode === 'styles'" @click="mode = 'styles'">风格轮动</button
+        ><button :aria-pressed="mode === 'styles'" @click="mode = 'styles'">{{
+          market === 'cn' ? '风格跟踪' : '风格轮动'
+        }}</button
         ><button :aria-pressed="mode === 'industries'" @click="mode = 'industries'"
           >行业对照</button
         ></div

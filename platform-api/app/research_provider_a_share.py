@@ -740,18 +740,16 @@ class AShareResearchProvider:
 
         opener = build_opener(ProxyHandler({}))
         if code in {"000300", "000852", "399006", "000688"}:
-            records = _records(self._akshare().stock_zh_index_daily(symbol=symbol))
-            return [
-                {
-                    "date": _date(row.get("date")),
-                    "close": _decimal(row.get("close")),
-                    "amount": None,
-                    "source": "sina-index-daily",
-                }
-                for row in records
-                if _date(row.get("date")) is not None
-                and (_decimal(row.get("close")) or Decimal("0")) > 0
-            ][-800:]
+            payload = self._direct_json(
+                opener, "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get",
+                {"param": f"{symbol},day,,,640,qfq"},
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            node = (payload.get("data") or {}).get(symbol) or {}
+            rows = self._normalize_tencent_history(node.get("day") or [])
+            if len({r["date"] for r in rows}) != len(rows) or not rows:
+                raise ResearchProviderError(f"tencent_index_history_invalid:{code}")
+            return [{**row, "source": "tencent-index-daily"} for row in rows][-800:]
 
         endpoint = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
         response = self._direct_json(

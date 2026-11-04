@@ -36,6 +36,7 @@
     end: string;
     tooltip: boolean;
     flowsOnly?: boolean;
+    mode?: 'price' | 'flows' | 'financing';
   }>();
   const emit = defineEmits<{ (event: 'range', start: string, end: string): void }>();
   const chartRef = ref<HTMLDivElement | null>(null);
@@ -46,18 +47,30 @@
     ink = '#27364c';
   let cursor = 0;
   let bound: ReturnType<typeof chart.getInstance> = null;
-  const plots = props.flowsOnly
-    ? ([
-        ['日度 ETF 申购赎回份额', 'qfq_delta_units_yi', '亿份', true],
-        ['净申赎金额 / 指数成交额', 'flow_to_index_pct', '%', true],
-      ] as const)
-    : ([
-        ['日线价格走势', 'etf_qfq_close', '元', false],
-        ['日度 ETF 成交额（估算）', 'etf_qfq_turnover_est_yi', '亿元', true],
-        ['日线 ETF 份额走势 · 圆点为持仓披露', 'qfq_total_units_yi', '亿份', false],
-        ['ETF 融资余额与融资净买入', 'financing_balance_yi', '亿元', false],
-        ['指数成分股融资余额与融资净买入', 'index_financing_balance_yi', '亿元', false],
-      ] as const);
+  const plots =
+    props.flowsOnly || props.mode === 'flows'
+      ? ([
+          ...(props.mode === 'flows'
+            ? [['日线 ETF 份额走势', 'qfq_total_units_yi', '亿份', false] as const]
+            : []),
+          ['日度 ETF 申购赎回份额', 'qfq_delta_units_yi', '亿份', true],
+          ['净申赎金额 / 指数成交额', 'flow_to_index_pct', '%', true],
+        ] as const)
+      : (
+          [
+            ['日线价格走势', 'etf_qfq_close', '元', false],
+            ['日度 ETF 成交额（估算）', 'etf_qfq_turnover_est_yi', '亿元', true],
+            ['日线 ETF 份额走势 · 圆点为持仓披露', 'qfq_total_units_yi', '亿份', false],
+            ['ETF 融资余额与融资净买入', 'financing_balance_yi', '亿元', false],
+            ['指数成分股融资余额与融资净买入', 'index_financing_balance_yi', '亿元', false],
+          ] as const
+        ).filter(
+          (p) =>
+            !props.mode ||
+            (props.mode === 'price'
+              ? ['etf_qfq_close', 'etf_qfq_turnover_est_yi'].includes(p[1])
+              : ['financing_balance_yi', 'index_financing_balance_yi'].includes(p[1])),
+        );
   const numberFormat = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
   const showNumber = (value: unknown) => {
     const n = numeric(value as number | null);
@@ -167,13 +180,14 @@
         ? [{ value: [day, value], ratio: d.combined_ratio_pct, report: d.report_date }]
         : [];
     });
-    if (!props.flowsOnly)
+    const sharesIndex = plots.findIndex((plot) => plot[1] === 'qfq_total_units_yi');
+    if (sharesIndex >= 0)
       series.push({
         id: 'disclosures',
         name: '持仓披露',
         type: 'scatter',
-        xAxisIndex: 2,
-        yAxisIndex: 2,
+        xAxisIndex: sharesIndex,
+        yAxisIndex: sharesIndex,
         symbolSize: 8,
         itemStyle: { color: '#fff', borderColor: blue, borderWidth: 2 },
         label: {

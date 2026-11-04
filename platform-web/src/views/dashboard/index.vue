@@ -1,95 +1,32 @@
 <template>
-  <RestoredProductSurface
-    :state="dashboardSampleMeta.state"
-    :source="dashboardSampleMeta.source"
-    :as-of="dashboardSampleMeta.asOf"
-    :actionable="dashboardSampleMeta.actionable"
-  >
-    <PageWrapper dense :content-style="{ overflow: 'visible' }">
-      <main
-        class="home-dashboard"
-        data-testid="dashboard-original-structure"
-        aria-label="全球变量首页"
-      >
-        <div class="home-dashboard__frame">
-          <section class="home-hero">
-            <div class="home-hero__copy">
-              <span>欢迎来到</span>
-              <h1>全球变量</h1>
-              <p>顺应时代大势，洞悉投资先机</p>
-            </div>
+  <PageWrapper dense :content-style="{ overflow: 'visible' }">
+    <main
+      class="home-dashboard"
+      data-testid="dashboard-original-structure"
+      aria-label="全球变量首页"
+    >
+      <div class="home-dashboard__frame">
+        <section class="home-hero">
+          <div class="home-hero__copy">
+            <span>欢迎来到</span>
+            <h1>全球变量</h1>
+            <p>顺应时代大势，洞悉投资先机</p>
+          </div>
 
-            <div class="home-hero__summaries">
-              <aside class="hero-side hero-side--market">
-                <header>
-                  <div>
-                    <strong>全球市场概览</strong>
-                    <span>非实时样例</span>
-                  </div>
-                  <RightOutlined />
-                </header>
-
-                <div class="market-mini-grid">
-                  <article v-for="item in marketOverviewItems" :key="item.label">
-                    <span>{{ item.label }}</span>
-                    <svg viewBox="0 0 78 22" preserveAspectRatio="none" aria-hidden="true">
-                      <polyline
-                        :points="item.spark"
-                        fill="none"
-                        :stroke="item.color"
-                        stroke-width="2.2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                    <strong>--</strong>
-                  </article>
+          <div class="home-hero__summaries">
+            <aside class="hero-side hero-side--market">
+              <header>
+                <div>
+                  <strong>全球市场概览</strong>
+                  <span>非实时样例</span>
                 </div>
-              </aside>
+                <RightOutlined />
+              </header>
 
-              <aside class="hero-side hero-side--portfolio">
-                <header>
-                  <strong>投资组合总览</strong>
-                  <RightOutlined />
-                </header>
-
-                <div class="portfolio-summary">
-                  <div>
-                    <span>总资产（估值）</span>
-                    <strong>--</strong>
-                  </div>
-                  <div>
-                    <span>今日收益</span>
-                    <strong>--（--）</strong>
-                  </div>
-                  <div class="portfolio-ring" aria-label="组合配置样例图"></div>
-                </div>
-              </aside>
-            </div>
-          </section>
-
-          <section class="dashboard-grid" aria-label="首页工作台">
-            <article class="dashboard-panel panel-market">
-              <header><h2>市场脉搏</h2></header>
-              <div class="pulse-tabs" aria-label="市场脉搏视角">
-                <button type="button" class="is-active">增长主线</button>
-                <button type="button">资产传导</button>
-                <button type="button">资金流向</button>
-              </div>
-
-              <div class="pulse-list">
-                <button
-                  v-for="item in pulseRows"
-                  :key="item.title"
-                  type="button"
-                  class="pulse-row"
-                  @click="goPath(item.path)"
-                >
-                  <span class="row-icon"><component :is="iconMap[item.icon]" /></span>
-                  <span class="row-copy"
-                    ><strong>{{ item.title }}</strong></span
-                  >
-                  <svg viewBox="0 0 82 22" preserveAspectRatio="none" aria-hidden="true">
+              <div class="market-mini-grid">
+                <article v-for="item in marketOverviewItems" :key="item.label">
+                  <span>{{ item.label }}</span>
+                  <svg viewBox="0 0 78 22" preserveAspectRatio="none" aria-hidden="true">
                     <polyline
                       :points="item.spark"
                       fill="none"
@@ -99,141 +36,43 @@
                       stroke-linejoin="round"
                     />
                   </svg>
-                  <span class="row-value">--</span>
-                </button>
-              </div>
-
-              <button class="panel-link" type="button" @click="goPath('/hedge-board/macro')">
-                查看全部市场分析
-                <RightOutlined />
-              </button>
-            </article>
-
-            <article class="dashboard-panel panel-portfolio">
-              <header><h2>组合概览</h2></header>
-              <div class="allocation-content">
-                <div class="allocation-ring" aria-label="资产配置样例图"></div>
-                <div class="allocation-legend">
-                  <div v-for="item in allocationLegend" :key="item.label">
-                    <i :style="{ background: item.color }"></i>
-                    <span>{{ item.label }}</span>
-                    <strong>--</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div class="risk-metrics">
-                <article v-for="item in allocationStats" :key="item">
-                  <span>{{ item }}</span>
                   <strong>--</strong>
                 </article>
               </div>
+            </aside>
 
-              <button class="panel-link" type="button" @click="goPath('/strategy/management')">
-                查看组合详情
+            <aside class="hero-side hero-side--portfolio">
+              <header>
+                <strong>投资组合总览</strong>
                 <RightOutlined />
-              </button>
-            </article>
+              </header>
 
-            <article class="dashboard-panel panel-strategy">
-              <header><h2>策略概览</h2></header>
-              <div class="strategy-list">
-                <button
-                  v-for="item in strategyRows"
-                  :key="item.title"
-                  type="button"
-                  class="strategy-row"
-                  @click="goPath(item.path)"
-                >
-                  <span class="row-icon"><component :is="iconMap[item.icon]" /></span>
-                  <span class="row-copy">
-                    <strong>{{ item.title }}</strong>
-                    <em>--（--）</em>
-                  </span>
-                  <svg viewBox="0 0 82 22" preserveAspectRatio="none" aria-hidden="true">
-                    <polyline
-                      :points="item.spark"
-                      fill="none"
-                      :stroke="item.color"
-                      stroke-width="2.2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </button>
+              <div class="portfolio-summary">
+                <div>
+                  <span>总资产（估值）</span>
+                  <strong>--</strong>
+                </div>
+                <div>
+                  <span>今日收益</span>
+                  <strong>--（--）</strong>
+                </div>
+                <div class="portfolio-ring" aria-label="组合配置样例图"></div>
               </div>
+            </aside>
+          </div>
+        </section>
 
-              <button class="panel-link" type="button" @click="goPath('/strategy/index')">
-                查看所有策略
-                <RightOutlined />
-              </button>
-            </article>
-
-            <article class="dashboard-panel panel-calendar">
-              <header><h2>重要日历</h2></header>
-              <div class="calendar-strip">
-                <LeftOutlined />
-                <strong>非实时日历样例</strong>
-                <span>参考</span>
-                <RightOutlined />
-              </div>
-
-              <div class="calendar-list">
-                <article v-for="item in calendarRows" :key="`${item.time}-${item.title}`">
-                  <span class="calendar-time"><i></i>{{ item.time }}</span>
-                  <strong>{{ item.region }}</strong>
-                  <p>{{ item.title }}</p>
-                  <em>预期：--<br />前值：--</em>
-                </article>
-              </div>
-
-              <button class="panel-link" type="button" @click="goPath('/hedge-board/macro')">
-                查看完整日历
-                <RightOutlined />
-              </button>
-            </article>
-          </section>
-        </div>
-      </main>
-    </PageWrapper>
-  </RestoredProductSurface>
+        <PersonalWorkspace />
+      </div>
+    </main>
+  </PageWrapper>
 </template>
 
 <script setup lang="ts">
-  import { useRouter } from 'vue-router';
-  import {
-    CalendarOutlined,
-    ClusterOutlined,
-    DatabaseOutlined,
-    FundProjectionScreenOutlined,
-    LeftOutlined,
-    LineChartOutlined,
-    RightOutlined,
-  } from '@ant-design/icons-vue';
+  import { RightOutlined } from '@ant-design/icons-vue';
   import { PageWrapper } from '@/components/Page';
-  import RestoredProductSurface from '@/components/ProductDataState/RestoredProductSurface.vue';
-  import {
-    allocationLegend,
-    allocationStats,
-    calendarRows,
-    dashboardSampleMeta,
-    marketOverviewItems,
-    pulseRows,
-    strategyRows,
-  } from '@/data/sample/dashboard';
-
-  const router = useRouter();
-  const iconMap = {
-    calendar: CalendarOutlined,
-    cluster: ClusterOutlined,
-    database: DatabaseOutlined,
-    line: LineChartOutlined,
-    projection: FundProjectionScreenOutlined,
-  } as const;
-
-  function goPath(path: string) {
-    router.push(path);
-  }
+  import PersonalWorkspace from './workspace/PersonalWorkspace.vue';
+  import { marketOverviewItems } from '@/data/sample/dashboard';
 </script>
 
 <style scoped lang="less">

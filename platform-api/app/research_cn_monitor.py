@@ -9,6 +9,7 @@ import json
 import logging
 import re
 import ssl
+from functools import lru_cache
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -119,7 +120,22 @@ def merge_history(old, new):
     return sorted({r["date"]: r for r in [*old, *new]}.values(), key=lambda r: r["date"])
 
 
-def read_monitor():
+@lru_cache(maxsize=2)
+def _monitor_view(revision):
+    return read_artifact("cn-monitor") or {"sources": {}, "generatedAt": None}
+
+
+def read_monitor(keys=None):
+    if keys is not None:
+        from app.research_local_data import local_json_revision
+        data = _monitor_view(local_json_revision("public/v1/equity/cn-monitor.json"))
+        allowed = {"dividend", "congestion", "industry", "growth",
+                   *["fund_"+k for k in ["stock", "pingheng", "linghuo"]],
+                   *["growth_"+k for k in METRICS]}
+        if not set(keys) <= allowed:
+            raise ValueError("unknown_monitor_source")
+        return {"generatedAt": data.get("generatedAt"), "sources": {
+            k:v for k,v in data.get("sources",{}).items() if k in keys}}
     return read_artifact("cn-monitor") or {"sources": {}, "generatedAt": None}
 
 

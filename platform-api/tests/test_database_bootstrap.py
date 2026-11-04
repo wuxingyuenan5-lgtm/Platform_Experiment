@@ -5,7 +5,8 @@ from pathlib import Path
 from app import database, database_bootstrap
 from app.config import get_settings
 
-EXPECTED_SCHEMA_SHA256 = "421f0625ffe3a8a26ca48bc827e64bd6aa6b2e49d95faef0b17313e808375801"
+# Bootstrap includes the strategy/order/fill lookup indexes added in 85f32ddb.
+EXPECTED_SCHEMA_SHA256 = "852ab72d731df4aadc074423c75d5e14fee07576272eebdf9cc41a09c43612d5"
 
 
 def test_schema_sql_checksum_and_compatibility_identity() -> None:
@@ -43,6 +44,17 @@ def test_initialize_database_preserves_bootstrap_before_seed_order(
     monkeypatch.setattr(database, "bootstrap_database", fake_bootstrap)
     monkeypatch.setattr(database, "seed_reference_data", fake_seed)
 
+    from app.schema_migrations import PLATFORM_MIGRATIONS
+    from app.user_product_migrations import USER_PRODUCT_MIGRATIONS
+
+    def fake_migrations(db, migrations):
+        assert db is sentinel
+        assert migrations == tuple(sorted(
+            (*PLATFORM_MIGRATIONS, *USER_PRODUCT_MIGRATIONS), key=lambda item: item.version
+        ))
+        calls.append("migrations")
+
+    monkeypatch.setattr("app.schema_migrations.apply_migrations", fake_migrations)
     database.initialize_database()
 
-    assert calls == ["connection-open", "bootstrap", "seed", "connection-close"]
+    assert calls == ["connection-open", "bootstrap", "seed", "migrations", "connection-close"]

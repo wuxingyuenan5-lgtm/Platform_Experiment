@@ -44,6 +44,7 @@ from app.user_admin_routes import router as user_admin_router
 from app.user_avatar_routes import router as user_avatar_router
 from app.user_cache_control import UserNoStoreMiddleware
 from app.user_routes import router as user_router
+from app.personal_workspace import router as personal_workspace_router
 from app.venue_reconciliation_routes import router as venue_reconciliation_router
 
 PLATFORM_VERSION = "0.11.4"
@@ -118,30 +119,19 @@ def create_application() -> FastAPI:
     application.include_router(create_catalog_router(settings.api_prefix))
     application.include_router(create_trading_router(settings.api_prefix))
 
-    application.include_router(financial_facts_router)
-    application.include_router(financial_ai_router)
-    application.include_router(execution_risk_router)
-    application.include_router(venue_reconciliation_router)
-    application.include_router(live_venue_accounting_router)
-    application.include_router(live_venue_snapshot_sync_router)
-    application.include_router(eod_reconciliation_router)
-    application.include_router(live_trading_sessions_router)
-    application.include_router(credential_security_router)
-    application.include_router(production_monitoring_router)
-    application.include_router(operational_metrics_router)
-    application.include_router(disaster_recovery_router)
-    application.include_router(schema_governance_router)
-    application.include_router(cross_spread_exit_router)
-    application.include_router(cross_spread_observability_router)
-    application.include_router(research_router)
-    application.include_router(data_audit_router)
-    application.include_router(strategy_research_router)
-    application.include_router(research_watchlist_router)
-    application.include_router(user_router)
-    application.include_router(user_avatar_router)
-    application.include_router(user_admin_router)
-    application.include_router(user_admin_note_router)
-    application.include_router(member_holding_router)
+    for router in (
+        financial_facts_router, financial_ai_router, execution_risk_router,
+        venue_reconciliation_router, live_venue_accounting_router,
+        live_venue_snapshot_sync_router, eod_reconciliation_router,
+        live_trading_sessions_router, credential_security_router,
+        production_monitoring_router, operational_metrics_router,
+        disaster_recovery_router, schema_governance_router, cross_spread_exit_router,
+        cross_spread_observability_router, research_router, data_audit_router,
+        strategy_research_router, research_watchlist_router, user_router,
+        personal_workspace_router, user_avatar_router, user_admin_router,
+        user_admin_note_router, member_holding_router,
+    ):
+        application.include_router(router)
 
     application.add_middleware(AuthenticationMiddleware)
     application.add_middleware(UserNoStoreMiddleware)

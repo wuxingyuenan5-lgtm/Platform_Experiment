@@ -12,10 +12,18 @@
             ><ResearchSourceState v-if="dashboard?.breadth" :meta="dashboard.breadth.meta"
           /></div>
           <div v-if="breadth" class="metric-grid"
-            ><div v-for="item in breadthMetrics" :key="item.label" class="metric-cell"
+            ><component
+              :is="item.label === '市场宽度' ? 'button' : 'div'"
+              v-for="item in breadthMetrics"
+              :key="item.label"
+              class="metric-cell"
+              :aria-expanded="item.label === '市场宽度' ? marketBreadthOpen : undefined"
+              @click="item.label === '市场宽度' && (marketBreadthOpen = !marketBreadthOpen)"
               ><span>{{ item.label }}</span
               ><strong :class="item.tone">{{ item.value }}</strong
-              ><small>{{ item.note }}</small></div
+              ><small>{{
+                item.label === '市场宽度' ? '点击查看历史' : item.note
+              }}</small></component
             ></div
           >
           <div v-if="latestHistory || turnoverData" class="overview-meta-grid">
@@ -36,9 +44,14 @@
               ><span>百亿成交股</span
               ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></button
             >
-            <div title="沪深A；（上涨家数－下跌家数）/（上涨家数＋下跌家数），不含平盘"
+            <button
+              type="button"
+              class="meta-action"
+              :aria-expanded="marketBreadthOpen"
+              @click="marketBreadthOpen = !marketBreadthOpen"
+              title="沪深A；（上涨家数－下跌家数）/（上涨家数＋下跌家数），不含平盘"
               ><span>沪深A市场宽度</span
-              ><strong>{{ formatPct(latestHistory?.market_breadth, true) }}</strong></div
+              ><strong>{{ formatPct(latestHistory?.market_breadth, true) }}</strong></button
             >
           </div>
           <div v-if="!breadth" class="empty">暂无市场情绪数据</div>
@@ -85,10 +98,12 @@
     <VibeTrendCharts
       v-if="allHistoryRows.length > 1"
       :mode="mode || 'overview'"
+      :show-breadth="marketBreadthOpen"
       :rows="allHistoryRows"
       :crowding-rows="dashboard?.crowding?.data?.history"
       :innovation-rows="dashboard?.crowding?.data?.innovationHistory"
     />
+    <slot></slot>
 
     <template v-if="mode !== 'crowding'">
       <div class="overview-grid">
@@ -469,6 +484,7 @@
   const turnoverLoading = ref(false);
   const turnoverError = ref('');
   const topN = useResearchViewState<10 | 20>('topN', 10);
+  const marketBreadthOpen = ref(false);
   const ladderOpen = ref(false);
   const hotMatrixOpen = ref(false);
   const marketAmountHistoryOpen = ref(false);
@@ -914,6 +930,13 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 9px;
     margin-top: 12px;
+  }
+
+  button.metric-cell {
+    border: 0;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
 
   .metric-cell {

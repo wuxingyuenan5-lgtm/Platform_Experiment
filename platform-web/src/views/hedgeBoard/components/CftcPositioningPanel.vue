@@ -85,7 +85,7 @@
 <script setup lang="ts">
   import { useDashboardRefresh } from '../useDashboardRefresh';
 
-  import { computed, ref } from 'vue';
+  import { computed, ref, shallowRef } from 'vue';
   import { getCommodityDashboardV1, type MacroDashboardSeries } from '@/api/hedgeResearch';
 
   import SourceSeriesPlot from '../charts/SourceSeriesPlot.vue';
@@ -115,7 +115,7 @@
     },
   ];
   const selectedKey = ref<MarketKey>('gold');
-  const groups = ref<Record<string, MacroDashboardSeries[]>>({});
+  const groups = shallowRef<Record<string, MacroDashboardSeries[]>>({});
   const loading = ref(true);
   const error = ref('');
 
@@ -173,7 +173,9 @@
 
   useDashboardRefresh(async () => {
     try {
-      const dashboard = await getCommodityDashboardV1();
+      const dashboard = await getCommodityDashboardV1(
+        markets.flatMap((m) => [m.net, m.percentile]),
+      );
       groups.value = dashboard.groups;
       error.value = '';
     } catch (reason) {

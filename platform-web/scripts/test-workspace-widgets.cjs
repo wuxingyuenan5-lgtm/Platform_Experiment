@@ -1,0 +1,7 @@
+const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');const ts=require('typescript');const test=require('node:test');const assert=require('node:assert/strict');
+const file=path.join(__dirname,'../src/views/dashboard/workspace/moduleCatalog.ts');
+const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+function catalog(){const module={exports:{}};vm.runInNewContext(code,{exports:module.exports,require:()=>({researchModules:[{id:'macro',label:'宏观',sections:[{id:'rates',widgets:[{kind:'local-chart',localKey:'macro-vix',title:'VIX'},{kind:'local-chart',localKey:'gold-factor-model',title:'多图整板'}]}]}]}),Set,Map});return module.exports.moduleCatalog;}
+test('catalog offers individual charts, never page or bundled panel entries',()=>{const rows=catalog()(['research.read']);assert(rows.some(r=>r.widget?.localKey==='macro-vix'));assert(!rows.some(r=>r.widget?.localKey==='gold-factor-model'));assert(rows.every(r=>r.path.includes('workbenchWidget=')));assert(rows.filter(r=>r.broadView==='details').length===6);});
+test('unprivileged user has neither native nor database widgets',()=>{assert.equal(catalog()([],[{id:'x',name:'private',group:'g'}]).length,0);});
+test('database indicator is one selectable item, not a route page',()=>{const item=catalog()(['research.read'],[{id:'x',name:'指标',group:'宏观',unit:'%'}]).find(r=>r.path==='series:x');assert.equal(item.series.id,'x');assert.equal(item.widget,undefined);});

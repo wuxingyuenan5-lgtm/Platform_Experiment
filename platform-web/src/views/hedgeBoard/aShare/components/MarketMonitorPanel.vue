@@ -1,21 +1,13 @@
 <template>
-  <section class="monitor" aria-label="市场监测">
+  <section class="monitor" :aria-label="sectionTitle">
     <header
-      ><div><h2>市场监测</h2><p>股息 · 仓位 · 风格 · 盈利 · 交易热度</p></div></header
+      ><h2>{{ sectionTitle }}</h2></header
     >
-    <nav aria-label="监测分类"
-      ><button
-        v-for="t in tabs"
-        :key="t.key"
-        :aria-pressed="tab === t.key"
-        :class="{ active: tab === t.key }"
-        @click="tab = t.key"
-        >{{ t.name }}</button
-      ></nav
+    <p v-if="loading && !contextSection && tab !== 'style'" role="status"
+      >正在读取{{ sectionTitle }}…</p
     >
-    <p v-if="loading && !contextSection && tab !== 'style'" role="status">正在读取市场监测…</p>
     <p v-if="error && !contextSection && tab !== 'style'" role="alert"
-      >{{ error }} <button @click="load">重试</button></p
+      >{{ error }} <button @click="load(true)">重试</button></p
     >
     <MarketContextPanel v-if="contextSection" :section="contextSection" :refresh-key="refreshKey" />
     <template v-if="tab !== 'style' && !contextSection && data">
@@ -61,7 +53,7 @@
             ><option value="pingheng">平衡混合型</option
             ><option value="linghuo">灵活配置型</option></select
           ></label
-        ><a href="#/hedge-board/a-share?view=funds">查看公募定期披露持仓 ↗</a></div
+        ></div
       >
       <p class="definition"
         >估算股票仓位，与基金定期报告披露仓位分开展示。来源页面标注停止更新，以下以实际观测日期为准。</p
@@ -187,12 +179,12 @@
       /></details>
     </template>
     <p v-if="data && tab !== 'style' && !contextSection && !source?.data?.length" class="notice"
-      >当前来源暂无有效数据，其他分类可继续查看。</p
+      >当前来源暂无有效数据。</p
     >
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, ref, watch } from 'vue';
+  import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
   import {
     getMarketMonitor,
     type MarketMonitor,
@@ -201,12 +193,24 @@
     type MonitorValue,
     MarketContextSection,
   } from '@/api/cnMarketMonitor';
-  import { getEquityObservatory, type EquityThemes } from '@/api/equityObservatory';
+  import { type EquityThemes } from '@/api/equityObservatory';
+  import { researchRequest } from '@/api/hedgeResearch';
   import FinancingChart from './FinancingChart.vue';
   import EquityStylePanel from '../../components/EquityStylePanel.vue';
   import MarketContextPanel from './MarketContextPanel.vue';
 
-  const props = defineProps<{ refreshKey?: number }>();
+  const props = defineProps<{
+    refreshKey?: number;
+    section:
+      | 'dividend'
+      | 'fund'
+      | 'style'
+      | 'growth'
+      | 'crowding'
+      | 'risk'
+      | 'breadth'
+      | 'macroValue';
+  }>();
   const emit = defineEmits<{ (e: 'ready'): void }>();
   const tabs = [
     { key: 'dividend', name: '股息率' },
@@ -218,8 +222,9 @@
     { key: 'breadth', name: '市场宽度' },
     { key: 'macroValue', name: '总市值与GDP' },
   ];
-  const tab = ref('dividend'),
-    dividend = ref('shangzheng'),
+  const tab = computed(() => props.section);
+  const sectionTitle = computed(() => tabs.find((t) => t.key === tab.value)!.name);
+  const dividend = ref('shangzheng'),
     fund = ref('stock'),
     industry = ref('801080.SI');
   const contextSection = computed(() =>
@@ -244,8 +249,8 @@
     query = ref(''),
     growthSort = ref(true),
     heatMetric = ref('turnover');
-  const data = ref<MarketMonitor>(),
-    themes = ref<EquityThemes>(),
+  const data = shallowRef<MarketMonitor>(),
+    themes = shallowRef<Pick<EquityThemes, 'styles' | 'benchmark'>>(),
     error = ref(''),
     styleError = ref(''),
     loading = ref(false);
@@ -338,17 +343,31 @@
               ? `rgba(220,60,70,${0.06 + Number(v) / 500})`
               : `rgba(0,150,100,${0.06 + (100 - Number(v)) / 500})`,
         };
-  async function load() {
+  function currentKeys() {
+    if (tab.value === 'dividend') return ['dividend'];
+    if (tab.value === 'fund') return ['fund_' + fund.value];
+    if (tab.value === 'growth') return ['growth', 'growth_' + metric.value];
+    if (tab.value === 'crowding') return ['industry', 'congestion'];
+    return [];
+  }
+  async function load(force = false) {
     controller?.abort();
+    const keys = currentKeys();
+    if (!keys.length || (!force && keys.every((k) => data.value?.sources[k]))) {
+      loading.value = false;
+      emit('ready');
+      return;
+    }
     const current = new AbortController();
     controller = current;
     loading.value = true;
     error.value = '';
     try {
-      const result = await getMarketMonitor(current.signal);
-      if (!current.signal.aborted) data.value = result;
+      const result = await getMarketMonitor(current.signal, keys);
+      if (!current.signal.aborted)
+        data.value = { ...result, sources: { ...data.value?.sources, ...result.sources } };
     } catch {
-      if (!current.signal.aborted) error.value = '市场监测读取失败';
+      if (!current.signal.aborted) error.value = sectionTitle.value + '读取失败';
     } finally {
       if (!current.signal.aborted) {
         loading.value = false;
@@ -362,8 +381,12 @@
     styleController = current;
     styleError.value = '';
     try {
-      const result = await getEquityObservatory('cn', current.signal);
-      if (!current.signal.aborted) themes.value = result.themes || undefined;
+      const result = await researchRequest<Pick<EquityThemes, 'styles' | 'benchmark'>>({
+        method: 'GET',
+        url: '/research/equity-styles/cn',
+        signal: current.signal,
+      });
+      if (!current.signal.aborted) themes.value = result;
     } catch {
       if (!current.signal.aborted) styleError.value = '风格数据读取失败';
     }
@@ -371,13 +394,15 @@
   watch(
     () => props.refreshKey,
     () => {
-      load();
+      data.value = undefined;
+      load(true);
       if (tab.value === 'style') loadStyles();
     },
     { immediate: true },
   );
-  watch(tab, (value) => {
-    if (value === 'style' && !themes.value) loadStyles();
+  watch([tab, fund, metric], () => {
+    load();
+    if (tab.value === 'style' && !themes.value) loadStyles();
   });
   onBeforeUnmount(() => {
     controller?.abort();
@@ -387,6 +412,9 @@
 <style scoped>
   .monitor {
     min-width: 0;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #dce5ef;
     color: #17324d;
   }
 

@@ -86,4 +86,5 @@ def test_execution_reads_are_reused_within_the_short_admission_window() -> None:
         ("specification", "bybit-live-main"),
         ("quote", "bybit-live-main"),
         ("margin", "bybit-live-main"),
+        ("specification", "bybit-live-main"),
     ]

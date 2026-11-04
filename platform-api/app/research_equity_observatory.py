@@ -588,6 +588,8 @@ def produce_local(sources):
             try:
                 payload = build(stamp[:10], sources)
                 section_status["market"] = "ready"
+                if payload.get("themes") and payload["themes"].get("date") == payload.get("date"):
+                    section_status["themes"] = "ready"
                 if payload.get("themes") and payload["themes"].get("date") != payload.get("date"):
                     section_status["themes"] = "stale"
                 if "themes" in payload and payload["themes"] is None:
@@ -677,7 +679,7 @@ async def run_periodic():
         await asyncio.sleep(300)
 
 
-def read_equity_observatory(market):
+def read_equity_observatory(market, view=None):
     result = read_artifact(market)
     if not result:
         return {"market": market, "status": "no_data", "generatedAt": None}
@@ -703,4 +705,15 @@ def read_equity_observatory(market):
     health = read_artifact("health")
     if health.get("markets", {}).get(market, {}).get("status") == "error":
         result["status"] = "stale"
+    fields = {
+        "themes": {"themes", "structure"},
+        "valuation": {"valuationCharts"},
+        "crowding": {"themeCrowding", "breadth", "structure", "crowding", "indexCrowding", "indices"},
+        "structure": {"breadth", "structure", "crowding", "indexCrowding", "indices", "ratios", "participation", "risk"},
+        "overview": {"breadth"},
+        "hk": {"hongKong"},
+    }
+    if view in fields:
+        metadata = {"schemaVersion", "market", "status", "date", "generatedAt", "source", "sourceFetchedAt", "sources", "sectionStatus"}
+        return {key: value for key, value in result.items() if key in fields[view] | metadata}
     return result

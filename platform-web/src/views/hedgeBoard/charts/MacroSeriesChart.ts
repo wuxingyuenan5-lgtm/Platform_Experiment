@@ -94,7 +94,11 @@ export default defineComponent({
             : props.dataDomain === 'crypto'
             ? getCryptoDashboardV1
             : getMacroDashboardV1;
-        const dashboard = await loader();
+        const dashboard = await loader(
+          props.groupId === 'shfeGoldCurve'
+            ? [props.groupId, 'shfeGoldCurveHistory']
+            : [props.groupId],
+        );
         const group = dashboard.groups[props.groupId] ?? [];
         curveHistory.value =
           props.groupId === 'shfeGoldCurve' ? dashboard.groups.shfeGoldCurveHistory ?? group : [];

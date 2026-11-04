@@ -92,7 +92,8 @@
   });
   useDashboardRefresh(async () => {
     try {
-      snapshot.value = (await getCryptoDashboardV1()).optionExposure?.[props.market] ?? null;
+      snapshot.value =
+        (await getCryptoDashboardV1(['optionExposure'])).optionExposure?.[props.market] ?? null;
       error.value = !snapshot.value?.legs.length;
     } catch {
       snapshot.value = null;

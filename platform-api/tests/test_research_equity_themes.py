@@ -60,7 +60,7 @@ def test_etfs_are_separate_and_stale_stocks_do_not_enter_statistics(monkeypatch)
     assert result["items"][1]["medianReturn"] is None
 
 
-def test_us_projection_anchors_history_not_intraday_quote_and_preserves_stale(monkeypatch):
+def test_us_projection_uses_retained_closed_history_but_rejects_missing_sessions(monkeypatch):
     from app import research_equity_observatory as module
 
     points = history()
@@ -75,9 +75,12 @@ def test_us_projection_anchors_history_not_intraday_quote_and_preserves_stale(mo
         }
         for code, status in (("SPY", "ready"), ("NVDA", "ready"), ("AMD", "stale"))
     ]
+    rows.append({"id":"MSFT","symbol":"MSFT","status":"stale","history":points[:-1],"name":"MSFT"})
     monkeypatch.setattr(module, "read_dataset", lambda _: {"rows": rows, "status": "partial"})
     result = module.build_us("2026-09-22", {})
     assert result["date"] == points[-1]["date"]
     members = [m for t in result["themes"]["items"] for m in t["members"]]
     assert next(m for m in members if m["code"] == "NVDA")["return20"] == 20
-    assert next(m for m in members if m["code"] == "AMD")["return20"] is None
+    # A failed latest transport does not invalidate already stored, same-session closes.
+    assert next(m for m in members if m["code"] == "AMD")["return20"] == 20
+    assert next(m for m in members if m["code"] == "MSFT")["return20"] is None

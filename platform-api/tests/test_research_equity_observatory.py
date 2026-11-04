@@ -692,3 +692,20 @@ def test_cn_new_snapshot_retains_last_closed_theme_until_benchmark_catches_up(mo
     stocks[0]["observedAt"] = "2026-10-29T07:01:00Z"
     result = module.build_cn("2026-10-29", {})
     assert result["themes"] == old_themes
+
+
+def test_equity_views_keep_their_data_without_unrelated_histories(tmp_path, monkeypatch):
+    monkeypatch.setenv("HEDGE_BOARD_DATA_ROOT", str(tmp_path))
+    from app.research_equity_observatory import read_equity_observatory
+    payload = {"market": "cn", "status": "ready", "generatedAt": datetime.now(UTC).isoformat(),
+        "sources": [{"name": "fixture"}], "themes": {"items": []}, "structure": {"industries": []},
+        "valuationCharts": [{"history": [{"date": "2026-11-02", "pe": "1.234500", "pb": None}]}],
+        "themeCrowding": {"items": []}, "hongKong": {"history": []}, "breadth": {"valid": 42}}
+    publish_artifact("cn", payload)
+    for view, wanted in [("themes", "themes"), ("valuation", "valuationCharts"), ("crowding", "themeCrowding"), ("hk", "hongKong"), ("overview", "breadth")]:
+        scoped = read_equity_observatory("cn", view)
+        assert scoped[wanted] == payload[wanted] and scoped["sources"] == payload["sources"]
+        if view != "valuation": assert "valuationCharts" not in scoped
+        if view != "crowding": assert "themeCrowding" not in scoped
+    assert read_equity_observatory("cn", "valuation")["valuationCharts"][0]["history"][0]["pb"] is None
+    assert read_equity_observatory("cn")["themeCrowding"] == payload["themeCrowding"]

@@ -124,7 +124,14 @@
       : value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
   useDashboardRefresh(async () => {
     try {
-      groups.value = (await getMacroDashboardV1()).groups;
+      groups.value = (
+        await getMacroDashboardV1([
+          'economicPulseUs',
+          'economicPulseCn',
+          'economicPulseEurope',
+          'economicPulseJapan',
+        ])
+      ).groups;
       error.value = false;
       if (!endMonth.value) {
         endMonth.value =

@@ -45,7 +45,9 @@ def test_ceo_permissions_are_explicit_and_safety_gates_remain_independent() -> N
     assert has_permission(("ceo",), "live_session:revoke")
     assert has_permission(("ceo",), "reconciliation:review")
     assert not has_permission(("ceo",), "trade:submit")
-    assert not has_permission(("ceo",), "risk:manage")
+    assert has_permission(("ceo",), "risk:manage")
+    for role in ("tech_lead", "employee", "member"):
+        assert not has_permission((role,), "risk:manage")
 
 
 def test_tech_lead_role_changes_still_use_protected_target_policy() -> None:

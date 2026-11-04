@@ -23,7 +23,7 @@ from tests.test_cross_spread_market_lifecycle import (
 
 @pytest.mark.parametrize("session_end", ["expired", "logout"])
 def test_background_exit_survives_browser_end_and_application_restart(
-    monkeypatch, tmp_path, session_end
+    monkeypatch, tmp_path, session_end, cross_native_specs
 ):
     configure_platform(tmp_path)
     settings = get_settings()

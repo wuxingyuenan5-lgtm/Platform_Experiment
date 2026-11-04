@@ -1241,6 +1241,28 @@ PLATFORM_MIGRATIONS += (
 )
 
 
+PLATFORM_MIGRATIONS += (
+    Migration(version=47, name="personal-workspace-documents", statements=(
+        "CREATE TABLE user_workspace_documents (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL CHECK(kind IN ('cards','events')), payload_json TEXT NOT NULL, row_version INTEGER NOT NULL CHECK(row_version>0), updated_at TEXT NOT NULL, PRIMARY KEY(user_id,kind))",
+    )),
+)
+
+
+PLATFORM_MIGRATIONS += (
+    Migration(
+        version=48,
+        name="trade-command-symbol-identity",
+        statements=(
+            "ALTER TABLE trade_commands ADD COLUMN symbol TEXT",
+            """UPDATE trade_commands SET symbol = (
+                SELECT MIN(o.symbol) FROM orders o WHERE o.command_id = trade_commands.id
+                HAVING COUNT(DISTINCT o.symbol) = 1
+            ) WHERE symbol IS NULL""",
+        ),
+    ),
+)
+
+
 def validate_migrations(migrations: tuple[Migration, ...]) -> None:
     versions = [migration.version for migration in migrations]
     names = [migration.name for migration in migrations]

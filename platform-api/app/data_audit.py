@@ -47,7 +47,7 @@ strategy_account_bindings instruments instrument_mappings contract_specification
 external_order_references pnl_attribution_items strategy_nav_snapshots strategy_runs risk_decisions
 audit_events orders execution_batch_legs fills positions economic_events market_spread_snapshots
 pnl_results schema_migrations cross_spread_exit_plans users user_sessions password_reset_tickets
-member_fund_holdings fund_nav_snapshots user_research_watchlists user_research_market_layouts
+member_fund_holdings fund_nav_snapshots user_research_watchlists user_research_market_layouts user_workspace_documents
 trading_kill_switches
 kill_switch_commands execution_risk_policies execution_risk_policy_commands execution_batch_risk
 execution_risk_actions venue_reconciliation_runs reconciliation_differences live_trading_sessions
@@ -783,6 +783,7 @@ def inspect_artifacts(now):
                     series_row.get("retrievedAt"),
                     {
                         "daily_business_day": 72,
+                        "daily_weekly_release": 336,
                         "weekly": 240,
                         "monthly": 1080,
                         "quarterly": 2880,
@@ -802,6 +803,10 @@ def inspect_artifacts(now):
                         and item["status"] == "healthy"
                     ):
                         item.update(status="warning", message="来源观测日期落后于最近工作日")
+                if str(series_row.get("frequency", "")).lower() == "daily_weekly_release":
+                    observed = str(series_row.get("observationDate") or "")[:10]
+                    if observed and observed < (now.date() - timedelta(days=14)).isoformat() and item["status"] == "healthy":
+                        item.update(status="warning", message="来源观测日期超过周度发布容限")
                 if (series_row.get("isStale") or status not in {"ready", "available"}) and item[
                     "status"
                 ] != "error":

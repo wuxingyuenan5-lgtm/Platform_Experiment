@@ -17,7 +17,7 @@ EXPECTED_MODEL_SCHEMA_HASHES = {
         "8688cabfd1ffb29657c3ce59bb9ea382ad35417b0a52dc11a23f053c9e922360"
     ),
     "ReconciliationDifferenceResponse": (
-        "6579651679e172b240a7ce5882e28b6557a8d76f5536d8f17d7ff8b0e70ced15"
+        "e451c6c57889bb13a5cbb5bd0a77751eb62c0d33f617de39a6a7ef1171fc4434"
     ),
     "ResolveDifferenceRequest": (
         "9679c1b4f03c2e557e5a26e0c5b36a464357360f1e1963d38211c3808ea8a7bf"
@@ -30,7 +30,7 @@ EXPECTED_MODEL_SCHEMA_HASHES = {
     ),
 }
 EXPECTED_RECONCILIATION_OPENAPI_HASH = (
-    "01a6a928c38eeafa7a0f059732b2499ffe0545cdd0b77a62cae388794c097c0b"
+    "ad2418212fdba5329165ab45aff6a4b28fd8502d2c4f08a0b96d0210d7257ace"
 )
 
 
@@ -47,7 +47,8 @@ def test_compatibility_exports_are_identical_schema_objects() -> None:
     assert compatibility.DifferenceStatus is schemas.DifferenceStatus
 
 
-def test_model_json_schemas_match_pre_extraction_goldens() -> None:
+def test_model_json_schemas_match_timestamp_reconciliation_contract() -> None:
+    assert "timestamp_mismatch" in schemas.ReconciliationDifferenceResponse.model_json_schema()["properties"]["differenceType"]["enum"]
     actual = {
         name: canonical_hash(getattr(schemas, name).model_json_schema())
         for name in MODEL_NAMES
@@ -56,7 +57,7 @@ def test_model_json_schemas_match_pre_extraction_goldens() -> None:
     assert actual == EXPECTED_MODEL_SCHEMA_HASHES
 
 
-def test_reconciliation_openapi_fragment_matches_pre_extraction_golden() -> None:
+def test_reconciliation_openapi_fragment_matches_timestamp_reconciliation_contract() -> None:
     openapi = app.openapi()
     fragment = {
         "schemas": {

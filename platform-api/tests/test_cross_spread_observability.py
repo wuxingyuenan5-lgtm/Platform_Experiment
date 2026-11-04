@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+import pytest
+
 from app.cross_spread_live_read_client import CrossSpreadLiveReadError
 from app.cross_spread_observability_service import get_cross_spread_observability
+from app.database import initialize_database
+
+
+@pytest.fixture(autouse=True)
+def account_bindings():
+    initialize_database()
 
 
 def _risk(account_id: str) -> dict[str, object]:

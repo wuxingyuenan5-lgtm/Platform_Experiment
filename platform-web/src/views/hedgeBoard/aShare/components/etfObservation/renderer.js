@@ -4,7 +4,7 @@ import { MarkLineComponent, MarkAreaComponent } from 'echarts/components';
 
 chartEngine.use([MarkLineComponent, MarkAreaComponent]);
 
-export function mountEtfObservation(root, initialData, request) {
+export function mountEtfObservation(root, initialData, request, options = {}) {
   const realWindow = globalThis.window;
   const realDocument = globalThis.document;
   let active = true;
@@ -55,15 +55,45 @@ export function mountEtfObservation(root, initialData, request) {
     }
   };
   root.addEventListener('click', navClick);
-  document.getElementById('supportCount').textContent =
-    '共' + (initialData.cmpData?.support?.length || 0) + '天';
+  if (document.getElementById('supportCount'))
+    document.getElementById('supportCount').textContent =
+      '共' + (initialData.cmpData?.support?.length || 0) + '天';
   const daily = initialData.dailyData?.dates || [],
     broad = initialData.broadData?.dates || [];
-  document.getElementById('dailyRange').textContent =
-    '20只重点ETF · ' + daily[0] + ' ~ ' + daily.at(-1) + '（' + daily.length + '个交易日）';
-  document.getElementById('broadRange').textContent = broad[0] + ' ~ ' + broad.at(-1);
+  if (document.getElementById('dailyRange'))
+    document.getElementById('dailyRange').textContent =
+      '20只重点ETF · ' + daily[0] + ' ~ ' + daily.at(-1) + '（' + daily.length + '个交易日）';
+  if (document.getElementById('broadRange'))
+    document.getElementById('broadRange').textContent = broad[0] + ' ~ ' + broad.at(-1);
+  const pendingCharts = [];
+  function visible(element) {
+    if (!element || !element.clientWidth) return false;
+    for (
+      let parent = element.parentElement;
+      parent && parent !== root;
+      parent = parent.parentElement
+    ) {
+      if (parent.tagName === 'DETAILS' && !parent.open) return false;
+    }
+    return true;
+  }
+  function whenVisible(id, initialize) {
+    const element = document.getElementById(id);
+    if (!element) return;
+    if (visible(element)) initialize();
+    else pendingCharts.push({ element, initialize });
+  }
+  function revealCharts() {
+    for (let i = pendingCharts.length - 1; i >= 0; i--) {
+      if (visible(pendingCharts[i].element)) pendingCharts.splice(i, 1)[0].initialize();
+    }
+    root.querySelectorAll('[_echarts_instance_]').forEach((el) => {
+      if (visible(el)) chartEngine.getInstanceByDom(el)?.resize();
+    });
+  }
+  root.addEventListener('toggle', revealCharts, true);
   /* 逻辑层：分钟观测 + 托底信号 + 日度全景 + 放量案例（原生JS，无框架无构建） */
-  (function () {
+  whenVisible('chart', function () {
     'use strict';
 
     /* 2026-10-15 换仓后的新篮子：沪深300/科创50/创业板/中证500/中证1000/中证A500/上证50 等
@@ -388,7 +418,7 @@ export function mountEtfObservation(root, initialData, request) {
     var cumChart = null;
     function ensureCumChart() {
       var el = document.getElementById('chartCum');
-      if (!el) return null;
+      if (!visible(el)) return null;
       if (!cumChart) cumChart = echarts.init(el);
       return cumChart;
     }
@@ -750,11 +780,12 @@ export function mountEtfObservation(root, initialData, request) {
     });
 
     renderStatic();
+    whenVisible('chartCum', drawCumChart);
     setTimeout(loadAll, 1500);
     setInterval(tick, 1000);
-  })();
+  });
 
-  (function () {
+  whenVisible('chartAmt', function () {
     'use strict';
     var D = (window.__ISLANDS && window.__ISLANDS.cmpData) || {};
     var support = D.support || [],
@@ -770,7 +801,11 @@ export function mountEtfObservation(root, initialData, request) {
     }
 
     document.getElementById('tagAmt').textContent =
-      '数据截至 ' + today.date + '：' + fmt(today.amount, 1) + '亿（正在获取实时…）';
+      '数据截至 ' +
+      today.date +
+      '：' +
+      fmt(today.amount, 1) +
+      (options.live === false ? '亿' : '亿（正在获取实时…）');
     function prevTradingDay(offset) {
       var d = new Date();
       d.setHours(0, 0, 0, 0);
@@ -1177,17 +1212,19 @@ export function mountEtfObservation(root, initialData, request) {
         })
         .catch(function (e) {});
     }
-    refreshToday();
-    setInterval(function () {
-      if (isTradingTime()) refreshToday();
-    }, 60000);
+    if (options.live !== false) {
+      refreshToday();
+      setInterval(function () {
+        if (isTradingTime()) refreshToday();
+      }, 60000);
+    }
     on(window, 'resize', function () {
       c1.resize();
       c2.resize();
     });
-  })();
+  });
 
-  (function () {
+  whenVisible('chartDAmt', function () {
     'use strict';
     var D = (window.__ISLANDS && window.__ISLANDS.dailyData) || {};
     var dates = D.dates || [],
@@ -1305,9 +1342,9 @@ export function mountEtfObservation(root, initialData, request) {
         if (c && c.resize) c.resize();
       });
     });
-  })();
+  });
 
-  (function () {
+  whenVisible('chartTypCase', function () {
     'use strict';
     var D = (window.__ISLANDS && window.__ISLANDS.typData) || {};
     var slots = D.slots || [],
@@ -1400,13 +1437,13 @@ export function mountEtfObservation(root, initialData, request) {
       c1.resize();
       c2.resize();
     });
-  })();
+  });
 
   /* ==========================================================================
    第三部分补充图（2026-10-15 换仓后新增）
    全市场宽基ETF日度净流入（按跟踪指数分类堆积）+ 累计净流入线（右轴）
    ========================================================================== */
-  (function () {
+  whenVisible(document.getElementById('chartBroad') ? 'chartBroad' : 'broadTable', function () {
     'use strict';
     var I = window.__ISLANDS || {};
     var BR = I.broadData || {};
@@ -1560,7 +1597,7 @@ export function mountEtfObservation(root, initialData, request) {
       html += '</tbody>';
       document.getElementById('broadTable').innerHTML = html;
     }
-  })();
+  });
 
   /* ==========================================================================
    区间框选求和
@@ -1717,9 +1754,9 @@ export function mountEtfObservation(root, initialData, request) {
   })();
 
   const resize = new ResizeObserver(() => {
-    root
-      .querySelectorAll('[_echarts_instance_]')
-      .forEach((el) => chartEngine.getInstanceByDom(el)?.resize());
+    root.querySelectorAll('[_echarts_instance_]').forEach((el) => {
+      if (visible(el)) chartEngine.getInstanceByDom(el)?.resize();
+    });
   });
   resize.observe(root);
   return () => {
@@ -1729,6 +1766,7 @@ export function mountEtfObservation(root, initialData, request) {
     timeouts.forEach((id) => realWindow.clearTimeout(id));
     listeners.forEach(([type, handler]) => realWindow.removeEventListener(type, handler));
     root.removeEventListener('click', navClick);
+    root.removeEventListener('toggle', revealCharts, true);
     root
       .querySelectorAll('[_echarts_instance_]')
       .forEach((el) => chartEngine.getInstanceByDom(el)?.dispose());

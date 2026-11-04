@@ -91,8 +91,9 @@ def batch_payload(direction: str) -> dict[str, object]:
     }
 
 
+@pytest.mark.parametrize("changed", [{"quantity": "2"}, {"symbol": "ETHUSDT"}, {"symbol": "btcusdt"}])
 def test_trade_command_key_cannot_be_reused_for_different_payload(
-    monkeypatch,
+    monkeypatch, changed,
     tmp_path: Path,
 ) -> None:
     settings = get_settings()
@@ -123,7 +124,7 @@ def test_trade_command_key_cannot_be_reused_for_different_payload(
         conflict = client.post(
             "/api/v1/trading/commands",
             headers=headers("admin-token"),
-            json=trade_command_payload("2"),
+            json={**trade_command_payload("1"), **changed},
         )
 
     assert first.status_code == 200
@@ -174,3 +175,43 @@ def test_execution_batch_key_cannot_be_reused_for_different_payload(
 
 
 pytestmark = pytest.mark.usefixtures("generic_trading_instance")
+
+
+@pytest.mark.parametrize("changed", [{"quantity": "2"}, {"side": "sell"}, {"price": "101"}, {"symbol": "ETHUSDT"}])
+def test_unknown_command_rejects_changed_retry_after_restart_without_new_effects(
+    monkeypatch, changed
+):
+    import httpx
+
+    from app.database import connection
+
+    submissions = []
+
+    def lost_response(url, **kwargs):
+        assert url.endswith("/commands/orders")
+        submissions.append(kwargs["json"])
+        raise httpx.ReadTimeout("response lost after Runtime acceptance")
+
+    monkeypatch.setattr("app.runtime_transport.post", lost_response)
+    payload = trade_command_payload("1")
+    with TestClient(app) as client:
+        first = client.post("/api/v1/trading/commands", json=payload)
+        assert first.status_code == 200, first.text
+        original = first.json()
+        assert original["status"] == "result_unknown"
+
+    with TestClient(app) as restarted:
+        conflict = restarted.post("/api/v1/trading/commands", json={**payload, **changed})
+        assert conflict.status_code == 409, conflict.text
+        assert "different trade command payload" in conflict.json()["detail"]
+        replay = restarted.post("/api/v1/trading/commands", json=payload)
+        assert replay.status_code == 200, replay.text
+        assert replay.json()["tradeCommandId"] == original["tradeCommandId"]
+        assert replay.json()["platformOrderId"] == original["platformOrderId"]
+        assert replay.json()["status"] == "result_unknown"
+
+    assert len(submissions) == 1
+    with connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM trade_commands").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM orders").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM fills").fetchone()[0] == 0

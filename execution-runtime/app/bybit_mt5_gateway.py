@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections import OrderedDict
 from concurrent.futures import Future
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -49,6 +50,7 @@ class BybitMt5Gateway:
     name = "bybit_mt5"
     _QUOTE_CACHE_SECONDS = 1.0
     _MARGIN_CACHE_SECONDS = 15.0
+    _EXECUTION_READ_CACHE_LIMIT = 1024
 
     def __init__(
         self,
@@ -66,7 +68,9 @@ class BybitMt5Gateway:
         # Keep construction side-effect free. Production MT5 workers are created
         # lazily from the explicit account id on the first account-scoped call.
         self.mt5: Any = mt5 or StrictMt5AcceptanceAdapter(self.settings)
-        self._execution_read_cache: dict[tuple[object, ...], tuple[float, Any]] = {}
+        self._execution_read_cache: OrderedDict[tuple[object, ...], tuple[float, Any]] = (
+            OrderedDict()
+        )
         self._execution_read_lock = Lock()
         self._execution_reads: dict[tuple[object, ...], Future[Any]] = {}
         self._execution_read_generation: dict[str, int] = {}
@@ -606,8 +610,12 @@ class BybitMt5Gateway:
         # Independent keys and writes never wait behind this bookkeeping lock.
         with self._execution_read_lock:
             now = monotonic()
+            for expired_key, (expires_at, _) in list(self._execution_read_cache.items()):
+                if expires_at < now:
+                    self._execution_read_cache.pop(expired_key, None)
             cached = self._execution_read_cache.get(key)
-            if cached is not None and now - cached[0] <= ttl_seconds:
+            if cached is not None:
+                self._execution_read_cache.move_to_end(key)
                 return cached[1]
             generation = self._execution_read_generation.get(key[1], 0)
             flight_key = (*key, generation)
@@ -622,8 +630,14 @@ class BybitMt5Gateway:
         try:
             value = loader()
             with self._execution_read_lock:
-                if self._execution_read_generation.get(key[1], 0) == generation:
-                    self._execution_read_cache[key] = (now, value)
+                if (
+                    self._execution_read_generation.get(key[1], 0) == generation
+                    and monotonic() <= now + ttl_seconds
+                ):
+                    self._execution_read_cache[key] = (now + ttl_seconds, value)
+                    self._execution_read_cache.move_to_end(key)
+                    while len(self._execution_read_cache) > self._EXECUTION_READ_CACHE_LIMIT:
+                        self._execution_read_cache.popitem(last=False)
             pending.set_result(value)
             return value
         except BaseException as exc:

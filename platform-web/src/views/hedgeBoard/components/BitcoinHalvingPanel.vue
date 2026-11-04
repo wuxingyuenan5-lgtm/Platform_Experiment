@@ -310,7 +310,7 @@
   }
   useDashboardRefresh(async () => {
     try {
-      const result = await getCryptoDashboardV1();
+      const result = await getCryptoDashboardV1(['halvingCycles']);
       error.value = '';
       const group = result.groups.halvingCycles ?? [];
       if (group.length !== 4) throw new Error('incomplete cycles');

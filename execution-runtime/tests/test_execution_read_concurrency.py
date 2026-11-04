@@ -66,3 +66,34 @@ def test_leverage_change_cannot_repopulate_old_margin_cache():
         release.set()
         assert pending.result() == "old"
     assert reader._cached_execution_read(key, 15, lambda: pytest.fail("lost new cache")) == "new"
+
+
+def test_expired_price_keys_are_reclaimed_and_live_entries_are_bounded(monkeypatch):
+    reader = gateway()
+    clock = [0.0]
+    monkeypatch.setattr("app.bybit_mt5_gateway.monotonic", lambda: clock[0])
+    for price in range(2000):
+        clock[0] += 20
+        key = ("margin", "a", "BTC", "buy", "1", str(price))
+        reader._cached_execution_read(key, 15, lambda: price)
+    assert len(reader._execution_read_cache) == 1
+    for price in range(2000, 4000):
+        key = ("margin", "a", "BTC", "buy", "1", str(price))
+        reader._cached_execution_read(key, 15, lambda: price)
+    assert len(reader._execution_read_cache) == reader._EXECUTION_READ_CACHE_LIMIT
+    key = ("margin", "a", "BTC", "buy", "1", "3999")
+    assert reader._cached_execution_read(key, 15, lambda: pytest.fail("lost cache")) == 3999
+
+
+def test_loader_that_outlives_ttl_does_not_leave_a_reusable_entry(monkeypatch):
+    reader = gateway()
+    clock = [0.0]
+    monkeypatch.setattr("app.bybit_mt5_gateway.monotonic", lambda: clock[0])
+
+    def slow():
+        clock[0] = 2
+        return "old"
+
+    key = ("quote", "a", "BTC")
+    assert reader._cached_execution_read(key, 1, slow) == "old"
+    assert reader._cached_execution_read(key, 1, lambda: "fresh") == "fresh"

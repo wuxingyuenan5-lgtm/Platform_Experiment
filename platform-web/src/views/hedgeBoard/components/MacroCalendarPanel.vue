@@ -1,4 +1,5 @@
 <template>
+  <EventValidationCalendar />
   <section class="content-panel" data-testid="macro-calendar-panel">
     <header>
       <h2>宏观日历</h2>
@@ -29,6 +30,7 @@
 
 <script setup lang="ts">
   import { ref } from 'vue';
+  import EventValidationCalendar from './EventValidationCalendar.vue';
   import TradingViewEconomicCalendarPanel from '../tradingTools/components/TradingViewEconomicCalendarPanel.vue';
 
   const props = defineProps<{ initiallyExpanded?: boolean }>();

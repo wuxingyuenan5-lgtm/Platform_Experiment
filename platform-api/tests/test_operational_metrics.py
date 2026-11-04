@@ -31,6 +31,9 @@ def test_scrape_reads_existing_snapshot_without_writes_or_financial_labels(monke
     initialize_database()
     stamp = (datetime.now(UTC) - timedelta(seconds=120)).isoformat()
     with connection() as db:
+        # Model an older store missing risk persistence; current migration 33
+        # creates this table at startup, so an ordinary fresh DB cannot do that.
+        db.execute("DROP TABLE execution_batch_risk")
         db.execute(
             "INSERT INTO strategy_runs "
             "(id,idempotency_key,strategy_instance_id,strategy_key,direction,status,"

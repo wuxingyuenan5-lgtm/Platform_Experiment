@@ -7,7 +7,8 @@
   | 'external-link';
 
 export type LocalWidgetKey =
-  | 'macro-liquidity-lens'
+  | 'crypto-correlation-ndx'
+  | 'crypto-correlation-xau'
   | 'macro-economic-pulse'
   | 'macro-us-claims'
   | 'macro-us-job-openings'
@@ -1207,6 +1208,8 @@ export const researchModules: ResearchModule[] = [
         description: '用于观察筹码成本分布、地址结构、周期位置与研究观点。',
         layout: 'three',
         widgets: [
+          localChart('BTC / 纳指 · 滚动相关性', '', 'crypto-correlation-ndx', { height: 540 }),
+          localChart('BTC / XAU · 滚动相关性', '', 'crypto-correlation-xau', { height: 540 }),
           localChart(
             'BTC ETF 溢价 / 折价',
             'IBIT / BITB / HODL · 发行方日度披露',
@@ -1367,9 +1370,6 @@ for (const section of researchModules.find((module) => module.id === 'macro')!.s
 }
 
 const macroSections = researchModules.find((module) => module.id === 'macro')!.sections;
-macroSections
-  .find((section) => section.id === 'macro-liquidity')!
-  .widgets.unshift(localChart('美元流动性透镜', '', 'macro-liquidity-lens', { height: 860 }));
 const macroEconomy = macroSections.find((section) => section.id === 'macro-growth')!;
 macroEconomy.widgets.unshift(
   localChart('重点经济数据一览', '', 'macro-economic-pulse', { height: 660 }),

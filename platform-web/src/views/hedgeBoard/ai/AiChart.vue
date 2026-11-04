@@ -39,6 +39,7 @@
     color: string;
     bar?: boolean;
     scatter?: boolean;
+    observedLine?: boolean;
     right?: boolean;
     unit?: string;
   }
@@ -65,7 +66,7 @@
       await nextTick();
       if (!element.value || !filtered.value.length) return;
       const rows = filtered.value;
-      const temporal = props.lines.every((line) => line.scatter);
+      const temporal = props.lines.every((line) => line.scatter || line.observedLine);
       chart.setOptions(
         {
           animation: false,
@@ -115,7 +116,7 @@
             name: l.name,
             type: l.scatter ? 'scatter' : l.bar ? 'bar' : 'line',
             symbolSize: l.scatter ? 7 : 4,
-            showSymbol: !!l.scatter,
+            showSymbol: !!(l.scatter || l.observedLine),
             connectNulls: false,
             yAxisIndex: l.right ? 1 : 0,
             data: rows.map((r) => (temporal ? [r.date, numeric(r[l.key])] : numeric(r[l.key]))),

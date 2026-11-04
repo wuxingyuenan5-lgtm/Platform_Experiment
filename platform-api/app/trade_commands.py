@@ -90,8 +90,9 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
             """
             INSERT OR IGNORE INTO trade_commands (
                 id, idempotency_key, strategy_instance_id, account_id, instrument_id,
-                command_type, side, order_type, quantity, price, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                command_type, side, order_type, quantity, price, status, created_at, updated_at,
+                symbol
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 trade_command_id,
@@ -107,6 +108,7 @@ def create_trade_command(request: CreateTradeCommandRequest) -> TradeCommandResp
                 "accepted",
                 created_at,
                 created_at,
+                request.symbol,
             ),
         )
         if cursor.rowcount == 0:
@@ -252,6 +254,7 @@ def assert_trade_command_request_matches(row, request: CreateTradeCommandRequest
         row["strategy_instance_id"] == request.strategy_instance_id
         and row["account_id"] == request.account_id
         and row["instrument_id"] == request.instrument_id
+        and row["symbol"] == request.symbol
         and row["side"] == request.side
         and row["order_type"] == request.order_type
         and Decimal(row["quantity"]) == request.quantity
@@ -290,7 +293,7 @@ def find_trade_command_by_idempotency_key(idempotency_key: str, *, db=None):
 def trade_command_query(where_clause: str) -> str:
     return f"""
         SELECT tc.id, tc.idempotency_key, tc.strategy_instance_id, tc.account_id,
-               tc.instrument_id, tc.side, tc.order_type, tc.quantity, tc.price,
+               tc.instrument_id, tc.symbol, tc.side, tc.order_type, tc.quantity, tc.price,
                tc.status, tc.created_at, tc.updated_at, o.id AS order_id
         FROM trade_commands tc
         LEFT JOIN orders o ON o.command_id = tc.id

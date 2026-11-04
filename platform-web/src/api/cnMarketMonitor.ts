@@ -35,9 +35,10 @@ export const getMarketContext = (
     url: `/research/a-share/market-monitor?section=${section}`,
     signal,
   });
-export const getMarketMonitor = (signal?: AbortSignal) =>
+export const getMarketMonitor = (signal?: AbortSignal, keys?: string[]) =>
   researchRequest<MarketMonitor>({
     method: 'GET',
     url: '/research/a-share/market-monitor',
+    params: { keys: keys?.join(',') },
     signal,
   });

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import connection
 from app.main import app
+from tests.test_cross_spread import authenticate_ceo
 
 
 def filled_runtime_response(command: dict[str, object]) -> object:
@@ -75,6 +76,7 @@ def funding_run_payload() -> dict[str, object]:
 def test_controlled_funding_rejects_legacy_run_without_creating_orders(tmp_path: Path) -> None:
     get_settings().database_path = str(tmp_path / "strategy-run.db")
     with TestClient(app) as client:
+        authenticate_ceo(client)
         url = "/api/v1/strategies/instances/strategy_funding_arbitrage_instance_default/runs"
         response = client.post(url, json=funding_run_payload())
         assert response.status_code == 403

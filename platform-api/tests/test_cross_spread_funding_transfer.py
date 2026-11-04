@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.config import get_settings
 from app.database import connection
 from app.main import app
+from tests.test_cross_spread import authenticate_ceo
 
 QUOTE_URL = "/api/v1/trading/cross-spread/funding-transfer/quote"
 CREATE_URL = "/api/v1/trading/cross-spread/funding-transfer"
@@ -74,6 +75,7 @@ def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
     get_settings().database_path = str(tmp_path / "funding-transfer-quote.db")
     _configure_quote(monkeypatch)
     with TestClient(app) as client:
+        authenticate_ceo(client)
         quote = client.get(QUOTE_URL)
     assert quote.status_code == 200, quote.text
     assert quote.json()["suggestedDirection"] == "bybit_to_mt5"
@@ -91,6 +93,7 @@ def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
 
     _configure_quote(monkeypatch, unavailable_readiness)
     with TestClient(app) as client:
+        authenticate_ceo(client)
         unavailable = client.get(QUOTE_URL)
     assert unavailable.status_code == 200
     assert unavailable.json()["bybitTransferable"]["amount"] is None
@@ -99,6 +102,7 @@ def test_quote_uses_decimal_half_difference_and_never_turns_failure_into_zero(
     assert unavailable.json()["mode"] == "unavailable"
 
     with TestClient(app) as client:
+        authenticate_ceo(client)
         blocked = client.post(CREATE_URL, json=_payload(key="permission-blocked", amount="10"))
     assert blocked.status_code == 423
     assert "ACCOUNT_TRANSFER_PERMISSION_REQUIRED" in blocked.json()["detail"]
@@ -160,6 +164,7 @@ def test_fake_transfer_executes_two_internal_steps_without_trading_objects(
         transfer_step,
     )
     with TestClient(app) as client:
+        authenticate_ceo(client)
         response = client.post(
             CREATE_URL,
             json=_payload(key=f"two-step-{direction}", direction=direction, amount="10.25"),
@@ -168,8 +173,10 @@ def test_fake_transfer_executes_two_internal_steps_without_trading_objects(
     assert response.json()["status"] == "completed"
     assert [(source, destination) for source, destination, _ in calls] == expected_path
     assert all(amount == Decimal("10.25") for _, _, amount in calls)
-    assert response.json()["requestedBy"] == settings.development_user_id
     with connection() as db:
+        assert response.json()["requestedBy"] == db.execute(
+            "SELECT id FROM users WHERE username='cross_test_owner'"
+        ).fetchone()["id"]
         assert db.execute("SELECT COUNT(*) FROM strategy_runs").fetchone()[0] == 0
         assert db.execute("SELECT COUNT(*) FROM execution_batches").fetchone()[0] == 0
         assert db.execute("SELECT COUNT(*) FROM trade_commands").fetchone()[0] == 0
@@ -198,6 +205,7 @@ def test_transfer_replay_conflict_and_public_payload_boundary(monkeypatch, tmp_p
         transfer_step,
     )
     with TestClient(app) as client:
+        authenticate_ceo(client)
         first = client.post(CREATE_URL, json=_payload(amount="10.125"))
         replay = client.post(CREATE_URL, json=_payload(amount="10.125"))
         conflict = client.post(CREATE_URL, json=_payload(amount="10.126"))
@@ -244,6 +252,7 @@ def test_second_step_failure_leaves_funds_in_funding_and_unknown_is_not_retried(
         partial_step,
     )
     with TestClient(app) as client:
+        authenticate_ceo(client)
         failed = client.post(CREATE_URL, json=_payload(key="partial", amount="10"))
     assert failed.status_code == 200
     assert failed.json()["status"] == "failed"
@@ -262,6 +271,7 @@ def test_second_step_failure_leaves_funds_in_funding_and_unknown_is_not_retried(
         unknown_step,
     )
     with TestClient(app) as client:
+        authenticate_ceo(client)
         unknown = client.post(CREATE_URL, json=_payload(key="unknown", amount="10"))
         replay = client.post(CREATE_URL, json=_payload(key="unknown", amount="10"))
     assert unknown.json()["status"] == "result_unknown"
@@ -276,6 +286,7 @@ def test_second_step_failure_leaves_funds_in_funding_and_unknown_is_not_retried(
         },
     )
     with TestClient(app) as client:
+        authenticate_ceo(client)
         reconciled = client.get(
             f"/api/v1/trading/cross-spread/funding-transfers/{unknown.json()['transferId']}"
         )
@@ -321,6 +332,7 @@ def test_live_transfer_uses_one_official_runtime_step_and_releases_claims(
         transfer_step,
     )
     with TestClient(app) as client:
+        authenticate_ceo(client)
         created = client.post(CREATE_URL, json=_payload(key="live-direct", amount="25"))
     assert created.status_code == 200, created.text
     assert created.json()["status"] == "completed"

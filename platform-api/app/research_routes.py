@@ -137,11 +137,25 @@ def ai_industry(_: ResearchPrincipal):
 
 
 @router.get("/a-share/market-monitor")
-def cn_market_monitor(_: ResearchPrincipal, section: str | None = Query(default=None, pattern="^(risk|breadth|macroValue|valuation)$")):
+def cn_market_monitor(_: ResearchPrincipal, section: str | None = Query(default=None, pattern="^(risk|breadth|macroValue|valuation)$"), keys: str | None = Query(default=None, max_length=200, pattern="^[a-zA-Z0-9_,]+$")):
     from app.research_cn_monitor import read_monitor
     from app.research_cn_context import read_context
 
-    return JSONResponse(content=jsonable_encoder(read_context(section), custom_encoder={Decimal: str}) if section else read_monitor(), headers={"Cache-Control": "no-store"})
+    try:
+        result = read_context(section) if section else read_monitor(keys.split(',') if keys else None)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    return JSONResponse(content=jsonable_encoder(result, custom_encoder={Decimal: str}), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/equity-styles/{market}")
+def equity_styles(market: str, _: ResearchPrincipal):
+    if market not in {"cn", "us"}:
+        raise HTTPException(422, "Unsupported market")
+    from app.research_equity_sources import read_artifact
+    data = read_artifact(market)
+    themes = data.get("themes") or {}
+    return {"styles": themes.get("styles"), "benchmark": themes.get("benchmark")}
 
 
 @router.get("/macro/liquidity-lens")
@@ -149,6 +163,24 @@ def macro_liquidity_lens(_: ResearchPrincipal):
     from app.research_liquidity_lens import read_liquidity_lens
 
     return JSONResponse(content=jsonable_encoder(read_liquidity_lens(), custom_encoder={Decimal: str}), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/chart-catalog")
+def chart_catalog(_: ResearchPrincipal):
+    from app.research_chart_catalog import series_catalog
+    return series_catalog()
+
+
+@router.get("/chart-series/{series_id}")
+def chart_series(series_id: str, _: ResearchPrincipal):
+    from app.research_chart_catalog import series_data
+    return series_data(series_id)
+
+
+@router.get("/crypto/rolling-correlation")
+def crypto_rolling_correlation(_: ResearchPrincipal, n: int = Query(default=20, ge=10, le=252), benchmark: str = Query(default="ndx", pattern="^(ndx|xau)$")):
+    from app.research_rolling_correlation import read_rolling
+    return jsonable_encoder(read_rolling(n, benchmark), custom_encoder={Decimal: str})
 
 
 @router.get("/equity/history-risk")
@@ -180,13 +212,13 @@ def macro_narratives(_: ResearchPrincipal, response: Response):
 
 
 @router.get("/equity-observatory/{market}")
-def equity_observatory(market: str, _: ResearchPrincipal, response: Response):
+def equity_observatory(market: str, _: ResearchPrincipal, response: Response, view: str | None = Query(None, pattern="^(overview|themes|valuation|crowding|structure|hk)$")):
     if market not in {"cn", "us"}:
         raise HTTPException(422, detail="Unsupported equity market")
     response.headers["Cache-Control"] = "no-store"
     # Published JSON already preserves financial Decimal values as text. Avoid
     # recursively encoding the large history tree a second time on every read.
-    return JSONResponse(content=read_equity_observatory(market), headers=dict(response.headers))
+    return JSONResponse(content=read_equity_observatory(market, view), headers=dict(response.headers))
 
 
 @router.get("/a-share/financing")
@@ -480,7 +512,7 @@ async def market_detail(
 
 
 @router.get("/macro/dashboard-v1", response_model=MacroDashboardResponse)
-async def macro_dashboard_v1(response: Response, _: ResearchPrincipal) -> MacroDashboardResponse:
+async def macro_dashboard_v1(response: Response, _: ResearchPrincipal, groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$")) -> MacroDashboardResponse:
     try:
         result = await _macro_dashboard_provider.get()
     except ResearchProviderError as exc:
@@ -489,12 +521,12 @@ async def macro_dashboard_v1(response: Response, _: ResearchPrincipal) -> MacroD
             detail={"code": "macro_dashboard_unavailable", "message": str(exc)},
         ) from exc
     _cache_header(response, 300)
-    return result
+    return result.select_groups(groups)
 
 
 @router.get("/commodity/dashboard-v1", response_model=MacroDashboardResponse)
 async def commodity_dashboard_v1(
-    response: Response, _: ResearchPrincipal
+    response: Response, _: ResearchPrincipal, groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$")
 ) -> MacroDashboardResponse:
     try:
         result = await _commodity_dashboard_provider.get()
@@ -504,7 +536,7 @@ async def commodity_dashboard_v1(
             detail={"code": "commodity_dashboard_unavailable", "message": str(exc)},
         ) from exc
     _cache_header(response, 300)
-    return result
+    return result.select_groups(groups)
 
 
 @router.get("/commodity/gold-positioning")
@@ -557,7 +589,7 @@ def gold_analysts(
 
 
 @router.get("/crypto/dashboard-v1", response_model=MacroDashboardResponse)
-async def crypto_dashboard_v1(response: Response, _: ResearchPrincipal) -> MacroDashboardResponse:
+async def crypto_dashboard_v1(response: Response, _: ResearchPrincipal, groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$")) -> MacroDashboardResponse:
     try:
         result = await _crypto_dashboard_provider.get()
     except ResearchProviderError as exc:
@@ -566,7 +598,7 @@ async def crypto_dashboard_v1(response: Response, _: ResearchPrincipal) -> Macro
             detail={"code": "crypto_dashboard_unavailable", "message": str(exc)},
         ) from exc
     _cache_header(response, 300)
-    return result
+    return result.select_groups(groups)
 
 
 @router.get("/macro/fedwatch", tags=["research"])
@@ -813,3 +845,11 @@ async def seasonality_history(asset: str, _: ResearchPrincipal) -> dict[str, obj
     if asset not in paths:
         raise HTTPException(status_code=404, detail="Unknown seasonal asset")
     return await asyncio.to_thread(read_local_json, paths[asset])
+
+
+@router.get("/reference-boards/{board}")
+def reference_board(board: str, _: ResearchPrincipal):
+    if board not in {"liquidity", "stocks"}:
+        raise HTTPException(422, "Unsupported reference board")
+    from app.research_reference_boards import read_references
+    return JSONResponse(content=jsonable_encoder(read_references(board), custom_encoder={Decimal:str}), headers={"Cache-Control":"no-store"})
