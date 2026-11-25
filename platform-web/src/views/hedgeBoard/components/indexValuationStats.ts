@@ -6,25 +6,50 @@ export interface ValuePoint {
 }
 export const finiteValue = (v: unknown): number | null =>
   v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
-export function valuationWindow(history: ValuePoint[], years: number, asOf: string) {
+export const RESEARCH_HISTORY_YEARS = [3, 5, 10, 15, 0] as const;
+export const DEFAULT_RESEARCH_HISTORY_YEARS = 10;
+export const RESEARCH_HISTORY_RANGE_KEY = 'aShareThemeResearchCalendarRanges';
+
+export function windowStart(years: number, asOf: string) {
+  if (!years) return '';
   const end = new Date(asOf + 'T00:00:00Z');
   const y = end.getUTCFullYear() - years,
     month = end.getUTCMonth();
   const day = Math.min(end.getUTCDate(), new Date(Date.UTC(y, month + 1, 0)).getUTCDate());
-  const start = years ? new Date(Date.UTC(y, month, day)).toISOString().slice(0, 10) : '';
+  return new Date(Date.UTC(y, month, day)).toISOString().slice(0, 10);
+}
+export function valuationWindow<T extends { date: string }>(
+  history: T[],
+  years: number,
+  asOf: string,
+) {
+  const start = windowStart(years, asOf);
   return [
     ...new Map(
       history.filter((p) => p.date <= asOf && p.date >= start).map((p) => [p.date, p]),
     ).values(),
   ].sort((a, b) => a.date.localeCompare(b.date));
 }
+
+export function hasShortValuationHistory(
+  years: number,
+  asOf: string,
+  firstValid?: string,
+  frequency?: 'month',
+) {
+  if (!years || !firstValid) return false;
+  const toleranceDays = frequency === 'month' ? 45 : 14;
+  return Date.parse(firstValid) - Date.parse(windowStart(years, asOf)) > toleranceDays * 86_400_000;
+}
 export function valuationStats(
   history: ValuePoint[],
   years: number,
   asOf: string,
   zeroValid = false,
+  frequency?: 'month',
 ) {
-  const window = valuationWindow(history, years, asOf);
+  const observations = valuationWindow(history, years, asOf);
+  const window = frequency === 'month' ? valuationSample(observations, 'month') : observations;
   const valid = window.filter(
     (p) => finiteValue(p.value) != null && (zeroValid ? Number(p.value) >= 0 : Number(p.value) > 0),
   );
@@ -32,6 +57,15 @@ export function valuationStats(
   const value = finiteValue(latest?.value);
   const eligible = value != null && (zeroValid ? value >= 0 : value > 0);
   const values = valid.map((p) => Number(p.value)).sort((a, b) => a - b);
+  const mean = values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null;
+  const standardDeviation =
+    values.length > 1 && mean != null
+      ? Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1))
+      : null;
+  const standardScore =
+    eligible && mean != null && standardDeviation != null && standardDeviation > 0
+      ? (value - mean) / standardDeviation
+      : null;
   const quantile = (p: number) => {
     if (!values.length) return null;
     const k = (values.length - 1) * p,
@@ -43,7 +77,8 @@ export function valuationStats(
     .map((p, i) => (Date.parse(p.date) - Date.parse(valid[i].date)) / 86400000)
     .sort((a, b) => a - b);
   const gap = gaps[Math.floor(gaps.length / 2)] || 1;
-  const minimum = gap <= 7 ? 252 : gap <= 45 ? 36 : gap <= 120 ? 12 : 5;
+  const minimum =
+    frequency === 'month' ? 36 : gap <= 7 ? 252 : gap <= 45 ? 36 : gap <= 120 ? 12 : 5;
   const rank =
     eligible && values.length >= minimum
       ? ((values.filter((v) => v < value!).length + values.filter((v) => v === value).length / 2) /
@@ -63,6 +98,9 @@ export function valuationStats(
     p20: quantile(0.2),
     median: quantile(0.5),
     p80: quantile(0.8),
+    mean,
+    standardDeviation,
+    standardScore,
   };
 }
 

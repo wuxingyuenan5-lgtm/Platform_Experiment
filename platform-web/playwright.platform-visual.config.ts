@@ -204,7 +204,7 @@ export default defineConfig({
         )}" frontend && ` +
         `corepack pnpm sync:trading-tools && corepack pnpm exec vite --host 127.0.0.1 --port ${frontendPort} --strictPort`,
       cwd: frontendRoot,
-      url: `${frontendOrigin}/`,
+      url: `${frontendOrigin}/index.html`,
       timeout: 120_000,
       reuseExistingServer: false,
       stdout: 'pipe',

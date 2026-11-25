@@ -85,6 +85,9 @@ def fake_cli(monkeypatch, script):
     original = asyncio.create_subprocess_exec
 
     async def spawn(*args, **kwargs):
+        assert args[0] == sys.executable or str(args[0]).lower().endswith("taskkill.exe"), (
+            "Test must never launch a real model CLI", args[0]
+        )
         process = await original(*args, **kwargs)
         if args[0] == sys.executable:
             processes.append((process, kwargs))
@@ -121,7 +124,7 @@ def test_real_process_drains_large_stderr_and_uses_empty_working_directory(monke
 @pytest.mark.parametrize("stop", ["close", "cancel", "timeout"])
 def test_real_process_is_reaped_when_stream_stops(monkeypatch, stop):
     processes = fake_cli(monkeypatch,
-        "import sys,time; sys.stdin.read(); print('ready',flush=True); time.sleep(60)")
+        "import os,sys,time; sys.stdin.read(); os.write(1,b'ready'); time.sleep(60)")
     monkeypatch.setattr(cli, "CLI_TIMEOUT_SECONDS", 0.4 if stop == "timeout" else 10)
 
     async def run():
@@ -156,3 +159,26 @@ def test_nonzero_exit_does_not_expose_stderr_credentials(monkeypatch):
         return [event async for event in cli.cli_stream("codex", "facts")]
 
     assert asyncio.run(run()) == [{"type": "error", "message": "CLI 退出码 2"}]
+
+
+def test_http_disconnect_closes_real_cli_process(monkeypatch):
+    processes = fake_cli(monkeypatch,
+        "import os,sys,time; sys.stdin.read(); os.write(1,b'ready'); time.sleep(60)")
+
+    async def run():
+        sent = asyncio.Event()
+        response = await routes.chat(request(), Principal("admin", ("admin",), "session"))
+
+        async def send(message):
+            if message["type"] == "http.response.body" and message.get("body"):
+                sent.set()
+
+        async def receive():
+            await sent.wait()
+            return {"type": "http.disconnect"}
+
+        await response({"type": "http", "asgi": {"spec_version": "2.3"}}, receive, send)
+        assert processes[0][0].returncode is not None
+        assert not os.path.exists(processes[0][1]["cwd"])
+
+    asyncio.run(run())

@@ -54,6 +54,37 @@
           ></table
         ></div
       >
+      <section v-if="attribution" aria-label="四因子贡献核对">
+        <h3>四因子贡献核对 · 新增</h3>
+        <p class="gold-meta"
+          >{{ attribution.first }} — {{ attribution.last }} ·
+          {{ attribution.count }}个共同有效观察。端点按所选区间内有效数据计算。</p
+        >
+        <div class="gold-table"
+          ><table
+            ><thead
+              ><tr><th>分项</th><th>对数贡献（100 × Δln）</th></tr></thead
+            ><tbody>
+              <tr v-for="p in attribution.parts" :key="p.name"
+                ><td>{{ p.name }}</td
+                ><td>{{ n(p.value, 3) }}</td></tr
+              >
+              <tr
+                ><td>金价对数变化</td><td>{{ n(attribution.gold, 3) }}</td></tr
+              >
+              <tr
+                ><td>金价减去四项之和</td><td>{{ n(attribution.difference, 6) }}</td></tr
+              >
+            </tbody></table
+          ></div
+        >
+        <p class="gold-meta"
+          >同期金价简单收益
+          {{
+            n(attribution.priceReturn, 2)
+          }}%。对数贡献可相加，但不等于简单收益的百分点贡献；剩余溢价为恒等式残差，不识别央行购金或避险需求的独立因果影响。</p
+        >
+      </section>
       <GoldReferenceSnapshots group="factors" />
       <details
         ><summary>计算口径</summary
@@ -83,6 +114,7 @@
 <script setup lang="ts">
   import { computed, ref, shallowRef, watch, nextTick, type Ref } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
+  import { factorAttribution } from './goldStructureAnalysis';
   import { goldRequest } from './goldResearch';
   import GoldReferenceSnapshots from './GoldReferenceSnapshots.vue';
   import { useDashboardRefresh } from '../useDashboardRefresh';
@@ -99,6 +131,7 @@
   const selected = computed(() =>
     rows.value.filter((r) => r.date >= start.value && r.date <= end.value),
   );
+  const attribution = computed(() => factorAttribution(selected.value));
   const latest = computed(() => [...selected.value].reverse().find((r) => r.available));
   const n = (v: number | undefined | null, digits: number) =>
     v == null

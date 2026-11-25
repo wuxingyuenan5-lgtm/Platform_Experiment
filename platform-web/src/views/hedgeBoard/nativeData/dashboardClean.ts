@@ -1,4 +1,4 @@
-﻿export type WidgetKind =
+export type WidgetKind =
   | 'advanced-chart'
   | 'symbol-overview'
   | 'market-overview'
@@ -7,8 +7,7 @@
   | 'external-link';
 
 export type LocalWidgetKey =
-  | 'crypto-correlation-ndx'
-  | 'crypto-correlation-xau'
+  | 'crypto-correlations'
   | 'macro-economic-pulse'
   | 'macro-us-claims'
   | 'macro-us-job-openings'
@@ -32,6 +31,20 @@ export type LocalWidgetKey =
   | 'macro-nyfed-repo'
   | 'macro-discount-window'
   | 'macro-funding-spreads'
+  | 'macro-bank-balance-sheets'
+  | 'macro-money-fund-assets'
+  | 'macro-cp-outstanding'
+  | 'macro-central-bank-swaps'
+  | 'macro-offshore-dollar-credit'
+  | 'macro-soma-bills'
+  | 'macro-soma-bills-change'
+  | 'macro-broad-dollar'
+  | 'macro-financial-stress'
+  | 'macro-baa-treasury-spread'
+  | 'macro-cp-rates'
+  | 'macro-cp-spreads'
+  | 'macro-primary-dealer-positions'
+  | 'macro-treasury-realized-volatility'
   | 'macro-sofr-ois'
   | 'macro-dxy'
   | 'macro-major-fx'
@@ -183,7 +196,23 @@ export type LocalWidgetKey =
   | 'eia-crude-stocks'
   | 'eia-products-stocks';
 
+export const commodityCapitalTabs = [
+  { key: 'etf', label: 'ETF流向' },
+  { key: 'inventory', label: '库存持仓' },
+  { key: 'central-banks', label: '央行信息' },
+  { key: 'options', label: '期权分析' },
+] as const;
+
+export const cryptoCapitalTabs = [
+  { key: 'etf', label: 'ETF' },
+  { key: 'treasury', label: '财库公司' },
+  { key: 'stablecoins', label: '稳定币' },
+] as const;
+
 export interface WidgetConfig {
+  capitalCategory?:
+    | (typeof commodityCapitalTabs)[number]['key']
+    | (typeof cryptoCapitalTabs)[number]['key'];
   region?: '美国' | '中国' | '欧元区' | '日本' | '全球';
   kind: WidgetKind;
   title: string;
@@ -316,6 +345,13 @@ function macroMicroReference(href: string) {
   return [{ label: 'MacroMicro 参考', href }];
 }
 
+function capitalWidgets(
+  category: NonNullable<WidgetConfig['capitalCategory']>,
+  widgets: WidgetConfig[],
+) {
+  return widgets.map((widget) => ({ ...widget, capitalCategory: category }));
+}
+
 function treasuryYieldOverview(): WidgetConfig {
   return {
     kind: 'local-chart',
@@ -419,12 +455,55 @@ export const researchModules: ResearchModule[] = [
               sourceUrl: 'https://www.federalreserve.gov/releases/h41/',
             },
           ),
+          localChart('SOMA 短期国债持仓', '纽约联储 · 周度 · 十亿美元', 'macro-soma-bills', {
+            sourceUrl: 'https://www.newyorkfed.org/markets/soma-holdings',
+          }),
+          localChart(
+            'SOMA 短期国债持仓周变化',
+            '相邻周余额之差，包含买入、到期等影响 · 十亿美元',
+            'macro-soma-bills-change',
+          ),
+          localChart(
+            '美国商业银行资产负债',
+            '存款、贷款与租赁、证券持有 · 季调 · 十亿美元',
+            'macro-bank-balance-sheets',
+            {
+              sourceUrl: 'https://www.federalreserve.gov/releases/h8/',
+            },
+          ),
+          localChart(
+            '货币市场基金总金融资产',
+            '季度存量 · 非季调 · 百万美元',
+            'macro-money-fund-assets',
+            {
+              sourceUrl: 'https://fred.stlouisfed.org/series/MMMFFAQ027S',
+            },
+          ),
+          localChart('非金融商业票据余额', '周度 · 非季调 · 十亿美元', 'macro-cp-outstanding', {
+            sourceUrl: 'https://fred.stlouisfed.org/series/COMPAPER',
+          }),
+          localChart(
+            '央行美元流动性互换',
+            '美联储提供的美元互换 · 周三余额 · 百万美元',
+            'macro-central-bank-swaps',
+            {
+              sourceUrl: 'https://fred.stlouisfed.org/series/SWPT',
+            },
+          ),
+          localChart(
+            '美国境外非银行部门美元信贷',
+            'BIS · 银行贷款与债券融资合计 · 季度 · 百万美元',
+            'macro-offshore-dollar-credit',
+            {
+              sourceUrl: 'https://data.bis.org/topics/GLI/BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD',
+            },
+          ),
         ],
       },
       {
         id: 'macro-market',
         eyebrow: 'Market',
-        title: '宏观市场明细',
+        title: '市场总览',
         description: '统一终端式明细布局，按流动性、利率汇率、风险偏好与经济四组变量展开。',
         layout: 'hero',
         widgets: [
@@ -596,7 +675,7 @@ export const researchModules: ResearchModule[] = [
           ]),
           localChart(
             '短期利率走廊',
-            'Fed target / IORB / ON RRP / EFFR / SOFR',
+            'Fed target / IORB / ON RRP / EFFR / SOFR / TGCR / BGCR',
             'macro-rate-corridor',
             {
               referenceLinks: [
@@ -642,6 +721,20 @@ export const researchModules: ResearchModule[] = [
             '美国高收益债信用利差（OAS）',
             'ICE BofA US High Yield OAS via FRED',
             'macro-risk-hy-oas',
+          ),
+          localChart(
+            '穆迪 Baa 公司债−10年国债利差',
+            '公司债收益率与国债收益率之差 · 百分点',
+            'macro-baa-treasury-spread',
+            {
+              sourceUrl: 'https://fred.stlouisfed.org/series/BAA10Y',
+            },
+          ),
+          localChart('90天 AA 商业票据利率', '金融 / 非金融企业 · 贴现基准 · %', 'macro-cp-rates'),
+          localChart(
+            '商业票据−SOFR 利差',
+            '90天 AA 商业票据与隔夜 SOFR 的同日差 · 含期限差异 · bp',
+            'macro-cp-spreads',
           ),
           localChart(
             '美国10年实际利率',
@@ -691,6 +784,24 @@ export const researchModules: ResearchModule[] = [
               ],
             },
           ),
+          localChart(
+            '美债期限利差',
+            '10Y−2Y / 10Y−3M / 30Y−5Y · 同日观测 · bp',
+            'macro-treasury-spreads',
+          ),
+          localChart(
+            '10年国债收益率相对变化波动率',
+            '20个日变化的样本标准差 × √252 · 年化%；非债券价格波动率',
+            'macro-treasury-realized-volatility',
+          ),
+          localChart(
+            '一级交易商美国国债净头寸',
+            '多头减空头 · 不含 TIPS · 周度 · 百万美元',
+            'macro-primary-dealer-positions',
+            {
+              sourceUrl: 'https://www.newyorkfed.org/markets/primarydealer_statistics',
+            },
+          ),
         ],
       },
       {
@@ -701,6 +812,14 @@ export const researchModules: ResearchModule[] = [
         layout: 'two',
         widgets: [
           localChart('DXY · 美元指数', '', 'macro-dxy'),
+          localChart(
+            '名义广义美元指数',
+            '美联储贸易加权口径 · 2006年1月=100',
+            'macro-broad-dollar',
+            {
+              sourceUrl: 'https://fred.stlouisfed.org/series/DTWEXBGS',
+            },
+          ),
           localChart('主要货币 · EUR/USD、GBP/USD、AUD/USD', '', 'macro-major-fx'),
           localChart('USD/JPY · 美元兑日元', '', 'macro-yen-fx'),
           localChart(
@@ -758,6 +877,14 @@ export const researchModules: ResearchModule[] = [
           }),
           localChart('美国金融状况指数', 'Chicago Fed NFCI', 'macro-nfci', { height: 360 }),
           localChart(
+            '圣路易斯联储金融压力指数',
+            'STLFSI4 · 周度；正值表示高于长期平均压力',
+            'macro-financial-stress',
+            {
+              sourceUrl: 'https://fred.stlouisfed.org/series/STLFSI4',
+            },
+          ),
+          localChart(
             '金融条件 · 风险、信贷与杠杆',
             '标准化子指数，不是可相加的贡献值；正值表示较历史均值偏紧',
             'macro-nfci-details',
@@ -779,7 +906,7 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'gold-market',
         eyebrow: 'Market',
-        title: '商品市场明细',
+        title: '市场总览',
         description: '',
         layout: 'hero',
         widgets: [
@@ -806,84 +933,145 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'gold-flows',
         eyebrow: 'ETF & Flows',
-        title: 'ETF 与资金面',
+        title: '资金面',
         description: '',
         layout: 'two',
         widgets: [
-          localChart(
-            'SPDR GLD资金流',
-            'SPDR 持仓日变化（吨） / XAUUSD（USD/oz）',
-            'spdr-daily-flow',
-            {
-              height: 420,
-              sourceNote: 'SPDR Gold Shares / MT5 XAUUSD',
+          ...capitalWidgets('etf', [
+            localChart(
+              'SPDR GLD资金流',
+              'SPDR 持仓日变化（吨） / XAUUSD（USD/oz）',
+              'spdr-daily-flow',
+              {
+                height: 420,
+                sourceNote: 'SPDR Gold Shares / MT5 XAUUSD',
+                referenceLinks: macroMicroReference(
+                  'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
+                ),
+              },
+            ),
+            localChart(
+              '中国黄金 ETF 资金流',
+              '中国大陆月度净资金流（USD） / XAUUSD（USD/oz）',
+              'china-gold-etf-flow',
+              {
+                height: 420,
+                sourceUrl: 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows',
+              },
+            ),
+            localChart('全球各地区 ETF 每周流入', '', 'etf-weekly-flows', {
+              height: 430,
+              sourceNote: 'External Link · World Gold Council · permission_required',
               referenceLinks: macroMicroReference(
-                'https://sc.macromicro.me/collections/45/mm-gold-price/23274/gld-fund-flow',
+                'https://sc.macromicro.me/collections/45/mm-gold-price/110882/global-gold-etf-net-flow-weekly-regional-sum',
               ),
-            },
-          ),
-          localChart(
-            '中国黄金 ETF 资金流',
-            '中国大陆月度净资金流（USD） / XAUUSD（USD/oz）',
-            'china-gold-etf-flow',
-            {
-              height: 420,
-              sourceUrl: 'https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows',
-            },
-          ),
-          localChart('全球各地区 ETF 每周流入', '', 'etf-weekly-flows', {
-            height: 430,
-            sourceNote: 'External Link · World Gold Council · permission_required',
-            referenceLinks: macroMicroReference(
-              'https://sc.macromicro.me/collections/45/mm-gold-price/110882/global-gold-etf-net-flow-weekly-regional-sum',
+            }),
+          ]),
+          ...capitalWidgets('inventory', [
+            localChart(
+              'SPDR 持仓量',
+              'SPDR 官方持仓（吨） / XAUUSD（USD/oz）',
+              'spdr-holdings-vs-price',
+              {
+                height: 420,
+                sourceNote: 'SPDR Gold Shares / MT5 XAUUSD',
+                referenceLinks: macroMicroReference(
+                  'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
+                ),
+              },
             ),
-          }),
-          localChart(
-            'SPDR 持仓量',
-            'SPDR 官方持仓（吨） / XAUUSD（USD/oz）',
-            'spdr-holdings-vs-price',
-            {
+            localChart(
+              '黄金期货未平仓量',
+              'COMEX GC / 上期所 AU · 分市场持仓，全球总量暂缺',
+              'gold-open-interest',
+              {
+                height: 420,
+                sourceUrl:
+                  'https://en.macromicro.me/collections/45/mm-gold-price/110916/global-gold-futures-open-interest-by-exchanges-stacked-bar-chart',
+              },
+            ),
+            localChart(
+              '黄金持仓驱动',
+              '资产管理机构持仓占比、金价对照与区间多空变动',
+              'gold-cot-drivers',
+              {
+                sourceNote: 'CFTC / COMEX',
+                sourceUrl: 'https://publicreporting.cftc.gov/',
+              },
+            ),
+            externalReference(
+              '商品期货持仓分析',
+              '交易法门 · 商品期货持仓与结构分析',
+              'https://www.jiaoyifamen.com/variety/',
+            ),
+            localChart(
+              'COMEX 黄金总库存',
+              'CME · 注册 / 合格 / 合计 · 金衡盎司 · 按活动日归档，历史从接入日积累',
+              'gold-comex-inventory',
+            ),
+            localChart(
+              'GLD 借券费率',
+              'Interactive Brokers 经 ChartExchange · 单一券商最新快照，历史从接入日积累',
+              'gold-borrow-fee',
+            ),
+            localChart('沪金期限结构', '上期所 · 各交割合约日结算价 · 元/克', 'gold-shfe-curve', {
+              sourceUrl: 'https://www.shfe.com.cn/reports/tradedata/dailyandweeklydata/',
+            }),
+            localChart(
+              'CFTC 持仓报告',
+              'CFTC 官方周度持仓；黄金支持多口径历史，保留白银、铜、WTI 与天然气。',
+              'cftc-positioning',
+              {
+                height: 620,
+                deferUntilExpanded: true,
+                sourceNote: 'CFTC 官方黄金多口径及商品周度落库序列',
+                referenceLinks: [
+                  {
+                    label: 'CFTC 官方报告',
+                    href: 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
+                  },
+                ],
+              },
+            ),
+          ]),
+          ...capitalWidgets('central-banks', [
+            localChart('各国黄金储备', '', 'central-bank-holders', {
               height: 420,
-              sourceNote: 'SPDR Gold Shares / MT5 XAUUSD',
+              sourceNote: 'World Gold Council / IMF · 季度截面',
               referenceLinks: macroMicroReference(
-                'https://sc.macromicro.me/collections/45/mm-gold-price/712/spdr-gold-trust-etf-gold-price',
+                'https://en.macromicro.me/charts/78898/world-central-bank-gold-reserves',
               ),
-            },
-          ),
-          localChart(
-            '黄金期货未平仓量',
-            'COMEX GC / 上期所 AU · 分市场持仓，全球总量暂缺',
-            'gold-open-interest',
-            {
-              height: 480,
-              sourceUrl:
-                'https://en.macromicro.me/collections/45/mm-gold-price/110916/global-gold-futures-open-interest-by-exchanges-stacked-bar-chart',
-            },
-          ),
-          externalReference(
-            '商品期货持仓分析',
-            '交易法门 · 商品期货持仓与结构分析',
-            'https://www.jiaoyifamen.com/variety/',
-          ),
-          localChart(
-            'COMEX 黄金总库存',
-            'CME · 注册 / 合格 / 合计 · 金衡盎司 · 按活动日归档，历史从接入日积累',
-            'gold-comex-inventory',
-          ),
-          localChart('央行购金', '', 'central-bank-buyers', {
-            height: 420,
-            sourceNote: 'World Gold Council · 月报披露',
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/93189/gold-demand-central-banks-and-other-inst',
+            }),
+            localChart('央行购金', '', 'central-bank-buyers', {
+              height: 420,
+              sourceNote: 'World Gold Council · 月报披露',
+              referenceLinks: macroMicroReference(
+                'https://en.macromicro.me/charts/93189/gold-demand-central-banks-and-other-inst',
+              ),
+            }),
+          ]),
+          ...capitalWidgets('options', [
+            localChart('金银期权结构', '成交量趋势、内在价值与最大痛点', 'gold-options'),
+            localChart(
+              '沪金期权波动率',
+              '上期所公布的各月份隐含波动率 · 非 ATM 波动率',
+              'gold-shfe-iv',
+              {
+                sourceUrl: 'https://www.openvlab.cn/volatility/analysis/AU',
+                referenceLinks: [
+                  {
+                    label: '上期所数据',
+                    href: 'https://www.shfe.com.cn/reports/tradedata/dailyandweeklydata/',
+                  },
+                ],
+              },
             ),
-          }),
-          localChart('各国黄金储备', '', 'central-bank-holders', {
-            height: 420,
-            sourceNote: 'World Gold Council / IMF · 季度截面',
-            referenceLinks: macroMicroReference(
-              'https://en.macromicro.me/charts/78898/world-central-bank-gold-reserves',
+            externalReference(
+              'CME QuikStrike 黄金期权',
+              'CME · 期权波动率与策略工具入口',
+              'https://cmegroup-sso.quikstrike.net/User/Disclaimer.aspx?ret=%2fUser%2fPartnerRegister.aspx',
             ),
-          }),
+          ]),
         ],
       },
       {
@@ -915,89 +1103,12 @@ export const researchModules: ResearchModule[] = [
             'https://sc.macromicro.me/commodities/gold',
           ),
           localChart(
-            '黄金持仓驱动',
-            '资产管理机构持仓占比、金价对照与区间多空变动',
-            'gold-cot-drivers',
-            {
-              sourceNote: 'CFTC / COMEX',
-              sourceUrl: 'https://publicreporting.cftc.gov/',
-            },
-          ),
-          localChart(
             '金价四因子分解',
             '货币基准、名义利率、盈亏平衡通胀与剩余溢价',
             'gold-factor-model',
           ),
-          localChart('金银期权结构', '成交量趋势、内在价值与最大痛点', 'gold-options'),
-          localChart('国内黄金 IV', '上期所黄金期权隐含波动率', 'gold-shfe-iv'),
           localChart('黄金月度统计分析', 'XAUUSD 月度收益与季节性', 'gold-seasonality'),
         ],
-      },
-      {
-        id: 'gold-browser-toolbox',
-        eyebrow: 'Owner Toolkit',
-        title: '商品补充分析',
-        description: 'Owner 浏览器中的黄金研究框架入口，按实物、期货、期权与辅助研究集中保留。',
-        layout: 'three',
-        widgets: [
-          localChart(
-            'GLD 借券费率',
-            'Interactive Brokers 经 ChartExchange · 单一券商最新快照，历史从接入日积累',
-            'gold-borrow-fee',
-          ),
-          localChart('沪金期限结构', '上期所 · 各交割合约日结算价 · 元/克', 'gold-shfe-curve', {
-            sourceUrl: 'https://www.shfe.com.cn/reports/tradedata/dailyandweeklydata/',
-          }),
-          localChart(
-            '沪金期权波动率',
-            '上期所公布的各月份隐含波动率 · 非 ATM 波动率',
-            'gold-shfe-iv',
-            {
-              sourceUrl: 'https://www.openvlab.cn/volatility/analysis/AU',
-              referenceLinks: [
-                {
-                  label: '上期所数据',
-                  href: 'https://www.shfe.com.cn/reports/tradedata/dailyandweeklydata/',
-                },
-              ],
-            },
-          ),
-          externalReference(
-            'CME QuikStrike 黄金期权',
-            'CME · 期权波动率与策略工具入口',
-            'https://cmegroup-sso.quikstrike.net/User/Disclaimer.aspx?ret=%2fUser%2fPartnerRegister.aspx',
-          ),
-          externalReference(
-            '黄金 Seasonal Chart',
-            'TradingView · XAUUSD 季节性走势（外部跳转）',
-            'https://www.tradingview.com/chart/?symbol=XAUUSD',
-            '打开 Seasonal Chart ↗',
-          ),
-          localChart(
-            'CFTC 持仓报告',
-            'CFTC 官方周度持仓；黄金支持多口径历史，保留白银、铜、WTI 与天然气。',
-            'cftc-positioning',
-            {
-              height: 620,
-              deferUntilExpanded: true,
-              sourceNote: 'CFTC 官方黄金多口径及商品周度落库序列',
-              referenceLinks: [
-                {
-                  label: 'CFTC 官方报告',
-                  href: 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
-                },
-              ],
-            },
-          ),
-        ],
-      },
-      {
-        id: 'gold-research-analysts',
-        eyebrow: 'Analyst Views',
-        title: '金属分析师跟踪',
-        description: '',
-        layout: 'hero',
-        widgets: [localChart('分析师观点与情景', '', 'gold-analysts', { height: 720 })],
       },
     ],
   },
@@ -1014,7 +1125,7 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'crypto-market',
         eyebrow: 'Market',
-        title: '加密市场明细',
+        title: '市场总览',
         description: '',
         layout: 'hero',
         widgets: [
@@ -1046,76 +1157,105 @@ export const researchModules: ResearchModule[] = [
         description: '',
         layout: 'two',
         widgets: [
-          localChart('BTC ETF 日流量', '', 'btc-etf-flow', {
-            height: 420,
-            sourceNote: '',
-            referenceLinks: [
-              {
-                label: '30日均线',
-                href: 'https://studio.glassnode.com/charts/institutions.UsSpotEtfFlowsNet?a=BTC&mAvg=30&resolution=24h&s=1704657272&u=1788393600&zoom=',
-              },
-              {
-                label: '各ETF细节',
-                href: 'https://studio.glassnode.com/charts/institutions.UsSpotEtfFlowsAll?a=BTC&mAvg=30&resolution=24h&s=1757139104&u=1788675104&zoom=365',
-              },
-            ],
-          }),
-          localChart('ETH ETF 日流量', 'SoSoValue', 'crypto-eth-etf-flow', {
-            height: 420,
-          }),
-          localChart(
-            'BTC 财库公司每周变动',
-            'SoSoValue · 上市公司买入 BTC 周度资金净流入',
-            'btc-treasury-flow',
-            {
+          ...capitalWidgets('etf', [
+            localChart('BTC ETF 日流量', '', 'btc-etf-flow', {
               height: 420,
-              sourceUrl: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
-            },
-          ),
-          withReferenceLinks(
+              sourceNote: '',
+              referenceLinks: [
+                {
+                  label: '30日均线',
+                  href: 'https://studio.glassnode.com/charts/institutions.UsSpotEtfFlowsNet?a=BTC&mAvg=30&resolution=24h&s=1704657272&u=1788393600&zoom=',
+                },
+                {
+                  label: '各ETF细节',
+                  href: 'https://studio.glassnode.com/charts/institutions.UsSpotEtfFlowsAll?a=BTC&mAvg=30&resolution=24h&s=1757139104&u=1788675104&zoom=365',
+                },
+              ],
+            }),
+            localChart('ETH ETF 日流量', 'SoSoValue', 'crypto-eth-etf-flow', {
+              height: 420,
+            }),
+          ]),
+          ...capitalWidgets('treasury', [
             localChart(
-              '上市公司 BTC 持仓分布',
-              'BitcoinTreasuries 公开公司样本；日期为采集日，各公司披露截止日不同',
-              'crypto-treasuries',
-            ),
-            [{ label: 'BitcoinTreasuries 参考', href: 'https://bitcointreasuries.net/' }],
-          ),
-          localChart(
-            'Strategic ETH Reserve',
-            '公开来源的 ACTIVE 实体；保留报告/自报/钱包追踪分类及原始更新时间，不代表统一时点储备',
-            'crypto-eth-reserves',
-          ),
-          localChart('稳定币市值历史', 'DefiLlama · 流通市值（USD）', 'crypto-stablecoins'),
-          withReferenceLinks(
-            localChart(
-              'STRC 股价历史',
-              '交易所日线收盘价 · Yahoo Finance · 最新交易日可能尚未收盘',
-              'crypto-strc',
-            ),
-            [
+              'BTC 财库公司每周变动',
+              'SoSoValue · 上市公司买入 BTC 周度资金净流入',
+              'btc-treasury-flow',
               {
-                label: 'STRC ATM Tracker',
-                href: 'https://bitcoinforcorporations.com/strc-atm-tracker/',
+                height: 420,
+                sourceUrl: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
               },
-            ],
-          ),
-          withReferenceLinks(
-            localChart(
-              'Strategy BTC 持仓',
-              'BitcoinTreasuries 披露快照 · 历史从接入日积累，日期为采集日',
-              'crypto-strategy-holdings',
             ),
-            [
+            withReferenceLinks(
+              localChart(
+                '上市公司 BTC 持仓分布',
+                'BitcoinTreasuries 公开公司样本；日期为采集日，各公司披露截止日不同',
+                'crypto-treasuries',
+              ),
+              [{ label: 'BitcoinTreasuries 参考', href: 'https://bitcointreasuries.net/' }],
+            ),
+            localChart(
+              'Strategic ETH Reserve',
+              'CoinStats 公开以太坊财库公司样本；各企业披露日不同',
+              'crypto-eth-reserves',
+              { sourceUrl: 'https://coinstats.app/zh/treasuries/ethereum/' },
+            ),
+          ]),
+          ...capitalWidgets('stablecoins', [
+            localChart('稳定币市值历史', 'DefiLlama · 流通市值（USD）', 'crypto-stablecoins', {
+              sourceUrl: 'https://www.coinglass.com/zh/pro/stablecoin',
+            }),
+          ]),
+          ...capitalWidgets('treasury', [
+            withReferenceLinks(
+              localChart(
+                'STRC 股价历史',
+                '交易所日线收盘价 · Yahoo Finance · 最新交易日可能尚未收盘',
+                'crypto-strc',
+              ),
+              [
+                {
+                  label: 'STRC ATM Tracker',
+                  href: 'https://bitcoinforcorporations.com/strc-atm-tracker/',
+                },
+              ],
+            ),
+            withReferenceLinks(
+              localChart(
+                'Strategy BTC 持仓',
+                'BitcoinTreasuries 披露快照 · 历史从接入日积累，日期为采集日',
+                'crypto-strategy-holdings',
+              ),
+              [
+                {
+                  label: '企业财库周度流入参考',
+                  href: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+                },
+              ],
+            ),
+          ]),
+          ...capitalWidgets('etf', [
+            localChart(
+              'BTC ETF 溢价 / 折价',
+              'IBIT / BITB / HODL · 发行方日度披露',
+              'crypto-etf-premium',
               {
-                label: '企业财库周度流入参考',
-                href: 'https://sosovalue.com/zh/assets/bitcoin-treasuries/weekly-net-inflow',
+                sourceUrl: 'https://www.coinglass.com/pro/etf/Premium',
+                referenceLinks: [
+                  {
+                    label: '发行方数据',
+                    href: 'https://www.ishares.com/us/products/333011/ishares-bitcoin-trust-etf',
+                  },
+                ],
               },
-            ],
-          ),
-          localChart('离岸人民币与 OKX 买卖U价', '', 'crypto-cny-usdt', {
-            height: 460,
-            sourceUrl: 'https://www.okx.com/zh-hans/p2p-markets/cny/buy-usdt',
-          }),
+            ),
+          ]),
+          ...capitalWidgets('stablecoins', [
+            localChart('离岸人民币与 OKX 买卖U价', '', 'crypto-cny-usdt', {
+              height: 460,
+              sourceUrl: 'https://www.okx.com/zh-hans/p2p-markets/cny/buy-usdt',
+            }),
+          ]),
         ],
       },
       {
@@ -1172,13 +1312,13 @@ export const researchModules: ResearchModule[] = [
         description: '期权隐波、持仓与 Gamma 敞口估算。',
         layout: 'two',
         widgets: [
-          localChart('期权分布', 'Deribit · BTC', 'crypto-options-distribution', {
-            height: 680,
-            sourceUrl: 'https://www.deribit.com/statistics/BTC/metrics/options',
-          }),
           localChart('BTC 期权隐含波动率', 'Deribit 期权数据实验室', 'crypto-atm-iv-term', {
             height: 420,
             sourceUrl: 'https://www.greeks.live/deribit/tools/datalab/BTC',
+          }),
+          localChart('期权分布', 'Deribit · BTC', 'crypto-options-distribution', {
+            height: 680,
+            sourceUrl: 'https://www.deribit.com/statistics/BTC/metrics/options',
           }),
           localChart(
             'BTC 期权持仓与看跌／看涨比',
@@ -1204,35 +1344,21 @@ export const researchModules: ResearchModule[] = [
       {
         id: 'crypto-onchain-toolbox',
         eyebrow: 'On-chain & Cycle',
-        title: '链上成本、周期与研究跟踪',
+        title: '链上与周期',
         description: '用于观察筹码成本分布、地址结构、周期位置与研究观点。',
-        layout: 'three',
+        layout: 'two',
         widgets: [
-          localChart('BTC / 纳指 · 滚动相关性', '', 'crypto-correlation-ndx', { height: 540 }),
-          localChart('BTC / XAU · 滚动相关性', '', 'crypto-correlation-xau', { height: 540 }),
-          localChart(
-            'BTC ETF 溢价 / 折价',
-            'IBIT / BITB / HODL · 发行方日度披露',
-            'crypto-etf-premium',
-            {
-              sourceUrl: 'https://www.coinglass.com/pro/etf/Premium',
-              referenceLinks: [
-                {
-                  label: '发行方数据',
-                  href: 'https://www.ishares.com/us/products/333011/ishares-bitcoin-trust-etf',
-                },
-              ],
-            },
-          ),
-          externalReference(
-            'BTC 三大驱动因素',
-            '暂无已接通数据 · MacroMicro · 流动性、实际利率与 GDP',
-            'https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP',
-          ),
+          localChart('BTC / 纳指、XAU · 滚动相关性', '', 'crypto-correlations', { height: 480 }),
           localChart(
             'Realized Price Distribution',
             'BGeometrics · UTXO 最后移动时的价格区间与 BTC 数量，不等于投资者持仓成本',
             'crypto-urpd',
+          ),
+          localChart(
+            'Bitcoin Address Distribution',
+            'ChainQuery · 每周 UTXO 地址快照，地址不等于持币人数或独立实体',
+            'crypto-address-distribution',
+            { sourceUrl: 'https://chainquery.com/reports/distribution' },
           ),
           localChart(
             'Bitcoin 减半周期表现',
@@ -1249,40 +1375,17 @@ export const researchModules: ResearchModule[] = [
               ],
             },
           ),
-          localChart(
-            'Bitcoin Address Distribution',
-            'BGeometrics · 按来源余额区间统计地址数量，地址不等于持币人数或独立实体',
-            'crypto-address-distribution',
-            { sourceUrl: 'https://charts.bgeometrics.com/bitcoin_distribution_addr_tables.html' },
-          ),
+          localChart('BTC 月度统计分析', 'BTC 月度收益与季节性', 'btc-seasonality'),
           externalReference(
-            'Glassnode Week On-chain',
-            '周度链上市场研究',
-            'https://research.glassnode.com/the-week-onchain-week-18-2026/',
-          ),
-          externalReference('Murphy Chen', 'X · 链上与周期研究跟踪', 'https://x.com/Murphychen888'),
-          externalReference(
-            'Market Beggar 市场观点',
-            'X · 指定市场研究帖',
-            'https://x.com/market_beggar/status/2096487388092698821?s=20',
-          ),
-          externalReference(
-            'BTC Seasonal Chart',
-            'TradingView · BTCUSD 季节性走势（外部跳转）',
-            'https://www.tradingview.com/chart/?symbol=BTCUSD',
-            '打开 Seasonal Chart ↗',
-          ),
-          externalReference(
-            'Unbias Analysts',
-            '加密研究员与观点聚合',
-            'https://unbias.fyi/analysts?source=all',
+            'BTC 三大驱动因素',
+            '暂无已接通数据 · MacroMicro · 流动性、实际利率与 GDP',
+            'https://www.macromicro.me/collections/22514/bi-te-bi_418919/111972/bi-te-bi-BTC-qu-dong-san-da-yin-su-liu-dong-xing-shi-ji-li-lyu-GDP',
           ),
           externalReference(
             '交易所链上资金监控',
             '暂无已接通数据 · OKLink · CEX 地址与链上资金流跟踪',
             'https://www.oklink.com/zh-hans/cex-list',
           ),
-          localChart('BTC 月度统计分析', 'BTC 月度收益与季节性', 'btc-seasonality'),
         ],
       },
     ],

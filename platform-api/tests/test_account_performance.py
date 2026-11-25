@@ -149,6 +149,21 @@ def test_equal_distance_rates_choose_lowest_decimal_rate(db):
     assert result[-1][0] == Decimal(0)
 
 
+def test_disjoint_rate_windows_keep_offset_rates_and_reject_distant_rates(db):
+    window(db, [(0.5, "USDT", "100"), (1.5, "USDT", "100"), (2.5, "USDT", "100")])
+    db.executemany(
+        "INSERT INTO account_valuation_rates (account_id,currency,as_of,usd_rate) VALUES (?,?,?,?)",
+        [
+            ("a", "USDT", "2026-08-31T20:32:00-04:00", "0.99"),
+            ("a", "USDT", "2026-09-01T01:36:00Z", "0.50"),
+            ("a", "USDT", "2026-09-01T10:28:00+08:00", "1.01"),
+        ],
+    )
+    results = daily_pnl(db, "a", points([100, 199, 299, 400]), "mt5_trading", "equity")
+    assert [value[0] for value in results] == [None, Decimal(0), None, Decimal(0)]
+    assert results[2][2] == "missing_flow_valuation"
+
+
 def test_idempotence_and_conflict(db):
     payload = window(db, [(1, "USD", "100")])
     persist_capital_window(db, "a", payload, START, START + timedelta(hours=3))

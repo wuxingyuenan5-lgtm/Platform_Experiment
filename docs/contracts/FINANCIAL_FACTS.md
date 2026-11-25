@@ -146,10 +146,12 @@ closing quantity
 
 `POST /strategies/instances/{id}/financials/rebuild`：
 
-- 删除指定 StrategyInstance 的 Formal Position / PnL 投影。
+- 在同一个 SQLite 写事务中清理指定 StrategyInstance 的 Formal Position / PnL 投影。
 - 保留全部 FinancialFact。
 - 按权威顺序完整重放。
-- 写入重建 AuditEvent。
+- 在同一事务中写入重建 AuditEvent，所有账户/标的成功后一起提交；任一步失败时保留原整套投影。
+
+单个账户/标的重放与整策略重建均在读取事实前取得 `BEGIN IMMEDIATE` 写锁，读取、计算和发布共用一个连接，禁止旧事实快照晚于新投影提交而覆盖结果。事实自身不可变且先行提交；失败后的原键重试仍可修复投影。事务内不访问外部服务。
 
 FinancialFact 入库和 Formal NAV 创建也必须写入 AuditEvent。
 

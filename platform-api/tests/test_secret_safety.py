@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import httpx
+
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -65,7 +67,16 @@ def test_all_accounts_must_be_active_before_order_submission(tmp_path: Path) -> 
     initialize_database()
     seed_live_account_for_test(status="paused")
 
+    import hashlib
+    import json
+    settings.auth_mode = "api_key"
+    settings.auth_credentials_json = json.dumps([{
+        "credentialId": "isolated-trader", "userId": "isolated-trader",
+        "tokenSha256": hashlib.sha256(b"isolated-trader-token").hexdigest(),
+        "roles": ["trader"], "status": "active",
+    }])
     with TestClient(app) as client:
+        client.headers["Authorization"] = "Bearer isolated-trader-token"
         response = client.post(
             "/api/v1/trading/orders",
             json={
@@ -83,13 +94,19 @@ def test_all_accounts_must_be_active_before_order_submission(tmp_path: Path) -> 
         assert response.json()["detail"] == "Account is not active"
 
 
-def test_paused_demo_account_is_allowed_for_local_order_submission(tmp_path: Path) -> None:
+def test_paused_demo_account_is_allowed_for_local_order_submission(tmp_path: Path, monkeypatch) -> None:
     settings = get_settings()
     settings.database_path = str(tmp_path / "demo-account-status.db")
-    settings.live_trading_enabled = True
+    settings.live_trading_enabled = False
     initialize_database()
 
+    def unavailable(*args, **kwargs):
+        raise httpx.ConnectError("isolated Runtime unavailable")
+
+    monkeypatch.setattr("app.runtime_transport.post", unavailable)
     with TestClient(app) as client:
+        with connection() as db:
+            db.execute("UPDATE accounts SET status='paused' WHERE id='account_mt5_demo'")
         response = client.post(
             "/api/v1/trading/orders",
             json={
@@ -102,7 +119,8 @@ def test_paused_demo_account_is_allowed_for_local_order_submission(tmp_path: Pat
             },
         )
 
-    assert response.status_code != 403
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "result_unknown"
     assert response.json().get("detail") != "Account is not active"
 
 

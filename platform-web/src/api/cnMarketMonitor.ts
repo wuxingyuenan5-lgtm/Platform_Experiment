@@ -19,6 +19,8 @@ export interface MonitorSource {
   status: string;
   sourceUrl: string;
   fetchedAt?: string;
+  referenceEnd?: string | null;
+  platformStart?: string | null;
   data?: MonitorRow[] | MonitorItem[];
 }
 export interface MarketMonitor {

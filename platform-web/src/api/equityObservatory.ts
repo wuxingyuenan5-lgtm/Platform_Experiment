@@ -48,6 +48,9 @@ export interface ThemeMember {
   themeCount: number;
   themes?: string[];
   industry?: string | null;
+  industryCode?: string | null;
+  industryName?: string | null;
+  industryAsOf?: string | null;
   region?: string | null;
   source?: string;
   sourceUrl?: string;
@@ -181,11 +184,17 @@ export interface IndexValuationChart {
     sourceUrl?: string;
     status: string;
     description?: string;
+    rankFrequency?: 'month';
     prices?: Array<{ date: string; value: EquityValue }>;
     history: Array<{ date: string; value: EquityValue }>;
   }>;
 }
 export interface ThemeCrowdingBasket {
+  concentration?: {
+    date: string;
+    sharePct: EquityValue;
+    leaders: Array<{ code: string; name?: string | null; amountYuan: EquityValue }>;
+  } | null;
   name: string;
   expected: number;
   priceBaseDate: string | null;
@@ -301,12 +310,26 @@ export interface EquityObservatory {
     value: EquityValue;
     history: EquityPoint[];
     indices?: Array<{
+      id: string;
       name: string;
       date: string;
       value: EquityValue;
       returnPct: EquityValue;
+      return5?: EquityValue;
+      return20?: EquityValue;
+      deviation20?: EquityValue;
+      drawdown252?: EquityValue;
+      status?: string;
+      sourceUrl?: string;
       history: EquityPoint[];
     }>;
+    benchmark?: {
+      name: string;
+      date?: string | null;
+      sourceUrl?: string;
+      status: string;
+      history: EquityPoint[];
+    };
     components: Array<{
       id: string;
       name: string;
@@ -330,10 +353,15 @@ export interface EquityObservatory {
   }>;
 }
 
-export const getEquityObservatory = (market: 'cn' | 'us', signal?: AbortSignal, view?: string) =>
+export const getEquityObservatory = (
+  market: 'cn' | 'us',
+  signal?: AbortSignal,
+  view?: string,
+  theme?: string,
+) =>
   researchRequest<EquityObservatory>({
     method: 'GET',
     url: `/research/equity-observatory/${market}`,
-    params: view ? { view } : undefined,
+    params: view ? { view, theme } : undefined,
     signal,
   });

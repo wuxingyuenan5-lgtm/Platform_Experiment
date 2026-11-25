@@ -22,7 +22,7 @@
           ><option value="OG">黄金</option
           ><option value="SO">白银</option></select
         >
-        <select v-if="mode === 'curve'" v-model="month" aria-label="期权合约月"
+        <select v-model="month" aria-label="期权合约月"
           ><option v-for="c in contracts" :key="c.month">{{ c.month }}</option></select
         >
         <button @click="table = !table">{{ table ? '查看图表' : '查看数据' }}</button>
@@ -60,6 +60,42 @@
           ></table
         ></div
       >
+      <section aria-label="金银期权持仓结构">
+        <h3>{{ product === 'OG' ? '黄金' : '白银' }} · {{ month }} 持仓结构 · 新增</h3>
+        <template v-if="structure">
+          <p class="gold-meta"
+            >Call持仓 {{ structure.callOi.toLocaleString() }} 张 · Put持仓
+            {{ structure.putOi.toLocaleString() }} 张 · OI Put/Call
+            {{ structure.oiRatio == null ? '—' : structure.oiRatio.toFixed(3) }}；所选合约当日成交
+            Call {{ structure.callVolume.toLocaleString() }} / Put
+            {{ structure.putVolume.toLocaleString() }} 张。</p
+          >
+          <div class="gold-table"
+            ><table
+              ><thead
+                ><tr
+                  ><th>行权价 USD/oz</th><th>Call持仓</th><th>Put持仓</th><th>Call成交</th
+                  ><th>Put成交</th></tr
+                ></thead
+              ><tbody>
+                <tr v-for="r in structure.rows" :key="r.strike"
+                  ><td>{{ r.strike }}</td
+                  ><td>{{ r.callOi ?? '—' }}</td
+                  ><td>{{ r.putOi ?? '—' }}</td
+                  ><td>{{ r.callVolume ?? '—' }}</td
+                  ><td>{{ r.putVolume ?? '—' }}</td></tr
+                >
+              </tbody></table
+            ></div
+          >
+          <p class="gold-meta"
+            >持仓比仅含所选合约月，与上方跨月成交EMA比不同。未列示的一侧保留为空；OI不识别买卖方方向，不能据此推断净多空或做市商Gamma。</p
+          >
+        </template>
+        <p v-else class="gold-meta"
+          >当前合约未取得完整且通过校验的双边行权价持仓，结构表暂不可用。</p
+        >
+      </section>
       <details
         ><summary>计算口径</summary
         ><p
@@ -72,7 +108,7 @@
         ></details
       >
     </div>
-    <GoldReferenceSnapshots group="options" />
+    <GoldReferenceSnapshots group="options" :options-ready="!!data?.snapshot" />
     <p class="gold-meta"
       ><a
         href="https://www.cmegroup.com/market-data/daily-bulletin.html"
@@ -86,11 +122,14 @@
 <script setup lang="ts">
   import { computed, nextTick, ref, shallowRef, watch, type Ref } from 'vue';
   import { useECharts } from '@/hooks/web/useECharts';
+  import { optionStructure, type OptionStrike } from './goldStructureAnalysis';
   import { goldRequest } from './goldResearch';
   import GoldReferenceSnapshots from './GoldReferenceSnapshots.vue';
   import { useDashboardRefresh } from '../useDashboardRefresh';
 
   interface Contract {
+    calls?: OptionStrike[];
+    puts?: OptionStrike[];
     product: string;
     month: string;
     maxPain: number[];
@@ -118,6 +157,9 @@
       month.value = contracts.value[0]?.month || '';
   });
   const contract = computed(() => contracts.value.find((c) => c.month === month.value));
+  const structure = computed(() =>
+    optionStructure(contract.value?.calls || [], contract.value?.puts || []),
+  );
   const points = computed<[string | number, string | number | null][]>(() =>
     mode.value === 'curve'
       ? contract.value?.curve.map((r): [number, number] => [r.price, r.intrinsicValue]) || []
@@ -136,7 +178,7 @@
         {
           animation: false,
           tooltip: { trigger: 'axis', confine: true },
-          grid: { left: 85, right: 25, top: 40, bottom: 75 },
+          grid: { left: 25, right: 25, top: 40, bottom: 75, containLabel: true },
           xAxis:
             mode.value === 'curve'
               ? { type: 'value', scale: true, name: 'USD/oz' }
@@ -173,6 +215,11 @@
 </script>
 <style scoped src="./goldResearch.css"></style>
 <style scoped>
+  .gold-table {
+    max-height: 480px;
+    overflow: auto;
+  }
+
   .options-chart {
     width: 100%;
     height: 480px;

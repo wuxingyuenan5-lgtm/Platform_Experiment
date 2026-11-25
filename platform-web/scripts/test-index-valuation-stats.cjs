@@ -39,3 +39,17 @@ test('display sampling keeps actual dates, last null, and calendar week across y
  const month=scope.exports.valuationSample(rows,'month');assert.equal(month.length,2);assert.equal(month[1].date,'2026-01-30');
  assert.equal(scope.exports.valuationSample(rows,'observation').length,4);
 });
+
+test('dispersion uses valid observations at the cutoff and sample standard deviation', () => {
+  const rows = daily(7, 0);
+  for (let i = 0; i < 5; i++) rows[i].value = i + 1;
+  rows[5].value = null;
+  rows[6].value = 100;
+  const stats = valuationStats(rows, 1, rows[4].date);
+  assert.equal(stats.mean, 3);
+  assert.equal(stats.standardDeviation, Math.sqrt(2.5));
+  assert.equal(stats.standardScore, 2 / Math.sqrt(2.5));
+  assert.equal(valuationStats(rows, 1, rows[5].date).standardScore, null);
+  assert.equal(valuationStats(rows.slice(0, 1), 1, rows[0].date).standardDeviation, null);
+  assert.equal(valuationStats(daily(3, 5), 0, rows[2].date).standardScore, null);
+});

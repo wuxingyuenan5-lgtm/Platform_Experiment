@@ -201,33 +201,41 @@ def _classified_intervals(db, account_id, points, scope, value_key):
     ).fetchall()
     events = [(stamp(row[0]), row[1], row[2]) for row in events]
     point_currencies = {point.currency.upper() for point in points if point.currency}
-    rate_currencies = {
-        currency
-        for _, currency, amount in events
-        if amount is not None
-        and Decimal(amount) != 0
-        and any(currency.upper() != point_currency for point_currency in point_currencies)
-    }
-    rates = []
-    if rate_currencies:
-        placeholders = ",".join("?" for _ in rate_currencies)
-        event_times = [
-            occurred_at for occurred_at, currency, amount in events if currency in rate_currencies
-        ]
-        rates = db.execute(
-            "SELECT currency,as_of,usd_rate FROM account_valuation_rates WHERE "
-            f"account_id=? AND currency IN ({placeholders}) "
-            "AND julianday(as_of)>=julianday(?) AND julianday(as_of)<=julianday(?)",
-            (
-                account_id,
-                *sorted(rate_currencies),
-                (min(event_times) - timedelta(minutes=5)).isoformat(),
-                (max(event_times) + timedelta(minutes=5)).isoformat(),
-            ),
-        ).fetchall()
+    rate_windows = {}
+    margin = timedelta(minutes=5)
+    for occurred_at, currency, amount in events:
+        if (
+            amount is None or Decimal(amount) == 0
+            or not any(currency.upper() != point_currency for point_currency in point_currencies)
+        ):
+            continue
+        windows_for_currency = rate_windows.setdefault(currency, [])
+        start, end = occurred_at - margin, occurred_at + margin
+        if windows_for_currency and start <= windows_for_currency[-1][1]:
+            windows_for_currency[-1] = (windows_for_currency[-1][0], end)
+        else:
+            windows_for_currency.append((start, end))
     rates_by_currency = {}
-    for row in rates:
-        rates_by_currency.setdefault(row[0], []).append((stamp(row[1]), row[2]))
+    for currency, ranges in rate_windows.items():
+        values = rates_by_currency[currency] = []
+        for start, end in ranges:
+            # The date bounds use the account/currency/time index. Allow an extra
+            # calendar day on either side for stored ISO timestamps with offsets.
+            # julianday still applies the exact window across timestamp formats.
+            values.extend(
+                (stamp(as_of), rate)
+                for as_of, rate in db.execute(
+                    "SELECT as_of,usd_rate FROM account_valuation_rates "
+                    "WHERE account_id=? AND currency=? AND as_of>=? AND as_of<? "
+                    "AND julianday(as_of)>=julianday(?) AND julianday(as_of)<=julianday(?)",
+                    (
+                        account_id, currency,
+                        (start.date() - timedelta(days=1)).isoformat(),
+                        (end.date() + timedelta(days=2)).isoformat(),
+                        start.isoformat(), end.isoformat(),
+                    ),
+                )
+            )
     for currency in rates_by_currency:
         rates_by_currency[currency].sort(key=lambda item: item[0])
     rate_times = {

@@ -17,6 +17,7 @@ from typing import Any, TypedDict
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
 from app import monitor_health, runtime_transport
 from app.auth import require_permission
@@ -93,7 +94,12 @@ HISTORY = {
     "cumulative_volatility": 2,
 }
 LEGACY = {"hot_stocks", "shenwan_history"}
-ARCHIVAL_HISTORY = {"stock_choice_qfq", "stock_tencent_qfq_native", "stock_tencent_day_native"}
+ARCHIVAL_HISTORY = {
+    "theme_amount_public",
+    "stock_choice_qfq",
+    "stock_tencent_qfq_native",
+    "stock_tencent_day_native",
+}
 
 
 def iso_now():
@@ -805,7 +811,11 @@ def inspect_artifacts(now):
                         item.update(status="warning", message="来源观测日期落后于最近工作日")
                 if str(series_row.get("frequency", "")).lower() == "daily_weekly_release":
                     observed = str(series_row.get("observationDate") or "")[:10]
-                    if observed and observed < (now.date() - timedelta(days=14)).isoformat() and item["status"] == "healthy":
+                    if (
+                        observed
+                        and observed < (now.date() - timedelta(days=14)).isoformat()
+                        and item["status"] == "healthy"
+                    ):
                         item.update(status="warning", message="来源观测日期超过周度发布容限")
                 if (series_row.get("isStale") or status not in {"ready", "available"}) and item[
                     "status"
@@ -845,6 +855,52 @@ def inspect_artifacts(now):
                 "研究文件库",
                 "error",
                 "数据不可读取",
+                errorType=type(exc).__name__,
+            )
+        )
+    try:
+        from app.data_audit_calendar import cached_sessions
+        from app.research_etf_audit import broad_etf_checks
+
+        local_day = now.astimezone(ZoneInfo("Asia/Shanghai")).date().isoformat()
+        results.extend(
+            broad_etf_checks(
+                read_local_json("public/v1/etf-native/broad-quality.json"),
+                now,
+                cached_sessions(local_day),
+            )
+        )
+    except Exception as exc:
+        results.append(
+            check(
+                "etf.broad.producer",
+                "宽基ETF生产与目录",
+                "ETF数据",
+                "error",
+                "ETF审计证据不可读取",
+                errorType=type(exc).__name__,
+            )
+        )
+    try:
+        from app.data_audit_calendar import cached_sessions
+        from app.research_etf_audit import minute_etf_check
+
+        local_day = now.astimezone(ZoneInfo("Asia/Shanghai")).date().isoformat()
+        results.append(
+            minute_etf_check(
+                read_local_json("public/v1/etf-observation/live.json"),
+                now,
+                cached_sessions(local_day),
+            )
+        )
+    except Exception as exc:
+        results.append(
+            check(
+                "etf.minutes",
+                "25只ETF分钟与累计成交额",
+                "ETF数据",
+                "error",
+                "分钟审计证据不可读取",
                 errorType=type(exc).__name__,
             )
         )
@@ -1235,6 +1291,10 @@ def run_audit():
         ]
     checks.extend(inspect_runtime(now))
     checks.extend(inspect_artifacts(now))
+    from app.research_crypto_coverage import crypto_coverage_checks
+    checks.extend(crypto_coverage_checks(now))
+    from app.research_history_coverage import research_history_checks
+    checks.extend(research_history_checks(now))
     from app.data_audit_history import inspect_changes, inspect_stock_returns, read_full_report
 
     changes = inspect_changes(now)
@@ -1317,23 +1377,33 @@ def run_audit():
     return persist_report(checks, now)
 
 
-def read_report():
+def read_report(*, summary_only=False):
     with read_only_connection() as db:
         row = db.execute(
             "SELECT report_json FROM data_audit_runs ORDER BY id DESC LIMIT 1"
         ).fetchone()
-        alerts = [
-            dict(r)
-            for r in db.execute(
-                "SELECT id,message,severity,status,first_seen_at,last_seen_at,occurrence_count "
-                "FROM operational_alerts WHERE category='data_audit' "
-                "ORDER BY last_seen_at DESC LIMIT 100"
-            )
-        ]
+        alerts = (
+            []
+            if summary_only
+            else [
+                dict(r)
+                for r in db.execute(
+                    "SELECT id,message,severity,status,first_seen_at,last_seen_at,occurrence_count "
+                    "FROM operational_alerts WHERE category='data_audit' "
+                    "ORDER BY last_seen_at DESC LIMIT 100"
+                )
+            ]
+        )
     report: dict[str, Any] = (
         decode_report(row[0]) if row else dict(checkedAt=None, checks=[], summary={})
     )
     age = age_seconds(report["checkedAt"], datetime.now(UTC))
+    if summary_only:
+        return {
+            "checkedAt": report["checkedAt"],
+            "summary": report["summary"],
+            "monitorStale": age is None or age > INTERVAL * 3,
+        }
     report.update(monitorStale=age is None or age > INTERVAL * 3, alerts=alerts)
     return report
 
@@ -1389,5 +1459,7 @@ router = APIRouter(
 
 
 @router.get("")
-def data_audit_report():
-    return read_report()
+def data_audit_report(summary_only: bool = False):
+    return JSONResponse(
+        content=read_report(summary_only=summary_only), headers={"Cache-Control": "no-store"}
+    )

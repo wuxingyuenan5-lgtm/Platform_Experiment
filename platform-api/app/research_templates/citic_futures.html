@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中信期货股指期货持仓</title>
+<script>__ECHARTS__</script>
+<style>
+  :root{--red:#d9544f;--green:#2fa36b;--blue:#2f6fdd;--ink:#1f2733;--sub:#6b7686;--line:#e4e9f0}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);padding:16px;font-size:14px}
+  .sub{color:var(--sub);font-size:12px;margin-bottom:14px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .panel h2{font-size:15px;margin-bottom:10px}
+  .panel h2 small{font-weight:400;color:var(--sub);font-size:12px;margin-left:8px}
+  .chart{width:100%;height:340px}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--sub);font-weight:500;font-size:12px}
+  th.l,td.l{text-align:left}
+  tbody tr:hover{background:#f7f9fc}
+  tbody tr.sumrow{background:#f2f5fa;font-weight:600}
+  .pos{color:var(--red)}.neg{color:var(--green)}
+  .tbl{overflow-x:auto}
+  .note{font-size:12px;color:var(--sub);line-height:1.8}
+  @media (max-width:640px){.chart{height:280px}body{padding:8px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="sub" id="updated"></div>
+  <div class="panel" id="futPanel" style="display:none">
+    <h2 id="futTitle">股指期货持仓走势<small>净空头 = 持卖单 − 持买单（手）；中金所前20会员排名口径</small></h2>
+    <div class="chart" id="chartFut"></div>
+  </div>
+
+  <div class="panel" id="futTblPanel" style="display:none">
+    <h2>股指期货最新持仓明细（按合约）<small id="futDate"></small></h2>
+    <div class="tbl"><table id="futTbl">
+      <thead><tr><th class="l">品种</th><th class="l">合约</th><th>多头持仓(手)</th><th>多头增减</th>
+      <th>空头持仓(手)</th><th>空头增减</th><th>净空头(手)</th><th>净空头变动</th></tr></thead>
+      <tbody></tbody></table></div>
+  </div>
+
+  <p class="note">来源：公开ETF监控站整理，中金所每日各合约前20会员成交持仓排名。中信期货席位为该会员全部客户合计，不能归因为国家队实际买卖；到期换月时建议结合品种合计观察。</p>
+</div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const BLUE="#2f6fdd";
+const fmt=(v,d=1,sign=false)=>v==null||isNaN(v)?"—":(sign&&v>0?"+":"")+v.toLocaleString("zh-CN",{minimumFractionDigits:d,maximumFractionDigits:d});
+const cls=v=>v>0?"pos":v<0?"neg":"";
+const D=__LOCAL_DATA__,dates=D.dates,charts=[];
+const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
+const count=(D.futures?.dates?.length||dates.length);
+const motionOption=()=>({animation:!motion.matches&&count<=1200&&count*(D.futures?.products?.length||4)<=3000,animationDuration:1000,animationDurationUpdate:500,animationEasing:'cubicInOut',animationEasingUpdate:'cubicInOut'});
+echarts.registerTheme('platform-motion',motionOption());
+motion.addEventListener('change',()=>charts.forEach(chart=>chart.setOption(motionOption())));
+  // ---- 期货: 中信席位持仓
+  const F=D.futures;
+  if(F&&F.latest&&F.latest.date){
+    $("futPanel").style.display="";$("futTblPanel").style.display="";
+    $("futTitle").firstChild.textContent=F.member+"股指期货持仓走势";
+    $("updated").textContent="最新交易日："+F.latest.date;
+    const fdates=(F.dates&&F.dates.length)?F.dates:dates;
+    const colors={IH:"#8a63d2",IF:BLUE,IC:"#e2984c",IM:"#38a1a8"};
+    const chF=echarts.init($("chartFut"),'platform-motion');charts.push(chF);
+    chF.setOption({
+      tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Math.round(v).toLocaleString()+" 手"},
+      legend:{data:F.products.map(p=>p+" "+(F.names[p]||"")),top:0},
+      grid:{left:10,right:10,top:30,bottom:50,containLabel:true},
+      xAxis:{type:"category",data:fdates,axisLabel:{fontSize:11}},
+      yAxis:{type:"value",name:"净空头(手)",splitLine:{lineStyle:{color:"#eef1f6"}}},
+      dataZoom:[{type:"inside"},{type:"slider",height:18,bottom:8}],
+      series:F.products.map(p=>({name:p+" "+(F.names[p]||""),type:"line",symbol:"none",
+        connectNulls:false,lineStyle:{width:2,color:colors[p]},itemStyle:{color:colors[p]},
+        data:F.series[p].net_short}))
+    });
+    $("futDate").textContent="交易日 "+F.latest.date+"　·　会员："+F.member+"　·　多空为该会员全部客户合计";
+    let fhtml="";
+    F.products.forEach(p=>{
+      const cs=F.latest.contracts[p]||[];if(!cs.length)return;
+      let sub=[0,0,0,0];
+      cs.forEach(c=>{
+        sub[0]+=c[1];sub[1]+=c[2];sub[2]+=c[3];sub[3]+=c[4];
+        fhtml+="<tr><td class='l'>"+p+"</td><td class='l'>"+c[0]+"</td>"+
+          "<td>"+c[1].toLocaleString()+"</td><td class='"+cls(c[2])+"'>"+fmt(c[2],0,true)+"</td>"+
+          "<td>"+c[3].toLocaleString()+"</td><td class='"+cls(c[4])+"'>"+fmt(c[4],0,true)+"</td>"+
+          "<td>"+(c[3]-c[1]).toLocaleString()+"</td>"+
+          "<td class='"+cls(c[4]-c[2])+"'>"+fmt(c[4]-c[2],0,true)+"</td></tr>";});
+      fhtml+="<tr class='sumrow'><td class='l'>"+p+" "+(F.names[p]||"")+"</td><td class='l'>小计</td>"+
+        "<td>"+sub[0].toLocaleString()+"</td><td class='"+cls(sub[1])+"'>"+fmt(sub[1],0,true)+"</td>"+
+        "<td>"+sub[2].toLocaleString()+"</td><td class='"+cls(sub[3])+"'>"+fmt(sub[3],0,true)+"</td>"+
+        "<td>"+(sub[2]-sub[0]).toLocaleString()+"</td>"+
+        "<td class='"+cls(sub[3]-sub[1])+"'>"+fmt(sub[3]-sub[1],0,true)+"</td></tr>";});
+    $("futTbl").querySelector("tbody").innerHTML=fhtml;
+  } else {
+    $("updated").textContent="暂无已采集的股指期货持仓数据";
+  }
+window.addEventListener("resize",()=>charts.forEach(c=>c.resize()));
+})();
+</script>
+<script>new ResizeObserver(()=>parent.postMessage({type:'national-etf-height',height:document.documentElement.scrollHeight},'*')).observe(document.body);</script>
+</body>
+</html>

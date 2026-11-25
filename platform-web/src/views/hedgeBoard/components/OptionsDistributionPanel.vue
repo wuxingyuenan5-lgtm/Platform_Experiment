@@ -1,5 +1,5 @@
 <template
-  ><div>
+  ><div class="option-distribution">
     <p v-if="error">{{ error }}</p>
     <div v-show="!error && rows.length">
       <div class="chart-legend"
@@ -89,14 +89,19 @@
   ) {
     return {
       animation: false,
-      tooltip: { trigger: 'axis', confine: true },
+      tooltip: {
+        trigger: 'axis',
+        confine: true,
+        valueFormatter: (value: number) =>
+          Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 }),
+      },
       legend: { data: series.map((s) => s.name), top: 0 },
-      grid: { left: 15, right: 15, top: 42, bottom: 60, containLabel: true },
+      grid: { left: 15, right: 15, top: 42, bottom: 72, containLabel: true },
       xAxis: { type: 'category', data: labels, axisLabel: { rotate: 35, hideOverlap: true } },
       yAxis: { type: 'value', name: 'BTC' },
       dataZoom: [
         { type: 'inside', filterMode: 'filter' },
-        { type: 'slider', filterMode: 'filter', height: 18, bottom: 0 },
+        { type: 'slider', filterMode: 'filter', height: 20, bottom: 8 },
       ],
       series: series.map((s) => ({ ...s, type: 'bar', itemStyle: { color: s.color } })),
     };
@@ -163,17 +168,38 @@
 <style scoped>
   .option-distribution-chart {
     width: 100%;
-    height: 320px;
+    height: 250px;
+    margin-bottom: 12px;
   }
 
   .option-distribution-metrics {
     display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     flex-wrap: wrap;
-    gap: 24px;
+    margin: 0 0 12px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--strategy-surface-muted, #f5f8fc);
+    gap: 12px;
   }
 
   .option-distribution-metrics b {
     display: block;
+  }
+
+  .option-distribution {
+    padding: 0 16px 12px;
+  }
+
+  h5 {
+    margin: 8px 0 6px;
+  }
+
+  @media (max-width: 600px) {
+    .option-distribution-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   p {

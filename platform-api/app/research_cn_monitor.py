@@ -125,6 +125,22 @@ def _monitor_view(revision):
     return read_artifact("cn-monitor") or {"sources": {}, "generatedAt": None}
 
 
+def _congestion_with_indices(source):
+    from app.research_etf_tracking import read
+
+    closes = {}
+    for key in ("hs300", "chinext", "star50"):
+        history = read(f"index-turnover/{key}").get("data", {}).get("rows", [])
+        closes[key] = {
+            row["date"]: close for row in history
+            if (close := number(row.get("close"))) is not None and close > 0
+        }
+    return {**source, "data": [
+        {**row, **{key: days.get(row["date"]) for key, days in closes.items()}}
+        for row in source.get("data", [])
+    ]}
+
+
 def read_monitor(keys=None):
     if keys is not None:
         from app.research_local_data import local_json_revision
@@ -134,8 +150,39 @@ def read_monitor(keys=None):
                    *["growth_"+k for k in METRICS]}
         if not set(keys) <= allowed:
             raise ValueError("unknown_monitor_source")
-        return {"generatedAt": data.get("generatedAt"), "sources": {
-            k:v for k,v in data.get("sources",{}).items() if k in keys}}
+        sources = {k: v for k, v in data.get("sources", {}).items() if k in keys and k != "congestion"}
+        if "congestion" in keys:
+            from app.data_audit_calendar import cached_sessions
+
+            reference = data.get("sources", {}).get("congestion", {})
+            equity = read_artifact("cn") or {}
+            local = {
+                row["date"]: row["top5PctAmountShare"]
+                for row in equity.get("structureHistory", [])
+                if row.get("top5PctAmountShare") is not None
+            }
+            first_local = min(local, default=None)
+            archived = {
+                row["date"]: row["value"] for row in reference.get("data", [])
+                if row.get("value") is not None and (first_local is None or row["date"] < first_local)
+            }
+            values = {**archived, **local}
+            first, latest = min(values, default=""), max(values, default="")
+            dates = values.keys() | {
+                row["date"] for row in reference.get("data", [])
+                if first <= row["date"] <= latest
+            }
+            if first_local and archived:
+                last_archived = max(archived)
+                dates.update(day for day in cached_sessions(latest) if last_archived < day <= latest)
+            sources["congestion"] = _congestion_with_indices({
+                "status": "ready" if dates else "no_data",
+                "fetchedAt": equity.get("generatedAt"),
+                "data": [{"date": day, "value": values.get(day)} for day in sorted(dates)],
+                "referenceEnd": max(archived, default=None),
+                "platformStart": first_local,
+            })
+        return {"generatedAt": data.get("generatedAt"), "sources": sources}
     return read_artifact("cn-monitor") or {"sources": {}, "generatedAt": None}
 
 
@@ -203,4 +250,15 @@ async def run_periodic():
             await collect()
         except Exception:
             logging.getLogger(__name__).exception("CN monitor refresh failed")
+        try:
+            from app.research_cn_crowding import collect_crowding, collect_industry_crowding
+            await collect_crowding()
+            await collect_industry_crowding()
+        except Exception:
+            logging.getLogger(__name__).exception("CN crowding refresh failed")
+        try:
+            from app.research_cn_price_breadth import collect_price_breadth
+            await collect_price_breadth()
+        except Exception:
+            logging.getLogger(__name__).exception("CN price breadth refresh failed")
         await asyncio.sleep(300)

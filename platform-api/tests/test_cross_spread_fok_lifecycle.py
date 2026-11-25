@@ -165,7 +165,7 @@ def test_non_executable_limit_persists_trigger_without_any_batch_submission(monk
     assert result.pending_trigger.limit_spread == Decimal("-1.0")
     with connection() as db:
         assert db.execute("SELECT COUNT(*) FROM cross_spread_open_triggers").fetchone()[0] == 1
-        for table in ("strategy_instructions", "execution_batches", "trade_commands", "orders"):
+        for table in ("strategy_runs", "execution_batches", "trade_commands", "orders"):
             assert db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
 
 
@@ -221,7 +221,7 @@ def test_clean_fok_close_no_fill_releases_plan_back_to_active(monkeypatch) -> No
     )
 
     assert captured["request"].action == "CLOSE_LONG"
-    assert captured["kwargs"]["allow_netting_close"] is True
+    assert captured["kwargs"]["allow_netting_close"] is False
     assert captured["kwargs"]["mt5_reduce_only"] is True
     assert captured["kwargs"]["mt5_position_id"] == "778899"
     assert captured["kwargs"]["idempotency_key"].startswith(

@@ -3,12 +3,18 @@
 import asyncio
 import json
 import logging
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from time import perf_counter
 from typing import Literal, overload
 
 from fastapi import BackgroundTasks, HTTPException
 
 from app import monitor_health
+from app.config import get_settings
 from app.database import connection
 from app.schemas import StrategyAccountSnapshotResponse, StrategyPnlResponse
 
@@ -93,14 +99,16 @@ def read_projection(
 
 def prepare_keys():
     with connection() as db:
+        instances = db.execute("SELECT id FROM strategy_instances").fetchall()
         rows = db.execute(
             "SELECT DISTINCT s.id,b.account_id FROM strategy_instances s "
             "JOIN strategy_account_bindings b ON b.strategy_instance_id=s.id "
             "WHERE b.status='active' AND b.role!='local_test'"
         ).fetchall()
-    for row in rows:
+    for row in instances:
         request_projection(row["id"], None, "pnl")
         request_projection(row["id"], None, "summary")
+    for row in rows:
         request_projection(row["id"], row["account_id"], "summary")
 
 
@@ -129,6 +137,7 @@ def refresh_one(*, force=False):
             "WHERE strategy_instance_id=? AND account_id=? AND kind=?",
             (now.isoformat(), *key),
         )
+    started = perf_counter()
     try:
         model = (
             get_strategy_pnl(key[0])
@@ -138,6 +147,7 @@ def refresh_one(*, force=False):
             )
         )
         payload = model.model_dump_json(by_alias=True)
+        computed = perf_counter()
         with connection() as db:
             db.execute(
                 "UPDATE strategy_management_projection "
@@ -153,6 +163,13 @@ def refresh_one(*, force=False):
                 (type(exc).__name__, *key),
             )
         logger.warning("Management projection failed for %s: %s", key, type(exc).__name__)
+    else:
+        finished = perf_counter()
+        if finished - started >= 1:
+            logger.warning(
+                "Slow management projection kind=%s compute_seconds=%.2f write_seconds=%.2f",
+                key[2], computed - started, finished - computed,
+            )
     return True
 
 
@@ -165,17 +182,42 @@ def refresh_and_check():
     return worked, bool(failed)
 
 
+def initialize_projection_worker(database_path):
+    get_settings().database_path = database_path
+
+
 async def run_management_projection_monitor():
     prepared = False
     while True:
-        monitor_health.begin("management_projection")
+        # History reconstruction is CPU-heavy even in a thread: it competes
+        # with authenticated HTTP reads for the API interpreter's GIL. Keep
+        # one serial worker and the same persisted projection/refresh rules.
+        pool = ProcessPoolExecutor(
+            max_workers=1,
+            mp_context=multiprocessing.get_context("spawn"),
+            initializer=initialize_projection_worker,
+            initargs=(str(Path(get_settings().database_path).resolve()),),
+        )
         try:
-            if not prepared:
-                await asyncio.to_thread(prepare_keys)
-                prepared = True
-            worked, failed = await asyncio.to_thread(refresh_and_check)
-            monitor_health.finish("management_projection", "projection_failed" if failed else None)
-        except Exception as exc:
-            worked = False
-            monitor_health.finish("management_projection", type(exc).__name__)
-        await asyncio.sleep(0.05 if worked else 1)
+            while True:
+                monitor_health.begin("management_projection")
+                try:
+                    if not prepared:
+                        await asyncio.to_thread(prepare_keys)
+                        prepared = True
+                    worked, failed = await asyncio.get_running_loop().run_in_executor(
+                        pool, refresh_and_check
+                    )
+                    monitor_health.finish("management_projection", "projection_failed" if failed else None)
+                except BrokenProcessPool:
+                    monitor_health.finish("management_projection", "worker_exited")
+                    break
+                except Exception as exc:
+                    worked = False
+                    monitor_health.finish("management_projection", type(exc).__name__)
+                await asyncio.sleep(0.05 if worked else 1)
+        finally:
+            # A cancelled await does not stop an in-flight child. Join it before
+            # replacing the worker so two projection writers cannot overlap.
+            await asyncio.to_thread(pool.shutdown, wait=True, cancel_futures=True)
+        await asyncio.sleep(1)

@@ -45,14 +45,23 @@ export default defineComponent({
     onBeforeUnmount(stop);
 
     return () =>
-      h('div', { ref: host, class: 'visible-chart', 'data-loaded': loaded.value }, [
-        loaded.value
-          ? slots.default?.()
-          : h('div', {
-              class: 'visible-chart__placeholder',
-              style: { height: `${props.height}px` },
-              'aria-hidden': 'true',
-            }),
-      ]);
+      h(
+        'div',
+        {
+          ref: host,
+          class: 'visible-chart',
+          'data-loaded': loaded.value,
+          style: { minHeight: `${props.height}px` },
+        },
+        [
+          loaded.value
+            ? slots.default?.()
+            : h('div', {
+                class: 'visible-chart__placeholder',
+                style: { height: `${props.height}px` },
+                'aria-hidden': 'true',
+              }),
+        ],
+      );
   },
 });

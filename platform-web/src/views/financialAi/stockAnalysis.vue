@@ -71,6 +71,7 @@
           ><article
             ><small>昨收</small><b>{{ formatPrice(globalStock.previousClose) }}</b></article
           ><svg
+            ref="motionPlot"
             v-if="candles.length"
             viewBox="0 0 600 180"
             preserveAspectRatio="none"
@@ -205,7 +206,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { watch as watchMotion, computed, ref } from 'vue';
   import { PageWrapper } from '@/components/Page';
   import {
     getStockSnapshot,
@@ -519,6 +521,9 @@
       }),
     );
   }
+  const motionPlot = ref<HTMLElement | SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion([candles, indicatorPaths], () => void reveal(), { flush: 'post', deep: true });
 </script>
 
 <style scoped lang="less">

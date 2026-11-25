@@ -46,7 +46,9 @@ assert.match(component, /自动划转暂不可用/);
 assert.doesNotMatch(component, /打开 Bybit 官方资金页|辅助调拨|一键复制金额/);
 assert.match(funding, /quote\.value\?\.mode === 'automated'/);
 assert.match(api, /idempotencyKey: string;\s+direction: FundingTransferDirection;\s+amount: string;/);
-assert.match(api, /mode: 'automated' \| 'unavailable'/);
+assert.match(api, /components\['schemas'\]\['FundingTransferQuoteResponse'\]/);
+const generated = fs.readFileSync(path.join(root, 'src/api/platform/generated/strategy.ts'), 'utf8');
+assert.match(generated.split('FundingTransferQuoteResponse: {')[1].split('};')[0], /mode: 'automated' \| 'unavailable'/);
 assert.doesNotMatch(api, /uid:|accountId:|apiKey:|mt5Login:/i);
 
 console.log('cross-spread funding-transfer template checks passed');

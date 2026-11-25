@@ -7,7 +7,7 @@ const {parse,compileScript} = require('@vue/compiler-sfc');
 const loader = require('./load-strategy-module.cjs')();
 const Boundary = loader('src/views/hedgeBoard/components/WidgetErrorBoundary.ts').default;
 
-function mount(data, view, brokenTheme = false) {
+function mount(data, view, brokenTheme = false, inThemeResearch = false) {
   const file = 'src/views/hedgeBoard/components/EquityObservatoryPanel.vue';
   const descriptor = parse(fs.readFileSync(file,'utf8')).descriptor;
   const script = compileScript(descriptor,{id:'failure-isolation',inlineTemplate:true}).content;
@@ -16,6 +16,8 @@ function mount(data, view, brokenTheme = false) {
   const stub = (name, broken=false) => ({name,setup:()=>()=>{if(broken && brokenTheme)throw Error('injected chart failure');return vue.h('div',name);}});
   new Function('require','module','exports','window','document',code)((name)=> {
     if(name==='vue')return vue;
+    if(name==='vue-router')return {useRoute:()=>({query:{}}),useRouter:()=>({replace(){}})};
+    if(name.includes('useDashboardRefresh'))return {useDashboardRefresh(){}};
     if(name.includes('api/equityObservatory'))return {getEquityObservatory:async()=>data};
     if(name.includes('researchWorkspace'))return {useResearchSnapshots:()=>({get:()=>data,set(){}}),useResearchViewState:(_,x)=>vue.ref(x)};
     if(name.includes('WidgetErrorBoundary'))return {__esModule:true,default:Boundary};
@@ -27,7 +29,8 @@ function mount(data, view, brokenTheme = false) {
     insert(n,p,a){if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1);}n.parent=p;const i=a?p.children.indexOf(a):-1;if(i>=0)p.children.splice(i,0,n);else p.children.push(n);},
     remove(n){const i=n.parent?.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1);},parentNode:n=>n.parent,nextSibling:n=>{const a=n.parent?.children||[];return a[a.indexOf(n)+1]||null;}
   });
-  const root={children:[]};const app=renderer.createApp(mod.exports.default,{market:'us',view});
+  const root={children:[]};const app=renderer.createApp(mod.exports.default,{market:data.market,view});
+  if (inThemeResearch) app.provide('themeResearchAlwaysExpanded', true);
   app.config.warnHandler=()=>{};app.mount(root);
   function text(n){return (n.text||'')+(n.children||[]).map(text).join(' ');}
   return {text:()=>text(root),recover:()=>{brokenTheme=false;data.generatedAt='next';},close:()=>app.unmount()};
@@ -36,18 +39,33 @@ const partial={market:'us',status:'partial',date:'2026-10-26',themes:null,valuat
 test('valuation renders when themes are absent',async()=>{
   const s=mount(partial,'valuation');await vue.nextTick();assert.match(s.text(),/IndexValuationPanel/);s.close();
 });
+
+test('theme research suppresses the shared source table without a per-panel prop', async () => {
+  const data = { ...partial, market: 'cn', sources: [{ name: '来源样例', date: partial.date, status: 'ready' }] };
+  const embedded = mount(data, 'valuation', false, true);
+  const standalone = mount(data, 'valuation');
+  try {
+    await vue.nextTick();
+    assert.match(embedded.text(), /IndexValuationPanel/);
+    assert.doesNotMatch(embedded.text(), /数据来源与更新日期|来源样例/);
+    assert.match(standalone.text(), /数据来源与更新日期.*来源样例/);
+  } finally {
+    embedded.close();
+    standalone.close();
+  }
+});
 test('structure renders when themes are absent',async()=>{
   const s=mount(partial,'structure');await vue.nextTick();assert.match(s.text(),/行业ETF站上20日均线/);s.close();
 });
 test('one throwing theme component leaves valuation and structure mounted',async()=>{
   const s=mount({...partial,themes:{date:'2026-10-26',items:[]}},undefined,true);
-  await vue.nextTick();await vue.nextTick();assert.match(s.text(),/主题与行业.*暂不可用/);assert.match(s.text(),/IndexValuationPanel/);assert.match(s.text(),/行业ETF站上20日均线/);s.close();
+  await vue.nextTick();await vue.nextTick();assert.match(s.text(),/主题研究.*暂不可用/);assert.match(s.text(),/IndexValuationPanel/);assert.match(s.text(),/行业ETF站上20日均线/);s.close();
 });
 
 test('a new published theme snapshot recovers a previously failed subtree',async()=>{
  const data=vue.reactive({...partial,themes:{date:'2026-10-26',items:[]},generatedAt:'first'});
  const s=mount(data,undefined,true);await vue.nextTick();await vue.nextTick();
- assert.match(s.text(),/主题与行业.*暂不可用/);
+ assert.match(s.text(),/主题研究.*暂不可用/);
  s.recover();await vue.nextTick();await vue.nextTick();
- assert.match(s.text(),/EquityThemePanel/);assert.doesNotMatch(s.text(),/主题与行业.*暂不可用/);s.close();
+ assert.match(s.text(),/EquityThemePanel/);assert.doesNotMatch(s.text(),/主题研究.*暂不可用/);s.close();
 });

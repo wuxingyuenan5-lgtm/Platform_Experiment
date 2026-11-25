@@ -1,238 +1,305 @@
 <template>
-  <section class="context" :aria-label="titles[section]">
+  <section
+    class="context"
+    :class="{
+      'context--compact': section !== 'breadth' || !!breadthPart,
+    }"
+    :aria-label="titles[section]"
+  >
     <p v-if="loading" role="status">正在读取{{ titles[section] }}…</p>
     <p v-if="error" role="alert">{{ error }} <button @click="load">重试</button></p>
     <template v-if="document">
       <template v-if="section === 'risk'">
-        <div class="controls"
-          ><label
-            >指数
-            <select v-model="riskIndex"
-              ><option value="000300">沪深300</option
-              ><option value="000016">上证50</option
-              ><option value="000905">中证500</option></select
-            ></label
-          ><label
-            >盈利口径
-            <select v-model="earningsMethod"
-              ><option value="Lyr">静态 PE LYR</option
-              ><option value="Ttm">滚动 PE TTM</option></select
-            ></label
-          ></div
-        >
-        <div class="cards"
-          ><article
-            ><span>盈利收益率 − 国债收益率</span
-            ><strong>{{ fmt(latestRisk?.['erp' + earningsMethod]) }} pp</strong
-            ><small>{{ latestRisk?.date || '—' }}</small></article
-          ><article
-            ><span>盈利收益率</span
-            ><strong>{{ fmt(latestRisk?.['earnings' + earningsMethod]) }}%</strong
-            ><small
-              >{{ earningsMethod === 'Lyr' ? '静态 PE LYR' : '滚动 PE TTM' }} 倒数</small
-            ></article
-          ><article
-            ><span>10年期国债收益率</span><strong>{{ fmt(latestRisk?.bond) }}%</strong
-            ><small>与指数估值同日匹配</small></article
-          ></div
-        >
-        <p class="definition"
-          >盈利收益率 = 100 ÷
-          PE；股债差为盈利收益率减同日10年国债收益率。静态和滚动口径分别计算。</p
-        >
         <FinancingChart
-          v-if="riskRows.length"
-          :key="riskIndex + earningsMethod"
-          :title="`${riskNames[riskIndex]} · 股债性价比`"
+          v-for="chart in riskCharts"
+          :key="chart.key + riskIndex"
+          :title="chart.title"
           :rows="riskRows"
-          :lines="[
-            {
-              key: 'erp' + earningsMethod,
-              name: '盈利收益率−国债收益率',
-              color: '#2864ec',
-              unit: 'pp',
-            },
-            { key: 'close', name: riskNames[riskIndex], color: '#171717', unit: '点', right: true },
-          ]"
-        />
-        <FinancingChart
-          v-if="riskRows.length"
-          :key="'inputs' + riskIndex + earningsMethod"
-          title="盈利收益率与国债收益率"
-          :rows="riskRows"
-          :lines="[
-            { key: 'earnings' + earningsMethod, name: '盈利收益率', color: '#2864ec', unit: '%' },
-            { key: 'bond', name: '10年国债收益率', color: '#d09a14', unit: '%' },
-          ]"
-        />
-        <p class="definition"
-          >指数估值：Choice · 国债：中债 / 财政部收益率曲线。<a
-            href="https://yield.chinabond.com.cn/cbweb-czb-web/czb/historyQuery"
-            target="_blank"
-            rel="noopener noreferrer"
-            >国债来源 ↗</a
-          >
-          <a
-            href="https://legulegu.com/stockdata/a-risk-premium"
-            target="_blank"
-            rel="noopener noreferrer"
-            >公式参考 ↗</a
-          ></p
+          :lines="chart.lines"
+          :axis-names="chart.axisNames"
+          :range-days="0"
+          hide-ranges
+          allow-table
         >
-        <p v-if="!latestRisk" class="notice">缺少同日有效PE和国债收益率，暂不能计算股债差。</p>
-        <p v-else-if="lagged(riskIndex, 'erp' + earningsMethod)" class="notice"
-          >最近可计算日期为 {{ latestRisk.date }}，后续缺少同日配对数据。</p
+          <template #range-controls>
+            <label class="risk-index"
+              >指数
+              <select v-model="riskIndex">
+                <option v-for="(name, code) in riskNames" :key="code" :value="code">{{
+                  name
+                }}</option>
+              </select>
+            </label>
+            <button
+              v-for="years in historyRanges"
+              :key="years"
+              type="button"
+              :class="{ active: riskYears === years }"
+              :aria-pressed="riskYears === years"
+              @click="riskYears = years"
+              >{{ years ? `${years}年` : '全部' }}</button
+            >
+          </template>
+        </FinancingChart>
+        <p v-if="!latestRisk" class="notice context-notice">暂无同日有效数据。</p>
+        <p v-else-if="lagged(riskIndex, 'erpTtm')" class="notice context-notice"
+          >股债差更新至 {{ latestRisk.date }}。</p
         >
-        <SourceState :source="document.sources[riskIndex]" :rows="riskRows" />
       </template>
       <template v-else-if="section === 'breadth'">
-        <h3>破净比例</h3>
-        <div class="cards cards-four"
-          ><button
-            v-for="(name, key) in markets"
-            :key="key"
-            :class="{ active: market === key }"
-            @click="market = key"
-            ><span>{{ name }}</span
-            ><strong>{{ fmt(latest('below_' + key, 'value')?.value) }}%</strong
-            ><small>{{ latest('below_' + key, 'value')?.date || '暂无有效日期' }}</small></button
-          ></div
-        >
-        <p class="definition"
-          >{{ markets[market] }}：{{ fmt(latest('below_' + market, 'value')?.count, 0) }}只破净 /
-          {{ fmt(latest('below_' + market, 'value')?.total, 0) }}只统计样本；0 &lt; PB &lt;
-          1，净资产为负的公司不计入破净数量。</p
-        >
-        <FinancingChart
-          v-if="rows('below_' + market).length"
-          :key="market"
-          :title="`${markets[market]} · 破净比例`"
-          :rows="rows('below_' + market)"
-          :lines="[
-            { key: 'value', name: '破净比例', color: '#2864ec', unit: '%' },
-            {
-              key: 'close',
-              name: market === 'all' ? '参考指数' : markets[market],
-              color: '#171717',
-              unit: '点',
-              right: true,
-            },
-          ]"
-        />
-        <SourceState
-          :source="document.sources['below_' + market]"
-          :rows="rows('below_' + market)"
-        />
-        <h3>全A · 均线宽度</h3>
-        <div class="cards"
-          ><article v-for="period in [5, 20, 60]" :key="period"
-            ><span>收盘价高于{{ period }}日均线</span
-            ><strong>{{ fmt(latest('ma', 'ma' + period)?.['ma' + period], 0) }}%</strong
-            ><small>{{ latest('ma', 'ma' + period)?.date || '暂无有效日期' }}</small></article
-          ></div
-        >
-        <p class="notice" v-if="lagged('ma', 'ma20')"
-          >公开来源均线统计截至 {{ latest('ma', 'ma20')?.date }}，其后暂无公开统计值。</p
-        >
-        <FinancingChart
-          v-if="rows('ma').length"
-          title="全A · 站上均线的股票比例"
-          :rows="rows('ma')"
-          :lines="[
-            { key: 'ma5', name: '高于5日均线', color: '#2864ec', unit: '%' },
-            { key: 'ma20', name: '高于20日均线', color: '#00976f', unit: '%' },
-            { key: 'ma60', name: '高于60日均线', color: '#d09a14', unit: '%' },
-          ]"
-        />
-        <SourceState :source="document.sources.ma" :rows="rows('ma')" />
-        <div class="controls"
-          ><h3>全A · 创新高 / 新低</h3
-          ><label
-            >观察窗口
-            <select v-model="highLowPeriod"
-              ><option :value="20">20日</option
-              ><option :value="60">60日</option
-              ><option :value="120">120日</option></select
-            ></label
-          ></div
-        >
-        <div class="cards"
-          ><article
-            ><span>{{ highLowPeriod }}日新高</span
-            ><strong
-              >{{
-                fmt(latest('highlow', 'high' + highLowPeriod)?.['high' + highLowPeriod], 0)
-              }}只</strong
-            ><small>{{ latest('highlow', 'high' + highLowPeriod)?.date }}</small></article
-          ><article
-            ><span>{{ highLowPeriod }}日新低</span
-            ><strong
-              >{{
-                fmt(latest('highlow', 'low' + highLowPeriod)?.['low' + highLowPeriod], 0)
-              }}只</strong
-            ><small>{{ latest('highlow', 'low' + highLowPeriod)?.date }}</small></article
-          ><article
-            ><span>新高 − 新低</span
-            ><strong
-              >{{
-                fmt(latest('highlow', 'net' + highLowPeriod)?.['net' + highLowPeriod], 0)
-              }}只</strong
-            ><small>同日数量差</small></article
-          ></div
-        >
-        <p v-if="lagged('highlow', 'high20')" class="notice"
-          >公开来源新高新低统计截至 {{ latest('highlow', 'high20')?.date }}，其后暂无公开统计值。</p
-        >
-        <FinancingChart
-          v-if="rows('highlow').length"
-          :key="highLowPeriod"
-          title="全A · 创新高与创新低数量"
-          :rows="rows('highlow')"
-          :lines="[
-            {
-              key: 'high' + highLowPeriod,
-              name: '创新高',
-              color: '#d84f5a',
-              unit: '只',
-              bar: true,
-            },
-            { key: 'low' + highLowPeriod, name: '创新低', color: '#00976f', unit: '只', bar: true },
-          ]"
-        />
-        <SourceState :source="document.sources.highlow" :rows="rows('highlow')" />
-        <p class="definition"
-          >均线和新高新低均为来源的全A统计、剔除停牌股，区别于股票池样本广度。</p
-        >
+        <template v-if="breadthPart !== 'history'">
+          <div class="below-book-summary">
+            <h3>破净比例</h3>
+            <div class="below-book-options">
+              <button
+                v-for="item in belowBookMetrics"
+                :key="item.key"
+                type="button"
+                :class="{ active: market === item.key }"
+                :aria-pressed="market === item.key"
+                @click="market = item.key"
+              >
+                <span>{{ item.name }}</span>
+                <strong>{{ item.row ? fmt(item.row.value) + '%' : '—' }}</strong>
+                <time v-if="!belowBookDate && item.row" :datetime="item.row.date">{{
+                  item.row.date
+                }}</time>
+              </button>
+            </div>
+            <time v-if="belowBookDate" :datetime="belowBookDate">{{ belowBookDate }}</time>
+            <span
+              v-if="selectedBelowBook?.count != null && selectedBelowBook?.total != null"
+              class="below-book-sample"
+              title="破净口径：0 < PB < 1，净资产为负的公司不计入破净数量"
+              >{{ fmt(selectedBelowBook.count, 0) }} /
+              {{ fmt(selectedBelowBook.total, 0) }} 只破净</span
+            >
+          </div>
+          <FinancingChart
+            v-if="rows('below_' + market).length"
+            :key="market"
+            :title="`${markets[market]} · 破净比例`"
+            :rows="breadthPart === 'belowBook' ? belowBookRows : rows('below_' + market)"
+            :range-days="breadthPart === 'belowBook' ? 0 : undefined"
+            :hide-ranges="breadthPart === 'belowBook'"
+            :lines="[
+              { key: 'value', name: '破净比例', color: '#2864ec', unit: '%' },
+              {
+                key: 'close',
+                name: market === 'all' ? '参考指数' : markets[market],
+                color: '#171717',
+                unit: '点',
+                right: true,
+              },
+            ]"
+          >
+            <template v-if="breadthPart === 'belowBook'" #range-controls>
+              <button
+                v-for="years in belowBookRanges ?? historyRanges"
+                :key="years"
+                type="button"
+                :class="{ active: belowBookYears === years }"
+                :aria-pressed="belowBookYears === years"
+                @click="belowBookYears = years"
+                >{{ years ? `${years}年` : '全部' }}</button
+              >
+            </template>
+          </FinancingChart>
+          <SourceState
+            :source="document.sources['below_' + market]"
+            :rows="rows('below_' + market)"
+          />
+        </template>
+        <div v-if="breadthPart === 'history'" class="breadth-history-grid">
+          <div v-for="chart in breadthCharts" :key="chart.key" class="breadth-history-card">
+            <FinancingChart
+              :title="chart.title"
+              :rows="rows(chart.key)"
+              :lines="chart.lines"
+              :alternate="breadthRanks?.[chart.key]"
+              primary-label="市场广度"
+              allow-table
+            >
+              <template v-if="chart.key === 'highlow'" #range-controls>
+                <div class="history-controls">
+                  <select v-model="highLowPeriod" aria-label="观察窗口">
+                    <option :value="20">20日</option>
+                    <option :value="60">60日</option>
+                    <option :value="120">120日</option>
+                  </select>
+                </div>
+              </template>
+              <template #summary>
+                <div v-if="chart.key === 'ma'" class="chart-summary-line">
+                  <template v-if="breadthSnapshot">
+                    <time :datetime="breadthSnapshot.date">收盘 {{ breadthSnapshot.date }}</time>
+                    <span
+                      >上涨<strong>{{
+                        breadthSnapshot.valid ? fmt(breadthSnapshot.advancing, 0) : '—'
+                      }}</strong></span
+                    >
+                    <span
+                      >下跌<strong>{{
+                        breadthSnapshot.valid ? fmt(breadthSnapshot.declining, 0) : '—'
+                      }}</strong></span
+                    >
+                    <span
+                      >平盘<strong>{{
+                        breadthSnapshot.valid ? fmt(breadthSnapshot.unchanged, 0) : '—'
+                      }}</strong></span
+                    >
+                    <span
+                      >上涨占比<strong>{{
+                        breadthSnapshot.valid
+                          ? fmt((breadthSnapshot.advancing / breadthSnapshot.valid) * 100) + '%'
+                          : '—'
+                      }}</strong></span
+                    >
+                    <span v-if="snapshotStale" class="notice">待更新</span>
+                  </template>
+                  <span v-else>暂无当日涨跌</span>
+                </div>
+                <div class="chart-summary-line">
+                  <template v-if="chart.latest">
+                    <time :datetime="chart.latest.date">历史截至 {{ chart.latest.date }}</time>
+                    <span v-for="line in chart.lines" :key="line.key">
+                      {{ line.name
+                      }}<strong>{{ historyValue(chart.latest[line.key], line.unit) }}</strong>
+                    </span>
+                  </template>
+                  <span v-else>暂无有效历史读数</span>
+                </div>
+              </template>
+            </FinancingChart>
+            <SourceState
+              :source="document.sources[chart.key]"
+              :rows="rows(chart.key)"
+              hide-source
+            />
+          </div>
+        </div>
+        <template v-else-if="breadthPart !== 'belowBook'">
+          <div>
+            <h3 v-if="!breadthPart">全A · 均线宽度</h3>
+            <div class="cards"
+              ><article v-for="period in [5, 20, 60]" :key="period"
+                ><span>收盘价高于{{ period }}日均线</span
+                ><strong>{{ fmt(latest('ma', 'ma' + period)?.['ma' + period], 0) }}%</strong
+                ><small>{{ latest('ma', 'ma' + period)?.date || '暂无有效日期' }}</small></article
+              ></div
+            >
+            <p class="notice" v-if="lagged('ma', 'ma20')"
+              >公开来源均线统计截至 {{ latest('ma', 'ma20')?.date }}，其后暂无公开统计值。</p
+            >
+            <FinancingChart
+              v-if="rows('ma').length"
+              title="全A · 站上均线的股票比例"
+              :rows="rows('ma')"
+              allow-table
+              :lines="[
+                { key: 'ma5', name: '高于5日均线', color: '#2864ec', unit: '%' },
+                { key: 'ma20', name: '高于20日均线', color: '#00976f', unit: '%' },
+                { key: 'ma60', name: '高于60日均线', color: '#d09a14', unit: '%' },
+              ]"
+            />
+            <SourceState :source="document.sources.ma" :rows="rows('ma')" />
+          </div>
+          <div>
+            <div v-if="!breadthPart" class="controls"
+              ><h3>全A · 创新高 / 新低</h3
+              ><label
+                >观察窗口
+                <select v-model="highLowPeriod"
+                  ><option :value="20">20日</option
+                  ><option :value="60">60日</option
+                  ><option :value="120">120日</option></select
+                ></label
+              ></div
+            >
+            <div class="cards"
+              ><article
+                ><span>{{ highLowPeriod }}日新高</span
+                ><strong
+                  >{{
+                    fmt(latest('highlow', 'high' + highLowPeriod)?.['high' + highLowPeriod], 0)
+                  }}只</strong
+                ><small>{{ latest('highlow', 'high' + highLowPeriod)?.date }}</small></article
+              ><article
+                ><span>{{ highLowPeriod }}日新低</span
+                ><strong
+                  >{{
+                    fmt(latest('highlow', 'low' + highLowPeriod)?.['low' + highLowPeriod], 0)
+                  }}只</strong
+                ><small>{{ latest('highlow', 'low' + highLowPeriod)?.date }}</small></article
+              ><article
+                ><span>新高 − 新低</span
+                ><strong
+                  >{{
+                    fmt(latest('highlow', 'net' + highLowPeriod)?.['net' + highLowPeriod], 0)
+                  }}只</strong
+                ><small>同日数量差</small></article
+              ></div
+            >
+            <p v-if="lagged('highlow', 'high20')" class="notice"
+              >公开来源新高新低统计截至
+              {{ latest('highlow', 'high20')?.date }}，其后暂无公开统计值。</p
+            >
+            <FinancingChart
+              v-if="rows('highlow').length"
+              :key="highLowPeriod"
+              title="全A · 创新高与创新低数量"
+              :rows="rows('highlow')"
+              allow-table
+              :lines="[
+                {
+                  key: 'high' + highLowPeriod,
+                  name: '创新高',
+                  color: '#d84f5a',
+                  unit: '只',
+                  bar: true,
+                },
+                {
+                  key: 'low' + highLowPeriod,
+                  name: '创新低',
+                  color: '#00976f',
+                  unit: '只',
+                  bar: true,
+                },
+              ]"
+            />
+            <SourceState :source="document.sources.highlow" :rows="rows('highlow')" />
+          </div>
+          <p class="definition"
+            >均线和新高新低均为来源的全A统计、剔除停牌股，区别于股票池样本广度。</p
+          >
+        </template>
       </template>
       <template v-else>
-        <h3>总市值 / GDP</h3>
-        <div class="cards"
-          ><article
-            ><span>总市值 / GDP</span><strong>{{ fmt(latest('buffett', 'value')?.value) }}%</strong
-            ><small>{{ latest('buffett', 'value')?.date }}</small></article
-          ><article
-            ><span>A股总市值</span
-            ><strong>{{ trillions(latest('buffett', 'value')?.marketCap) }}万亿元</strong
-            ><small>沪、深、北交易所上市股票</small></article
-          ><article
-            ><span>年度GDP（来源口径）</span
-            ><strong>{{ trillions(latest('buffett', 'value')?.gdp) }}万亿元</strong
-            ><small>按来源年度值计算</small></article
-          ></div
-        >
         <FinancingChart
-          v-if="rows('buffett').length"
+          v-if="buffettRows.length"
+          :key="buffettYears"
           title="巴菲特指标 · 总市值 / GDP"
-          :rows="rows('buffett')"
+          :rows="buffettRows"
+          :range-days="0"
+          hide-ranges
           :lines="[
             { key: 'value', name: '总市值 / GDP', color: '#2864ec', unit: '%' },
             { key: 'close', name: '沪深300', color: '#171717', unit: '点', right: true },
           ]"
-        />
-        <SourceState :source="document.sources.buffett" :rows="rows('buffett')" />
-        <p class="definition"
-          >分子为来源汇总的A股总市值，分母为来源提供的年度GDP；上市公司收入与国内GDP覆盖范围不同。</p
         >
+          <template #range-controls>
+            <button
+              v-for="years in historyRanges"
+              :key="years"
+              type="button"
+              :class="{ active: buffettYears === years }"
+              :aria-pressed="buffettYears === years"
+              @click="buffettYears = years"
+              >{{ years ? `${years}年` : '全部' }}</button
+            >
+          </template>
+        </FinancingChart>
+        <SourceState :source="document.sources.buffett" :rows="rows('buffett')" hide-source />
       </template>
     </template>
   </section>
@@ -256,17 +323,37 @@
     type MonitorSource,
     type MonitorValue,
   } from '@/api/cnMarketMonitor';
-  import FinancingChart from './FinancingChart.vue';
+  import type { EquityObservatory } from '@/api/equityObservatory';
+  import FinancingChart, { type FinanceLine, type FinanceRow } from './FinancingChart.vue';
+  import {
+    DEFAULT_RESEARCH_HISTORY_YEARS,
+    RESEARCH_HISTORY_YEARS,
+    valuationWindow,
+  } from '../../components/indexValuationStats';
 
-  const props = defineProps<{ section: MarketContextSection; refreshKey?: number }>();
-  const titles = { risk: '股债性价比', breadth: '市场宽度', macroValue: '总市值与GDP' };
+  const props = defineProps<{
+    section: MarketContextSection;
+    refreshKey?: number;
+    breadthPart?: 'history' | 'belowBook';
+    breadthSnapshot?: EquityObservatory['breadth'];
+    breadthRanks?: Record<
+      'ma' | 'highlow',
+      { rows: FinanceRow[]; lines: FinanceLine[]; title: string }
+    >;
+    snapshotStale?: boolean;
+    belowBookRanges?: number[];
+  }>();
+  const titles = { risk: '股债性价比', breadth: '市场宽度', macroValue: '巴菲特指标' };
   const document = shallowRef<MarketMonitor>(),
     loading = ref(false),
     error = ref('');
   const riskIndex = ref('000300'),
-    earningsMethod = ref('Lyr'),
     market = ref('all'),
     highLowPeriod = ref(20);
+  const historyRanges = RESEARCH_HISTORY_YEARS;
+  const riskYears = ref<number>(DEFAULT_RESEARCH_HISTORY_YEARS);
+  const buffettYears = ref<number>(DEFAULT_RESEARCH_HISTORY_YEARS);
+  const belowBookYears = ref<number>(DEFAULT_RESEARCH_HISTORY_YEARS);
   const riskNames: Record<string, string> = {
     '000300': '沪深300',
     '000016': '上证50',
@@ -279,6 +366,12 @@
     zz500: '中证500',
   };
   const rows = (key: string) => (document.value?.sources[key]?.data || []) as MonitorRow[];
+  const windowRows = (key: string, years: number) => {
+    const history = rows(key);
+    const end = history.at(-1)?.date;
+    return end ? valuationWindow(history, years, end) : [];
+  };
+  const buffettRows = computed(() => windowRows('buffett', buffettYears.value));
   const latest = (key: string, field: string) => {
     const history = rows(key);
     for (let i = history.length - 1; i >= 0; i--) {
@@ -286,8 +379,98 @@
     }
     return undefined;
   };
-  const riskRows = computed(() => rows(riskIndex.value));
-  const latestRisk = computed(() => latest(riskIndex.value, 'erp' + earningsMethod.value));
+  const belowBookMetrics = computed(() =>
+    Object.entries(markets).map(([key, name]) => ({
+      key,
+      name,
+      row: latest('below_' + key, 'value'),
+    })),
+  );
+  const belowBookDate = computed(() => {
+    const dates = new Set(belowBookMetrics.value.flatMap(({ row }) => (row ? [row.date] : [])));
+    return dates.size === 1 ? [...dates][0] : undefined;
+  });
+  const selectedBelowBook = computed(() => latest('below_' + market.value, 'value'));
+  const historyLines = (view: 'ma' | 'highlow'): FinanceLine[] =>
+    view === 'ma'
+      ? [
+          { key: 'ma5', name: '高于5日均线', color: '#2864ec', unit: '%', defaultSelected: false },
+          {
+            key: 'ma20',
+            name: '高于20日均线',
+            color: '#00976f',
+            unit: '%',
+            defaultSelected: false,
+          },
+          { key: 'ma60', name: '高于60日均线', color: '#d09a14', unit: '%' },
+        ]
+      : [
+          {
+            key: 'high' + highLowPeriod.value,
+            name: '创新高',
+            color: '#d84f5a',
+            unit: '只',
+            bar: true,
+            barColor: 'series',
+          },
+          {
+            key: 'low' + highLowPeriod.value,
+            name: '创新低',
+            color: '#00976f',
+            unit: '只',
+            bar: true,
+            barColor: 'series',
+          },
+        ];
+  const breadthCharts = computed(() =>
+    (['ma', 'highlow'] as const).map((key) => {
+      const lines = historyLines(key);
+      return {
+        key,
+        title: key === 'ma' ? '全A · 站上均线' : '全A · 创新高／新低',
+        lines,
+        latest: rows(key).findLast((row) => lines.some((line) => row[line.key] != null)),
+      };
+    }),
+  );
+  function historyValue(value: MonitorValue | undefined, unit: string) {
+    const formatted = fmt(value, 0);
+    return formatted === '—' ? formatted : formatted + unit;
+  }
+  const belowBookRows = computed(() => {
+    const key = 'below_' + market.value;
+    const end = latest(key, 'value')?.date;
+    return end ? valuationWindow(rows(key), belowBookYears.value, end) : [];
+  });
+  const riskRows = computed(() => windowRows(riskIndex.value, riskYears.value));
+  const latestRisk = computed(() => latest(riskIndex.value, 'erpTtm'));
+  const riskCharts = computed<
+    { key: string; title: string; lines: FinanceLine[]; axisNames?: [string, string] }[]
+  >(() => [
+    {
+      key: 'spread',
+      title: `${riskNames[riskIndex.value]} · 股债性价比`,
+      lines: [
+        { key: 'erpTtm', name: '股债差', color: '#2864ec', unit: '百分点' },
+        {
+          key: 'close',
+          name: riskNames[riskIndex.value],
+          color: '#171717',
+          unit: '点',
+          right: true,
+        },
+      ],
+    },
+    {
+      key: 'yields',
+      title: '盈利收益率与国债收益率',
+      lines: [
+        { key: 'earningsTtm', name: '盈利收益率', color: '#2864ec', unit: '%' },
+        { key: 'bond', name: '10年国债收益率', color: '#b57a08', unit: '%', right: true },
+      ],
+      axisNames: ['盈利收益率（%）', '10年国债收益率（%）'],
+    },
+  ]);
   const fmt = (v: MonitorValue | undefined, digits = 2) =>
     v == null || v === '' || !Number.isFinite(Number(v))
       ? '—'
@@ -295,18 +478,18 @@
           minimumFractionDigits: digits,
           maximumFractionDigits: digits,
         });
-  const trillions = (v: MonitorValue | undefined) => (v == null ? '—' : fmt(Number(v) / 10000));
   const lagged = (key: string, field: string) =>
     !!latest(key, field)?.date && latest(key, field)!.date < (rows(key).at(-1)?.date || '');
   const SourceState = defineComponent({
     props: {
       source: Object as PropType<MonitorSource>,
       rows: { type: Array as PropType<MonitorRow[]>, required: true },
+      hideSource: Boolean,
     },
     setup(p) {
       return () => {
         const conflicts = p.rows.filter((r) => r.conflictFields).map((r) => r.date);
-        return h('div', { class: 'source-state' }, [
+        const content = [
           p.source?.status === 'error'
             ? h('p', { class: 'notice' }, '本轮来源更新失败，保留已有有效历史。')
             : null,
@@ -320,14 +503,15 @@
                 }。`,
               )
             : null,
-          p.source?.sourceUrl && /^https?:\/\//.test(p.source.sourceUrl)
+          !p.hideSource && p.source?.sourceUrl && /^https?:\/\//.test(p.source.sourceUrl)
             ? h(
                 'a',
                 { href: p.source.sourceUrl, target: '_blank', rel: 'noopener noreferrer' },
                 '来源 ↗',
               )
             : null,
-        ]);
+        ].filter((item) => item !== null);
+        return content.length ? h('div', { class: 'source-state' }, content) : null;
       };
     },
   });
@@ -352,6 +536,56 @@
   onBeforeUnmount(() => controller?.abort());
 </script>
 <style scoped>
+  .history-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .breadth-history-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .breadth-history-card {
+    min-width: 0;
+  }
+
+  @media (min-width: 1181px) {
+    .breadth-history-card,
+    .breadth-history-card > :deep(.chart-expand),
+    .breadth-history-card :deep(.chart-expand__surface:not(:modal)),
+    .breadth-history-card :deep(.chart-expand__surface:not(:modal) > .financing-chart) {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .breadth-history-card > :deep(.chart-expand),
+    .breadth-history-card :deep(.chart-expand__surface:not(:modal)),
+    .breadth-history-card :deep(.chart-expand__surface:not(:modal) > .financing-chart),
+    .breadth-history-card :deep(.chart-expand__surface:not(:modal) .plot) {
+      flex: 1 0 auto;
+    }
+
+    .breadth-history-card :deep(.chart-expand__surface:not(:modal) .data-scroll) {
+      max-height: 340px;
+      overflow: auto;
+    }
+  }
+
+  @media (max-width: 1180px) {
+    .breadth-history-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .history-controls select {
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+
   .context {
     min-width: 0;
     color: #17324d;
@@ -390,34 +624,30 @@
     color: #2864ec;
   }
 
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    margin: 16px 0;
-  }
-
-  .cards-four {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .cards article,
-  .cards button {
+  .below-book-summary,
+  .below-book-options,
+  .below-book-options button {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 16px;
-    border: 1px solid #dce5ef;
-    border-radius: 10px;
-    background: #f8fafd;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
   }
 
-  .cards strong {
-    font-size: 22px;
+  .below-book-summary {
+    margin-bottom: 8px;
   }
 
-  .cards small,
+  .below-book-summary h3 {
+    margin: 0 4px 0 0;
+    font-size: 16px;
+  }
+
+  .below-book-options button {
+    padding: 4px 9px;
+  }
+
+  .below-book-summary time,
+  .below-book-sample,
   .definition {
     color: #71869d;
     font-size: 12px;
@@ -429,19 +659,28 @@
     font-size: 12px;
   }
 
-  a,
   .context :deep(a) {
     color: #2864ec;
+  }
+
+  .risk-index {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .risk-index select {
+    padding: 4px 8px;
   }
 
   .context :deep(.source-state) {
     margin: 10px 0 22px;
   }
 
-  @media (max-width: 700px) {
-    .cards,
-    .cards-four {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+  .context--compact :deep(.financing-chart),
+  .context--compact :deep(.source-state),
+  .context-notice {
+    margin: 4px 0;
   }
 </style>

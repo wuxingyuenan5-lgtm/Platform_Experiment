@@ -1,5 +1,5 @@
 <template>
-  <section class="liquidity-dashboard" aria-label="美元流动性评分与透镜">
+  <section ref="motionPlot" class="liquidity-dashboard" aria-label="美元流动性评分与透镜">
     <p v-if="loading" role="status">正在读取流动性评分…</p
     ><p v-if="error" role="alert">{{ error }} <button @click="load">重试</button></p>
     <p v-if="stale" class="notice">部分来源更新未成功，保留上次有效读数；各数据日期分别列示。</p>
@@ -105,7 +105,13 @@
           >
           <p class="muted">{{ axis.sparkName }}</p>
           <svg class="spark" viewBox="0 0 300 65" role="img" :aria-label="axis.name + '近期走势'">
-            <polyline :points="spark(axis.rows)" fill="none" stroke="#6b7d90" stroke-width="1.5" />
+            <polyline
+              data-chart-kind="line"
+              :points="spark(axis.rows)"
+              fill="none"
+              stroke="#6b7d90"
+              stroke-width="1.5"
+            />
           </svg>
           <p class="muted">数据截至 {{ axis.date }}</p>
         </article></div
@@ -144,7 +150,8 @@
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { watch as watchMotion, computed, ref } from 'vue';
   import { useReferenceBoard } from '../composables/useReferenceBoard';
   import ReferencePlot from '../components/ReferencePlot.vue';
 
@@ -319,6 +326,9 @@
       .filter(Boolean)
       .join(' ');
   }
+  const motionPlot = ref<HTMLElement | SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion(axes, () => void reveal(), { flush: 'post', deep: true });
 </script>
 <style scoped>
   .liquidity-dashboard {

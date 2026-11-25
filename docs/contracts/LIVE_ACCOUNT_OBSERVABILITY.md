@@ -366,6 +366,12 @@ never use this cache. Both total-assets modes are read-only display policies.
 
 Strategy management PnL and account snapshots are served from the durable `strategy_management_projection` table (migration 32). A background worker refreshes active summaries and requested details, targeting 30 seconds; HTTP reads do not reconstruct financial histories. Failed refreshes preserve the last payload and flag it stale after 90 seconds or immediately on refresh error. Cold keys return an explicit retryable 503. Trading validation and execution continue using current authoritative facts, never this serving projection. Monitor health exposes `managementProjection`.
 
+The API owns one spawned process for this CPU-heavy display reconstruction,
+using the same database and calculation functions. It submits one refresh at a
+time and joins an in-flight worker before replacing it after a crash or shutdown.
+Worker failure is reported by monitor health; it does not mark retained data
+fresh, alter financial formulas, or move execution into the display worker.
+
 Published projection reads require no write transaction. Detail demand is renewed
 at most every 30 seconds in a response background task, and expires after ten
 minutes without reads. Demand-write failures remain server errors in logs and

@@ -64,6 +64,10 @@ Protected navigation continues to verify the server-side session, including revi
 
 The shared ECharts hook retains the latest options while a chart is outside the viewport and paints when it approaches visibility. Page deactivation and disposal still stop painting; this scheduling changes neither API refresh intervals nor numerical, timestamp, missing-data or trading-freshness rules.
 
+Hedge Board markets share `ResearchWorkspace` for sidebar layout, account-scoped research state and snapshots, and scroll restoration as asynchronous content grows. A-share retains its three-page KeepAlive limit through a stable content key; other markets retain their per-view component lifecycle. Shared `useDashboardRefresh` polling removes timers while the browser document is hidden or a page is deactivated, resumes an overdue read when visible, and prevents overlapping reads. Existing one-minute and five-minute cadences, manual refresh paths and API data semantics remain unchanged. Presentation tokens are owned by `platform-web/src/views/hedgeBoard/hedgeBoardTheme.less`.
+
+All platform-owned charts follow the original national ETF chart cadence: 1000 ms on first drawing and 500 ms on updates, using cubicInOut easing in ECharts and a corresponding cubic ease in SVG. The shared ECharts hook applies one atomic option replacement without a clear-and-repaint blank frame; obsolete series are removed and unchanged chart identities retain the selected window. When a series exceeds 1200 points or the total exceeds 3000, per-mark animation is replaced by a lightweight chart reveal at the same cadence rather than dropping motion entirely. SVG lines, bars, candlesticks, distributions, matrices and small trend charts use the shared reveal lifecycle. Pointer and wheel gestures cancel reveals and remain direct; reduced-motion preferences disable both animation paths. Route changes do not layer a whole-page fade or slide over chart drawing. Third-party embedded TradingView content retains its own rendering behavior. These presentation rules do not change requests, polling, cache scope, source data or trading controls.
+
 ## Data authority
 
 | Data | Authority |

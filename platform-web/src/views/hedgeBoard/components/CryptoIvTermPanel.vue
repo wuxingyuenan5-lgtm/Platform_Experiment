@@ -45,6 +45,7 @@
           </button>
         </div>
       </header>
+      <p class="iv-panel__timestamp">{{ formatTs(snapshot.observedAt) }}</p>
       <div class="iv-panel__meta">
         <span
           v-for="t in snapshot.tenors"
@@ -55,9 +56,12 @@
           <span class="iv-panel__legend-dot" :style="{ background: TENOR_COLORS[t.tenor] }"></span>
           <span class="iv-panel__legend-name">{{ t.tenor }}</span>
           <strong>{{ t.iv.toFixed(2) }}%</strong>
-          <small>{{ formatTs(snapshot.observedAt) }}</small>
         </span>
       </div>
+      <details v-if="missingDates.length" class="iv-panel__coverage"
+        ><summary>历史有 {{ missingDates.length }} 个日期存在缺失</summary
+        >{{ missingDates.join('、') }}</details
+      >
 
       <!-- 表格视图 -->
       <div v-if="mode === 'table'" class="iv-panel__table-wrap">
@@ -151,6 +155,15 @@
   const historyLoading = ref(false);
   const historyError = ref('');
   const histories = ref<Record<string, CryptoIvHistoryPoint[]>>({});
+  const missingDates = computed(() =>
+    [
+      ...new Set(
+        Object.values(histories.value).flatMap((rows) =>
+          rows.filter((row) => row.iv == null).map((row) => row.observedAt),
+        ),
+      ),
+    ].sort(),
+  );
 
   async function loadSnapshot() {
     const r = await getCryptoIvSnapshot();
@@ -232,10 +245,15 @@
 </script>
 
 <style scoped lang="less">
-
   @media (max-width: 600px) {
     .iv-panel {
       padding: 0 14px 16px;
+    }
+
+    .iv-panel__timestamp {
+      margin: 0;
+      color: var(--strategy-text-faint);
+      font-size: 12px;
     }
 
     .iv-panel__meta {
@@ -243,7 +261,7 @@
     }
 
     .iv-panel__legend {
-      min-height: 80px;
+      min-height: 64px;
     }
 
     .iv-panel__table th,
@@ -346,7 +364,7 @@
     grid-template-columns: 8px minmax(0, 1fr);
     align-content: start;
     gap: 3px 8px;
-    min-height: 96px;
+    min-height: 72px;
     padding: 10px 12px;
     border: 1px solid #e5ecf3;
     border-radius: 8px;
@@ -445,6 +463,12 @@
     color: var(--strategy-text-faint, #667085);
     font-size: 11px;
     line-height: 1.5;
+  }
+
+  .iv-panel__coverage {
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    line-height: 1.6;
   }
 
   /* --- 折线 --- */

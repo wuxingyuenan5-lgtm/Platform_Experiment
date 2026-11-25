@@ -781,6 +781,14 @@ def fetch_btc_iv_snapshot() -> dict[str, Any]:
             "strike": slot["strike"],
         })
 
+    legacy_term = []
+    seen = set()
+    for point in sorted(per_expiry, key=lambda p: p['daysToExpiry']):
+        tenor = _tenor_label(point['daysToExpiry'])
+        if tenor not in seen:
+            legacy_term.append(dict(point, tenor=tenor))
+            seen.add(tenor)
+
     # 按主要时段（1M/3M/6M/1Y）各取最近的合约
     band_best: dict[str, dict[str, Any]] = {}
     for p in per_expiry:
@@ -816,6 +824,7 @@ def fetch_btc_iv_snapshot() -> dict[str, Any]:
         "dvol": dvol_latest,
         "observedAt": date.today().isoformat(),
         "tenors": tenors,
+        "term": legacy_term,
     }
 
 

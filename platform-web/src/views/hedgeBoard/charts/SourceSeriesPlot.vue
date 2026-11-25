@@ -5,9 +5,11 @@
     :class="{
       'source-series-plot--drivers': mode === 'gold-drivers',
       'source-series-plot--binance': mode === 'binance',
+      'source-series-plot--independent': independentAxes,
     }"
     role="img"
     :aria-label="description"
+    @click="selectObservation"
   ></div>
 </template>
 
@@ -19,6 +21,7 @@
   import { useECharts } from '@/hooks/web/useECharts';
   import {
     buildSourceSeriesOptions,
+    buildIndependentSeriesOptions,
     buildRegionalStackOptions,
     buildGoldDriversOptions,
     buildSourceCurveOptions,
@@ -33,6 +36,8 @@
     series: MacroDashboardSeries[];
     colors: string[];
     unitLabel?: string;
+    independentAxes?: boolean;
+    pickDate?: boolean;
     barSeriesIds?: string[];
     mode?:
       | 'time'
@@ -59,6 +64,27 @@
   });
   const chartRef = ref<HTMLDivElement | null>(null);
   const chart = useECharts(chartRef as Ref<HTMLDivElement>, 'light');
+  const emit = defineEmits<{ pick: [date: string] }>();
+  function selectObservation(event: MouseEvent) {
+    if (!props.pickDate || !chartRef.value) return;
+    const instance = chart.getInstance();
+    const bounds = chartRef.value.getBoundingClientRect();
+    const pixel = [event.clientX - bounds.left, event.clientY - bounds.top];
+    if (!instance?.containPixel({ gridIndex: 0 }, pixel)) return;
+    const time = Number(instance.convertFromPixel({ xAxisIndex: 0 }, pixel[0]));
+    let distance = Infinity,
+      selected = '';
+    for (const series of props.series)
+      for (const row of series.observations) {
+        const delta = Math.abs(Date.parse(row.date) - time);
+        if (row.value != null && delta < distance) {
+          distance = delta;
+          selected = row.date;
+        }
+      }
+    if (selected) emit('pick', selected);
+  }
+  let renderedIdentity = '';
   const description = computed(
     () =>
       props.series.map((s) => `${s.label}，${unitText(s.unit)}`).join('；') +
@@ -67,10 +93,30 @@
         : '。可拖动下方范围选择器查看区间，详细数据可切换至表格。'),
   );
   watch(
-    () => [props.series, props.colors, props.unitLabel, props.mode, props.barSeriesIds],
+    () => [
+      props.series,
+      props.colors,
+      props.unitLabel,
+      props.mode,
+      props.barSeriesIds,
+      props.independentAxes,
+    ],
     () => {
+      const identity = `${props.stateKey || props.series.map((s) => s.seriesId).join(',')}:${
+        props.mode || 'time'
+      }`;
+      const currentZoom =
+        renderedIdentity === identity
+          ? (
+              chart.getInstance()?.getOption().dataZoom as
+                | Array<{ start?: number; end?: number }>
+                | undefined
+            )?.[0]
+          : undefined;
       const options = (
-        props.mode === 'distribution'
+        props.independentAxes
+          ? buildIndependentSeriesOptions(props.series, props.colors, props.unitLabel)
+          : props.mode === 'distribution'
           ? buildDistributionOptions(props.series)
           : props.mode === 'binance'
           ? buildBinanceOptions(props.series, props.colors)
@@ -89,7 +135,15 @@
               props.barSeriesIds,
             )
       ) as EChartsOption;
-      if (savedWindow.value && Array.isArray(options.dataZoom)) {
+      if (currentZoom && Array.isArray(options.dataZoom)) {
+        options.dataZoom = options.dataZoom.map((zoom) => ({
+          ...zoom,
+          start: currentZoom.start,
+          end: currentZoom.end,
+          startValue: undefined,
+          endValue: undefined,
+        }));
+      } else if (savedWindow.value && Array.isArray(options.dataZoom)) {
         options.dataZoom = options.dataZoom.map((zoom) => ({
           ...zoom,
           start: undefined,
@@ -98,6 +152,7 @@
         }));
       }
       chart.setOptions(options);
+      renderedIdentity = identity;
     },
     { immediate: true },
   );
@@ -114,7 +169,8 @@
   }
 
   .source-series-plot--drivers,
-  .source-series-plot--binance {
+  .source-series-plot--binance,
+  .source-series-plot--independent {
     min-height: 580px;
     max-height: 700px;
   }

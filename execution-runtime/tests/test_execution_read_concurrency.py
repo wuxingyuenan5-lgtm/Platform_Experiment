@@ -75,11 +75,11 @@ def test_expired_price_keys_are_reclaimed_and_live_entries_are_bounded(monkeypat
     for price in range(2000):
         clock[0] += 20
         key = ("margin", "a", "BTC", "buy", "1", str(price))
-        reader._cached_execution_read(key, 15, lambda: price)
+        reader._cached_execution_read(key, 15, lambda value=price: value)
     assert len(reader._execution_read_cache) == 1
     for price in range(2000, 4000):
         key = ("margin", "a", "BTC", "buy", "1", str(price))
-        reader._cached_execution_read(key, 15, lambda: price)
+        reader._cached_execution_read(key, 15, lambda value=price: value)
     assert len(reader._execution_read_cache) == reader._EXECUTION_READ_CACHE_LIMIT
     key = ("margin", "a", "BTC", "buy", "1", "3999")
     assert reader._cached_execution_read(key, 15, lambda: pytest.fail("lost cache")) == 3999

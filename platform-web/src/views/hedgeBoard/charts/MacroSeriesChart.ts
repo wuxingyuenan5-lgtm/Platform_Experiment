@@ -1,3 +1,4 @@
+import './macroSeriesChart.less';
 import { useResearchViewState } from '../composables/researchWorkspace';
 import { useDashboardRefresh } from '../useDashboardRefresh';
 import { defineComponent, h, type PropType, ref, shallowRef } from 'vue';
@@ -62,11 +63,12 @@ export default defineComponent({
     defaultTableView: { type: Boolean, default: false },
     years: { type: Number, default: 5 },
     unitLabel: { type: String, default: '' },
+    independentAxes: { type: Boolean, default: false },
     curveValueLabel: { type: String, default: '结算价' },
     preferredSeriesIds: { type: Array as PropType<string[]>, default: () => [] },
     dataDomain: { type: String as PropType<'macro' | 'commodity' | 'crypto'>, default: 'macro' },
   },
-  setup(props) {
+  setup(props, { slots }) {
     const selectedYears = useResearchViewState(
       `macro:${props.groupId}:selectedYears`,
       initialChartYears(props.groupId, props.dataDomain, props.presentation),
@@ -133,6 +135,34 @@ export default defineComponent({
     return () => {
       if (status.value === 'loading') return h('div', { class: 'local-empty' }, '正在加载数据…');
       if (status.value === 'error') return h('div', { class: 'local-empty' }, '该组数据暂不可用。');
+      const flags = series.value.flatMap((item) => item.qualityFlags || []);
+      const availabilityText =
+        props.dataDomain !== 'crypto'
+          ? ''
+          : flags.includes('source_discontinued')
+          ? '来源已停止更新，保留历史快照。'
+          : flags.includes('upstream_refresh_failed')
+          ? '最近采集未成功，保留最后有效数据；数据日期见各序列。'
+          : series.value.some((item) => item.isStale)
+          ? '当前数据已超过更新时限，保留最后有效数据。'
+          : '';
+      const availability = availabilityText
+        ? h(
+            'p',
+            {
+              role: 'status',
+              class: 'source-availability',
+              style: {
+                padding: '8px 12px',
+                margin: '0',
+                fontSize: '12px',
+                color: '#8b641d',
+                background: '#fff8e8',
+              },
+            },
+            availabilityText,
+          )
+        : null;
       if (props.presentation === 'curve') {
         const latestDate = series.value[0]?.observationDate ?? '';
         const dates = curveDates(curveHistory.value, latestDate);
@@ -149,7 +179,8 @@ export default defineComponent({
           values.every((value) => Number.isFinite(value)) &&
           values.length >= 2 &&
           rows.every((row) => /^AU\d{4}$/.test(row.label));
-        return h('div', { class: 'local-widget-stack' }, [
+        return h('div', { class: 'local-widget-stack macro-series-chart' }, [
+          availability,
           h(
             'div',
             { class: 'chart-legend' },
@@ -242,8 +273,10 @@ export default defineComponent({
           rows.sort((a, b) => quantity(b) - quantity(a));
         }
         const maxValue = Math.max(1, ...series.value.map((item) => Number(item.latestValue ?? 0)));
-        return h('div', { class: 'local-widget-stack' }, [
-          h('div', { class: 'chart-legend' }, [
+        return h('div', { class: 'local-widget-stack macro-series-chart' }, [
+          availability,
+          h('div', { class: 'chart-legend source-chart-controls' }, [
+            slots.controls?.(),
             h(
               'span',
               `${rows.length} / ${series.value.length} 项 · ${series.value[0]?.source ?? ''}`,
@@ -257,6 +290,19 @@ export default defineComponent({
                 search.value = (event.target as HTMLInputElement).value;
               },
             }),
+            ['wgcReserves', 'wgcPurchases'].includes(props.groupId)
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: controlStyle,
+                    onClick: () => {
+                      tableView.value = false;
+                    },
+                  },
+                  '查看图表',
+                )
+              : null,
           ]),
           h(
             'div',
@@ -337,7 +383,7 @@ export default defineComponent({
             series.value.some((item) =>
               item.qualityFlags.includes('addresses_not_people_or_entities'),
             )
-              ? '按来源余额区间统计地址数量，地址不等于持币人数或独立实体。日期沿用来源报表。'
+              ? '每周 UTXO 地址快照，按来源余额区间统计；地址不等于持币人数或独立实体。'
               : series.value.some((item) =>
                   item.qualityFlags.includes('observation_date_is_collection_date'),
                 )
@@ -362,7 +408,8 @@ export default defineComponent({
         .flatMap((item) => item.points)
         .filter((point): point is ChartPoint & { value: number } => point.value !== null);
 
-      const controls = h('div', { class: 'chart-legend', style: { gap: '12px' } }, [
+      const controls = h('div', { class: 'chart-legend source-chart-controls' }, [
+        slots.controls?.(),
         ...(props.dataDomain === 'macro' ? [0.25, 1, 3, 5, 10, 0] : [0.25, 1, 3, 0])
           .filter((years) => props.dataDomain === 'macro' || years === 3 || years <= props.years)
           .map((years) =>
@@ -406,7 +453,8 @@ export default defineComponent({
         const values = plotted.map(
           ({ item }) => new Map(item.observations.map((point) => [point.date, point.value])),
         );
-        return h('div', { class: 'local-widget-stack' }, [
+        return h('div', { class: 'local-widget-stack macro-series-chart' }, [
+          availability,
           controls,
           h('div', { style: { overflow: 'auto', maxHeight: '320px' } }, [
             h('table', { style: { width: '100%', textAlign: 'right', fontSize: '12px' } }, [
@@ -482,7 +530,8 @@ export default defineComponent({
           notation: props.groupId === 'stablecoinComposition' ? 'compact' : 'standard',
         }).format(value);
 
-      return h('div', { class: 'local-widget-stack' }, [
+      return h('div', { class: 'local-widget-stack macro-series-chart' }, [
+        availability,
         controls,
         h(
           'div',
@@ -563,6 +612,7 @@ export default defineComponent({
                   ? 'regional-stack'
                   : 'time',
               unitLabel: props.unitLabel,
+              independentAxes: props.independentAxes,
             })
           : h('div', { class: 'local-empty' }, '当前窗口没有观测，可切换其他范围。'),
         h(

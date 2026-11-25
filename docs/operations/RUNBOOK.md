@@ -24,7 +24,24 @@ returns failure even if later commands update other artifacts or the DuckDB
 mirror; preserve quality failures rather than treating a fresh mirror as full
 success.
 
+The producer command `refresh-cn-equity` owns all six margin series from one Eastmoney daily report, including the published turnover ratio. Its `observationDate` is the source date. An overnight run can retrieve the prior report before the new trading-day figures are available. Verify the observed date after publication.
+
+`refresh-research-extensions` collects the U.S. options stress inputs from the Cboe index history CSVs, Cboe Daily Market Statistics, and Nasdaq Historical Quotes. The scheduled database sync mirrors the canonical daily series into `hedge_board.duckdb`. The three put/call series accumulate from the dates returned by the exchange report. The research endpoint `GET /api/v1/research/us-options-stress` joins observations on the latest available U.S. session date and returns absent inputs as null. It calculates volatility ratios from same-date index closes.
+
+The A-share timing radar uses `refresh-research-extensions` for CSI returns, turnover and valuation inputs, Choice index series, BIS China non-financial debt, S&P Global manufacturing PMI via MetaTrader, China 5Y CDS and the 50ETF settlement estimates. `refresh-china-macro` provides CPI month-over-month, other macro inputs and Choice long-term loans. The same task mirrors these observations into DuckDB. `GET /api/v1/research/a-share/timing-radar` reads revision-keyed canonical observations and computes daily factor scores. A missing input or warm-up window results in a null score. See the [research data contract](../contracts/RESEARCH_DATA.md#a-share-timing-radar) for assumptions and pending inputs.
+
 ### Persisted audit results
+
+History coverage is checked independently from fetch freshness by
+`app/research_history_coverage.py`: deduplicated macro/crypto/commodity histories,
+native open/close endpoints, research producer failures and Choice EDB quota
+status. Only registered 7x24 feeds have calendar-day gap expectations; long
+gaps in other frequencies remain candidates for source/calendar review.
+Check `public/v1/choice-edb-refresh.json` under the data root for error 10001029.
+The existing collectors stop EDB retries for that Beijing day and retain old
+observations; do not interpret a successful SDK login as available data quota.
+Session-price holes and repair attempts are retained in
+`public/v1/crypto/us-session-prices.json`; do not join chart lines across them.
 
 `/risk/data-audit` is the internal `risk.read` view; `GET /api/v1/risk/data-audit` reads persisted results only. Platform API lifespan runs a serial audit every 300 seconds without browser activity. `GET /health/monitors` includes `dataAudit`; a report older than 900 seconds is not considered current. The header indicator reports read failures even if the API cannot answer.
 

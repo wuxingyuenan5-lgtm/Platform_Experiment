@@ -41,7 +41,7 @@ assert.match(presentation, /主账号恢复失败/);
 assert.match(snapshots, /financialProfile/);
 assert.match(snapshots, /return snapshot\?\.positions \?\? \[\]/);
 assert.match(presentation, /原币资产/);
-assert.match(presentation, /const sourceDailyPnl = account\.dailyPnl \?\? \[\]/);
+assert.match(presentation, /const sourceDailyPnl = strategyScope \? account\.strategyDailyPnl \?\? \[\] : account\.dailyPnl \?\? \[\]/);
 assert.doesNotMatch(snapshots, /venue: 'Bybit'/);
 assert.doesNotMatch(snapshots, /Bybit 账户/);
 assert.doesNotMatch(snapshots, /2,984,316\.97|511,986\.31|4,502,541\.72/);

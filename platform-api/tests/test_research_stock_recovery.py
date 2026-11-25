@@ -28,6 +28,12 @@ def test_current_valid_stored_history_does_not_require_duplicate_download(monkey
     rows, _ = _build_stock_rows(["689009"], {"689009": quote}, {}, {}, {}, "2026-10-28")
     assert rows[0]["status"] == "ready"
     assert rows[0]["history_source"] == "stored"
+    rows, _ = _build_stock_rows(
+        ["689009"], {"689009": quote}, {}, {}, {}, "2026-10-28", ["689009"]
+    )
+    assert rows[0]["status"] == "partial"
+    assert rows[0]["history_date"] == "2026-10-28"
+    assert rows[0]["price"] == 32.61
     points[0].observed_at = date(2026, 10, 27)
     rows, _ = _build_stock_rows(["689009"], {"689009": quote}, {}, {}, {}, "2026-10-28")
     assert rows[0]["status"] == "partial"

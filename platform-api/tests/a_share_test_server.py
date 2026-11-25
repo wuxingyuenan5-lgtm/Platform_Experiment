@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from a_share_fixture import CODES, AShareFixtureProvider
 from fastapi import Depends
@@ -12,6 +12,7 @@ from fastapi import Depends
 from app import auth
 from app import research_a_share_refresh as refresh
 from app import research_a_share_repository as repository
+from app import research_hk_share_refresh as hk_refresh
 from app import research_service as service
 from app.application import create_application
 from app.auth import require_permission
@@ -28,6 +29,9 @@ with connection() as db:
         (json.dumps(CODES), datetime.now(UTC).isoformat()),
     )
 asyncio.run(refresh.refresh_a_share_research(force=True))
+hk_refresh._PROVIDER = provider
+hk_refresh.hk_last_session = lambda _: date(2026, 9, 7)
+asyncio.run(hk_refresh.refresh_hk_share_research(force=True))
 run_id = repository.read_refresh_status()["runId"]
 points = provider.history("600519")
 repository.write_history_points(

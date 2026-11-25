@@ -17,6 +17,7 @@ from app.research_equity_metrics import (
     credit_impulse,
     distribution,
     hk_composite,
+    hk_session_metrics,
     monthly_yoy,
     number,
     percentage,
@@ -244,12 +245,20 @@ def build_cn(today, sources):
     current_amounts = close_amount_points(aligned, structure["date"], closed=complete)
     stored_amounts = read_theme_amount_history()
     if current_amounts:
-        stored_amounts = [p for p in stored_amounts if p[0] != structure["date"]]
+        stored_amounts = [p for p in stored_amounts if p[0] != structure["date"] or p[2].get("sourceUrl")]
+    from app.research_a_share_repository import read_theme_market_amounts
+    market_amounts = read_theme_market_amounts()
+    breadth = read_dataset("breadth") or {}
+    breadth_meta = read_dataset_metadata("breadth") or {}
+    if complete and isinstance(breadth, dict) and breadth.get("tradeDate") == structure["date"] and breadth_meta.get("status") == "ready" and number(breadth.get("totalAmountYuan")):
+        market_amounts.append((structure["date"], "__market__", {"amountYuan":breadth["totalAmountYuan"]}))
+    matched_amounts = [point for point in stored_amounts + current_amounts if point[1] != "__market__"] + market_amounts
     theme_crowding = build_theme_crowding(
         histories,
-        stored_amounts + current_amounts,
+        matched_amounts,
         [p["date"] for p in benchmark_points],
         structure["date"],
+        names={code: row["name"] for code, row in observations.items()},
     )
     indices = []
     for row in read_dataset("market_detail") or []:
@@ -530,7 +539,20 @@ def build_us(today, sources):
     }
 
 
-def build_hk(today, sources):
+def hk_benchmark():
+    from app.research_a_share_repository import read_index_history
+
+    try:
+        points = [{"date": p["observedAt"], "value": p.get("close")} for p in read_index_history("000300")]
+        return {"name": "沪深300", "history": points, "date": points[-1]["date"] if points else None,
+                "sourceUrl": "https://www.csindex.com.cn/#/indices/family/detail?indexCode=000300",
+                "status": "ready" if points else "no_data"}
+    except Exception:
+        _LOG.exception("Hong Kong comparison benchmark unavailable; other Hong Kong views retained")
+        return {"name": "沪深300", "history": [], "date": None, "status": "error"}
+
+
+def build_hk(today, sources, benchmark=None):
     # Both publishers report PBC monthly AFRE flow in CNY 100 million.
     # Keep their artifacts separate; newer official revisions win by month.
     tsf = series(sources.get("cn_tsf", {}))
@@ -547,20 +569,18 @@ def build_hk(today, sources):
     result["indices"] = []
     for key in ("hk_hsi", "hk_hscei", "hk_hstech", "hk_hsiii"):
         doc = sources.get(key, {})
-        points = doc.get("rows", [])
-        latest = points[-1] if points else {}
-        previous = number(points[-2].get("value")) if len(points) > 1 else None
-        value = number(latest.get("value"))
+        points = sorted({p["date"]: p for p in doc.get("rows", [])}.values(), key=lambda p: p["date"])
         result["indices"].append(
             {
+                "id": key,
                 "name": doc.get("name", key),
-                "date": latest.get("date"),
-                "value": value,
-                "returnPct": (value / previous - 1) * 100 if value and previous else None,
+                **hk_session_metrics(points),
                 "status": source_state(doc, today),
-                "history": points[-260:],
+                "sourceUrl": doc.get("url"),
+                "history": points,
             }
         )
+    result["benchmark"] = benchmark or {"name": "沪深300", "history": [], "status": "no_data"}
     for row, key in zip(
         result["components"], ["hk_m2", "cn_ppi", "cn_retail", credit_source], strict=True
     ):
@@ -616,7 +636,7 @@ def produce_local(sources):
             payload["schemaVersion"] = "1.0"
             if market == "cn":
                 try:
-                    payload["hongKong"] = build_hk(stamp[:10], sources)
+                    payload["hongKong"] = build_hk(stamp[:10], sources, hk_benchmark())
                     section_status["hongKong"] = "ready"
                 except Exception:
                     _LOG.exception("Hong Kong section failed; mainland sections retained")
@@ -679,8 +699,57 @@ async def run_periodic():
         await asyncio.sleep(300)
 
 
-def read_equity_observatory(market, view=None):
-    result = read_artifact(market)
+from functools import lru_cache
+from app.research_local_data import local_json_revision
+
+@lru_cache(maxsize=2)
+def _equity_source_snapshot(market, revision, reader):
+    return reader(market)
+
+def _themes_with_industry_memberships(themes):
+    """Join existing classifications at the theme observation date without mutating the artifact."""
+    as_of = themes.get("date")
+    if not as_of or not themes.get("items"):
+        return themes
+    classifications = {}
+    conflicts = set()
+    for row in read_dataset("memberships") or []:
+        if row.get("effectiveFrom", "") > as_of or (
+            row.get("effectiveTo") and row["effectiveTo"] <= as_of
+        ):
+            continue
+        code = row.get("securityCode")
+        identity = (row.get("swL1Code"), row.get("swL1Name"))
+        if not code or not all(identity):
+            continue
+        if code in classifications and classifications[code] != identity:
+            conflicts.add(code)
+        classifications[code] = identity
+
+    def member_with_industry(member):
+        identity = classifications.get(member["code"]) if member["code"] not in conflicts else None
+        return {
+            **member,
+            "industryCode": identity[0] if identity else None,
+            "industryName": identity[1] if identity else None,
+            "industryAsOf": as_of if identity else None,
+        }
+
+    return {**themes, "items": [
+        {**item, "members": [member_with_industry(m) for m in item.get("members", [])]}
+        for item in themes["items"]
+    ]}
+
+
+def read_equity_observatory(market, view=None, theme=None):
+    revision = local_json_revision(f"public/v1/equity/{market}.json")
+    source = _equity_source_snapshot(market, revision, read_artifact) if revision is not None else read_artifact(market)
+    # Only the projection is mutable. Freshness and field pruning must never
+    # change the cached source or another view of the same artifact.
+    result = dict(source)
+    if result.get("reference"):
+        result["reference"] = dict(result["reference"])
+
     if not result:
         return {"market": market, "status": "no_data", "generatedAt": None}
     generated = datetime.fromisoformat(result["generatedAt"])
@@ -705,6 +774,8 @@ def read_equity_observatory(market, view=None):
     health = read_artifact("health")
     if health.get("markets", {}).get(market, {}).get("status") == "error":
         result["status"] = "stale"
+    if market == "cn" and view in (None, "themes") and result.get("themes"):
+        result["themes"] = _themes_with_industry_memberships(result["themes"])
     fields = {
         "themes": {"themes", "structure"},
         "valuation": {"valuationCharts"},
@@ -713,6 +784,13 @@ def read_equity_observatory(market, view=None):
         "overview": {"breadth"},
         "hk": {"hongKong"},
     }
+    if view == "crowding" and theme and result.get("themeCrowding"):
+        group = result["themeCrowding"]
+        result["themeCrowding"] = {**group, "items": [
+            item if item["name"] == theme else {**item, "history": item.get("history", [])[-1:], "segments": [
+                {**part, "history": part.get("history", [])[-1:]} for part in item.get("segments", [])
+            ]} for item in group.get("items", [])
+        ]}
     if view in fields:
         metadata = {"schemaVersion", "market", "status", "date", "generatedAt", "source", "sourceFetchedAt", "sources", "sectionStatus"}
         return {key: value for key, value in result.items() if key in fields[view] | metadata}

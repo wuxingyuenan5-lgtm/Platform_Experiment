@@ -6,7 +6,7 @@ import json
 import logging
 import ssl
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -111,6 +111,35 @@ def parse_context(key, raw):
     raise ValueError("context_source_unknown")
 
 
+def resolve_buffett_close_conflicts(rows):
+    conflicts = {
+        row["date"]: (row, fields)
+        for row in rows
+        if "close" in (fields := row.get("conflictFields", "").split(","))
+    }
+    if not conflicts:
+        return
+    try:
+        history = read_artifact("sources/choice_index_000300")
+    except ResearchProviderError:
+        return
+    for point in history.get("rows", []):
+        day = point["date"]
+        if day not in conflicts:
+            continue
+        close = number(point.get("close"))
+        if close is None or close <= 0:
+            continue
+        row, fields = conflicts.pop(day)
+        row["close"] = close.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        row["closeSource"] = "choice_index_000300"
+        fields.remove("close")
+        if fields:
+            row["conflictFields"] = ",".join(fields)
+        else:
+            row.pop("conflictFields")
+
+
 def risk_history(valuations, bonds):
     bond_lookup = {r["date"]: number(r.get("value")) for r in bonds}
     result = []
@@ -192,7 +221,10 @@ async def collect_context(force=False, keys=None):
                     response.raise_for_status()
                     data = parse_context(key, json.loads(response.content, parse_float=Decimal))
                     digest = await asyncio.to_thread(archive, "legu_context_" + key, response.content, stamp)
-                    document["sources"][key] = {"status": "ready", "data": merge_history(old.get("data", []), data),
+                    history = merge_history(old.get("data", []), data)
+                    if key == "buffett":
+                        await asyncio.to_thread(resolve_buffett_close_conflicts, history)
+                    document["sources"][key] = {"status": "ready", "data": history,
                                                 "fetchedAt": stamp, "attemptedAt": stamp, "rawSha256": digest,
                                                 "sourceUrl": BASE + "/stockdata/" + page}
                 except Exception as exc:

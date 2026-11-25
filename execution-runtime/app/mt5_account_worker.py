@@ -34,6 +34,7 @@ _READ_METHODS = frozenset(
         "get_market_quote",
         "get_research_ticks",
         "get_research_daily_rates",
+        "get_research_intraday_rates",
         "estimate_order_margin",
         "get_order",
         "list_balances",
@@ -101,7 +102,7 @@ class Mt5AccountWorkerClient:
             self._close_unlocked()
 
     def _call(self, method: str, *args, **kwargs):
-        if method in {"get_research_ticks", "get_research_daily_rates"} and (
+        if method in {"get_research_ticks", "get_research_daily_rates", "get_research_intraday_rates"} and (
             self._lock.locked() or self.settings.live_write_enabled
         ):
             raise GatewayConfigurationError("Research yielded to account operations")

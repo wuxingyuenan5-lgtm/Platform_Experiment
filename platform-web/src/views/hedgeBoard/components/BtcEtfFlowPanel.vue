@@ -53,6 +53,7 @@
 
       <div v-if="mode === 'chart'" class="etf-flow-panel__chart-wrap">
         <svg
+          ref="motionPlot"
           class="etf-flow-panel__chart"
           :viewBox="`0 0 ${chart.width} ${chart.height}`"
           @mousemove="onChartMove"
@@ -93,34 +94,38 @@
             :y2="chart.zeroY"
             class="etf-flow-panel__zero"
           />
-          <rect
-            v-for="bar in chart.bars"
-            :key="bar.date"
-            :x="bar.x"
-            :y="bar.y"
-            :width="bar.width"
-            :height="bar.height"
-            :class="['etf-flow-panel__bar', { 'is-outflow': bar.value < 0 }]"
-            rx="1.5"
-          >
-            <title>{{ bar.date }}：{{ formatFlow(bar.value) }} {{ flowUnit }}</title>
-          </rect>
-          <path
-            v-if="showPrice && chart.priceLine"
-            :d="chart.priceLine"
-            class="etf-flow-panel__price-line"
-          />
-          <g v-if="showPrice && chart.hasPriceAxis">
-            <circle
-              v-for="point in chart.isolatedPrices"
-              :key="point.date"
-              :cx="point.x"
-              :cy="point.y"
-              r="2.5"
-              fill="#111111"
+          <g data-chart-kind="bar" :style="{ transformOrigin: `0px ${chart.zeroY}px` }">
+            <rect
+              v-for="bar in chart.bars"
+              :key="bar.date"
+              :x="bar.x"
+              :y="bar.y"
+              :width="bar.width"
+              :height="bar.height"
+              :class="['etf-flow-panel__bar', { 'is-outflow': bar.value < 0 }]"
+              rx="1.5"
             >
-              <title>{{ point.date }}：{{ assetLabel }} {{ formatPrice(point.price) }}</title>
-            </circle>
+              <title>{{ bar.date }}：{{ formatFlow(bar.value) }} {{ flowUnit }}</title>
+            </rect>
+          </g>
+          <g data-chart-kind="line">
+            <path
+              v-if="showPrice && chart.priceLine"
+              :d="chart.priceLine"
+              class="etf-flow-panel__price-line"
+            />
+            <g v-if="showPrice && chart.hasPriceAxis">
+              <circle
+                v-for="point in chart.isolatedPrices"
+                :key="point.date"
+                :cx="point.x"
+                :cy="point.y"
+                r="2.5"
+                fill="#111111"
+              >
+                <title>{{ point.date }}：{{ assetLabel }} {{ formatPrice(point.price) }}</title>
+              </circle>
+            </g>
           </g>
           <g v-for="tick in chart.xTicks" :key="tick.label">
             <text
@@ -244,6 +249,7 @@
 </template>
 
 <script setup lang="ts">
+  import { useChartReveal } from '@/hooks/web/chartMotion';
   import { computed, onMounted, ref, watch } from 'vue';
 
   import {
@@ -323,6 +329,24 @@
   );
 
   const visibleDays = computed(() => days.value.slice(startIndex.value, endIndex.value + 1));
+
+  const motionPlot = ref<SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watch(
+    [data, preset, showPrice, mode],
+    (current, previous) => {
+      if (
+        current[1] === null &&
+        previous &&
+        current[0] === previous[0] &&
+        current[2] === previous[2] &&
+        current[3] === previous[3]
+      )
+        return;
+      void reveal(visibleDays.value.length * 2);
+    },
+    { flush: 'post' },
+  );
 
   const chart = computed(() => {
     const width = 920;
@@ -460,6 +484,7 @@
   }
 
   function onStartInput(event: Event) {
+    reveal.cancel();
     const value = Number((event.target as HTMLInputElement).value);
     if (!Number.isFinite(value)) return;
     preset.value = null;
@@ -467,6 +492,7 @@
   }
 
   function onEndInput(event: Event) {
+    reveal.cancel();
     const value = Number((event.target as HTMLInputElement).value);
     if (!Number.isFinite(value)) return;
     preset.value = null;

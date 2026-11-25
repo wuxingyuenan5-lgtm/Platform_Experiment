@@ -256,3 +256,39 @@ def test_group_projection_keeps_original_values_and_provider_cache(selected):
     assert set(source.groups) == {"a", "b"} and source.option_distribution["rows"]
     assert source.select_groups(None) is source
     assert source.select_groups("optionDistribution").option_distribution == source.option_distribution
+
+
+def test_selected_dashboard_reader_versions_null_precision_and_failure(monkeypatch):
+    from app import research_provider_macro_dashboard as m
+    state={"revision":("file",1),"calls":0,"fail":False}
+    document={"schemaVersion":"1.0","status":"ready","asOf":date.today().isoformat(),"groups":{"g":[{"seriesId":"s","label":"test","status":"ready","unit":"price","frequency":"irregular","timezone":"UTC","source":"test","methodologyVersion":"test","observations":[{"date":"2026-01-01","value":"1.234500"},{"date":"2026-01-02","value":None}]}],"other":[{"intentionally":"invalid unrelated series"}]}}
+    def read(_):
+        state["calls"]+=1
+        if state["fail"]:raise ResearchProviderError("read failed")
+        return document
+    monkeypatch.setattr(m,"local_json_revision",lambda _:state["revision"])
+    monkeypatch.setattr(m,"read_local_json",read)
+    reader=m.DashboardGroupReader("fixture","macro")
+    one=reader.load("g")
+    assert str(one.groups["g"][0].observations[0].value)=="1.234500"
+    assert one.groups["g"][0].observations[1].value is None
+    assert set(one.groups)=={"g"} and "other" in document["groups"]
+    reader.load("g");reader.load("unknown")
+    assert state["calls"]==1
+    state["revision"]=("file",2)
+    reader.load("g")
+    assert state["calls"]==2
+    state.update(revision=("file",3),fail=True)
+    with pytest.raises(ResearchProviderError):reader.load("g")
+    assert reader.retained("g").status=="stale"
+    assert one.status!="stale"  # stale marking never mutates a shared response
+
+
+def test_selected_dashboard_cache_is_bounded(monkeypatch):
+    from app import research_provider_macro_dashboard as m
+    monkeypatch.setattr(m,"local_json_revision",lambda _:("file",1))
+    monkeypatch.setattr(m,"read_local_json",lambda _:{"schemaVersion":"1.0","status":"ready","asOf":date.today().isoformat(),"groups":{"unused":[{}]}})
+    reader=m.DashboardGroupReader("fixture","macro")
+    for i in range(40):reader.load(str(i))
+    assert len(reader.views)==32
+    assert reader.retained("0") is None

@@ -19,6 +19,7 @@
     "src/api/sys/accountDirectory.ts",
     "src/api/sys/errorLog.ts",
     "src/components/Loading/**/*.vue",
+    "src/components/Preview/src/Functional.tsx",
     "src/components/ProductDataState/**/*.vue",
     "src/components/SimpleMenu/**/*.ts",
     "src/components/SimpleMenu/**/*.vue",
@@ -49,6 +50,7 @@
     "src/views/financialAi/**/*.vue",
     "src/views/hedgeBoard/**/*.ts",
     "src/views/hedgeBoard/**/*.vue",
+    "src/views/hedgeBoard/aShare/components/etfObservation/renderer.js",
     "src/views/landing/**/*.ts",
     "src/views/landing/**/*.vue",
     "src/views/log/operate/data.tsx",
@@ -73,12 +75,12 @@
     "src/views/sys/error-log/index.vue",
     "types/**/*.d.ts",
     "types/**/*.ts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "vite.funding-demo.config.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "**/*.js",
     "src/store/modules/multipleTab.ts",
     "src/store/modules/permission.ts",
     "src/store/modules/user.ts",

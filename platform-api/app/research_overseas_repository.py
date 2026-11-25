@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -196,6 +196,91 @@ def read_iv_snapshot_latest() -> dict[str, Any]:
     }
 
 
+def read_iv_snapshot_dates() -> list[dict[str, str]]:
+    with connection() as db:
+        return [
+            dict(row)
+            for row in db.execute(
+                "SELECT entity_code,observed_at FROM research_a_share_history "
+                "WHERE dataset='crypto_iv_snapshot' AND entity_code!='__meta__'"
+            )
+        ]
+
+
+def recover_iv_snapshots_from_terms(days: list[str]) -> list[str]:
+    """Recover missing days from retained same-day measured ATM term observations.
+
+    Only complete four-band days are recovered; no interpolation or other IV index.
+    Keep the original expiry, value, fetch time and source lineage in each point.
+    """
+    from app.research_provider_overseas import _MAJOR_TENOR_BANDS
+
+    recovered = []
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        for day in days:
+            date.fromisoformat(day)
+            if db.execute(
+                "SELECT 1 FROM research_a_share_history "
+                "WHERE dataset='crypto_iv_snapshot' AND observed_at=?",
+                (day,),
+            ).fetchone():
+                continue
+            records = db.execute(
+                "SELECT * FROM research_a_share_history "
+                "WHERE dataset='crypto_iv_term' AND observed_at=? AND entity_code!='__meta__'",
+                (day,),
+            ).fetchall()
+            points = []
+            for tenor, lo, hi in _MAJOR_TENOR_BANDS:
+                candidates = [(r, json.loads(r["payload_json"])) for r in records]
+                candidates = [
+                    (r, p)
+                    for r, p in candidates
+                    if lo <= p.get("daysToExpiry", -1) <= hi
+                    and Decimal(str(p.get("iv", "NaN"))).is_finite()
+                    and Decimal(str(p["iv"])) > 0
+                ]
+                if not candidates:
+                    break
+                origin, value = min(candidates, key=lambda rp: rp[1]["daysToExpiry"])
+                points.append(
+                    (
+                        origin,
+                        tenor,
+                        {
+                            "iv": value["iv"],
+                            "expiry": origin["entity_code"],
+                            "daysToExpiry": value["daysToExpiry"],
+                            "strike": None,
+                            "recoveredFrom": "crypto_iv_term",
+                            "originalFetchedAt": origin["fetched_at"],
+                            "selection": "nearest_retained_expiry_in_same_tenor_band",
+                        },
+                    )
+                )
+            if len(points) != 4:
+                continue
+            for origin, tenor, payload in points:
+                db.execute(
+                    "INSERT INTO research_a_share_history "
+                    "(dataset,observed_at,entity_code,payload_json,source,fetched_at,"
+                    "refresh_run_id) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    (
+                        "crypto_iv_snapshot",
+                        day,
+                        tenor,
+                        json.dumps(payload),
+                        origin["source"],
+                        origin["fetched_at"],
+                        origin["refresh_run_id"],
+                    ),
+                )
+            recovered.append(day)
+    return recovered
+
+
 def read_iv_snapshot_history(tenor: str, days: int = 365) -> list[dict[str, Any]]:
     """读单一时段的累积历史快照（升序）。"""
     dataset = "crypto_iv_snapshot"
@@ -211,7 +296,24 @@ def read_iv_snapshot_history(tenor: str, days: int = 365) -> list[dict[str, Any]
         if r["payload_json"]:
             item["iv"] = json.loads(r["payload_json"]).get("iv")
         result.append(item)
-    return result
+    if not result:
+        return result
+    by_day = {item["observedAt"]: item for item in result}
+    first = max(
+        date.fromisoformat(result[0]["observedAt"]),
+        date.fromisoformat(result[-1]["observedAt"]) - timedelta(days=days - 1),
+    )
+    last = date.fromisoformat(result[-1]["observedAt"])
+    return [
+        by_day.get(
+            (first + timedelta(days=i)).isoformat(),
+            {
+                "observedAt": (first + timedelta(days=i)).isoformat(),
+                "iv": None,
+            },
+        )
+        for i in range((last - first).days + 1)
+    ]
 
 
 # 新增模块依赖（避免循环 import）
@@ -293,11 +395,25 @@ def read_dataset_health(dataset: str) -> dict[str, Any]:
             if dataset == "cumulative_volatility"
             else "run_id NOT LIKE 'volatility-%'"
         )
-        run = db.execute(
-            "SELECT status, error_code, message, started_at, finished_at "
-            f"FROM research_a_share_refresh_runs WHERE {run_scope} "
-            "ORDER BY started_at DESC LIMIT 1"
-        ).fetchone()
+        if dataset.startswith("crypto_") or dataset == "macro_fedwatch":
+            prefix = (
+                "overseas-crypto_iv-%"
+                if dataset in {"crypto_iv_snapshot", "crypto_iv_term"}
+                else f"overseas-{dataset}-%"
+            )
+            run = db.execute(
+                "SELECT status,error_code,message,started_at,finished_at "
+                "FROM research_a_share_refresh_runs WHERE run_id LIKE ? OR run_id IN "
+                "(SELECT DISTINCT refresh_run_id FROM research_a_share_history WHERE dataset=?) "
+                "ORDER BY started_at DESC LIMIT 1",
+                (prefix, dataset),
+            ).fetchone()
+        else:
+            run = db.execute(
+                "SELECT status, error_code, message, started_at, finished_at "
+                f"FROM research_a_share_refresh_runs WHERE {run_scope} "
+                "ORDER BY started_at DESC LIMIT 1"
+            ).fetchone()
 
     observed_at = latest["observed_at"] if latest else None
     fetched_at = latest["fetched_at"] if latest else None

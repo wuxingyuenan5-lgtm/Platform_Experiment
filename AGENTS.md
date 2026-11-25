@@ -14,6 +14,8 @@ Mode 2/3, task cards, branches, Worktrees, locks, monitors, and structured deliv
 
 ## Execution behavior
 
+- Owner standing authorization (2026-11-10): after completing and validating platform changes, automatically publish and switch the local running version using the supported project procedure, and verify the actual product entry. Do not stop at source-only delivery or ask again for this local switch. This does not authorize remote deployment or real trading.
+
 - For an execution request, complete reversible local work within scope by default. Make ordinary technical choices from the current code, contracts, and tests; do not stop at a plan, status update, first error, or partial implementation.
 - Ask the Owner only when ambiguity would materially change the user experience or product scope, an external fact cannot be inferred safely, concurrent changes cannot be merged safely, or the work requires an ongoing external cost, credentials, external writes, real trading, or an irreversible action.
 - Treat the Owner's technical diagnosis or implementation suggestion as a hypothesis to verify against the current code, contracts and evidence. Follow an explicit product outcome, but do not copy an unverified technical mechanism merely because the Owner proposed it.

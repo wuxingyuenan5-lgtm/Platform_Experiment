@@ -8,7 +8,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import anyio
@@ -83,10 +83,12 @@ async def _stop_process(process: asyncio.subprocess.Process) -> None:
                 process.kill()
             except ProcessLookupError:
                 pass
-    await process.wait()
+    # Drain both pipes as well as waiting: Windows transports otherwise retain
+    # handles after cancellation, even when returncode has already been set.
+    await process.communicate()
 
 
-async def cli_stream(cli: str, prompt: str) -> AsyncIterator[dict[str, str]]:
+async def cli_stream(cli: str, prompt: str) -> AsyncGenerator[dict[str, str], None]:
     arguments = CLI_COMMANDS.get(cli)
     if arguments is None:
         yield {"type": "error", "message": "该 CLI 尚不支持受限分析调用，请使用 API 接入。"}
@@ -105,8 +107,8 @@ async def cli_stream(cli: str, prompt: str) -> AsyncIterator[dict[str, str]]:
                 executable, *arguments, stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                 cwd=workspace, env=cli_environment(),
-                **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt"
-                   else {"start_new_session": True}),
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                start_new_session=os.name != "nt",
             )
             assert process.stdin and process.stdout and process.stderr
             stderr_task = asyncio.create_task(_drain_stderr(process.stderr))
@@ -132,11 +134,11 @@ async def cli_stream(cli: str, prompt: str) -> AsyncIterator[dict[str, str]]:
     finally:
         # Starlette cancellation uses an AnyIO cancel scope. Cleanup must survive it.
         with anyio.CancelScope(shield=True):
-            if process is not None:
-                await _stop_process(process)
             if stderr_task is not None:
                 stderr_task.cancel()
                 await asyncio.gather(stderr_task, return_exceptions=True)
+            if process is not None:
+                await _stop_process(process)
         try:
             os.rmdir(workspace)  # Only remove an empty invocation directory.
         except OSError:

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const copyDirectory = require('./copy-test-fixture.cjs');
 
 const {
   ManifestError,
@@ -25,10 +26,10 @@ function copyFixture() {
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'formal-route-manifest-'));
   const routeTarget = path.join(fixture, 'src', 'router', 'routes', 'modules');
   fs.mkdirSync(path.dirname(routeTarget), { recursive: true });
-  fs.cpSync(path.join(root, 'src', 'router', 'routes', 'modules'), routeTarget, { recursive: true });
+  copyDirectory(path.join(root, 'src', 'router', 'routes', 'modules'), routeTarget);
   const viewsTarget = path.join(fixture, 'src', 'views');
   fs.mkdirSync(path.dirname(viewsTarget), { recursive: true });
-  fs.symlinkSync(path.join(root, 'src', 'views'), viewsTarget, 'dir');
+  copyDirectory(path.join(root, 'src', 'views'), viewsTarget);
   return fixture;
 }
 
@@ -60,7 +61,7 @@ function testDriftAndRewrite() {
     writeManifest({ root: fixture, manifestPath: candidate });
     checkManifest({ root: fixture, manifestPath: candidate });
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    // Retain the isolated fixture for inspection; repository rules prohibit bulk deletion.
   }
 }
 
@@ -75,7 +76,7 @@ function testMissingViewFails() {
     fs.writeFileSync(modulePath, source, 'utf8');
     expectManifestError(() => generateManifest({ root: fixture }), /View cannot resolve/);
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    // Retain the isolated fixture for inspection; repository rules prohibit bulk deletion.
   }
 }
 
@@ -93,7 +94,7 @@ function testDuplicateNameFails() {
     );
     expectManifestError(() => generateManifest({ root: fixture }), /duplicate Route name/);
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    // Retain the isolated fixture for inspection; repository rules prohibit bulk deletion.
   }
 }
 
@@ -110,7 +111,7 @@ function testDuplicatePathFails() {
     );
     expectManifestError(() => generateManifest({ root: fixture }), /duplicate Route path/);
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    // Retain the isolated fixture for inspection; repository rules prohibit bulk deletion.
   }
 }
 
@@ -126,7 +127,7 @@ function testNestedDemoMockTestDirectoriesAreExcluded() {
     assert.equal(manifest.modules.length, 15);
     assert.ok(manifest.modules.every((module) => !/[\\/](demo|mock|test)[\\/]/.test(module.path)));
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    // Retain the isolated fixture for inspection; repository rules prohibit bulk deletion.
   }
 }
 

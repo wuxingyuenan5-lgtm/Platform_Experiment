@@ -1,6 +1,6 @@
 <template>
-  <section class="monitor" :aria-label="sectionTitle">
-    <header
+  <section class="monitor" :class="{ 'monitor--embedded': embedded }" :aria-label="sectionTitle">
+    <header v-if="!embedded && tab !== 'fund'"
       ><h2>{{ sectionTitle }}</h2></header
     >
     <p v-if="loading && !contextSection && tab !== 'style'" role="status"
@@ -10,8 +10,8 @@
       >{{ error }} <button @click="load(true)">重试</button></p
     >
     <MarketContextPanel v-if="contextSection" :section="contextSection" :refresh-key="refreshKey" />
-    <template v-if="tab !== 'style' && !contextSection && data">
-      <div class="source"
+    <template v-if="tab !== 'style' && tab !== 'fund' && !contextSection && data">
+      <div v-if="tab !== 'congestion' && tab !== 'growth'" class="source"
         ><span>{{ sourceDate }}</span
         ><a :href="source?.sourceUrl" target="_blank" rel="noopener noreferrer">来源 ↗</a></div
       >
@@ -45,29 +45,40 @@
       <p class="definition">板块整体股息率；具体宽基指数股息率可在“估值”中切换查看。</p>
     </template>
     <template v-else-if="tab === 'fund'">
-      <div class="controls"
-        ><label
-          >基金类型
-          <select v-model="fund"
-            ><option value="stock">股票型</option
-            ><option value="pingheng">平衡混合型</option
-            ><option value="linghuo">灵活配置型</option></select
-          ></label
-        ></div
-      >
-      <p class="definition"
-        >估算股票仓位，与基金定期报告披露仓位分开展示。来源页面标注停止更新，以下以实际观测日期为准。</p
-      >
       <FinancingChart
-        v-if="rows('fund_' + fund).length"
-        :key="fund"
+        v-if="data"
         :title="`${fundNames[fund]} · 估算仓位`"
         :rows="rows('fund_' + fund)"
         :lines="[
           { key: 'value', name: '估算股票仓位', color: '#2864ec', unit: '%' },
           { key: 'close', name: '沪深300', color: '#171717', unit: '点', right: true },
         ]"
-      />
+        allow-table
+      >
+        <template #toolbar>
+          <div class="fund-estimate-controls">
+            <label
+              >基金类型
+              <select v-model="fund" aria-label="基金类型">
+                <option value="stock">股票型</option>
+                <option value="pingheng">平衡混合型</option>
+                <option value="linghuo">灵活配置型</option>
+              </select>
+            </label>
+            <span
+              >{{ sourceDate || '暂无观测'
+              }}<template v-if="source?.status === 'error'"> · 更新失败</template></span
+            >
+            <a
+              v-if="source?.sourceUrl"
+              :href="source.sourceUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              >来源 ↗</a
+            >
+          </div>
+        </template>
+      </FinancingChart>
     </template>
     <template v-else-if="tab === 'style'">
       <p v-if="styleError" role="alert"
@@ -81,59 +92,96 @@
       />
       <p v-else-if="!styleError" role="status">正在读取风格数据…</p>
     </template>
-    <template v-else-if="tab === 'growth'">
-      <div class="controls"
-        ><label
-          >景气指标
-          <select v-model="metric"
-            ><option v-for="(name, key) in metrics" :key="key" :value="key">{{
-              name
-            }}</option></select
-          ></label
-        ><label>行业筛选 <input v-model="query" placeholder="输入行业名称" /></label
-      ></div>
-      <FinancingChart
-        v-if="rows('growth').length"
-        :key="metric"
-        :title="`全A · ${metrics[metric]}中位数`"
-        :rows="rows('growth')"
-        :lines="[{ key: metric, name: metrics[metric], color: '#2864ec', unit: '%' }]"
-      />
-      <div class="table-scroll"
-        ><table
-          ><thead
-            ><tr
-              ><th>申万一级行业</th><th>{{ growthItems[0]?.date || '本期' }}</th
-              ><th>{{ growthItems[0]?.previousDate || '上期' }}</th
-              ><th><button @click="growthSort = !growthSort">同比变化（pp） ↕</button></th></tr
-            ></thead
-          ><tbody
-            ><tr v-for="r in growthItems" :key="r.code"
-              ><th>{{ r.name }}</th
-              ><td :class="tone(r.value)">{{ fmt(r.value) }}%</td><td>{{ fmt(r.previous) }}%</td
-              ><td :class="tone(r.change)">{{ fmt(r.change) }}</td></tr
-            ></tbody
-          ></table
-        ></div
-      >
-      <p class="definition"
-        >财报同比增速的中位数；变化列为本期与上期同比增速之差（百分点），不代表单季环比增速。</p
-      >
-    </template>
+    <FinancingChart
+      v-else-if="tab === 'growth' && data"
+      :title="
+        growthView === 'comparison' ? '申万一级行业景气对照' : `全A · ${metrics[metric]}中位数`
+      "
+      :rows="growthView === 'comparison' ? growthBars : rows('growth')"
+      :lines="growthView === 'comparison' ? growthLines : growthTrendLines"
+      :category-axis="growthView === 'comparison'"
+      allow-table
+    >
+      <template #range-controls>
+        <div v-if="!industryCode" class="growth-views" role="group" aria-label="景气视图">
+          <button
+            v-for="view in growthViews"
+            :key="view.key"
+            type="button"
+            :aria-pressed="growthView === view.key"
+            @click="growthView = view.key"
+            >{{ view.label }}</button
+          >
+        </div>
+        <select v-model="metric" class="growth-filter" aria-label="景气指标">
+          <option v-for="(name, key) in metrics" :key="key" :value="key">{{ name }}</option>
+        </select>
+        <input
+          v-if="growthView === 'comparison' && !industryCode"
+          v-model="query"
+          class="growth-filter growth-search"
+          aria-label="筛选行业"
+          placeholder="行业名称"
+        />
+        <a
+          v-if="source?.sourceUrl"
+          class="growth-source"
+          :href="source.sourceUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          >来源 ↗</a
+        >
+      </template>
+      <template v-if="growthView === 'comparison'" #data-table>
+        <div
+          class="table-scroll growth-table"
+          role="region"
+          aria-label="行业景气对照数据"
+          tabindex="0"
+        >
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">申万一级行业</th>
+                <th scope="col">{{ growthItems[0]?.date || '本期' }}</th>
+                <th scope="col">{{ growthItems[0]?.previousDate || '上期' }}</th>
+                <th scope="col" :aria-sort="growthSort ? 'descending' : 'ascending'">
+                  <button type="button" @click="growthSort = !growthSort">
+                    同比变化（pp） {{ growthSort ? '↓' : '↑' }}
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in growthPageItems" :key="row.code">
+                <th scope="row">{{ row.name }}</th>
+                <td :class="tone(row.value)">{{
+                  row.value == null ? '—' : fmt(row.value) + '%'
+                }}</td>
+                <td>{{ row.previous == null ? '—' : fmt(row.previous) + '%' }}</td>
+                <td :class="tone(row.change)">{{ fmt(row.change) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <nav class="growth-pages" aria-label="行业景气数据分页">
+          <span>{{ growthItems.length }} 条</span>
+          <button type="button" :disabled="growthPage === 1" @click="growthPage--">上一页</button>
+          <span>{{ growthPage }} / {{ growthPageCount }}</span>
+          <button type="button" :disabled="growthPage === growthPageCount" @click="growthPage++"
+            >下一页</button
+          >
+        </nav>
+      </template>
+    </FinancingChart>
     <template v-else-if="tab === 'crowding'">
-      <div class="controls"
+      <div v-if="!industryCode" class="controls"
         ><label
           >行业
           <select v-model="industry"
             ><option v-for="r in items('industry')" :key="r.code" :value="r.code">{{
               r.name
             }}</option></select
-          ></label
-        ><label
-          >观察维度
-          <select v-model="heatMetric"
-            ><option value="turnover">等权换手率分位</option
-            ><option value="amount">成交额占比分位</option></select
           ></label
         ></div
       >
@@ -147,44 +195,41 @@
           { key: 'amount', name: '成交额占比分位', color: '#e6aa20', unit: '%' },
         ]"
       />
-      <div class="table-scroll"
-        ><table class="heatmap"
-          ><thead
-            ><tr
-              ><th>行业 / 日期</th><th v-for="d in heatDates" :key="d">{{ d.slice(5) }}</th></tr
-            ></thead
-          ><tbody
-            ><tr v-for="r in items('industry')" :key="r.code"
-              ><th
-                ><button @click="industry = r.code">{{ r.name }}</button></th
-              ><td v-for="d in heatDates" :key="d" :style="heatStyle(heatValue(r, d))">{{
-                fmt(heatValue(r, d), 0)
-              }}</td></tr
-            ></tbody
-          ></table
-        ></div
-      >
-      <details
-        ><summary>全A交易集中度历史</summary
-        ><p class="definition"
-          >公开来源最近有效值：{{ lastValidCongestion?.date || '—' }}；其后缺值保留为空。</p
-        ><FinancingChart
-          v-if="rows('congestion').length"
-          title="全A · 交易集中度"
-          :rows="rows('congestion')"
-          :lines="[
-            { key: 'value', name: '成交额集中度', color: '#2864ec', unit: '%' },
-            { key: 'close', name: '上证指数', color: '#171717', unit: '点', right: true },
-          ]"
-      /></details>
     </template>
-    <p v-if="data && tab !== 'style' && !contextSection && !source?.data?.length" class="notice"
+    <FinancingChart
+      v-else-if="tab === 'congestion' && data"
+      title="成交集中度"
+      :rows="rows('congestion')"
+      :lines="congestionLines"
+      allow-table
+    >
+      <template #summary>
+        <div class="chart-summary-line">
+          <template v-if="lastCongestion">
+            <time :datetime="lastCongestion.date">截至 {{ lastCongestion.date }}</time>
+            <strong>{{ pct(lastCongestion.value) }}</strong>
+            <span v-if="snapshotStale" class="notice">待更新</span>
+          </template>
+          <span v-else>暂无有效历史读数</span>
+        </div>
+        <div class="chart-summary-line">
+          <span v-if="source?.referenceEnd">乐咕乐股历史至 {{ source.referenceEnd }}</span>
+          <span v-if="source?.platformStart">平台自算自 {{ source.platformStart }} 起</span>
+        </div>
+      </template>
+    </FinancingChart>
+    <p
+      v-if="
+        data && tab !== 'style' && tab !== 'congestion' && !contextSection && !source?.data?.length
+      "
+      class="notice"
       >当前来源暂无有效数据。</p
     >
   </section>
 </template>
 <script setup lang="ts">
   import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+  import { industryCode as normalizeIndustryCode } from './industryResearch';
   import {
     getMarketMonitor,
     type MarketMonitor,
@@ -193,44 +238,59 @@
     type MonitorValue,
     MarketContextSection,
   } from '@/api/cnMarketMonitor';
-  import { type EquityThemes } from '@/api/equityObservatory';
+  import { type EquityObservatory, type EquityThemes } from '@/api/equityObservatory';
   import { researchRequest } from '@/api/hedgeResearch';
-  import FinancingChart from './FinancingChart.vue';
+  import FinancingChart, { type FinanceLine } from './FinancingChart.vue';
   import EquityStylePanel from '../../components/EquityStylePanel.vue';
   import MarketContextPanel from './MarketContextPanel.vue';
 
   const props = defineProps<{
     refreshKey?: number;
+    embedded?: boolean;
+    industryCode?: string;
+    concentrationSnapshot?: EquityObservatory['structure'];
+    snapshotStale?: boolean;
     section:
       | 'dividend'
       | 'fund'
       | 'style'
       | 'growth'
       | 'crowding'
+      | 'congestion'
       | 'risk'
-      | 'breadth'
-      | 'macroValue';
+      | 'breadth';
   }>();
-  const emit = defineEmits<{ (e: 'ready'): void }>();
+  const emit = defineEmits<{ ready: []; industry: [code: string] }>();
   const tabs = [
     { key: 'dividend', name: '股息率' },
     { key: 'fund', name: '基金仓位' },
     { key: 'style', name: '风格跟踪' },
     { key: 'growth', name: '行业景气度' },
     { key: 'crowding', name: '交易拥挤度' },
+    { key: 'congestion', name: '全A交易集中度历史' },
     { key: 'risk', name: '股债性价比' },
     { key: 'breadth', name: '市场宽度' },
-    { key: 'macroValue', name: '总市值与GDP' },
   ];
   const tab = computed(() => props.section);
-  const sectionTitle = computed(() => tabs.find((t) => t.key === tab.value)!.name);
+  const sectionTitle = computed(() => {
+    const name = tabs.find((t) => t.key === tab.value)!.name;
+    const selectedName =
+      tab.value === 'growth' ? growthItems.value[0]?.name : selectedIndustry.value?.name;
+    return props.industryCode && selectedName ? `${selectedName} · ${name}` : name;
+  });
   const dividend = ref('shangzheng'),
     fund = ref('stock'),
-    industry = ref('801080.SI');
+    localIndustry = ref('801080.SI');
+  const industry = computed({
+    get: () =>
+      props.industryCode ? `${normalizeIndustryCode(props.industryCode)}.SI` : localIndustry.value,
+    set: (value: string) => {
+      localIndustry.value = value;
+      emit('industry', normalizeIndustryCode(value));
+    },
+  });
   const contextSection = computed(() =>
-    ['risk', 'breadth', 'macroValue'].includes(tab.value)
-      ? (tab.value as MarketContextSection)
-      : null,
+    ['risk', 'breadth'].includes(tab.value) ? (tab.value as MarketContextSection) : null,
   );
   const metrics: Record<string, string> = {
     netProfitYoy: '净利润同比',
@@ -247,8 +307,7 @@
   };
   const metric = ref('netProfitYoy'),
     query = ref(''),
-    growthSort = ref(true),
-    heatMetric = ref('turnover');
+    growthSort = ref(true);
   const data = shallowRef<MarketMonitor>(),
     themes = shallowRef<Pick<EquityThemes, 'styles' | 'benchmark'>>(),
     error = ref(''),
@@ -291,7 +350,11 @@
   const selectedIndustry = computed(() => items('industry').find((r) => r.code === industry.value));
   const growthItems = computed(() =>
     items('growth_' + metric.value)
-      .filter((r) => r.name.includes(query.value))
+      .filter((r) =>
+        props.industryCode
+          ? normalizeIndustryCode(r.code) === normalizeIndustryCode(props.industryCode)
+          : r.name.includes(query.value),
+      )
       .slice()
       .sort((a, b) => {
         if (a.change == null) return b.change == null ? 0 : 1;
@@ -299,6 +362,34 @@
         return (Number(b.change) - Number(a.change)) * (growthSort.value ? 1 : -1);
       }),
   );
+  const growthLines: FinanceLine[] = [
+    { key: 'change', name: '同比变化', color: '#2864ec', unit: 'pp', bar: true },
+  ];
+  const growthTrendLines = computed<FinanceLine[]>(() => [
+    { key: metric.value, name: metrics[metric.value], color: '#2864ec', unit: '%' },
+  ]);
+  const growthBars = computed(() =>
+    growthItems.value.map((row) => ({ date: row.name, change: row.change })),
+  );
+  const growthPage = ref(1);
+  const growthView = ref<'comparison' | 'trend'>('comparison');
+  const growthViews = [
+    { key: 'comparison', label: '行业对照' },
+    { key: 'trend', label: '全A中位数走势' },
+  ] as const;
+  const growthPageSize = 20;
+  const growthPageCount = computed(() =>
+    Math.max(1, Math.ceil(growthItems.value.length / growthPageSize)),
+  );
+  const growthPageItems = computed(() =>
+    growthItems.value.slice(
+      (growthPage.value - 1) * growthPageSize,
+      growthPage.value * growthPageSize,
+    ),
+  );
+  watch(growthItems, () => {
+    growthPage.value = 1;
+  });
   const source = computed(
     () =>
       data.value?.sources[
@@ -320,34 +411,44 @@
       ? growthItems.value[0]?.date
       : last(rows('fund_' + fund.value))?.date,
   );
-  const lastValidCongestion = computed(() =>
-    rows('congestion')
-      .filter((r) => r.value != null)
-      .at(-1),
-  );
-  const heatDates = computed(
-    () => selectedIndustry.value?.history?.slice(-10).map((r) => r.date) || [],
-  );
-  const heatValue = (r: MonitorItem, d: string) =>
-    r.history?.find((p) => p.date === d)?.[heatMetric.value];
+  const congestionBenchmarks: FinanceLine[] = [
+    { key: 'hs300', name: '沪深300', color: '#171717', unit: '点', right: true },
+    {
+      key: 'chinext',
+      name: '创业板指',
+      color: '#b57a08',
+      unit: '点',
+      right: true,
+      defaultSelected: false,
+    },
+    {
+      key: 'star50',
+      name: '科创50',
+      color: '#00976f',
+      unit: '点',
+      right: true,
+      defaultSelected: false,
+    },
+  ];
+  const congestionLines: FinanceLine[] = [
+    { key: 'value', name: '前5%股票成交额占比', color: '#2864ec', unit: '%', markLatest: true },
+    ...congestionBenchmarks,
+  ];
+  const lastCongestion = computed(() => rows('congestion').findLast((row) => row.value != null));
   const fmt = (v: MonitorValue | undefined, digits = 2) =>
     v == null || v === '' || !Number.isFinite(Number(v)) ? '—' : Number(v).toFixed(digits);
+  const pct = (value: MonitorValue | undefined) => {
+    const result = fmt(value);
+    return result === '—' ? result : result + '%';
+  };
   const tone = (v: MonitorValue | undefined) =>
     v == null ? '' : Number(v) > 0 ? 'positive' : Number(v) < 0 ? 'negative' : '';
-  const heatStyle = (v: MonitorValue | undefined) =>
-    v == null
-      ? {}
-      : {
-          background:
-            Number(v) >= 50
-              ? `rgba(220,60,70,${0.06 + Number(v) / 500})`
-              : `rgba(0,150,100,${0.06 + (100 - Number(v)) / 500})`,
-        };
   function currentKeys() {
     if (tab.value === 'dividend') return ['dividend'];
     if (tab.value === 'fund') return ['fund_' + fund.value];
     if (tab.value === 'growth') return ['growth', 'growth_' + metric.value];
-    if (tab.value === 'crowding') return ['industry', 'congestion'];
+    if (tab.value === 'crowding') return ['industry'];
+    if (tab.value === 'congestion') return ['congestion'];
     return [];
   }
   async function load(force = false) {
@@ -410,6 +511,67 @@
   });
 </script>
 <style scoped>
+  .monitor.monitor--embedded {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .monitor--embedded .source {
+    margin: 0;
+  }
+
+  .fund-estimate-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .growth-views,
+  .growth-pages {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .growth-views {
+    gap: 4px;
+  }
+
+  .growth-views button,
+  .growth-filter {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  .growth-search {
+    width: 120px;
+  }
+
+  .growth-source {
+    padding: 0 4px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .growth-table {
+    max-height: none;
+  }
+
+  .growth-pages {
+    justify-content: flex-end;
+    margin: 12px 0 0;
+    font-size: 12px;
+  }
+
+  .growth-pages button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
   .monitor {
     min-width: 0;
     margin-top: 24px;
@@ -537,15 +699,12 @@
     color: #00976f;
   }
 
-  .heatmap td {
-    text-align: center;
-  }
-
   .notice {
     color: #967025;
   }
 
-  details {
+  details,
+  .expanded-disclosure {
     margin: 16px 0;
     padding: 16px;
     border: 1px solid #dce5ef;
@@ -568,5 +727,12 @@
     nav button {
       padding: 6px 8px;
     }
+  }
+
+  .disclosure-title {
+    margin: 0 0 12px;
+    color: #354d68;
+    font-size: 14px;
+    font-weight: 600;
   }
 </style>

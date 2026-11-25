@@ -453,6 +453,37 @@ export default defineComponent({
             });
           case 'macro-funding-spreads':
             return h(MacroSeriesChart, { groupId: 'fundingSpreads' });
+          case 'macro-bank-balance-sheets':
+            return h(MacroSeriesChart, { groupId: 'bankBalanceSheets' });
+          case 'macro-money-fund-assets':
+            return h(MacroSeriesChart, { groupId: 'moneyFundAssets' });
+          case 'macro-cp-outstanding':
+            return h(MacroSeriesChart, { groupId: 'commercialPaperOutstanding' });
+          case 'macro-central-bank-swaps':
+            return h(MacroSeriesChart, { groupId: 'centralBankSwaps' });
+          case 'macro-offshore-dollar-credit':
+            return h(MacroSeriesChart, { groupId: 'offshoreDollarCredit' });
+          case 'macro-soma-bills':
+            return h(MacroSeriesChart, { groupId: 'somaBills' });
+          case 'macro-soma-bills-change':
+            return h(MacroSeriesChart, {
+              groupId: 'somaBillsChange',
+              barSeriesIds: ['soma_tbill_weekly_change'],
+            });
+          case 'macro-broad-dollar':
+            return h(MacroSeriesChart, { groupId: 'broadDollar' });
+          case 'macro-financial-stress':
+            return h(MacroSeriesChart, { groupId: 'financialStress' });
+          case 'macro-baa-treasury-spread':
+            return h(MacroSeriesChart, { groupId: 'baaTreasurySpread' });
+          case 'macro-cp-rates':
+            return h(MacroSeriesChart, { groupId: 'commercialPaperRates' });
+          case 'macro-cp-spreads':
+            return h(MacroSeriesChart, { groupId: 'commercialPaperSpreads' });
+          case 'macro-primary-dealer-positions':
+            return h(MacroSeriesChart, { groupId: 'primaryDealerPositions' });
+          case 'macro-treasury-realized-volatility':
+            return h(MacroSeriesChart, { groupId: 'treasuryRealizedVolatility' });
           case 'macro-treasury-details':
             return h(TreasuryComparisonPanel);
           case 'macro-treasury-spreads':
@@ -569,10 +600,8 @@ export default defineComponent({
             return h(SeasonalityPanel, { asset: 'btc' });
           case 'crypto-halving-cycles':
             return h(BitcoinHalvingPanel);
-          case 'crypto-correlation-ndx':
-            return h(RollingCorrelationPanel, { benchmark: 'ndx' });
-          case 'crypto-correlation-xau':
-            return h(RollingCorrelationPanel, { benchmark: 'xau' });
+          case 'crypto-correlations':
+            return h(RollingCorrelationPanel);
           case 'gold-borrow-fee':
             return h(MacroSeriesChart, { dataDomain: 'commodity', groupId: 'gldBorrow' });
           case 'crypto-coinbase-premium':
@@ -612,6 +641,7 @@ export default defineComponent({
               dataDomain: 'commodity',
               groupId: 'comexGoldInventory',
               unitLabel: 'troy oz',
+              independentAxes: true,
             });
           case 'crypto-cny-usdt':
             return h('div', [

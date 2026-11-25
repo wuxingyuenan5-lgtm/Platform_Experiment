@@ -29,7 +29,7 @@ test('research uses real isolated API, preserves unknowns and removes carry temp
   await expect(page.getByRole('heading', { name: '最低资金费率' })).toBeVisible();
   const boardAlignment = await page.locator('.market-board').evaluate((el) => {
     const table = el.querySelector('.market-board__table-area')?.getBoundingClientRect();
-    const extrema = el.querySelector('.extrema-grid')?.getBoundingClientRect();
+    const extrema = el.querySelector('.extrema-card--combined')?.getBoundingClientRect();
     return table && extrema ? Math.abs(table.top - extrema.top) : 999;
   });
   expect(boardAlignment).toBeLessThanOrEqual(2);
@@ -184,6 +184,16 @@ test('market data remains visible when latest quote fails; original chart and ta
         data: {
           chartSeries: [
             {
+              name: 'BTCUSDT 指示资金费率',
+              type: 'bar',
+              axis: 1,
+              selected: true,
+              data: [
+                { value: [Date.parse(at), '0.0123'] },
+                { value: [Date.parse(at) + 60000, '-0.01'] },
+              ],
+            },
+            {
               name: 'BTCUSDT 永续收盘',
               type: 'line',
               axis: 0,
@@ -232,9 +242,10 @@ test('market data remains visible when latest quote fails; original chart and ta
   ).toBeVisible();
   await expect(page.getByLabel('资费精度')).toContainText('1H');
   await expect(page.locator('.history-panel')).toContainText('BTC');
+  await page.locator('.history-chart').scrollIntoViewIfNeeded();
   await expect(page.locator('.history-chart svg')).toBeVisible();
-  await expect(page.locator('.chart-panel svg [fill="#2db87c"]').first()).toBeVisible();
-  await expect(page.locator('.chart-panel svg [fill="#cf3f4f"]').first()).toBeVisible();
+  await expect(page.locator('.history-chart svg [fill="#2db87c"]').first()).toBeVisible();
+  await expect(page.locator('.history-chart svg [fill="#cf3f4f"]').first()).toBeVisible();
   const added = page.waitForRequest(
     (r) =>
       r.url().includes('/funding/board?') &&

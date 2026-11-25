@@ -1,5 +1,5 @@
 <template>
-  <section class="macro-expectation-panel">
+  <section ref="motionPlot" class="macro-expectation-panel">
     <header class="panel-header">
       <div>
         <h2>polymarket</h2>
@@ -45,7 +45,11 @@
                 <line x1="0" y1="18" x2="220" y2="18" />
                 <line x1="0" y1="36" x2="220" y2="36" />
                 <line x1="0" y1="54" x2="220" y2="54" />
-                <polyline v-if="event.chart.count > 1" :points="event.chart.points" />
+                <polyline
+                  data-chart-kind="line"
+                  v-if="event.chart.count > 1"
+                  :points="event.chart.points"
+                />
                 <circle
                   v-else-if="event.chart.single"
                   :cx="event.chart.single.x"
@@ -90,7 +94,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { watch as watchMotion, computed, onMounted, onBeforeUnmount, ref } from 'vue';
   import {
     getMacroExpectations,
     type MacroExpectationEvent,
@@ -199,6 +204,9 @@
       : `更新 ${new Date(timestamp).toLocaleString('zh-CN', { hour12: false })}`;
   }
   onMounted(() => void load());
+  const motionPlot = ref<HTMLElement | SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion([response, expanded], () => void reveal(), { flush: 'post', deep: true });
 </script>
 
 <style scoped lang="less">

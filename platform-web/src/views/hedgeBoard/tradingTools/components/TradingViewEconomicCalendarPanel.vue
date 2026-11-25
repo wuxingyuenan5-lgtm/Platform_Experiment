@@ -1,4 +1,5 @@
 <script setup lang="ts">
+  import { prepareTradingView } from '../../components/tradingViewResources';
   import { useResearchViewState } from '../../composables/researchWorkspace';
   import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -63,6 +64,7 @@
 
     widgetScript = document.createElement('script');
     widgetScript.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
+    prepareTradingView(widgetScript.src);
     widgetScript.async = true;
     widgetScript.type = 'text/javascript';
     widgetScript.innerHTML = JSON.stringify({

@@ -151,7 +151,9 @@ test('completes isolated four-role browser acceptance without Live Write', async
     await page.getByRole('textbox', { name: '邮箱' }).fill(memberEmail);
     await page.getByPlaceholder('至少 12 个字符').fill(memberPassword);
     await page.getByPlaceholder('请再次输入密码').fill(memberPassword);
-    await page.getByPlaceholder('请简要说明申请用途').fill('GitHub Actions isolated browser acceptance');
+    await page
+      .getByPlaceholder('请简要说明申请用途')
+      .fill('GitHub Actions isolated browser acceptance');
     await page.getByRole('checkbox').check();
     await page.getByRole('button', { name: '提交申请' }).click();
     await expect(page).toHaveURL(/\/login$/);
@@ -165,7 +167,10 @@ test('completes isolated four-role browser acceptance without Live Write', async
     await page.getByRole('button', { name: '登录', exact: true }).click();
     expect((await pendingResponse).status()).toBe(403);
     await expect(page.getByText('账号正在等待审核')).toBeVisible();
-    await page.getByRole('dialog').getByRole('button', { name: /确\s*认/ }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /确\s*认/ })
+      .click();
   });
 
   let memberUserId = '';
@@ -181,9 +186,9 @@ test('completes isolated four-role browser acceptance without Live Write', async
     expect(sessionCookie?.httpOnly).toBe(true);
     expect(sessionCookie?.sameSite).toBe('Lax');
     expect(sessionCookie?.path).toBe('/');
-    expect(await page.evaluate((name) => document.cookie.includes(`${name}=`), SESSION_COOKIE_NAME)).toBe(
-      false,
-    );
+    expect(
+      await page.evaluate((name) => document.cookie.includes(`${name}=`), SESSION_COOKIE_NAME),
+    ).toBe(false);
 
     await page.goto(absoluteUrl('/risk/users'));
     await expect(page.getByText('用户管理', { exact: true }).first()).toBeVisible();
@@ -191,7 +196,14 @@ test('completes isolated four-role browser acceptance without Live Write', async
     const authentication = await getAuthentication(page);
     expect(authentication.user.role).toBe('ceo');
     expect(authentication.permissions).not.toContain('*');
-    expect(authentication.permissions.some((permission) => permission.includes('live'))).toBe(false);
+    expect(authentication.permissions).toEqual(
+      expect.arrayContaining([
+        'live_session:request',
+        'live_session:approve',
+        'live_session:revoke',
+      ]),
+    );
+    expect(authentication.permissions).not.toContain('trade:submit');
     const csrfToken = authentication.csrfToken;
 
     await sessionMutation(page, csrfToken, 'POST', '/api/v1/auth/reauth', {
@@ -321,8 +333,14 @@ test('completes isolated four-role browser acceptance without Live Write', async
   });
 
   await test.step('member profile, avatar, holdings, CSRF and session invalidation work in browser', async () => {
-    const primaryContext = await browser.newContext({ locale: 'zh-CN', timezoneId: 'Asia/Shanghai' });
-    const secondaryContext = await browser.newContext({ locale: 'zh-CN', timezoneId: 'Asia/Shanghai' });
+    const primaryContext = await browser.newContext({
+      locale: 'zh-CN',
+      timezoneId: 'Asia/Shanghai',
+    });
+    const secondaryContext = await browser.newContext({
+      locale: 'zh-CN',
+      timezoneId: 'Asia/Shanghai',
+    });
     try {
       const primaryPage = await primaryContext.newPage();
       const secondaryPage = await secondaryContext.newPage();

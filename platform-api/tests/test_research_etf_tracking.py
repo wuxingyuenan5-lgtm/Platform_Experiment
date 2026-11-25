@@ -7,6 +7,45 @@ import pytest
 from app import research_etf_tracking as etf
 
 
+def test_single_projection_keeps_primary_charts_and_skips_removed_group_reads(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("HEDGE_BOARD_DATA_ROOT", str(tmp_path))
+    members = [
+        {"code": code, "name": code, "display_group": "宽基/沪深300", "dashboard_eligible": True}
+        for code in ["510310", "510300"]
+    ]
+    etf.write("universe", {"data": members})
+    for member in members:
+        etf.write(
+            "etfs/" + member["code"],
+            {
+                "status": "ready",
+                "data": {
+                    "series": [
+                        {"date": "2026-11-03", "etf_qfq_close": "4.123", "qfq_total_units_yi": "8"}
+                    ],
+                    "disclosures": [],
+                },
+            },
+        )
+    full = etf.detail("510310")
+    original = etf.read
+    reads = []
+
+    def read(name):
+        reads.append(name)
+        return original(name)
+
+    monkeypatch.setattr(etf, "read", read)
+    single = etf.detail("510310", include_group=False)
+    assert "etfs/510300" not in reads
+    assert single["members"] == [] and single["group"] == []
+    for key in ["meta", "series", "disclosures", "margin", "groupMargin", "groupLabel"]:
+        assert single[key] == full[key]
+    assert full["members"]
+
+
 def test_flow_decimal_null_and_close_basis():
     rows = etf.enriched(
         {
@@ -203,3 +242,114 @@ def test_group_weighted_returns_members_and_missing_amount(tmp_path, monkeypatch
     assert result["group"][2]["return_pct"] is None
     assert result["group"][2]["etf_qfq_turnover_est_yi"] is None
     assert result["members"][0]["series"][1]["return_pct"] == "10.0"
+
+
+@pytest.mark.parametrize("latest,expected_calls", [("2026-11-03",1),("2026-11-04",0)])
+def test_new_closed_session_bypasses_recent_success_but_pending_source_keeps_backoff(monkeypatch, latest, expected_calls):
+    from datetime import UTC, datetime
+    from app import research_etf_native as native
+    class Clock(datetime):
+        @classmethod
+        def now(cls,tz=None): return datetime(2026,11,4,14,tzinfo=UTC)
+    monkeypatch.setattr(etf,"datetime",Clock)
+    docs={"refresh":{"attemptedAt":"2026-11-04T13:55:00+00:00","status":"partial"},"universe":{"data":[{"code":"510310","name":"ETF"}]}}
+    monkeypatch.setattr(etf,"read",lambda name:docs.get(name,{}))
+    monkeypatch.setattr(etf,"write",lambda name,value:docs.update({name:value}))
+    monkeypatch.setattr(native,"closed_session_target",lambda _:"2026-11-04")
+    monkeypatch.setattr(native,"read",lambda _: {"sessions":[latest]})
+    calls=[]
+    def collect(*_):
+        calls.append(True)
+        return {"sessions":["2026-11-04"],"retrievedAt":Clock.now().isoformat(),"catalog":[{"code":"510310","name":"ETF"}],"failures":[]}
+    monkeypatch.setattr(native,"refresh",collect)
+    monkeypatch.setattr(native,"publish_tracking",lambda *_:[])
+    etf.refresh()
+    assert len(calls)==expected_calls
+
+
+@pytest.mark.parametrize(
+    "status,minutes,expected_pending",
+    [("partial", 9, None), ("partial", 10, True), ("error", 10, True),
+     ("ready", 10, None), ("ready", 360, False)],
+)
+def test_pending_daily_retry_is_ten_minutes_and_complete_maintenance_is_six_hours(
+    monkeypatch, status, minutes, expected_pending
+):
+    from datetime import UTC, datetime
+    from app import research_etf_native as native
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 4, 8, tzinfo=UTC) + timedelta(minutes=minutes)
+
+    monkeypatch.setattr(etf, "datetime", Clock)
+    docs = {
+        "refresh": {"attemptedAt": "2026-11-04T08:00:00+00:00", "status": status},
+        "universe": {"data": [{"code": "510310", "name": "ETF"}]},
+    }
+    monkeypatch.setattr(etf, "read", lambda name: docs.get(name, {}))
+    monkeypatch.setattr(etf, "write", lambda name, value: docs.update({name: value}))
+    monkeypatch.setattr(native, "closed_session_target", lambda _: "2026-11-04")
+    monkeypatch.setattr(native, "read", lambda _: {"sessions": ["2026-11-04"]})
+    calls = []
+
+    def collect(*args, **kwargs):
+        calls.append(kwargs.get("pending_only", False))
+        return {"sessions": ["2026-11-04"], "retrievedAt": Clock.now().isoformat(),
+                "catalog": [{"code": "510310", "name": "ETF"}], "failures": []}
+
+    monkeypatch.setattr(native, "refresh", collect)
+    monkeypatch.setattr(native, "publish_tracking", lambda *args, **kwargs: [])
+    etf.refresh()
+    assert calls == ([] if expected_pending is None else [expected_pending])
+    if calls:
+        assert docs["refresh"]["status"] == "ready"
+        etf.refresh()
+        assert len(calls) == 1
+
+
+def test_periodic_check_aligns_with_1510_and_ten_minute_retry_due_time():
+    from datetime import UTC, datetime
+
+    assert etf._next_check_seconds(datetime(2026, 11, 4, 7, 9, 40, tzinfo=UTC), {}) == 20
+    assert etf._next_check_seconds(datetime(2026, 11, 4, 8, 7, tzinfo=UTC), {
+        "status": "partial", "attemptedAt": "2026-11-04T08:00:00+00:00"
+    }) == 180
+    assert etf._next_check_seconds(datetime(2026, 11, 4, 8, 7, tzinfo=UTC), {
+        "status": "ready", "attemptedAt": "2026-11-04T08:00:00+00:00"
+    }) == 300
+
+
+def test_1510_new_target_bypasses_a_one_minute_old_attempt_and_old_source_date_is_not_ready(monkeypatch):
+    from datetime import UTC, datetime
+    from app import research_etf_native as native
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 4, 7, 10, tzinfo=UTC)
+
+    monkeypatch.setattr(etf, "datetime", Clock)
+    docs = {
+        "refresh": {"attemptedAt": "2026-11-04T07:09:00+00:00", "targetDate": "2026-11-03", "status": "ready"},
+        "universe": {"data": [{"code": "510310", "name": "ETF"}]},
+    }
+    monkeypatch.setattr(etf, "read", lambda name: docs.get(name, {}))
+    monkeypatch.setattr(etf, "write", lambda name, value: docs.update({name: value}))
+    monkeypatch.setattr(native, "closed_session_target", lambda _: "2026-11-04")
+    monkeypatch.setattr(native, "read", lambda _: {"sessions": ["2026-11-03"]})
+    calls = []
+
+    def collect(*args, **kwargs):
+        calls.append(kwargs)
+        return {"sessions": ["2026-11-03"], "retrievedAt": Clock.now().isoformat(),
+                "catalog": [{"code": "510310", "name": "ETF"}], "failures": []}
+
+    monkeypatch.setattr(native, "refresh", collect)
+    monkeypatch.setattr(native, "publish_tracking", lambda *args, **kwargs: [])
+    assert etf.refresh() == "partial"
+    assert docs["refresh"]["targetDate"] == "2026-11-04"
+    assert len(calls) == 1 and calls[0] == {}
+    assert etf.refresh() == "up_to_date"
+    assert len(calls) == 1  # retries of the same lagging target still respect ten minutes

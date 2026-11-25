@@ -5,34 +5,44 @@ const root = path.resolve(__dirname, '..');
 const dashboardPath = path.join(root, 'src', 'views', 'dashboard', 'index.vue');
 const source = fs.readFileSync(dashboardPath, 'utf8');
 
+const workspace = fs.readFileSync(
+  path.join(root, 'src/views/dashboard/workspace/PersonalWorkspace.vue'),
+  'utf8',
+);
 const checks = [
   {
-    name: 'homepage keeps a dedicated 1200-1599px hero layout',
+    name: 'desktop hero keeps separate flexible copy and summary columns',
+    pass: /\.home-hero\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1\.42fr\)\s*minmax\(380px,\s*0\.58fr\)/.test(
+      source,
+    ),
+  },
+  {
+    name: 'hero collapses at tablet width and summaries at narrow width',
     pass:
-      /@media\s*\(max-width:\s*1599px\)[\s\S]*?\.home-hero\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1\.08fr\)\s*minmax\(390px,\s*0\.92fr\)/.test(
+      /@media\s*\(max-width:\s*1024px\)[\s\S]*?\.home-hero\s*\{[\s\S]*?grid-template-columns:\s*1fr/.test(
+        source,
+      ) &&
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.home-hero__summaries,[\s\S]*?grid-template-columns:\s*1fr/.test(
         source,
       ),
   },
   {
-    name: 'homepage returns to one-column hero below 1200px',
-    pass:
-      /@media\s*\(max-width:\s*1199px\)[\s\S]*?\.home-hero\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/.test(
-        source,
-      ),
-  },
-  {
-    name: 'LESS avoids native min/max function expressions that break Vite LESS',
+    name: 'LESS avoids unsupported native min/max expressions',
     pass: !/\b(?:min|max)\(/.test(source),
   },
   {
-    name: 'homepage copy remains real HTML instead of baked into the bitmap',
-    pass: source.includes('class="home-hero__copy"'),
+    name: 'homepage title stays real HTML',
+    pass: source.includes('class="home-hero__copy"') && source.includes('<h1>全球变量</h1>'),
   },
   {
-    name: 'strategy panel keeps visible spacing between title and list',
+    name: 'personal workspace replaces old strategy list with bounded responsive cards',
     pass:
-      /\.panel-strategy header\s*\{[\s\S]*?margin-bottom:\s*28px;[\s\S]*?\}/.test(source) &&
-      /\.panel-strategy \.strategy-list\s*\{[\s\S]*?margin-top:\s*0;[\s\S]*?\}/.test(source),
+      source.includes('<PersonalWorkspace') &&
+      workspace.includes('min-width: 0;') &&
+      /@media\s*\(max-width:\s*800px\)[\s\S]*?\.cards\s*\{[\s\S]*?grid-template-columns:\s*1fr/.test(
+        workspace,
+      ) &&
+      /\.card > header\s*\{[\s\S]*?padding-bottom:\s*10px/.test(workspace),
   },
 ];
 

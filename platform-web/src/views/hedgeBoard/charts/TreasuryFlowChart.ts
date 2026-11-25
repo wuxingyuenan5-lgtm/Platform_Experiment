@@ -1,4 +1,5 @@
-import { defineComponent, h, ref, watch } from 'vue';
+import { useChartReveal } from '@/hooks/web/chartMotion';
+import { defineComponent, h, onMounted, ref, watch } from 'vue';
 
 import {
   BTC_TREASURY_FLOW_ROWS,
@@ -17,6 +18,9 @@ import { renderChartRangeSelector } from './chartRange';
 export default defineComponent({
   name: 'TreasuryFlowChart',
   setup() {
+    const motionPlot = ref<SVGElement>();
+    const reveal = useChartReveal(motionPlot);
+    onMounted(() => void reveal(BTC_TREASURY_FLOW_ROWS.length * 3));
     const startIndex = ref(0);
     const endIndex = ref(0);
     const windowSize = 4;
@@ -84,44 +88,60 @@ export default defineComponent({
           ),
         ]),
         h('div', { class: 'chart-shell' }, [
-          h('svg', { viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`, class: 'local-chart-svg' }, [
-            h('g', { transform: `translate(${CHART_PADDING.left},${CHART_PADDING.top})` }, [
-              ...makeTicks(Math.min(0, range.min), range.max, 4).flatMap((tick) => {
-                const y = scaleY(tick, Math.min(0, range.min), range.max, innerHeight);
-                return [
-                  h('line', { x1: 0, x2: innerWidth, y1: y, y2: y, class: 'chart-grid-line' }),
-                  h(
-                    'text',
-                    { x: -12, y: y + 4, textAnchor: 'end', class: 'chart-axis-label' },
-                    formatAxis(tick),
-                  ),
-                ];
-              }),
-              h('line', { x1: 0, x2: innerWidth, y1: baseY, y2: baseY, class: 'chart-zero-line' }),
-              ...rows.flatMap((row, rowIndex) => {
-                const centerX = scaleX(rowIndex, rows.length, innerWidth);
-                return series.map((item, seriesIndex) => {
-                  const value = Number(row[item.key]);
-                  const x = centerX - singleBarWidth * 1.45 + seriesIndex * (singleBarWidth + 4);
-                  const y = scaleY(value, Math.min(0, range.min), range.max, innerHeight);
-                  return h('rect', {
-                    x,
-                    y: value >= 0 ? y : baseY,
-                    width: singleBarWidth,
-                    height: Math.max(1, Math.abs(baseY - y)),
-                    rx: 3,
-                    fill: item.color,
-                    opacity: 0.94,
+          h(
+            'svg',
+            {
+              ref: motionPlot,
+              viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`,
+              class: 'local-chart-svg',
+            },
+            [
+              h('g', { transform: `translate(${CHART_PADDING.left},${CHART_PADDING.top})` }, [
+                ...makeTicks(Math.min(0, range.min), range.max, 4).flatMap((tick) => {
+                  const y = scaleY(tick, Math.min(0, range.min), range.max, innerHeight);
+                  return [
+                    h('line', { x1: 0, x2: innerWidth, y1: y, y2: y, class: 'chart-grid-line' }),
+                    h(
+                      'text',
+                      { x: -12, y: y + 4, textAnchor: 'end', class: 'chart-axis-label' },
+                      formatAxis(tick),
+                    ),
+                  ];
+                }),
+                h('line', {
+                  x1: 0,
+                  x2: innerWidth,
+                  y1: baseY,
+                  y2: baseY,
+                  class: 'chart-zero-line',
+                }),
+                ...rows.flatMap((row, rowIndex) => {
+                  const centerX = scaleX(rowIndex, rows.length, innerWidth);
+                  return series.map((item, seriesIndex) => {
+                    const value = Number(row[item.key]);
+                    const x = centerX - singleBarWidth * 1.45 + seriesIndex * (singleBarWidth + 4);
+                    const y = scaleY(value, Math.min(0, range.min), range.max, innerHeight);
+                    return h('rect', {
+                      'data-chart-kind': 'bar',
+                      style: { transformOrigin: `0px ${baseY}px` },
+                      x,
+                      y: value >= 0 ? y : baseY,
+                      width: singleBarWidth,
+                      height: Math.max(1, Math.abs(baseY - y)),
+                      rx: 3,
+                      fill: item.color,
+                      opacity: 0.94,
+                    });
                   });
-                });
-              }),
-              ...renderDateLabels(
-                rows.map((row) => ({ date: String(row.date), left: 0, right: 0 })),
-                innerWidth,
-                innerHeight,
-              ),
-            ]),
-          ]),
+                }),
+                ...renderDateLabels(
+                  rows.map((row) => ({ date: String(row.date), left: 0, right: 0 })),
+                  innerWidth,
+                  innerHeight,
+                ),
+              ]),
+            ],
+          ),
         ]),
         BTC_TREASURY_FLOW_ROWS.length > minSpan
           ? renderChartRangeSelector({
@@ -132,8 +152,14 @@ export default defineComponent({
               startIndex: startIndex.value,
               endIndex: endIndex.value,
               minWindowSize: minSpan,
-              onStartChange: (value) => (startIndex.value = value),
-              onEndChange: (value) => (endIndex.value = value),
+              onStartChange: (value) => {
+                reveal.cancel();
+                startIndex.value = value;
+              },
+              onEndChange: (value) => {
+                reveal.cancel();
+                endIndex.value = value;
+              },
             })
           : null,
       ]);

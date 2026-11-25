@@ -42,6 +42,8 @@ _HTTP_SSL_CONTEXT = httpx.create_ssl_context(trust_env=False)
 
 INDEX_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
     # Market Overview: core benchmarks followed by the fixed theme basket.
+    ("000001", "上证综指", "sh000001"),
+    ("000016", "上证50", "sh000016"),
     ("000300", "沪深300", "sh000300"),
     ("000852", "中证1000", "sh000852"),
     ("399006", "创业板指", "sz399006"),
@@ -50,8 +52,6 @@ INDEX_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
     ("931238", "金股", "931238"),
     ("932082", "医药", "932082"),
     ("H30590", "机器人", "H30590"),
-    # Retained for non-dashboard consumers that still use the broad index feed.
-    ("000001", "上证指数", "sh000001"),
 )
 
 _CSI_THEME_INDEX_CODES = frozenset({"931071", "931238", "932082", "H30590"})
@@ -739,7 +739,7 @@ class AShareResearchProvider:
             return self._csindex_theme_history(code)
 
         opener = build_opener(ProxyHandler({}))
-        if code in {"000300", "000852", "399006", "000688"}:
+        if code in {"000001", "000016", "000300", "000852", "399006", "000688"}:
             payload = self._direct_json(
                 opener, "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get",
                 {"param": f"{symbol},day,,,640,qfq"},

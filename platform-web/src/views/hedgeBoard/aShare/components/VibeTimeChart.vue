@@ -6,23 +6,13 @@
         ><h3>{{ title }}</h3
         ><div class="range-buttons" role="group" :aria-label="`${title}历史范围`"
           ><button
-            v-for="size in frequency === 'quarterly'
-              ? [4, 12, 0]
-              : frequency === 'monthly'
-              ? [36, 60, 0]
-              : [60, 90, 0]"
-            :key="size"
+            v-for="option in presets"
+            :key="option.value"
             type="button"
-            :aria-pressed="preset === size"
-            :class="{ active: preset === size }"
-            @click="setPreset(size)"
-            >{{
-              size
-                ? `近${size}${
-                    frequency === 'quarterly' ? '季' : frequency === 'monthly' ? '期' : '日'
-                  }`
-                : '全部'
-            }}</button
+            :aria-pressed="preset === option.value"
+            :class="{ active: preset === option.value }"
+            @click="setPreset(option.value)"
+            >{{ option.label }}</button
           ></div
         ></header
       >
@@ -47,6 +37,7 @@
       }}</div>
       <div v-else class="vibe-chart-stage">
         <svg
+          ref="chartSvg"
           class="vibe-chart-svg"
           :viewBox="`0 0 ${plotWidth} ${plotHeight}`"
           :style="{ height: `${plotHeight}px` }"
@@ -59,8 +50,14 @@
           @blur="hover = null"
           @keydown.left.prevent="moveHover(-1)"
           @keydown.right.prevent="moveHover(1)"
-          @wheel.prevent="onWheel"
-          @pointerdown="onPointerDown"
+          @wheel.prevent="
+            reveal.cancel();
+            onWheel($event);
+          "
+          @pointerdown="
+            reveal.cancel();
+            onPointerDown($event);
+          "
           @pointermove="onPointerMove"
           @pointerup="onPointerUp"
           @pointercancel="onPointerUp"
@@ -108,39 +105,44 @@
             v-memo="[entry]"
             :clip-path="`url(#${clipId})`"
           >
-            <template v-if="entry.item.type === 'bar'">
-              <rect
-                v-for="bar in entry.bars"
-                :key="bar.index"
-                :x="bar.x"
-                :y="bar.y"
-                :width="bar.width"
-                :height="bar.height"
-                :fill="entry.item.color"
-                opacity="0.4"
-              />
-            </template>
-            <template v-else v-for="(segment, index) in entry.segments" :key="index">
-              <path
-                v-if="entry.item.type === 'area'"
-                :d="segment.area"
-                :fill="entry.item.color"
-                opacity="0.12"
-              />
-              <polyline
-                :points="segment.points"
-                :stroke="entry.item.color"
-                :stroke-width="entry.item.lineWidth || 2"
-                class="vibe-chart-line"
-              />
-              <circle
-                v-if="segment.isolated"
-                :cx="segment.isolated.x"
-                :cy="segment.isolated.y"
-                r="3"
-                :fill="entry.item.color"
-              />
-            </template>
+            <g
+              :data-chart-kind="entry.item.type === 'bar' ? 'bar' : 'line'"
+              :style="{ transformOrigin: `0px ${y(0, entry.item)}px` }"
+            >
+              <template v-if="entry.item.type === 'bar'">
+                <rect
+                  v-for="bar in entry.bars"
+                  :key="bar.index"
+                  :x="bar.x"
+                  :y="bar.y"
+                  :width="bar.width"
+                  :height="bar.height"
+                  :fill="entry.item.color"
+                  opacity="0.4"
+                />
+              </template>
+              <template v-else v-for="(segment, index) in entry.segments" :key="index">
+                <path
+                  v-if="entry.item.type === 'area'"
+                  :d="segment.area"
+                  :fill="entry.item.color"
+                  opacity="0.12"
+                />
+                <polyline
+                  :points="segment.points"
+                  :stroke="entry.item.color"
+                  :stroke-width="entry.item.lineWidth || 2"
+                  class="vibe-chart-line"
+                />
+                <circle
+                  v-if="segment.isolated"
+                  :cx="segment.isolated.x"
+                  :cy="segment.isolated.y"
+                  r="3"
+                  :fill="entry.item.color"
+                />
+              </template>
+            </g>
           </g>
           <line
             v-if="hover != null"
@@ -185,8 +187,14 @@
             min="0"
             :max="maxIndex"
             :aria-label="`${title}起始日期`"
-            @input="onStartInput"
-            @wheel.prevent="onRangeWheel"
+            @input="
+              reveal.cancel();
+              onStartInput($event);
+            "
+            @wheel.prevent="
+              reveal.cancel();
+              onRangeWheel($event);
+            "
           />
           <input
             v-model.number="endIndex"
@@ -195,12 +203,18 @@
             min="0"
             :max="maxIndex"
             :aria-label="`${title}结束日期`"
-            @input="onEndInput"
-            @wheel.prevent="onRangeWheel"
+            @input="
+              reveal.cancel();
+              onEndInput($event);
+            "
+            @wheel.prevent="
+              reveal.cancel();
+              onRangeWheel($event);
+            "
           />
         </div>
       </div>
-      <footer
+      <footer v-if="!hideFooter"
         >{{ shownDates[0] || '—' }} — {{ shownDates.at(-1) || '—'
         }}<span
           >{{ shownDates.length
@@ -221,11 +235,20 @@
 <script setup lang="ts">
   import { useResearchViewState } from '../../composables/researchWorkspace';
   import ChartExpand from '../../components/ChartExpand.vue';
-  import { computed, getCurrentInstance, onBeforeUnmount, ref, watch } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { computed, getCurrentInstance, inject, onBeforeUnmount, ref, watch } from 'vue';
   import { useElementSize, useWindowSize } from '@vueuse/core';
   import { overviewSegments } from './overviewSegments';
+  import {
+    DEFAULT_RESEARCH_HISTORY_YEARS,
+    RESEARCH_HISTORY_RANGE_KEY,
+    RESEARCH_HISTORY_YEARS,
+    windowStart,
+  } from '../../components/indexValuationStats';
 
   const clipId = `vibe-chart-plot-clip-${getCurrentInstance()!.uid}`;
+  const chartSvg = ref<SVGElement>();
+  const reveal = useChartReveal(chartSvg);
 
   export interface Series {
     name: string;
@@ -247,15 +270,34 @@
     frequency?: 'monthly' | 'quarterly';
     precision?: number;
     initialWindow?: number;
+    hideFooter?: boolean;
+    compactPlot?: boolean;
     dates: string[];
     series: Series[];
   }>();
+  const calendarRanges = inject(RESEARCH_HISTORY_RANGE_KEY, false);
+  const presets = computed(() => {
+    if (calendarRanges)
+      return RESEARCH_HISTORY_YEARS.map((value) => ({
+        value,
+        label: value ? `${value}年` : '全部',
+      }));
+    const sizes =
+      props.frequency === 'quarterly'
+        ? [4, 12, 0]
+        : props.frequency === 'monthly'
+        ? [36, 60, 0]
+        : [60, 90, 0];
+    const unit =
+      props.frequency === 'quarterly' ? '季' : props.frequency === 'monthly' ? '期' : '日';
+    return sizes.map((value) => ({ value, label: value ? `近${value}${unit}` : '全部' }));
+  });
   const remembered = useResearchViewState<{
     preset: number | null;
     start: string;
     end: string;
     hidden: number[];
-  } | null>(`chart:${props.title}`, null);
+  } | null>(`chart:${props.title}${calendarRanges ? ':calendar-years' : ''}`, null);
   let restored = false;
   onBeforeUnmount(() => {
     if (props.dates.length)
@@ -268,9 +310,10 @@
   });
   const chartExpanded = ref(false);
   const { height: viewportHeight } = useWindowSize();
-  const defaultWindow =
-    props.initialWindow ??
-    (props.frequency === 'quarterly' ? 12 : props.frequency === 'monthly' ? 60 : 90);
+  const defaultWindow = calendarRanges
+    ? DEFAULT_RESEARCH_HISTORY_YEARS
+    : props.initialWindow ??
+      (props.frequency === 'quarterly' ? 12 : props.frequency === 'monthly' ? 60 : 90);
   const preset = ref<number | null>(defaultWindow);
   const startIndex = ref(0);
   const endIndex = ref(0);
@@ -283,7 +326,7 @@
     Math.round(
       chartExpanded.value
         ? Math.max(320, viewportHeight.value - 360)
-        : Math.max(280, Math.min(420, plotWidth.value / 1.8)),
+        : Math.max(280, Math.min(props.compactPlot ? 340 : 420, plotWidth.value / 1.8)),
     ),
   );
   const left = 62,
@@ -474,6 +517,7 @@
     next.has(index) ? next.delete(index) : next.add(index);
     hidden.value = next;
     syncAutoAxisDomains();
+    void reveal(shownDates.value.length * props.series.length);
   }
   function syncAutoAxisDomains() {
     for (const axis of ['left', 'right'] as const) {
@@ -497,12 +541,24 @@
   function moveHover(delta: number) {
     hover.value = Math.max(start.value, Math.min(end.value, (hover.value ?? end.value) + delta));
   }
+  function presetStart(size: number) {
+    if (!size) return 0;
+    if (!calendarRanges) return Math.max(0, maxIndex.value - size + 1);
+    const last = props.dates.at(-1)?.slice(0, 10);
+    if (!last) return 0;
+    const cutoff = windowStart(size, last);
+    return Math.max(
+      0,
+      props.dates.findIndex((date) => date >= cutoff),
+    );
+  }
   function setPreset(size: number) {
     preset.value = size;
     const max = maxIndex.value;
     endIndex.value = max;
-    startIndex.value = size ? Math.max(0, max - size + 1) : 0;
+    startIndex.value = presetStart(size);
     hover.value = null;
+    void reveal(shownDates.value.length * props.series.length);
   }
   function resetAxis(axis: 'left' | 'right') {
     axisState.value[axis] = { domain: dataDomain(axis), manual: false };
@@ -627,7 +683,7 @@
       }
       if (preset.value != null) {
         endIndex.value = max;
-        startIndex.value = preset.value ? Math.max(0, max - preset.value + 1) : 0;
+        startIndex.value = presetStart(preset.value);
       } else {
         startIndex.value = Math.min(startIndex.value, Math.max(0, max - 1));
         endIndex.value = Math.max(
@@ -642,6 +698,7 @@
         .flatMap((item) => item.values.map(numeric))
         .filter((value): value is number => value != null);
       if (prices.length) priceBounds.value = [Math.min(...prices), Math.max(...prices)];
+      void reveal(shownDates.value.length * props.series.length);
     },
     { immediate: true, deep: true },
   );

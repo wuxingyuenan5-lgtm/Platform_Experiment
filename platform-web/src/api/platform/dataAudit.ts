@@ -28,3 +28,8 @@ const client = createStrategyClient();
 export async function getDataAudit(): Promise<DataAuditReport> {
   return (await client.get('/risk/data-audit')).data;
 }
+export async function getDataAuditSummary(): Promise<
+  Pick<DataAuditReport, 'checkedAt' | 'monitorStale' | 'summary'>
+> {
+  return (await client.get('/risk/data-audit', { params: { summary_only: true } })).data;
+}

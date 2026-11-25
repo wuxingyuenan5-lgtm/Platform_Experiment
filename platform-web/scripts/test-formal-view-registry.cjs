@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const copyDirectory = require('./copy-test-fixture.cjs');
 
 const {
   ViewRegistryError,
@@ -19,12 +20,8 @@ const output = path.join(root, 'src', 'router', 'viewRegistry.generated.ts');
 
 function copyFixture() {
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'formal-view-registry-'));
-  fs.cpSync(path.join(root, 'src', 'router'), path.join(fixture, 'src', 'router'), {
-    recursive: true,
-  });
-  fs.cpSync(path.join(root, 'src', 'views'), path.join(fixture, 'src', 'views'), {
-    recursive: true,
-  });
+  copyDirectory(path.join(root, 'src', 'router'), path.join(fixture, 'src', 'router'));
+  copyDirectory(path.join(root, 'src', 'views'), path.join(fixture, 'src', 'views'));
   return fixture;
 }
 
@@ -65,7 +62,7 @@ function testDriftAndRewrite() {
     writeRegistry({ root: fixture, output: candidate });
     checkRegistry({ root: fixture, output: candidate });
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    // Retain the isolated fixture for inspection; repository rules prohibit bulk deletion.
   }
 }
 
@@ -79,7 +76,7 @@ function testMissingViewFails() {
       (error) => error instanceof ViewRegistryError && /missing View/.test(error.message),
     );
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    // Retain the isolated fixture for inspection; repository rules prohibit bulk deletion.
   }
 }
 
@@ -96,7 +93,7 @@ function testForbiddenViewFails() {
       (error) => error instanceof ViewRegistryError && /forbidden View key/.test(error.message),
     );
   } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    // Retain the isolated fixture for inspection; repository rules prohibit bulk deletion.
   }
 }
 

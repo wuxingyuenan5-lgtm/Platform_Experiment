@@ -30,10 +30,12 @@ test('China macro groups follow US groups on each requested topic, without empty
   const macro = researchModules.find(module => module.id === 'macro');
   for (const id of ['macro-rates', 'macro-growth', 'macro-inflation', 'macro-risk-appetite']) {
     const { widgets } = macro.sections.find(section => section.id === id);
-    const firstChina = widgets.findIndex(widget => widget.region === '中国');
+    const regional = widgets.filter(widget => ['美国', '中国'].includes(widget.region));
+    const firstChina = regional.findIndex(widget => widget.region === '中国');
     assert.ok(firstChina > 0, id);
-    assert.ok(widgets.slice(0, firstChina).every(widget => widget.region === '美国'));
-    assert.ok(widgets.slice(firstChina).every(widget => widget.region === '中国' && widget.localKey.startsWith('macro-cn-')));
+    assert.ok(regional.slice(0, firstChina).every(widget => widget.region === '美国'));
+    assert.ok(regional.slice(firstChina).every(widget => widget.region === '中国' && widget.localKey.startsWith('macro-cn-')));
+    assert.ok(widgets.every(widget => widget.localKey || widget.title));
     assert.equal(new Set(widgets.map(widget => widget.localKey || widget.title)).size, widgets.length);
   }
 });

@@ -240,6 +240,24 @@ def test_cross_strategy_pnl_uses_canonical_fills_and_contract_multiplier(
                 (timestamp, timestamp),
             )
 
+        # Cross reporting requires an archived two-leg market observation.
+        import json
+        with connection() as db:
+            db.execute(
+                "INSERT INTO market_spread_snapshots "
+                "(id,strategy_key,strategy_instance_id,observed_at,payload_json,left_venue_code,left_symbol,right_venue_code,right_symbol,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                ("pnl-session", "cross_venue_spread", strategy_id, timestamp, json.dumps({
+                    "asOf": timestamp,
+                    "mt5": {"status": "available", "marketStatus": "open"},
+                    "bybit": {"status": "available", "marketStatus": "open"},
+                }), "bybit", "XAUTUSDT", "mt5", "XAUUSD.S", "available", timestamp),
+            )
+        from app.strategy_management_projection import request_projection, refresh_one
+        # The endpoint serves the background projection, not raw fill tables.
+        with connection() as db:
+            db.execute("DELETE FROM strategy_management_projection")
+        request_projection(strategy_id, None, "pnl")
+        assert refresh_one(force=True)
         response = client.get(f"/api/v1/strategies/instances/{strategy_id}/pnl")
 
     assert response.status_code == 200

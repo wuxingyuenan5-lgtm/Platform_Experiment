@@ -49,8 +49,8 @@ class AShareFixtureProvider:
 
     async def index_snapshots(self) -> list[AShareIndexSnapshot]:
         await self._check("indices")
-        codes = ["000300", "000852", "399006", "000688", "931071", "931238", "932082", "H30590"]
-        names = ["沪深300", "中证1000", "创业板指", "科创50", "AI", "金股", "医药", "机器人"]
+        codes = ["000001", "000016", "000300", "000852", "399006", "000688", "931071", "931238", "932082", "H30590"]
+        names = ["上证综指", "上证50", "沪深300", "中证1000", "创业板指", "科创50", "AI", "金股", "医药", "机器人"]
         return [
             AShareIndexSnapshot(
                 code=code,

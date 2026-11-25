@@ -52,6 +52,18 @@ def configure_live(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(settings, "live_session_absolute_max_order_notional", 1000)
     monkeypatch.setattr(settings, "live_session_absolute_max_daily_notional", 2000)
 
+    def runtime_read(url, *, params=None, **kwargs):
+        if "/venue/instruments/" not in url:
+            raise httpx.ConnectError("isolated Runtime read unavailable")
+        return httpx.Response(200, request=httpx.Request("GET", url), json={
+            **params, "symbol": url.rsplit("/", 1)[1],
+            "status": "Trading", "dataQualityState": "complete",
+            "minQuantity": "0.001", "quantityStep": "0.001", "priceTick": "0.01",
+        })
+
+    monkeypatch.setattr("app.runtime_transport.get", runtime_read)
+
+
 
 def make_account_live() -> None:
     with connection() as db:

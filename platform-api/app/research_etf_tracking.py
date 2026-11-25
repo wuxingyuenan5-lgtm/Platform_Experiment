@@ -5,21 +5,18 @@ import hashlib
 import json
 import logging
 import re
-import ssl
 import threading
 from bisect import bisect_right, insort
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-
-import httpx
-import truststore
 
 from app.research_local_data import read_local_json, write_local_json
 from app.research_provider_errors import ResearchProviderError
 
 BASE = "https://wangwang-etf.com/"
 ROOT = "public/v1/etf-tracking/"
+SUCCESS_REFRESH_SECONDS = 21600
+PENDING_REFRESH_SECONDS = 600
 INDICES = dict(
     zip(
         [
@@ -142,38 +139,93 @@ def refresh(*, force=False):
     if not _REFRESH.acquire(blocking=False):
         return "busy"
     try:
+        from app import research_etf_native as native
+        from app.research_etf_observation import SYMBOLS
+
         last = read("refresh")
+        current = native.read("refresh")
+        target = native.closed_session_target(datetime.now(UTC))
+        caught_up = bool(current.get("sessions") and current["sessions"][-1] >= target)
+        same_target = last.get("targetDate") == target or (
+            not last.get("targetDate") and caught_up
+        )
         if not force and last.get("attemptedAt"):
             elapsed = (
                 datetime.now(UTC) - datetime.fromisoformat(last["attemptedAt"])
             ).total_seconds()
-            if elapsed < (21600 if last.get("status") == "ready" else 3600):
+            interval = SUCCESS_REFRESH_SECONDS if last.get("status") == "ready" else PENDING_REFRESH_SECONDS
+            if 0 <= elapsed < interval and same_target:
                 return "up_to_date"
-        with httpx.Client(
-            timeout=25, follow_redirects=True, verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ) as client:
-            universe = fetch(client, "universe")
-            if not universe.get("data"):
-                write("refresh", {"attemptedAt": datetime.now(UTC).isoformat(), "status": "error"})
-                return "error"
-            paths = set()
-            for item in universe["data"]:
-                if item.get("dashboard_eligible"):
-                    paths.update(["etfs/" + item["code"], "margin/etfs/" + item["code"]])
-                    key = index_key(item)
-                    if key:
-                        paths.update(["index-turnover/" + key, "margin/" + key])
-            with ThreadPoolExecutor(max_workers=4) as pool:
-                docs = list(pool.map(lambda p: fetch(client, p), sorted(paths)))
-            state = (
-                "ready"
-                if universe["status"] == "ready" and all(d["status"] == "ready" for d in docs)
-                else "partial"
+
+        universe = read("universe")
+        if not universe.get("data"):
+            raise ValueError("ETF tracking catalog missing")
+        retry = (
+            {"pending_only": True}
+            if not force and caught_up and last.get("status") != "ready"
+            else {}
+        )
+        attempted = datetime.now(UTC).isoformat()
+        try:
+            state = native.refresh(universe["data"], SYMBOLS, **retry)
+        except Exception as exc:
+            write("refresh", {"attemptedAt": attempted, "targetDate": target,
+                              "status": "error", "error": str(exc)[:240]})
+            write_local_json(
+                native.ROOT + "refresh.json",
+                {
+                    **native.read("refresh"),
+                    "status": "stale",
+                    "attemptedAt": attempted,
+                    "error": str(exc)[:240],
+                },
             )
-            write("refresh", {"attemptedAt": datetime.now(UTC).isoformat(), "status": state})
-            return state
+            raise
+        failures = native.publish_tracking(state, universe["data"], **retry)
+        native_names = {m["code"]: m["name"] for m in state["catalog"]}
+        write(
+            "universe",
+            {
+                **universe,
+                "data": [
+                    {**m, "name": native_names.get(m["code"], m["name"])} for m in universe["data"]
+                ],
+                "status": "ready",
+                "sha256": None,
+                "url": native.CATALOG,
+                "fetchedAt": state["retrievedAt"],
+                "attemptedAt": state["retrievedAt"],
+            },
+        )
+        status = "partial" if failures or state["failures"] or state["sessions"][-1] < target else "ready"
+        write(
+            "refresh",
+            {
+                "attemptedAt": attempted,
+                "targetDate": target,
+                "status": status,
+                "failures": state["failures"] + failures,
+            },
+        )
+        return status
     finally:
         _REFRESH.release()
+
+
+def _next_check_seconds(now, last):
+    from app.research_etf_native import CHINA
+
+    local = now.astimezone(CHINA)
+    close = local.replace(hour=15, minute=10, second=0, microsecond=0)
+    delay = min(300, (close - local).total_seconds()) if local < close else 300
+    try:
+        interval = SUCCESS_REFRESH_SECONDS if last.get("status") == "ready" else PENDING_REFRESH_SECONDS
+        elapsed = (now - datetime.fromisoformat(last["attemptedAt"])).total_seconds()
+        if 0 <= elapsed < interval:
+            delay = min(delay, interval - elapsed)
+    except (KeyError, ValueError, TypeError):
+        pass
+    return max(1, delay)
 
 
 async def run_periodic():
@@ -182,7 +234,7 @@ async def run_periodic():
             await asyncio.to_thread(refresh)
         except Exception:
             logging.getLogger(__name__).exception("ETF tracking refresh failed")
-        await asyncio.sleep(300)
+        await asyncio.sleep(_next_check_seconds(datetime.now(UTC), read("refresh")))
 
 
 def provenance(doc):
@@ -199,8 +251,14 @@ def enriched(data, index_rows=()):
         price, delta = number(row.get("etf_qfq_close")), number(row.get("qfq_delta_units_yi"))
         average = number(row.get("etf_qfq_avg_price_est"))
         basis = average if average is not None else price
-        row["flow_yi"] = str(delta * basis) if delta is not None and basis is not None else None
-        row["flow_price_basis"] = "average" if average is not None else "close"
+        historical_flow = number(row.get("historical_flow_yi"))
+        row["flow_yi"] = (
+            str(historical_flow) if historical_flow is not None else
+            str(delta * basis) if delta is not None and basis is not None else None
+        )
+        row["flow_price_basis"] = (
+            "unit_nav" if historical_flow is not None else "average" if average is not None else "close"
+        )
         row["return_pct"] = (
             str((price / previous - 1) * 100) if price is not None and previous else None
         )
@@ -239,7 +297,7 @@ def catalog():
     return {"items": result, "source": provenance(doc), "refresh": read("refresh")}
 
 
-def detail(code):
+def detail(code, *, include_group=True):
     if not re.fullmatch(r"\d{6}", code):
         raise ValueError("Invalid code")
     meta = next((x for x in read("universe").get("data", []) if x["code"] == code), None)
@@ -251,6 +309,23 @@ def detail(code):
     margin = read("margin/etfs/" + code)
     group_margin = read("margin/" + key) if key else {}
     data = doc.get("data", {})
+    index_rows = index.get("data", {}).get("rows", [])
+    common = {
+        "meta": meta,
+        "series": enriched(data, index_rows),
+        "groupLabel": meta.get("index_turnover_name") or meta.get("display_group"),
+        "disclosures": data.get("disclosures", []),
+        "margin": margin.get("data", {}).get("rows", []),
+        "groupMargin": group_margin.get("data", {}).get("rows", []),
+        "sources": {
+            "market": provenance(doc),
+            "index": provenance(index),
+            "margin": provenance(margin),
+            "groupMargin": provenance(group_margin),
+        },
+    }
+    if not include_group:
+        return {**common, "group": [], "members": []}
     members = [
         x
         for x in read("universe").get("data", [])
@@ -258,7 +333,6 @@ def detail(code):
         and (index_key(x) == key if key else x.get("display_group") == meta.get("display_group"))
     ]
     member_docs = [read("etfs/" + x["code"]) for x in members]
-    index_rows = index.get("data", {}).get("rows", [])
     member_series = [enriched(d.get("data", {}), index_rows) for d in member_docs]
     member_rows = [{r["date"]: r for r in rows} for rows in member_series]
     index_by_date = {r["date"]: r for r in index_rows}
@@ -312,10 +386,8 @@ def detail(code):
             )
         group.append(row)
     return {
-        "meta": meta,
-        "series": enriched(data, index.get("data", {}).get("rows", [])),
+        **common,
         "group": group,
-        "groupLabel": meta.get("index_turnover_name") or meta.get("display_group"),
         "members": [
             {
                 "meta": member,
@@ -324,20 +396,14 @@ def detail(code):
             }
             for member, rows in zip(members, member_series, strict=True)
         ],
-        "disclosures": data.get("disclosures", []),
-        "margin": margin.get("data", {}).get("rows", []),
-        "groupMargin": group_margin.get("data", {}).get("rows", []),
         "sources": {
-            "market": provenance(doc),
-            "index": provenance(index),
-            "margin": provenance(margin),
-            "groupMargin": provenance(group_margin),
+            **common["sources"],
             "groupMarket": {
                 "status": "ready"
                 if all(d.get("status") == "ready" for d in member_docs)
                 else "stale",
                 "fetchedAt": None,
-                "url": BASE,
+                "url": "https://www.sse.com.cn/assortment/fund/etf/list/scale/",
             },
         },
     }

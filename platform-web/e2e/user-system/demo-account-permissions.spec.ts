@@ -28,8 +28,7 @@ async function loginWithUi(page: Page, username: string, password: string): Prom
   await page.getByPlaceholder('请输入账号').fill(username);
   await page.getByPlaceholder('请输入密码').fill(password);
   const response = page.waitForResponse(
-    (item) =>
-      item.url().endsWith('/api/v1/auth/login') && item.request().method() === 'POST',
+    (item) => item.url().endsWith('/api/v1/auth/login') && item.request().method() === 'POST',
   );
   await page.getByRole('button', { name: '登录', exact: true }).click();
   expect((await response).ok()).toBe(true);
@@ -81,18 +80,10 @@ test('all eight reusable accounts keep self account access and obey risk, URL an
         await expect(
           account.page.getByTestId('strategy-management-original-structure'),
         ).toBeVisible();
-        await expect(
-          account.page.getByText('示例策略不可启停、部署或下单', { exact: true }),
-        ).toBeVisible();
-        if (expected.write) {
-          await expect(account.page.getByRole('button', { name: '启停策略' })).toBeDisabled();
-          await expect(account.page.getByRole('button', { name: '部署策略' })).toBeDisabled();
-        } else {
-          await expect(
-            account.page.getByText('当前账号为只读权限', { exact: true }),
-          ).toBeVisible();
-          await expect(account.page.locator('[data-write-action="true"]')).toHaveCount(0);
-        }
+        await expect(account.page.getByRole('button', { name: '启停策略' })).toHaveCount(0);
+        await expect(account.page.getByRole('button', { name: '部署策略' })).toHaveCount(0);
+        await expect(account.page.locator('[data-write-action="true"]')).toHaveCount(0);
+        expect(authentication.permissions.includes('trading.write')).toBe(expected.write);
 
         await account.page.goto(absoluteUrl('/account/index'));
         await expect(account.page.getByText(/个人账号|我的资产/).first()).toBeVisible();
@@ -104,17 +95,11 @@ test('all eight reusable accounts keep self account access and obey risk, URL an
         if (!expected.risk) {
           expect(listResponse.status()).toBe(403);
           expect(
-            (
-              await account.page.request.get(
-                absoluteUrl('/api/v1/users?search=e2e_ceo'),
-              )
-            ).status(),
+            (await account.page.request.get(absoluteUrl('/api/v1/users?search=e2e_ceo'))).status(),
           ).toBe(403);
           expect(
             (
-              await account.page.request.get(
-                absoluteUrl('/api/v1/users/not-the-current-member'),
-              )
+              await account.page.request.get(absoluteUrl('/api/v1/users/not-the-current-member'))
             ).status(),
           ).toBe(403);
 
@@ -131,9 +116,7 @@ test('all eight reusable accounts keep self account access and obey risk, URL an
           await account.page.goto(absoluteUrl('/risk'));
           await expect(account.page).not.toHaveURL(/\/exception\/403|\/403/);
           await account.page.goto(absoluteUrl('/risk/users'));
-          await expect(
-            account.page.getByText('用户管理', { exact: true }).first(),
-          ).toBeVisible();
+          await expect(account.page.getByText('用户管理', { exact: true }).first()).toBeVisible();
 
           if (!expected.write) {
             const targetId = authentication.user.id || authentication.user.userId;

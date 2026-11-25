@@ -23,10 +23,12 @@
       class="chart-section"
       :class="{
         'chart-section--gold': unified,
+        'chart-section--macro': moduleId === 'macro',
         'market-detail-section-shell': isMarketDetailSection(section),
       }"
     >
       <div
+        v-if="!hideHeadings"
         class="chart-section__heading"
         :class="{ 'market-detail-section-heading': isMarketDetailSection(section) }"
       >
@@ -45,6 +47,36 @@
         </button>
       </div>
 
+      <nav
+        v-if="section.id === 'gold-flows'"
+        class="commodity-capital-tabs"
+        aria-label="资金面分类"
+      >
+        <button
+          v-for="tab in commodityCapitalTabs"
+          :key="tab.key"
+          type="button"
+          :aria-pressed="capitalTab === tab.key"
+          @click="capitalTab = tab.key"
+          >{{ tab.label }}</button
+        >
+      </nav>
+
+      <nav
+        v-if="section.id === 'crypto-etf'"
+        class="commodity-capital-tabs"
+        aria-label="资金面分类"
+      >
+        <button
+          v-for="tab in cryptoCapitalTabs"
+          :key="tab.key"
+          type="button"
+          :aria-pressed="cryptoCapitalTab === tab.key"
+          @click="cryptoCapitalTab = tab.key"
+          >{{ tab.label }}</button
+        >
+      </nav>
+
       <div
         v-if="!isCollapsibleSection(section) || isMarketDetailExpanded(section.id)"
         :id="`${section.id}-content`"
@@ -57,6 +89,7 @@
         >
           <h5
             v-if="
+              !hideHeadings &&
               widget.region &&
               (widgetIndex === 0 ||
                 orderedWidgets(section)[widgetIndex - 1].region !== widget.region)
@@ -80,7 +113,15 @@
                 widget.localKey === 'macro-treasury-details' ||
                 widget.localKey === 'macro-corporate-yields' ||
                 widget.localKey === 'etf-weekly-flows' ||
-                widget.localKey === 'crypto-cny-usdt',
+                widget.localKey === 'crypto-cny-usdt' ||
+                (section.id === 'gold-flows' &&
+                  ([
+                    'gold-comex-inventory',
+                    'gold-cot-drivers',
+                    'gold-options',
+                    'gold-shfe-iv',
+                  ].includes(widget.localKey || '') ||
+                    widget.kind === 'external-link')),
               'widget-card--macro-fedwatch': widget.localKey === 'macro-fedwatch',
               'widget-card--macro-polymarket-fed': widget.localKey === 'macro-polymarket-fed',
               'widget-card--stretch-table': ['crypto-treasuries', 'crypto-eth-reserves'].includes(
@@ -90,8 +131,12 @@
                 widget.localKey || '',
               ),
               'widget-card--halving': widget.localKey === 'crypto-halving-cycles',
+              'widget-card--correlations': widget.localKey === 'crypto-correlations',
               'widget-card--urpd': widget.localKey === 'crypto-urpd',
+              'widget-card--address': widget.localKey === 'crypto-address-distribution',
               'widget-card--etf-premium': widget.localKey === 'crypto-etf-premium',
+              'widget-card--iv-term': widget.localKey === 'crypto-atm-iv-term',
+              'widget-card--option-distribution': widget.localKey === 'crypto-options-distribution',
               'widget-card--cftc': widget.localKey === 'cftc-positioning',
             }"
           >
@@ -106,9 +151,15 @@
                     widget.region === '日本' ||
                     widget.region === '欧元区' ||
                     widget.region === '全球' ||
-                    ['macro-net-liquidity', 'macro-nfci-details', 'macro-us-confidence'].includes(
-                      widget.localKey || '',
-                    )
+                    [
+                      'macro-net-liquidity',
+                      'macro-nfci-details',
+                      'macro-us-confidence',
+                      'macro-cp-spreads',
+                      'macro-soma-bills-change',
+                      'macro-treasury-realized-volatility',
+                      'macro-financial-stress',
+                    ].includes(widget.localKey || '')
                   "
                   class="research-definition"
                   >{{ widget.subtitle }}</p
@@ -157,6 +208,11 @@
               <div v-else-if="widget.kind === 'external-link'" class="external-reference-card">
                 <p>{{ widget.subtitle }}</p>
               </div>
+              <component
+                :is="localChartWidget"
+                v-else-if="widget.localKey?.endsWith('-market-detail-table')"
+                :widget="widget"
+              />
               <VisibleChart
                 v-else-if="widget.kind === 'local-chart' && widget.localKey"
                 :height="widget.height"
@@ -178,10 +234,17 @@
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
   import VisibleChart from './VisibleChart';
   import ChartExpand from './ChartExpand.vue';
-  import type { ChartSection, LocalWidgetKey, WidgetConfig } from '../nativeData/dashboardClean';
+  import {
+    commodityCapitalTabs,
+    cryptoCapitalTabs,
+    type ChartSection,
+    type LocalWidgetKey,
+    type WidgetConfig,
+  } from '../nativeData/dashboardClean';
 
   const props = defineProps<{
     standalone?: boolean;
+    hideHeadings?: boolean;
     moduleId: string;
     moduleLabel: string;
     formula?: {
@@ -200,17 +263,33 @@
     widgetErrorBoundary: Component;
   }>();
 
+  const capitalTab = useResearchViewState<NonNullable<WidgetConfig['capitalCategory']>>(
+    'commodity-capital-tab',
+    'etf',
+  );
+  const cryptoCapitalTab = useResearchViewState<(typeof cryptoCapitalTabs)[number]['key']>(
+    'crypto-capital-tab',
+    'etf',
+  );
+
   function orderedWidgets(section: ChartSection) {
+    if (section.id === 'crypto-onchain-toolbox') return section.widgets;
+    const widgets =
+      section.id === 'gold-flows'
+        ? section.widgets.filter((widget) => widget.capitalCategory === capitalTab.value)
+        : section.id === 'crypto-etf'
+        ? section.widgets.filter((widget) => widget.capitalCategory === cryptoCapitalTab.value)
+        : section.widgets;
     return [
-      ...section.widgets.filter((widget) => widget.localKey === 'etf-weekly-flows'),
-      ...section.widgets.filter(
+      ...widgets.filter((widget) => widget.localKey === 'etf-weekly-flows'),
+      ...widgets.filter(
         (widget) =>
           widget.kind !== 'external-link' &&
           widget.localKey !== 'etf-weekly-flows' &&
           !['gold-seasonality', 'btc-seasonality'].includes(widget.localKey || ''),
       ),
-      ...section.widgets.filter((widget) => widget.kind === 'external-link'),
-      ...section.widgets.filter((widget) =>
+      ...widgets.filter((widget) => widget.kind === 'external-link'),
+      ...widgets.filter((widget) =>
         ['gold-seasonality', 'btc-seasonality'].includes(widget.localKey || ''),
       ),
     ];
@@ -293,6 +372,13 @@
     }
   }
 
+  @container research-section (max-width: 960px) {
+    .chart-section--macro .widget-grid--two,
+    .chart-section--macro .widget-grid--three {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   @media (max-width: 768px) {
     .formula-strip,
     .chart-section {
@@ -350,12 +436,12 @@
   }
 
   .widget-card--halving,
-  .widget-card--urpd {
+  .widget-card--correlations {
     grid-column: 1 / -1;
   }
 
   .widget-card--etf-premium {
-    grid-column: span 2;
+    grid-column: 1 / -1;
   }
 
   .formula-strip,
@@ -436,6 +522,94 @@
     display: grid;
     gap: 16px;
     align-items: start;
+  }
+
+  .chart-section--macro .widget-grid {
+    align-items: stretch;
+  }
+
+  .chart-section--macro .widget-card {
+    :deep(.chart-expand__surface:not([aria-modal='true'])) {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+
+      .visible-chart,
+      .local-widget-stack {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .source-series-plot {
+        flex: 1 0 auto;
+      }
+
+      .source-series-footer {
+        margin-top: auto;
+      }
+    }
+  }
+
+  .commodity-capital-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 10px;
+    background: var(--strategy-surface);
+  }
+
+  .commodity-capital-tabs button {
+    padding: 7px 11px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: var(--strategy-surface);
+    color: var(--strategy-text-2);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .commodity-capital-tabs button[aria-pressed='true'] {
+    background: var(--strategy-accent-soft);
+    color: var(--strategy-accent);
+  }
+
+  .commodity-capital-tabs button:focus-visible {
+    outline: 2px solid var(--strategy-accent);
+    outline-offset: 2px;
+  }
+
+  #gold-flows-content {
+    align-items: stretch;
+  }
+
+  #gold-flows-content .widget-card {
+    :deep(.chart-expand__surface:not([aria-modal='true'])) {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    :deep(.visible-chart),
+    :deep(.macro-series-chart) {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    :deep(.source-series-footer) {
+      margin-top: auto;
+    }
+
+    :deep(.distribution-scroll) {
+      flex: 1;
+      min-height: 330px;
+      max-height: 520px !important;
+    }
   }
 
   .widget-card--seasonality {
@@ -623,6 +797,22 @@
 
   #crypto-external-research-content {
     align-items: stretch;
+  }
+
+  #crypto-onchain-toolbox-content .widget-card--urpd,
+  #crypto-onchain-toolbox-content .widget-card--address {
+    align-self: stretch;
+
+    :deep(.chart-expand__surface:not([aria-modal='true'])) {
+      height: 100%;
+    }
+  }
+
+  #crypto-external-research-content .widget-card--iv-term :deep(.iv-panel .source-series-plot) {
+    height: 470px;
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: auto;
   }
 
   #crypto-external-research-content :deep(.source-series-summary .source-series-legend) {

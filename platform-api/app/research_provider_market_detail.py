@@ -59,6 +59,12 @@ class MarketDetailResponse(ResearchApiModel):
     retrieved_at: datetime | None = None
     rows: list[MarketDetailRow] = Field(default_factory=list)
 
+    def for_table(self) -> MarketDetailResponse:
+        """Keep quotes, provenance and sparklines without unused full histories."""
+        return self.model_copy(
+            update={"rows": [row.model_copy(update={"history": []}) for row in self.rows]}
+        )
+
     @field_validator("retrieved_at")
     @classmethod
     def require_timezone(cls, value: datetime | None) -> datetime | None:

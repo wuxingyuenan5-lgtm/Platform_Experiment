@@ -29,6 +29,7 @@
       <ChartExpand title="跨资产同窗比较">
         <div class="plot">
           <svg
+            ref="motionPlot"
             viewBox="0 0 900 260"
             role="img"
             aria-label="以共同起点100归一化的价格走势，左右方向键查看数值"
@@ -44,12 +45,14 @@
               <line x1="48" x2="880" :y1="y(tick)" :y2="y(tick)" />
               <text x="4" :y="y(tick) + 4">{{ tick.toFixed(0) }}</text>
             </g>
-            <polyline
-              v-for="(asset, index) in data.assets"
-              :key="asset.id"
-              :points="path(asset.normalized)"
-              :stroke="colors[index]"
-            />
+            <g data-chart-kind="line">
+              <polyline
+                v-for="(asset, index) in data.assets"
+                :key="asset.id"
+                :points="path(asset.normalized)"
+                :stroke="colors[index]"
+              />
+            </g>
             <text x="48" y="253">{{ data.dates[0] }}</text>
             <text x="880" y="253" text-anchor="end">{{ data.dates.at(-1) }}</text>
             <line
@@ -110,12 +113,20 @@
   </section>
 </template>
 <script setup lang="ts">
+  import { useChartReveal } from '@/hooks/web/chartMotion';
   import { computed, onBeforeUnmount, ref, watch } from 'vue';
   import { getCrossAssetComparison, type CrossAssetComparison } from '@/api/hedgeResearch';
   import ChartExpand from './ChartExpand.vue';
 
   const days = ref(90);
   const data = ref<CrossAssetComparison | null>(null);
+  const motionPlot = ref<SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watch(
+    data,
+    () => void reveal((data.value?.dates.length || 0) * (data.value?.assets.length || 0)),
+    { flush: 'post' },
+  );
   const loading = ref(false);
   const error = ref(false);
   const hover = ref<number | null>(null);

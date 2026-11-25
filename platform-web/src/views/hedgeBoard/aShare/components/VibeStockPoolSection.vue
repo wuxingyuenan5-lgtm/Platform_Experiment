@@ -134,6 +134,7 @@
             </div>
             <div v-if="matrixPoints.length" class="matrix-wrap">
               <svg
+                ref="motionPlot"
                 viewBox="0 0 1000 420"
                 preserveAspectRatio="xMidYMid meet"
                 aria-label="股票池强弱矩阵"
@@ -393,6 +394,12 @@
               ><th
                 tabindex="0"
                 role="columnheader"
+                @keydown.enter="sortBy('relative_5d_pp')"
+                @click="sortBy('relative_5d_pp')"
+                >5日相对行业（百分点） {{ sortIndicator('relative_5d_pp') }}</th
+              ><th
+                tabindex="0"
+                role="columnheader"
                 :aria-sort="
                   sortKey === 'change_20d'
                     ? sortDirection === 'desc'
@@ -496,6 +503,9 @@
               ><td>{{ row.currency === 'HKD' ? 'HK$ ' : '' }}{{ formatNumber(row.price) }}</td
               ><td :class="tone(row.change)">{{ formatPct(row.change) }}</td
               ><td :class="tone(row.change_5d)">{{ formatPct(row.change_5d) }}</td
+              ><td :class="tone(row.relative_5d_pp)" :title="row.industryComparison?.name">{{
+                formatNumber(row.relative_5d_pp)
+              }}</td
               ><td :class="tone(row.change_20d)">{{ formatPct(row.change_20d) }}</td
               ><td :class="tone(row.ytd)">{{ formatPct(row.ytd) }}</td
               ><td>{{ formatNumber(row.amount_yi) }}</td
@@ -522,7 +532,7 @@
                 ></td
               ></tr
             ><tr v-if="!visibleRows.length"
-              ><td colspan="13" class="empty">{{
+              ><td colspan="14" class="empty">{{
                 filter === '__focus__' ? '暂无关注股票' : '暂无匹配股票'
               }}</td></tr
             ></tbody
@@ -597,8 +607,9 @@
 </template>
 
 <script setup lang="ts">
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { watch as watchMotion, computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
   import { useResearchViewState } from '../../composables/researchWorkspace';
-  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
   import { Modal, Input, Button } from 'ant-design-vue';
   import type { Stock, Period } from '@/api/platform/aShareStockPool';
@@ -860,6 +871,9 @@
   onMounted(() => {
     void load(false).finally(() => emit('ready'));
   });
+  const motionPlot = ref<HTMLElement | SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion(matrixPoints, () => void reveal(), { flush: 'post', deep: true });
 </script>
 
 <style scoped lang="less">

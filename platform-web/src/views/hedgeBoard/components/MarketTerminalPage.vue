@@ -1,6 +1,9 @@
 ﻿<template>
-  <div class="market-terminal">
-    <p v-if="['us', 'global'].includes(config.id)" role="status">
+  <div ref="motionPlot" class="market-terminal">
+    <p
+      v-if="['us', 'global'].includes(config.id) && !(config.id === 'us' && view === 'themes')"
+      role="status"
+    >
       {{
         marketLoading
           ? '正在读取数据…'
@@ -16,7 +19,11 @@
       }}
     </p>
     <details
-      v-if="['us', 'global'].includes(config.id) && missingMarketRows.length"
+      v-if="
+        ['us', 'global'].includes(config.id) &&
+        !(config.id === 'us' && view === 'themes') &&
+        missingMarketRows.length
+      "
       class="market-terminal__coverage"
     >
       <summary>数据覆盖 · {{ missingMarketRows.length }} 项缺失或待更新</summary>
@@ -25,14 +32,11 @@
     <HedgeBoardSubnav
       v-if="!view && displayConfig.id === 'us'"
       :sections="[
-        { id: 'us-market-overview', title: '大盘表现' },
+        { id: 'us-market-overview', title: '市场总览' },
         ...(detailSectionId ? [{ id: detailSectionId, title: '美股市场明细' }] : []),
-        { id: 'us-equity-themes', title: '主题与行业' },
+        { id: 'us-equity-themes', title: '主题研究' },
         { id: 'us-equity-valuation', title: '估值' },
         { id: 'us-equity-structure', title: '结构与风险' },
-        ...(displayConfig.rotationButtonLabel
-          ? [{ id: 'us-market-rotation', title: displayConfig.rotationButtonLabel }]
-          : []),
       ]"
       module-label="美股"
       unified
@@ -44,12 +48,17 @@
       v-if="(!view || view === 'overview') && displayOverviewCards.length"
       class="market-terminal__overview-strip"
       :class="{
-        'is-single': !(displayConfig.breadthCards?.length || displayConfig.volatilityCards?.length),
+        'market-terminal__overview-strip--a-share': displayConfig.id === 'aShare',
+        'is-single': !(
+          $slots.breadth ||
+          displayConfig.breadthCards?.length ||
+          displayConfig.volatilityCards?.length
+        ),
       }"
     >
       <article class="market-terminal__overview-panel">
         <div class="market-terminal__panel-head">
-          <h3>大盘表现</h3>
+          <h3>{{ displayConfig.id === 'us' ? '市场总览' : '大盘表现' }}</h3>
           <div v-if="displayConfig.overviewChip" class="market-terminal__mini-chip">{{
             displayConfig.overviewChip
           }}</div>
@@ -67,7 +76,9 @@
             <span class="market-terminal__market-symbol">{{ item.symbol }}</span>
             <div class="market-terminal__market-head">
               <strong>{{ item.label }}</strong>
-              <em :class="toneClass(item.tone)">{{ item.change }}</em>
+              <em :class="toneClass(item.tone)"
+                >{{ displayConfig.id === 'aShare' ? '当日 ' : '' }}{{ item.change }}</em
+              >
             </div>
             <svg
               class="market-terminal__market-spark"
@@ -75,78 +86,145 @@
               preserveAspectRatio="none"
             >
               <polyline
+                data-chart-kind="line"
                 :points="compactSparkline(item.spark, 300, 40)"
                 :class="sparkStrokeClass(item.change)"
               />
             </svg>
-          </button>
-        </div>
-
-        <div class="market-terminal__subhead">主题指数</div>
-
-        <div class="market-terminal__market-grid">
-          <button
-            v-for="item in displayMoverCards"
-            :key="item.id"
-            type="button"
-            class="market-terminal__market-card market-terminal__market-card--mover"
-            :class="{ 'is-clickable': canOpenTickerChart(item.symbol) }"
-            @click="openTickerChart(item.symbol, item.label)"
-          >
-            <span class="market-terminal__market-category">{{ item.category }}</span>
-            <span class="market-terminal__market-symbol">{{ item.symbol }}</span>
-            <div class="market-terminal__market-head">
-              <strong>{{ item.label }}</strong>
-              <em :class="toneClass(item.tone)">{{ item.change }}</em>
-            </div>
-            <span v-if="item.price" class="market-terminal__market-price">{{ item.price }}</span>
-            <svg
-              class="market-terminal__market-spark"
-              viewBox="0 0 300 40"
-              preserveAspectRatio="none"
+            <small v-if="displayConfig.id === 'aShare' && item.spark?.length"
+              >最近 {{ item.spark.length }} 个收盘观测</small
             >
-              <polyline
-                :points="compactSparkline(item.spark, 300, 40)"
-                :class="sparkStrokeClass(item.change)"
-              />
-            </svg>
           </button>
         </div>
+
+        <template v-if="displayMoverCards.length">
+          <div class="market-terminal__subhead">主题指数</div>
+
+          <div class="market-terminal__market-grid">
+            <button
+              v-for="item in displayMoverCards"
+              :key="item.id"
+              type="button"
+              class="market-terminal__market-card market-terminal__market-card--mover"
+              :class="{ 'is-clickable': canOpenTickerChart(item.symbol) }"
+              @click="openTickerChart(item.symbol, item.label)"
+            >
+              <span class="market-terminal__market-category">{{ item.category }}</span>
+              <span class="market-terminal__market-symbol">{{ item.symbol }}</span>
+              <div class="market-terminal__market-head">
+                <strong>{{ item.label }}</strong>
+                <em :class="toneClass(item.tone)">{{ item.change }}</em>
+              </div>
+              <span v-if="item.price" class="market-terminal__market-price">{{ item.price }}</span>
+              <svg
+                class="market-terminal__market-spark"
+                viewBox="0 0 300 40"
+                preserveAspectRatio="none"
+              >
+                <polyline
+                  data-chart-kind="line"
+                  :points="compactSparkline(item.spark, 300, 40)"
+                  :class="sparkStrokeClass(item.change)"
+                />
+              </svg>
+            </button>
+          </div>
+        </template>
       </article>
 
       <div
-        v-if="displayConfig.breadthCards?.length || displayConfig.volatilityCards?.length"
+        v-if="
+          $slots.breadth ||
+          displayConfig.breadthCards?.length ||
+          displayConfig.volatilityCards?.length
+        "
         class="market-terminal__overview-side"
       >
         <article class="market-terminal__side-panel">
           <div class="market-terminal__panel-head">
-            <h3>大盘广度</h3>
+            <h3>{{ displayConfig.id === 'aShare' ? '大盘信息' : '大盘广度' }}</h3>
             <span class="market-terminal__info-dot">i</span>
           </div>
-          <p class="market-terminal__side-subtitle">{{ displayConfig.breadthSubtitle }}</p>
-
-          <div v-if="displayConfig.breadthCards?.length" class="market-terminal__breadth-grid">
+          <div v-if="displayConfig.id === 'aShare'" class="market-terminal__info-grid">
+            <slot name="breadth"></slot>
+            <slot name="option-iv">
+              <article
+                v-for="item in overviewIndicatorCards.filter((item) => item.id === 'a-vix50')"
+                :key="item.id"
+                class="market-terminal__info-card market-terminal__vol-card"
+                :title="item.description"
+              >
+                <span>{{ item.title }}</span>
+                <strong>{{ item.value }}</strong>
+                <small>{{ item.badge }}</small>
+              </article>
+            </slot>
+            <slot name="info-extra"></slot>
             <article
               v-for="item in displayConfig.breadthCards"
               :key="item.id"
-              class="market-terminal__breadth-card"
+              class="market-terminal__info-card market-terminal__breadth-card"
             >
-              <div class="market-terminal__breadth-head">
-                <strong>{{ item.title }}</strong>
-                <span>{{ item.value }}</span>
-              </div>
-              <div class="market-terminal__breadth-meta">
-                <b>{{ item.tag }}</b>
-                <em>{{ item.delta }}</em>
-              </div>
-              <div class="market-terminal__breadth-track">
-                <i :style="{ width: `${parsePercent(item.value)}%` }"></i>
-              </div>
+              <span>{{ item.title }}</span>
+              <strong>{{ item.value }}</strong>
+              <small>{{ item.tag }}</small>
+            </article>
+            <article
+              v-for="item in overviewIndicatorCards.filter((item) => item.id !== 'a-vix50')"
+              :key="item.id"
+              class="market-terminal__info-card market-terminal__vol-card"
+              :title="item.description"
+            >
+              <span>{{ item.title }}</span>
+              <strong>{{ item.value }}</strong>
+              <small>{{ item.badge }}</small>
             </article>
           </div>
+          <template v-else>
+            <slot name="breadth"></slot>
+            <p class="market-terminal__side-subtitle">{{ displayConfig.breadthSubtitle }}</p>
+
+            <div v-if="displayConfig.breadthCards?.length" class="market-terminal__breadth-grid">
+              <article
+                v-for="item in displayConfig.breadthCards"
+                :key="item.id"
+                class="market-terminal__breadth-card"
+              >
+                <div class="market-terminal__breadth-head">
+                  <strong>{{ item.title }}</strong>
+                  <span>{{ item.value }}</span>
+                </div>
+                <div class="market-terminal__breadth-meta">
+                  <b>{{ item.tag }}</b>
+                  <em>{{ item.delta }}</em>
+                </div>
+                <div class="market-terminal__breadth-track">
+                  <i :style="{ width: `${parsePercent(item.value)}%` }"></i>
+                </div>
+              </article>
+            </div>
+            <div v-if="overviewIndicatorCards.length" class="market-terminal__vol-grid">
+              <article
+                v-for="item in overviewIndicatorCards"
+                :key="item.id"
+                class="market-terminal__vol-card"
+              >
+                <div class="market-terminal__vol-top">
+                  <span>{{ item.title }}</span>
+                  <b :class="badgeClass(item.badgeTone)">{{ item.badge }}</b>
+                </div>
+                <strong>{{ item.value }}</strong>
+                <p>{{ item.description }}</p>
+                <small>{{ item.ranges }}</small>
+              </article>
+            </div>
+          </template>
         </article>
 
-        <article v-if="displayConfig.volatilityCards?.length" class="market-terminal__side-panel">
+        <article
+          v-if="!isOverviewConsolidated && displayConfig.volatilityCards?.length"
+          class="market-terminal__side-panel"
+        >
           <div class="market-terminal__panel-head">
             <h3>波动与相关性</h3>
             <span class="market-terminal__info-dot">i</span>
@@ -197,7 +275,6 @@
           :columns="displayConfig.detailColumns"
           :groups="displayConfig.detailGroups"
           :readonly="readonlyDetails"
-          @index-chart="(code, name) => emit('index-chart', code, name)"
         />
       </WidgetErrorBoundary>
     </section>
@@ -205,12 +282,15 @@
     <section
       :id="`${displayConfig.id}-market-rotation`"
       v-if="
-        (!view || view === 'rotation' || displayConfig.id === 'global') &&
+        (!view ||
+          (displayConfig.id === 'us' ? view === 'themes' : view === 'rotation') ||
+          displayConfig.id === 'global') &&
         displayConfig.rotationButtonLabel
       "
       class="market-terminal__rotation"
     >
-      <button type="button" class="market-terminal__rotation-button" @click="toggleRotation">
+      <h3 v-if="displayConfig.id === 'us'">板块表现</h3>
+      <button v-else type="button" class="market-terminal__rotation-button" @click="toggleRotation">
         <span>{{ rotationExpanded ? '▼' : '▶' }}</span>
         {{ displayConfig.rotationButtonLabel }}
       </button>
@@ -347,14 +427,13 @@
             <div v-if="chartModal.error" class="market-terminal-chart-modal__state is-error">
               {{ chartModal.error }}
             </div>
-            <div v-else-if="chartModal.loading" class="market-terminal-chart-modal__state">
+            <div
+              v-else-if="chartModal.loading"
+              class="market-terminal-chart-modal__state is-loading"
+            >
               正在加载 {{ chartModal.symbol }} 的走势...
             </div>
-            <div
-              ref="chartContainerRef"
-              class="market-terminal-chart-modal__widget"
-              :class="{ 'is-hidden': chartModal.loading }"
-            ></div>
+            <div ref="chartContainerRef" class="market-terminal-chart-modal__widget"></div>
           </div>
         </ChartExpand>
       </div>
@@ -363,11 +442,24 @@
 </template>
 
 <script setup lang="ts">
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { mountTickerChart } from './tickerChart';
+  import { prepareTradingView } from './tradingViewResources';
   import { useResearchSnapshots, useResearchViewState } from '../composables/researchWorkspace';
+  import { useDashboardRefresh } from '../useDashboardRefresh';
   import HedgeBoardSubnav from './HedgeBoardSubnav.vue';
   import ChartExpand from './ChartExpand.vue';
   import EquityObservatoryPanel from './EquityObservatoryPanel.vue';
-  import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+  import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    shallowRef,
+    watch,
+    watch as watchMotion,
+  } from 'vue';
   import {
     getMarketDetail,
     type MarketDetailResponse,
@@ -422,13 +514,12 @@
     readonlyDetails?: boolean;
   }>();
 
-  const marketSnapshot = ref<MarketDetailResponse | null>(null);
+  const marketSnapshot = shallowRef<MarketDetailResponse | null>(null);
   const marketLoading = ref(false);
   const marketError = ref(false);
   const snapshots = useResearchSnapshots();
   let marketController: AbortController | undefined;
   let marketRequestId = 0;
-  let marketTimer: ReturnType<typeof setInterval> | undefined;
   const displayConfig = computed(() =>
     ['us', 'global'].includes(props.config.id)
       ? mergeTerminalMarket(props.config, marketSnapshot.value?.rows ?? [])
@@ -477,20 +568,20 @@
       marketController?.abort();
       marketSnapshot.value =
         snapshots.get<MarketDetailResponse>(`market:${props.config.id}`) || null;
-      clearInterval(marketTimer);
       if (!marketSnapshot.value) void loadMarket();
-      if (['us', 'global'].includes(props.config.id))
-        marketTimer = setInterval(loadMarket, 300_000);
     },
     { immediate: true },
   );
   onBeforeUnmount(() => {
     ++marketRequestId;
     marketController?.abort();
-    clearInterval(marketTimer);
+  });
+  useDashboardRefresh(loadMarket, {
+    intervalMs: 300_000,
+    immediate: false,
+    enabled: () => ['us', 'global'].includes(props.config.id) && !marketLoading.value,
   });
 
-  const emit = defineEmits<{ (event: 'index-chart', code: string, name: string): void }>();
   const rotationExpanded = ref(true);
   const marketDetailExpanded = ref(true);
   watch(
@@ -498,6 +589,7 @@
     () => (marketDetailExpanded.value = true),
   );
   const rotationSortState = useResearchViewState<SortState | null>('market-rotation-sort', null);
+  onMounted(() => prepareTradingView());
   const chartContainerRef = ref<HTMLDivElement | null>(null);
   const chartModal = ref<ChartModalState>({
     visible: false,
@@ -511,8 +603,7 @@
     props.config.id === 'aShare' ? props.dashboard?.marketDetail.data || [] : [],
   );
 
-  const aShareCoreCodes = ['000300', '000852', '399006', '000688'];
-  const aShareThemeCodes = ['931071', '931238', '932082', 'H30590'];
+  const aShareCoreCodes = ['000001', '000016', '000300', '000852', '399006', '000688'];
   const asNumber = (value: string | number | null | undefined) => {
     const parsed = value == null ? NaN : Number(value);
     return Number.isFinite(parsed) ? parsed : null;
@@ -530,7 +621,7 @@
     return {
       id: `a-live-${code}`,
       symbol: code,
-      label: row?.name || fallback,
+      label: fallback || row?.name || code,
       change: asChange(row?.return1dPct),
       price: row?.close == null ? undefined : String(row.close),
       spark: (row?.spark || []).map(Number).filter(Number.isFinite),
@@ -540,6 +631,8 @@
   const displayOverviewCards = computed(() => {
     if (props.config.id !== 'aShare') return displayConfig.value.overviewCards || [];
     const labels: Record<string, string> = {
+      '000001': '上证综指',
+      '000016': '上证50',
       '000300': '沪深300',
       '000852': '中证1000',
       '399006': '创业板指',
@@ -553,22 +646,19 @@
       ),
     );
   });
-  const displayMoverCards = computed(() => {
-    if (props.config.id !== 'aShare') return displayConfig.value.moverCards || [];
-    const labels: Record<string, string> = {
-      '931071': 'AI',
-      '931238': '金股',
-      '932082': '医药',
-      H30590: '机器人',
-    };
-    return aShareThemeCodes.map((code) =>
-      toOverviewCard(
-        aShareSnapshots.value.find((row) => row.code === code),
-        code,
-        labels[code],
-      ),
-    );
-  });
+  const isOverviewConsolidated = computed(() => ['aShare', 'us'].includes(props.config.id));
+  const overviewIndicatorCards = computed(() =>
+    isOverviewConsolidated.value
+      ? (displayConfig.value.volatilityCards || []).filter((item) =>
+          (props.config.id === 'aShare' ? ['a-vix50', 'a-style'] : ['vix', 'cor1m']).includes(
+            item.id,
+          ),
+        )
+      : [],
+  );
+  const displayMoverCards = computed(() =>
+    isOverviewConsolidated.value ? [] : displayConfig.value.moverCards || [],
+  );
 
   const marketDetailTitle = computed(
     () =>
@@ -581,7 +671,7 @@
       }[props.config.id] ?? '市场明细'),
   );
 
-  let tradingViewScriptPromise: Promise<void> | null = null;
+  let disposeTickerChart: (() => void) | undefined;
   const rotationColumns = [
     { key: 'd1', label: '1日' },
     { key: 'w1', label: '1周' },
@@ -883,67 +973,6 @@
     return Boolean(resolveTradingViewSymbol(props.config.id, symbol, tvSymbol));
   }
 
-  async function ensureTradingViewScript() {
-    if (typeof window === 'undefined') return;
-    if (window.document.querySelector('script[data-tv-advanced-chart-script="true"]')) return;
-    if (!tradingViewScriptPromise) {
-      tradingViewScriptPromise = new Promise<void>((resolve, reject) => {
-        const script = window.document.createElement('script');
-        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-        script.async = true;
-        script.dataset.tvAdvancedChartScript = 'true';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('TradingView 脚本加载失败'));
-        window.document.head.appendChild(script);
-      });
-    }
-    return tradingViewScriptPromise;
-  }
-
-  async function renderTradingViewChart(tvSymbol: string) {
-    await nextTick();
-    const host = chartContainerRef.value;
-    if (!host) return;
-
-    host.innerHTML = '';
-
-    const container = document.createElement('div');
-    container.className = 'tradingview-widget-container';
-
-    const widget = document.createElement('div');
-    widget.className = 'tradingview-widget-container__widget';
-
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.async = true;
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.text = JSON.stringify({
-      autosize: true,
-      symbol: tvSymbol,
-      interval: 'D',
-      timezone: 'Asia/Shanghai',
-      theme: 'light',
-      style: '1',
-      locale: 'zh_CN',
-      allow_symbol_change: true,
-      calendar: false,
-      support_host: 'https://www.tradingview.com',
-      hide_top_toolbar: false,
-      hide_legend: false,
-      save_image: false,
-      details: false,
-      studies: ['Volume@tv-basicstudies'],
-      withdateranges: true,
-      range: '30D',
-      backgroundColor: '#f7fafc',
-      gridColor: 'rgba(101, 119, 139, 0.12)',
-    });
-
-    container.appendChild(widget);
-    container.appendChild(script);
-    host.appendChild(container);
-  }
-
   async function openTickerChart(symbol: string, name: string, tvSymbolOverride?: string) {
     const tvSymbol = resolveTradingViewSymbol(props.config.id, symbol, tvSymbolOverride);
     if (!tvSymbol) return;
@@ -958,9 +987,14 @@
     };
 
     try {
-      await ensureTradingViewScript();
-      await renderTradingViewChart(tvSymbol);
-      chartModal.value.loading = false;
+      await nextTick();
+      if (!chartModal.value.visible || chartModal.value.tvSymbol !== tvSymbol) return;
+      disposeTickerChart?.();
+      if (!chartContainerRef.value) return;
+      disposeTickerChart = mountTickerChart(chartContainerRef.value, tvSymbol, (error) => {
+        chartModal.value.loading = false;
+        chartModal.value.error = error || '';
+      });
     } catch (error) {
       chartModal.value.loading = false;
       chartModal.value.error = error instanceof Error ? error.message : '走势图加载失败';
@@ -968,6 +1002,8 @@
   }
 
   function closeTickerChart() {
+    disposeTickerChart?.();
+    disposeTickerChart = undefined;
     chartModal.value.visible = false;
     chartModal.value.loading = false;
     chartModal.value.error = '';
@@ -977,10 +1013,11 @@
   }
 
   onBeforeUnmount(() => {
-    if (chartContainerRef.value) {
-      chartContainerRef.value.innerHTML = '';
-    }
+    disposeTickerChart?.();
   });
+  const motionPlot = ref<HTMLElement | SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion(marketSnapshot, () => void reveal(), { flush: 'post', deep: true });
 </script>
 
 <style lang="less" scoped>
@@ -1041,6 +1078,93 @@
     max-width: 100%;
     padding: 12px;
     gap: 12px;
+  }
+
+  .market-terminal__info-grid {
+    display: grid;
+    grid-auto-rows: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 1;
+    gap: 8px;
+  }
+
+  .market-terminal__overview-strip--a-share .market-terminal__side-panel {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .market-terminal__info-grid :deep(.overview-meta-grid) {
+    display: contents;
+  }
+
+  .market-terminal__info-grid :deep(.meta-action),
+  .market-terminal__info-grid :deep(.market-terminal__info-card) {
+    display: grid;
+    box-sizing: border-box;
+    align-content: center;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid var(--strategy-border);
+    border-radius: 10px;
+    background: var(--strategy-surface-2);
+    color: var(--strategy-text-1);
+    text-align: center;
+    justify-items: center;
+    gap: 4px;
+  }
+
+  .market-terminal__info-grid :deep(.meta-action span),
+  .market-terminal__info-grid :deep(.market-terminal__info-card > span) {
+    margin: 0;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: normal;
+  }
+
+  .market-terminal__info-grid :deep(.meta-action strong),
+  .market-terminal__info-grid :deep(.market-terminal__info-card > strong) {
+    margin: 0;
+    color: var(--strategy-text-1);
+    font-size: 18px;
+    line-height: 24px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .market-terminal__info-grid :deep(.meta-action small),
+  .market-terminal__info-grid :deep(.market-terminal__info-card > small) {
+    min-height: 16px;
+    margin: 0;
+    color: var(--strategy-text-4);
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  .market-terminal__info-grid :deep(.meta-action) {
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .market-terminal__info-grid :deep(.meta-action:hover:not(:disabled)) {
+    background: var(--strategy-accent-soft);
+  }
+
+  .market-terminal__info-grid :deep(.meta-action:disabled) {
+    cursor: not-allowed;
+  }
+
+  .market-terminal__info-grid :deep(.meta-action:focus-visible) {
+    outline: 2px solid var(--strategy-accent-strong);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 560px) {
+    .market-terminal__info-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   .market-terminal__overview-strip.is-single {
@@ -1659,12 +1783,15 @@
   }
 
   .market-terminal-chart-modal__body {
+    position: relative;
     height: min(78vh, 860px);
     padding: 0 12px 12px;
   }
 
   .market-terminal-chart-modal__state {
     display: flex;
+    position: absolute;
+    z-index: 1;
     align-items: center;
     justify-content: center;
     height: min(78vh, 860px);
@@ -1672,6 +1799,7 @@
     color: var(--terminal-muted);
     font-size: 14px;
     font-weight: 700;
+    inset: 0;
   }
 
   .market-terminal-chart-modal__state.is-error {
@@ -1682,8 +1810,13 @@
     height: min(78vh, 860px);
   }
 
-  .market-terminal-chart-modal__widget.is-hidden {
-    display: none;
+  .market-terminal-chart-modal__state.is-loading {
+    min-height: 0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    pointer-events: none;
+    inset: 8px 8px auto auto;
   }
 
   .is-right {

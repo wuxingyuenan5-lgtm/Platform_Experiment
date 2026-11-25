@@ -750,16 +750,13 @@ def get_strategy_financials(
             f"SELECT * FROM account_venue_snapshots WHERE account_id IN ({placeholders})",
             accounts,
         ).fetchall()
-        valuation_rows = db.execute(
-            "SELECT account_id,currency,as_of,usd_rate FROM account_valuation_rates "
-            f"WHERE account_id IN ({placeholders}) ORDER BY as_of",
-            accounts,
-        ).fetchall()
-        identities = load_order_identities(db)
+        identities = load_order_identities(db, account_ids=accounts)
         assignments: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
         for row in db.execute(
             "SELECT account_id, instrument_id, source, external_id, fact_type, "
-            "strategy_instance_id, payload_json FROM financial_facts"
+            "strategy_instance_id, payload_json FROM financial_facts "
+            f"WHERE account_id IN ({placeholders})",
+            accounts,
         ):
             assignments[
                 (
@@ -793,7 +790,6 @@ def get_strategy_financials(
         reporting_cutoff = stamp(last_observation["asOf"])
         events = [e for e in events if stamp(e["occurred_at"]) <= reporting_cutoff]
         fill_rows = [f for f in fill_rows if stamp(f["occurred_at"]) <= reporting_cutoff]
-        valuation_rows = [r for r in valuation_rows if stamp(r["as_of"]) <= reporting_cutoff]
         snapshots = historical_snapshots(snapshots, last_observation, orders)
 
     mt5_currencies = {
@@ -802,19 +798,50 @@ def get_strategy_financials(
         if (payload := json.loads(row["payload_json"])).get("venue") == "mt5"
     }
     valuation_rates: dict[tuple[str, str], list[tuple[datetime, Decimal]]] = defaultdict(list)
-    for row in valuation_rows:
-        valuation_rates[(row["account_id"], str(row["currency"]).upper())].append(
-            (
-                datetime.fromisoformat(str(row["as_of"]).replace("Z", "+00:00")),
-                _amount(row["usd_rate"]),
-            )
-        )
+    valuation_times: dict[tuple[str, str], list[datetime]] = {}
+    valuation_loaded: set[tuple[str, str]] = set()
+    account_currencies: dict[str, list[str]] = {}
 
-    for rates in valuation_rates.values():
-        rates.sort(key=lambda row: row[0])
-    valuation_times = {key: [row[0] for row in rates] for key, rates in valuation_rates.items()}
+    def load_valuation_rates(account: str, currency: str) -> None:
+        key = (account, currency.upper())
+        if key in valuation_loaded:
+            return
+        # Load only the requested account/currency history. Preserve the existing
+        # case-insensitive currency matching while using the composite PK index.
+        with connection() as db:
+            if account not in account_currencies:
+                account_currencies[account] = [
+                    row[0] for row in db.execute(
+                        "SELECT DISTINCT currency FROM account_valuation_rates WHERE account_id=?",
+                        (account,),
+                    )
+                ]
+            currencies = [
+                value for value in account_currencies[account]
+                if str(value).upper() == key[1]
+            ]
+            if currencies:
+                currency_placeholders = ",".join("?" for _ in currencies)
+                valuation_rows = db.execute(
+                    "SELECT as_of,usd_rate FROM account_valuation_rates "
+                    f"WHERE account_id=? AND currency IN ({currency_placeholders}) ORDER BY as_of",
+                    [account, *currencies],
+                ).fetchall()
+            else:
+                valuation_rows = []
+        for row in valuation_rows:
+            observed_at = datetime.fromisoformat(str(row["as_of"]).replace("Z", "+00:00"))
+            if reporting_cutoff is not None and observed_at > reporting_cutoff:
+                continue
+            valuation_rates[key].append((observed_at, _amount(row["usd_rate"])))
+        valuation_rates[key].sort(key=lambda row: row[0])
+        valuation_times[key] = [row[0] for row in valuation_rates[key]]
+        valuation_loaded.add(key)
 
     def nearest_rate(account: str, currency: str, occurred_at: str | None) -> Decimal | None:
+        if not occurred_at:
+            return None
+        load_valuation_rates(account, currency)
         key = (account, currency.upper())
         rows = valuation_rates.get(key, [])
         if not rows or not occurred_at:

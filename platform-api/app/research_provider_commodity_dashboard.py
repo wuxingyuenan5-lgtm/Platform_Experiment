@@ -4,7 +4,7 @@ import asyncio
 
 from app.research_local_data import local_json_revision, read_local_json
 from app.research_provider_errors import ResearchProviderError
-from app.research_provider_macro_dashboard import MacroDashboardResponse
+from app.research_provider_macro_dashboard import MacroDashboardResponse, DashboardGroupReader
 
 
 class CommodityDashboardProvider:
@@ -14,6 +14,7 @@ class CommodityDashboardProvider:
         self._last_known_good: MacroDashboardResponse | None = None
         self._revision: tuple[str, int, int, int] | None = None
         self._load_lock = asyncio.Lock()
+        self._group_reader = DashboardGroupReader("public/v1/commodity/dashboard.json", "commodity")
 
     def _load(self) -> MacroDashboardResponse:
         path = "public/v1/commodity/dashboard.json"
@@ -36,14 +37,20 @@ class CommodityDashboardProvider:
         self._revision = revision
         return contract
 
-    async def get(self) -> MacroDashboardResponse:
+    async def get(self, groups: str | None = None) -> MacroDashboardResponse:
         async with self._load_lock:
             try:
                 # JSON decoding and Decimal validation must not block the API event loop.
+                if groups is not None:
+                    return await asyncio.to_thread(self._group_reader.load, groups)
                 return await asyncio.to_thread(self._load)
             except Exception as exc:
+                if groups is not None:
+                    retained = self._group_reader.retained(groups)
+                    if retained is not None:
+                        return retained
                 if self._last_known_good is not None:
-                    return self._last_known_good.stale_copy()
+                    return self._last_known_good.select_groups(groups).stale_copy()
                 if isinstance(exc, ResearchProviderError):
                     raise
                 raise ResearchProviderError(

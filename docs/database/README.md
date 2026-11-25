@@ -56,6 +56,14 @@ second batch. This changes transaction duration, not schema or financial facts.
 
 ## Migration rules
 
+Migration 48 (`trade-command-symbol-identity`) adds nullable `trade_commands.symbol`.
+New commands store the submitted symbol before dispatch. Existing commands are
+backfilled only when their order evidence contains one distinct symbol; absent or
+ambiguous evidence remains NULL and replay fails closed. Orders and financial
+facts remain unchanged. Apply through the normal initializer; forward-fix rather
+than editing applied migration checksums. The 11月4日 repair was verified on isolated
+databases; this does not assert that the resident business database was migrated.
+
 1. Never edit an applied migration.
 2. Add one monotonic version with a stable name and checksum.
 3. Prefer additive DDL.

@@ -1,5 +1,5 @@
 <template>
-  <section class="lens" aria-label="美元流动性透镜">
+  <section ref="motionPlot" class="lens" aria-label="美元流动性透镜">
     <header
       ><div
         ><h3>量 · 价 · 结构</h3><p>共同观测日 {{ data?.asOf || '—' }} · 单位：十亿美元</p></div
@@ -56,6 +56,7 @@
             :aria-label="`${card.name}最近30次有效观测`"
           >
             <polyline
+              data-chart-kind="line"
               :points="spark(card.spark)"
               fill="none"
               stroke="#2864ec"
@@ -133,7 +134,8 @@
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, ref, shallowRef } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { watch as watchMotion, computed, onBeforeUnmount, ref, shallowRef } from 'vue';
   import { getLiquidityLens, type LiquidityLens, type LensCard } from '@/api/marketAnalytics';
   import FinancingChart from '../aShare/components/FinancingChart.vue';
 
@@ -194,6 +196,9 @@
   }
   void load();
   onBeforeUnmount(() => controller?.abort());
+  const motionPlot = ref<HTMLElement | SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion(data, () => void reveal(), { flush: 'post', deep: true });
 </script>
 <style scoped>
   .lens {

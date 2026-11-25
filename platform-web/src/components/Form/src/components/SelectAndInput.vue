@@ -38,16 +38,8 @@
     </FormItem>
   </div>
 </template>
-<script lang="tsx" setup>
-  import {
-    defineProps,
-    toRefs,
-    unref,
-    computed,
-    defineComponent,
-    type Ref,
-    type Component,
-  } from 'vue';
+<script lang="ts" setup>
+  import { h, toRefs, unref, computed, defineComponent, type Ref, type Component } from 'vue';
   import { Input, Checkbox, FormItem, FormItemRest, Select } from 'ant-design-vue';
   import { propTypes } from '@/utils/propTypes';
   import {
@@ -170,7 +162,7 @@
       ...on,
       ...bindValue,
     };
-    return <Comp {...compAttr}></Comp>;
+    return h(Comp, compAttr);
   }
   renderComponent();
 </script>

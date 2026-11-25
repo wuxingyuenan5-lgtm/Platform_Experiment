@@ -44,7 +44,7 @@
   "explicit_unavailable_views": [
     {
       "path": "platform-web/src/views/dashboard/index.vue",
-      "required_markers": ["RestoredProductSurface", "@/data/sample/dashboard", "dashboard-original-structure"]
+      "required_markers": ["PersonalWorkspace", "非实时样例", "@/data/sample/dashboard", "dashboard-original-structure"]
     }
   ]
 }

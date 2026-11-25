@@ -57,5 +57,16 @@ const treasuryLabels: Record<string, string> = {
 };
 export function macroDisplayLabel(group: string, seriesId: string, original: string): string {
   if (group === 'usUnemployment' && seriesId === 'us_unrate') return '美国失业率';
+  if (group === 'comexGoldInventory') {
+    return (
+      (
+        {
+          comex_gold_registered: '注册库存',
+          comex_gold_eligible: '合格库存',
+          comex_gold_total: '合计库存',
+        } as Record<string, string>
+      )[seriesId] ?? original
+    );
+  }
   return group === 'treasuryYields' ? treasuryLabels[seriesId] ?? original : original;
 }

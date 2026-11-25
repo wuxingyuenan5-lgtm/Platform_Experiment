@@ -13,6 +13,41 @@ from app.research_provider_market_detail import MarketDetailProvider
 pytestmark = pytest.mark.unit
 
 
+def test_table_projection_preserves_quotes_sources_and_full_snapshot():
+    snapshot = market_detail.MarketDetailResponse.model_validate(_payload())
+    snapshot.rows[0].spark_90d = [Decimal("1.2300"), Decimal("1.2400")]
+    snapshot.rows[0].history = [{"date": "2026-08-31", "value": "1.2400"}]
+    full = snapshot.model_dump(mode="json")
+    table = snapshot.for_table()
+    expected = snapshot.model_dump(mode="json")
+    expected["rows"][0]["history"] = []
+    assert table.model_dump(mode="json") == expected
+    assert snapshot.model_dump(mode="json") == full
+    assert table.rows[0] is not snapshot.rows[0]
+
+
+def test_market_detail_route_keeps_full_history_by_default_and_projects_table(monkeypatch):
+    from fastapi import Response
+    from app import research_routes
+
+    snapshot = market_detail.MarketDetailResponse.model_validate(_payload())
+    snapshot.rows[0].history = [{"date": "2026-08-31", "value": "1.2400"}]
+
+    async def get(_):
+        return snapshot
+
+    monkeypatch.setattr(research_routes._market_detail_provider, "get", get)
+
+    async def run():
+        full = await research_routes.market_detail("macro", Response(), None, True)
+        table = await research_routes.market_detail("macro", Response(), None, False)
+        assert full.rows[0].history == snapshot.rows[0].history
+        assert table.rows[0].history == []
+        assert table.rows[0].close == full.rows[0].close
+
+    asyncio.run(run())
+
+
 def test_yahoo_open_bar_preserves_quote_time_but_excludes_it_from_comparison(monkeypatch):
     from datetime import UTC, datetime, timedelta
 

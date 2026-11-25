@@ -4122,7 +4122,7 @@ export const marketTerminalConfigs: Record<TerminalMarketId, MarketTerminalPageC
   macro: {
     id: 'macro',
     label: '宏观',
-    headline: '宏观市场明细',
+    headline: '市场总览',
     summary: '',
     note: '',
     updatedAt: '2026年6月24日 05:00 CST',

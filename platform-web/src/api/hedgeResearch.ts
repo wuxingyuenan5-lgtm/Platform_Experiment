@@ -72,6 +72,7 @@ export interface AShareMarketTurnoverResponse {
     observedAt: string;
     totalAmountYuan?: string | number | null;
     amountChangePct?: string | number | null;
+    amount20dAverageYuan?: string | number | null;
     source?: string | null;
   }>;
   rows: AShareMarketTurnoverRow[];
@@ -238,8 +239,11 @@ export interface AShareDashboardResponse {
     flat?: number | null;
     limitUp?: number | null;
     limitDown?: number | null;
+    allALimitUp?: number | null;
+    allALimitDown?: number | null;
     totalAmountYuan?: string | number | null;
     amountChangePct?: string | number | null;
+    amount20dAverageYuan?: string | number | null;
     marketBreadthPct?: string | number | null;
     csi300Close?: string | number | null;
     communicationPrice?: string | number | null;
@@ -251,6 +255,7 @@ export interface AShareMarketHistoryRow {
   observedAt: string;
   totalAmountYuan?: string | number | null;
   amountChangePct?: string | number | null;
+  amount20dAverageYuan?: string | number | null;
   source?: string | null;
 }
 
@@ -585,12 +590,21 @@ export const getMacroExpectations = (signal?: AbortSignal) =>
 export const getMarketDetail = (
   marketId: 'macro' | 'gold' | 'crypto' | 'us' | 'global',
   signal?: AbortSignal,
-) =>
-  researchRequest<MarketDetailResponse>({
-    method: 'GET',
-    url: `/research/market-detail/${marketId}`,
-    signal,
-  });
+) => {
+  const load = () =>
+    researchRequest<MarketDetailResponse>({
+      method: 'GET',
+      url: `/research/market-detail/${marketId}`,
+      params: { include_history: false },
+      headers: { 'Cache-Control': 'no-cache' },
+      signal,
+    });
+  // Abortable page requests own their transport; independent lazy panels can
+  // share the same short-lived, session-scoped read without cancelling peers.
+  return signal
+    ? load()
+    : loadDashboardSnapshot(`market-detail:${marketId}:table`, getUserSystemCsrfToken(), load);
+};
 
 export interface CrossAssetComparison {
   status: string;
@@ -808,11 +822,13 @@ export const getCumulativeVolatility = (
   days: number = 7,
   interval: CumulativeVolatilityInterval = '15m',
   window?: { start: string; end: string },
+  signal?: AbortSignal,
 ) =>
   researchRequest<CumulativeVolatilityResponse>({
     method: 'GET',
     url: '/research/cumulative-volatility',
-    params: { asset, days, interval, ...window },
+    params: { asset, days, interval, compact: true, ...window },
+    signal,
   });
 
 export interface TreasuryWeeklyRow {

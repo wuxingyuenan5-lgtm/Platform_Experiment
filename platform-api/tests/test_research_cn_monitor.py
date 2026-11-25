@@ -27,9 +27,48 @@ def test_invalid_fund_percent_rejected():
         parse("fund_stock", [{"date": "2026-10-30", "position": "101"}])
 
 
+def test_congestion_index_closes_match_only_same_trading_day(monkeypatch):
+    from app import research_etf_tracking
+    from app.research_cn_monitor import _congestion_with_indices
+
+    histories = {"hs300": [{"date": "2026-11-17", "close": "3979.8"}],
+                 "chinext": [{"date": "2026-11-18", "close": "2311.62"}]}
+    monkeypatch.setattr(research_etf_tracking, "read", lambda path: {
+        "data": {"rows": histories.get(path.rsplit("/", 1)[-1], [])}})
+    source = {"data": [{"date": "2026-11-17", "value": "31.00"}]}
+    assert _congestion_with_indices(source)["data"] == [
+        {**source["data"][0], "hs300": Decimal("3979.8"), "chinext": None, "star50": None}]
+
+
 def test_public_industry_window_alignment():
     with pytest.raises(ValueError, match="dates_mismatch"):
         parse("industry", {"dates": ["2026-10-30"], "swCodeNames": [{"indexCode": "a", "indexName": "A"}], "congestions": {"a": []}})
+
+
+def test_congestion_joins_history_and_platform_without_filling_missing_sessions(monkeypatch, tmp_path):
+    from app import data_audit_calendar, research_etf_tracking
+    from app.research_cn_monitor import read_monitor
+    from app.research_equity_sources import publish_artifact
+
+    monkeypatch.setenv("HEDGE_BOARD_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(research_etf_tracking, "read", lambda _: {})
+    monkeypatch.setattr(data_audit_calendar, "cached_sessions", lambda _: ["2026-11-18", "2026-11-19"])
+    publish_artifact("cn-monitor", {"sources": {"congestion": {
+        "data": [{"date": "2026-09-03", "value": "43.56"}, {"date": "2026-09-04", "value": None}],
+    }}})
+    publish_artifact("cn", {
+        "structure": {"date": "2026-11-20", "closed": False, "market": {"top20AmountPct": "1"}},
+        "structureHistory": [{"date": "2026-11-17", "top20AmountPct": "12.66"},
+                             {"date": "2026-11-19", "top5PctAmountShare": "42.50"}],
+    })
+
+    source = read_monitor(["congestion"])["sources"]["congestion"]
+    assert source["referenceEnd"] == "2026-09-03"
+    assert source["platformStart"] == "2026-11-19"
+    assert [(row["date"], row["value"]) for row in source["data"]] == [
+        ("2026-09-03", "43.56"), ("2026-09-04", None), ("2026-11-18", None),
+        ("2026-11-19", "42.50"),
+    ]
 
 
 def test_history_retained_and_same_date_revision():

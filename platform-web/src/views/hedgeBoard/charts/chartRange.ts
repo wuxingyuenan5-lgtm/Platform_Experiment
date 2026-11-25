@@ -13,27 +13,58 @@ function beginChartRangeDrag(
     minGap: number;
     startIndex: number;
     endIndex: number;
+    positions?: number[];
     onStartChange: (value: number) => void;
     onEndChange: (value: number) => void;
   },
 ) {
-  const { viewport, mode, maxIndex, minGap, startIndex, endIndex, onStartChange, onEndChange } =
-    options;
-  if (!viewport || maxIndex <= 0) return;
+  const {
+    viewport,
+    mode,
+    maxIndex,
+    minGap,
+    startIndex,
+    endIndex,
+    positions,
+    onStartChange,
+    onEndChange,
+  } = options;
+  if (!viewport || maxIndex <= 0 || event.button !== 0) return;
 
   event.preventDefault();
   event.stopPropagation();
 
   const rect = viewport.getBoundingClientRect();
-  const pixelToIndex = (clientX: number) => {
-    const ratio = clampRangeValue((clientX - rect.left) / rect.width, 0, 1);
-    return Math.round(ratio * maxIndex);
+  if (!rect.width) return;
+  const positionAt = (index: number) => positions?.[index] ?? index / maxIndex;
+  const indexAt = (ratio: number) => {
+    if (!positions) return Math.round(clampRangeValue(ratio, 0, 1) * maxIndex);
+    let left = 0;
+    let right = maxIndex;
+    while (right - left > 1) {
+      const middle = Math.floor((left + right) / 2);
+      if (positions[middle] < ratio) left = middle;
+      else right = middle;
+    }
+    return ratio - positions[left] <= positions[right] - ratio ? left : right;
+  };
+  const pixelToIndex = (clientX: number) => indexAt((clientX - rect.left) / rect.width);
+  const timeSpan = positionAt(endIndex) - positionAt(startIndex);
+  const moveTimeWindow = (start: number) => {
+    const position = clampRangeValue(start, 0, 1 - timeSpan);
+    const nextStart = Math.min(indexAt(position), maxIndex - minGap);
+    onStartChange(nextStart);
+    onEndChange(Math.max(nextStart + minGap, indexAt(position + timeSpan)));
   };
 
   const windowSpan = endIndex - startIndex;
   const anchorIndex = pixelToIndex(event.clientX);
 
   if (mode === 'jump') {
+    if (positions) {
+      moveTimeWindow((event.clientX - rect.left) / rect.width - timeSpan / 2);
+      return;
+    }
     const centeredStart = clampRangeValue(
       anchorIndex - Math.round(windowSpan / 2),
       0,
@@ -51,6 +82,10 @@ function beginChartRangeDrag(
   const handleMouseMove = (moveEvent: MouseEvent) => {
     if (mode === 'window') {
       const deltaRatio = (moveEvent.clientX - dragOriginX) / rect.width;
+      if (positions) {
+        moveTimeWindow(positionAt(dragOriginStart) + deltaRatio);
+        return;
+      }
       const deltaIndex = Math.round(deltaRatio * maxIndex);
       const nextStart = clampRangeValue(
         dragOriginStart + deltaIndex,
@@ -70,13 +105,20 @@ function beginChartRangeDrag(
     onEndChange(clampRangeValue(nextIndex, dragOriginStart + minGap, maxIndex));
   };
 
+  const pointer = event.type === 'pointerdown';
+  const moveEvent = pointer ? 'pointermove' : 'mousemove';
+  const endEvent = pointer ? 'pointerup' : 'mouseup';
   const handleMouseUp = () => {
-    window.removeEventListener('mousemove', handleMouseMove);
-    window.removeEventListener('mouseup', handleMouseUp);
+    window.removeEventListener(moveEvent, handleMouseMove);
+    window.removeEventListener(endEvent, handleMouseUp);
+    window.removeEventListener('pointercancel', handleMouseUp);
+    window.removeEventListener('blur', handleMouseUp);
   };
 
-  window.addEventListener('mousemove', handleMouseMove);
-  window.addEventListener('mouseup', handleMouseUp);
+  window.addEventListener(moveEvent, handleMouseMove);
+  window.addEventListener(endEvent, handleMouseUp);
+  if (pointer) window.addEventListener('pointercancel', handleMouseUp);
+  window.addEventListener('blur', handleMouseUp);
 }
 
 export function renderChartRangeSelector(options: {
@@ -85,10 +127,11 @@ export function renderChartRangeSelector(options: {
   startIndex: number;
   endIndex: number;
   minWindowSize: number;
+  timeline?: { positions: number[]; previewPath: string };
   onStartChange: (value: number) => void;
   onEndChange: (value: number) => void;
 }) {
-  const { labels, values, startIndex, endIndex, minWindowSize, onStartChange, onEndChange } =
+  const { labels, startIndex, endIndex, minWindowSize, timeline, onStartChange, onEndChange } =
     options;
   if (labels.length <= 1) return null;
 
@@ -97,8 +140,9 @@ export function renderChartRangeSelector(options: {
   const minGap = minSpan - 1;
   const safeStart = Math.max(0, Math.min(startIndex, Math.max(0, maxIndex - minGap)));
   const safeEnd = Math.max(safeStart + minGap, Math.min(endIndex, maxIndex));
-  const startPercent = maxIndex <= 0 ? 0 : (safeStart / maxIndex) * 100;
-  const endPercent = maxIndex <= 0 ? 100 : (safeEnd / maxIndex) * 100;
+  const startPercent = (timeline?.positions[safeStart] ?? safeStart / maxIndex) * 100;
+  const endPercent = (timeline?.positions[safeEnd] ?? safeEnd / maxIndex) * 100;
+  const dragEvent = timeline ? 'onPointerdown' : 'onMousedown';
   const getLabelTransform = (percent: number, side: 'start' | 'end') => {
     if (side === 'start') {
       if (percent < 8) return 'translateX(0)';
@@ -139,7 +183,7 @@ export function renderChartRangeSelector(options: {
   } as const;
   const selectionStyle = {
     left: `${startPercent}%`,
-    width: `${Math.max(4, endPercent - startPercent)}%`,
+    width: `${timeline ? endPercent - startPercent : Math.max(4, endPercent - startPercent)}%`,
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
@@ -165,7 +209,43 @@ export function renderChartRangeSelector(options: {
     zIndex: 3,
   } as const;
 
-  return h('div', { class: 'chart-range' }, [
+  function handleKey(event: KeyboardEvent, side: 'start' | 'end') {
+    const index = side === 'start' ? safeStart : safeEnd;
+    const min = side === 'start' ? 0 : safeStart + minGap;
+    const max = side === 'start' ? safeEnd - minGap : maxIndex;
+    const jump = Math.max(1, Math.round(maxIndex / 100));
+    const steps: Record<string, number | undefined> = {
+      ArrowLeft: index - 1,
+      ArrowRight: index + 1,
+      ArrowDown: index - 1,
+      ArrowUp: index + 1,
+      PageDown: index - jump,
+      PageUp: index + jump,
+      Home: min,
+      End: max,
+    };
+    const next = Object.hasOwn(steps, event.key) ? steps[event.key] : undefined;
+    if (next == null) return;
+    event.preventDefault();
+    (side === 'start' ? onStartChange : onEndChange)(clampRangeValue(next, min, max));
+  }
+
+  function handleAttributes(side: 'start' | 'end') {
+    if (!timeline) return {};
+    const index = side === 'start' ? safeStart : safeEnd;
+    return {
+      role: 'slider',
+      tabindex: 0,
+      'aria-label': side === 'start' ? '区间起点' : '区间终点',
+      'aria-valuemin': side === 'start' ? 0 : safeStart + minGap,
+      'aria-valuemax': side === 'start' ? safeEnd - minGap : maxIndex,
+      'aria-valuenow': index,
+      'aria-valuetext': labels[index],
+      onKeydown: (event: KeyboardEvent) => handleKey(event, side),
+    };
+  }
+
+  return h('div', { class: ['chart-range', { 'chart-range--timeline': timeline }] }, [
     h('div', { class: 'chart-range__labels', style: metaStyle }, [
       h(
         'span',
@@ -201,7 +281,7 @@ export function renderChartRangeSelector(options: {
       {
         class: 'chart-range__viewport',
         style: viewportStyle,
-        onMousedown: (mouseEvent: MouseEvent) =>
+        [dragEvent]: (mouseEvent: MouseEvent) =>
           beginChartRangeDrag(mouseEvent, {
             mode: 'jump',
             viewport: mouseEvent.currentTarget as HTMLElement,
@@ -209,6 +289,7 @@ export function renderChartRangeSelector(options: {
             minGap,
             startIndex: safeStart,
             endIndex: safeEnd,
+            positions: timeline?.positions,
             onStartChange,
             onEndChange,
           }),
@@ -219,12 +300,30 @@ export function renderChartRangeSelector(options: {
           style: railStyle,
           'aria-hidden': 'true',
         }),
+        timeline?.previewPath
+          ? h(
+              'svg',
+              {
+                class: 'chart-range__preview',
+                viewBox: '0 0 360 24',
+                preserveAspectRatio: 'none',
+                'aria-hidden': 'true',
+              },
+              [
+                h('path', {
+                  d: timeline.previewPath,
+                  fill: 'none',
+                  'vector-effect': 'non-scaling-stroke',
+                }),
+              ],
+            )
+          : null,
         h(
           'div',
           {
             class: 'chart-range__selection',
             style: selectionStyle,
-            onMousedown: (mouseEvent: MouseEvent) =>
+            [dragEvent]: (mouseEvent: MouseEvent) =>
               beginChartRangeDrag(mouseEvent, {
                 mode: 'window',
                 viewport: (mouseEvent.currentTarget as HTMLElement).closest(
@@ -234,6 +333,7 @@ export function renderChartRangeSelector(options: {
                 minGap,
                 startIndex: safeStart,
                 endIndex: safeEnd,
+                positions: timeline?.positions,
                 onStartChange,
                 onEndChange,
               }),
@@ -242,7 +342,8 @@ export function renderChartRangeSelector(options: {
             h('span', {
               class: 'chart-range__handle chart-range__handle--start',
               style: { ...handleBaseStyle, left: '-3px' },
-              onMousedown: (mouseEvent: MouseEvent) =>
+              ...handleAttributes('start'),
+              [dragEvent]: (mouseEvent: MouseEvent) =>
                 beginChartRangeDrag(mouseEvent, {
                   mode: 'start',
                   viewport: (mouseEvent.currentTarget as HTMLElement).closest(
@@ -252,6 +353,7 @@ export function renderChartRangeSelector(options: {
                   minGap,
                   startIndex: safeStart,
                   endIndex: safeEnd,
+                  positions: timeline?.positions,
                   onStartChange,
                   onEndChange,
                 }),
@@ -259,7 +361,8 @@ export function renderChartRangeSelector(options: {
             h('span', {
               class: 'chart-range__handle chart-range__handle--end',
               style: { ...handleBaseStyle, right: '-3px' },
-              onMousedown: (mouseEvent: MouseEvent) =>
+              ...handleAttributes('end'),
+              [dragEvent]: (mouseEvent: MouseEvent) =>
                 beginChartRangeDrag(mouseEvent, {
                   mode: 'end',
                   viewport: (mouseEvent.currentTarget as HTMLElement).closest(
@@ -269,6 +372,7 @@ export function renderChartRangeSelector(options: {
                   minGap,
                   startIndex: safeStart,
                   endIndex: safeEnd,
+                  positions: timeline?.positions,
                   onStartChange,
                   onEndChange,
                 }),

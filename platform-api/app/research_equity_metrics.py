@@ -69,6 +69,25 @@ def trend(points):
     return result
 
 
+def hk_session_metrics(points):
+    """Actual retained sessions; missing quotes do not shorten a return window."""
+    rows = sorted({p["date"]: p for p in points}.values(), key=lambda p: p["date"])
+    values = [number(p.get("value")) for p in rows]
+    def valid(window):
+        return bool(window) and all(v is not None and v > 0 for v in window)
+
+    last = values[-1] if values else None
+    result = {"date": rows[-1]["date"] if rows else None, "value": last}
+    for n, key in ((1, "returnPct"), (5, "return5"), (20, "return20")):
+        window = values[-n - 1:]
+        result[key] = (last / window[0] - 1) * 100 if len(window) == n + 1 and valid(window) else None
+    window = values[-20:]
+    result["deviation20"] = (last / (sum(window) / 20) - 1) * 100 if len(window) == 20 and valid(window) else None
+    window = values[-252:]
+    result["drawdown252"] = (last / max(window) - 1) * 100 if len(window) == 252 and valid(window) else None
+    return result
+
+
 def distribution(rows):
     pe = [v for r in rows if (v := number(r.get("peTtm"))) is not None and v > 0]
     pb = [v for r in rows if (v := number(r.get("pb"))) is not None and v > 0]
@@ -126,6 +145,13 @@ def cn_structure(stocks, memberships):
         if m and m.get("effectiveFrom", "") <= (latest.isoformat() if latest else ""):
             sectors[(m["swL1Code"], m["swL1Name"])].append(row)
     all_stats = distribution(rows)
+    if closed and all_stats["amountCount"] == len(rows):
+        amounts = sorted(
+            (value for row in rows if (value := number(row.get("turnoverYuan"))) > 0),
+            reverse=True,
+        )
+        top_count = max(1, len(amounts) // 20)
+        all_stats["top5PctAmountShare"] = percentage(sum(amounts[:top_count]), all_stats["amount"])
     result = []
     for (code, name), members in sectors.items():
         stats = distribution(members)

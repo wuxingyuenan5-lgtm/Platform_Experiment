@@ -63,9 +63,9 @@ def add_group(
             oid = f"{identity}:{role}"
             db.execute(
                 "INSERT INTO trade_commands (id,idempotency_key,strategy_instance_id,account_id,"
-                "instrument_id,command_type,side,order_type,quantity,status,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,'create_order',?,'market',?,'filled',?,?)",
-                (oid, oid, CROSS, account, instrument, side, str(size), now, now),
+                "instrument_id,symbol,command_type,side,order_type,quantity,status,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,'create_order',?,'market',?,'filled',?,?)",
+                (oid, oid, CROSS, account, instrument, symbol, side, str(size), now, now),
             )
             db.execute(
                 "INSERT INTO orders (id,command_id,account_id,instrument_id,symbol,side,order_type,"

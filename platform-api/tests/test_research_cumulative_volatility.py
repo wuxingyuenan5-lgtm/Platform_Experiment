@@ -397,3 +397,23 @@ def test_runtime_repair_starts_at_session_boundary_when_archive_is_empty(monkeyp
     start = datetime(2026, 10, 24, 15, tzinfo=UTC)
     assert cumulative._shared_bybit_bars("btc", start, end) == []
     assert int(requests[0]["startMs"]) == int(start.timestamp() * 1000)
+
+
+def test_cumulative_compact_response_preserves_values_and_encodes_off_event_loop(monkeypatch):
+    import asyncio,json,threading
+    from fastapi import Response
+    from app import research_routes as routes
+    main_thread=threading.get_ident()
+    def read(*args,**kwargs):
+        assert threading.get_ident()!=main_thread
+        return {"points":[{"timestamp":"2026-11-04T00:00:00Z","session":"asia","value":"1.234500","price":None,"priceBaseline":"99.500","priceChangePct":None}],"isStale":True}
+    monkeypatch.setattr(routes,"read_cumulative_volatility",read)
+    async def run():
+        for compact in [False,True]:
+            response=await routes.cumulative_volatility(Response(),None,asset="btc",days=365,interval="15m",compact=compact,start=None,end=None)
+            data=json.loads(response.body)["data"]
+            assert data["isStale"] is True
+            assert data["points"][0]["value"]=="1.234500"
+            assert data["points"][0]["price"] is None
+            assert ("priceBaseline" in data["points"][0]) is not compact
+    asyncio.run(run())

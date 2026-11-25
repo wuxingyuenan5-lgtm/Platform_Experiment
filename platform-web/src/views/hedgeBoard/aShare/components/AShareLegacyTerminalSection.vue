@@ -1,71 +1,46 @@
 <template>
   <div class="index-overview">
-    <ResearchSourceState v-if="dashboard?.marketDetail" :meta="dashboard.marketDetail.meta" />
+    <ResearchSourceState
+      v-if="view !== 'overview' && dashboard?.marketDetail"
+      :meta="dashboard.marketDetail.meta"
+    />
     <MarketTerminalPage
       :dashboard="dashboard"
+      :view="view"
       :config="config"
       :market-tabs="tabs"
-      :readonly-details="true"
       detail-section-id="a-share-market-detail"
-      @index-chart="openChart"
-    />
-    <Modal
-      v-model:open="chartOpen"
-      :title="`${chartName} · 指数日线`"
-      :footer="null"
-      width="min(1050px, calc(100vw - 32px))"
-      :get-container="false"
     >
-      <p v-if="loading" role="status">正在读取历史日线…</p>
-      <p v-else-if="error" role="alert">{{ error }}</p>
-      <VibeTimeChart
-        v-else-if="history.length"
-        :title="chartName"
-        y-label="指数收盘"
-        :dates="history.map((row) => row.observedAt)"
-        :series="[
-          {
-            name: '收盘',
-            type: 'line',
-            color: '#1d4ed8',
-            values: history.map((row) => Number(row.close)),
-          },
-        ]"
-      />
-      <p v-else>暂无已入库的指数日线。</p>
-    </Modal>
+      <template v-if="$slots.breadth" #breadth><slot name="breadth"></slot></template>
+      <template v-if="view === 'overview'" #option-iv
+        ><DomesticOptionIvCard :refresh-key="refreshKey"
+      /></template>
+      <template v-if="view === 'overview'" #info-extra
+        ><ChinaTreasuryInfoCards :refresh-key="refreshKey"
+      /></template>
+    </MarketTerminalPage>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue';
-  import { Modal } from 'ant-design-vue';
-  import {
-    getMarketDetail,
-    researchRequest,
-    type MarketDetailRow,
-    type AShareDashboardResponse,
-  } from '@/api/hedgeResearch';
+  import { computed } from 'vue';
+  import ChinaTreasuryInfoCards from './ChinaTreasuryInfoCards.vue';
+  import DomesticOptionIvCard from './DomesticOptionIvCard.vue';
+  import { type AShareDashboardResponse } from '@/api/hedgeResearch';
   import MarketTerminalPage from '../../components/MarketTerminalPage.vue';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
-  import VibeTimeChart from './VibeTimeChart.vue';
   import {
     marketTerminalConfigs,
     type TerminalMarketId,
     type MarketTerminalPageConfig,
   } from '../../nativeData/marketTerminal';
 
-  const props = defineProps<{ dashboard: AShareDashboardResponse | null }>();
+  const props = defineProps<{
+    dashboard: AShareDashboardResponse | null;
+    view?: 'overview' | 'details';
+    refreshKey?: number;
+  }>();
   const base = marketTerminalConfigs.aShare;
-  const chinaYield = ref<MarketDetailRow | null>(null);
-  onMounted(async () => {
-    try {
-      const snapshot = await getMarketDetail('macro');
-      chinaYield.value = snapshot.rows.find((row) => row.symbol === 'CN10Y') ?? null;
-    } catch {
-      chinaYield.value = null;
-    }
-  });
   const tabs: Array<{ id: TerminalMarketId; label: string; path: string }> = [
     { id: 'aShare', label: 'A股', path: '/hedge-board/a-share' },
   ];
@@ -74,7 +49,6 @@
   const config = computed<MarketTerminalPageConfig>(() => {
     const snapshots = props.dashboard?.marketDetail.data || [];
     const benchmark = snapshots.find((row) => row.code === '000300');
-    const breadth = props.dashboard?.breadth.data;
     return {
       ...base,
       updatedAt: props.dashboard?.generatedAt || '',
@@ -85,28 +59,9 @@
         tag: '暂无数据',
         delta: '',
       })),
-      volatilityCards: (base.volatilityCards || []).map((row) =>
-        row.id === 'a-advdec'
-          ? {
-              ...row,
-              value: breadth && breadth.down > 0 ? (breadth.up / breadth.down).toFixed(2) : '—',
-              badge: breadth?.breadthState || '暂无数据',
-              ranges: '',
-            }
-          : row.id === 'a-cn10y' &&
-            chinaYield.value?.close != null &&
-            !['error', 'no_data'].includes(chinaYield.value.status)
-          ? {
-              ...row,
-              value: `${Number(chinaYield.value.close).toFixed(2)}%`,
-              badge: `${
-                ['stale', 'degraded'].includes(chinaYield.value.status) ? '旧数据 · ' : ''
-              }${chinaYield.value.observationDate ?? ''}`,
-              description: `中国10年国债收益率 · ${chinaYield.value.source}`,
-              ranges: '',
-            }
-          : { ...row, value: '—', badge: '暂无数据', ranges: '' },
-      ),
+      volatilityCards: (base.volatilityCards || [])
+        .filter((row) => ['a-vix50', 'a-style'].includes(row.id))
+        .map((row) => ({ ...row, value: '—', badge: '暂无数据', ranges: '' })),
       detailGroups: base.detailGroups.map((group) => ({
         ...group,
         rows: group.rows.map((row) => {
@@ -133,31 +88,6 @@
       })),
     };
   });
-  const chartOpen = ref(false),
-    loading = ref(false),
-    error = ref(''),
-    chartName = ref('');
-  const history = ref<Array<{ observedAt: string; close: string | number }>>([]);
-  let requestId = 0;
-  async function openChart(code: string, name: string) {
-    const current = ++requestId;
-    chartName.value = name;
-    chartOpen.value = true;
-    loading.value = true;
-    error.value = '';
-    history.value = [];
-    try {
-      const result = await researchRequest<{ data: typeof history.value }>({
-        url: `/research/a-share/indices/${encodeURIComponent(code)}/history`,
-      });
-      if (current === requestId) history.value = result.data;
-    } catch (cause) {
-      if (current === requestId)
-        error.value = cause instanceof Error ? cause.message : '日线暂不可用';
-    } finally {
-      if (current === requestId) loading.value = false;
-    }
-  }
 </script>
 
 <style scoped>

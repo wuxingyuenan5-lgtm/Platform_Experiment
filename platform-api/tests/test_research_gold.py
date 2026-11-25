@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 import pytest
 from app.research_gold import analyst_page, read_gold
@@ -12,7 +13,9 @@ def test_gold_driver_artifacts_preserve_unavailable_and_age(tmp_path, monkeypatc
     path=folder/f'{name}.json'
     path.write_text(json.dumps(dict(schemaVersion='1.0',status='unavailable',error='upstream timeout')))
     assert read_gold(name)['status']=='unavailable'
+    original_stat = path.stat()
     path.write_text(json.dumps(dict(schemaVersion='1.0',status='ready',retrievedAt='2020-01-01T00:00:00Z',rows=[{'date':'2019-12-31'}])))
+    os.utime(path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
     result=read_gold(name)
     assert result['status']=='stale' and result['rows'][0]['date']=='2019-12-31'
 

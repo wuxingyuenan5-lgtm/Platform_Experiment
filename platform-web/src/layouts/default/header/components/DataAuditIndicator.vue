@@ -11,7 +11,7 @@
   import { Badge, Tooltip } from 'ant-design-vue';
   import { DatabaseOutlined } from '@ant-design/icons-vue';
   import { usePermissionStore } from '@/store/modules/permission';
-  import { getDataAudit } from '@/api/platform/dataAudit';
+  import { getDataAuditSummary } from '@/api/platform/dataAudit';
 
   const permissions = usePermissionStore();
   const allowed = computed(() =>
@@ -25,7 +25,7 @@
     if (!allowed.value || pending || document.hidden) return;
     pending = true;
     try {
-      const report = await getDataAudit();
+      const report = await getDataAuditSummary();
       count.value =
         (report.summary.error ?? 0) + (report.summary.warning ?? 0) + Number(report.monitorStale);
       title.value = report.monitorStale

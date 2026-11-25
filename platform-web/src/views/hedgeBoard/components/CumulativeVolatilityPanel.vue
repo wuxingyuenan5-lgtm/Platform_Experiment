@@ -1,8 +1,12 @@
 <template>
-  <div class="cumulative-volatility">
+  <div class="cumulative-volatility macro-series-chart">
     <div class="cumulative-volatility__toolbar">
       <div class="cumulative-volatility__controls">
-        <div class="cumulative-volatility__control-group" role="group" aria-label="历史范围">
+        <div
+          class="cumulative-volatility__control-group source-chart-controls"
+          role="group"
+          aria-label="历史范围"
+        >
           <button
             v-for="item in rangeOptions"
             :key="item.value"
@@ -14,7 +18,11 @@
             {{ item.label }}
           </button>
         </div>
-        <div class="cumulative-volatility__control-group" role="group" aria-label="采样精度">
+        <div
+          class="cumulative-volatility__control-group source-chart-controls"
+          role="group"
+          aria-label="采样精度"
+        >
           <button
             v-for="item in precisionOptions"
             :key="item.value"
@@ -44,7 +52,6 @@
     </div>
     <div v-else class="cumulative-volatility__stage">
       <div class="cumulative-volatility__legend" aria-label="盘口颜色与时间说明">
-        <span class="cumulative-volatility__legend-note">时间均为 UTC</span>
         <button
           v-for="series in sessionSeries"
           :key="series.key"
@@ -63,130 +70,157 @@
           :aria-pressed="priceVisible"
           @click="togglePrice"
         >
-          <i></i>{{ title }}价格
+          <i></i>价格
         </button>
+        <span class="cumulative-volatility__legend-note">UTC</span>
       </div>
-      <svg
-        class="cumulative-volatility__svg"
-        viewBox="0 0 1200 360"
-        preserveAspectRatio="none"
-        role="img"
-        :aria-label="`${title}，${formatDate(dates[0])}至${formatDate(dates.at(-1) ?? dates[0])}`"
-        @mousemove="onMove"
-        @mouseleave="hoverIndex = null"
-      >
-        <g v-for="tick in ticks" :key="tick">
+      <div class="cumulative-volatility__plot">
+        <svg
+          ref="motionPlot"
+          class="cumulative-volatility__svg"
+          :viewBox="`0 0 ${plotWidth} ${plotHeight}`"
+          :style="{ height: plotHeight + 'px' }"
+          role="img"
+          :aria-label="`${title}，${formatDate(dates[0])}至${formatDate(dates.at(-1) ?? dates[0])}`"
+          @pointermove="onMove"
+          @pointerleave="hoverIndex = null"
+        >
+          <text :x="plot.left" :y="plot.top - 14">累计波动（%）</text>
+          <g v-for="tick in ticks" :key="tick">
+            <line
+              :x1="plot.left"
+              :x2="plot.right"
+              :y1="yForTick(tick)"
+              :y2="yForTick(tick)"
+              class="cumulative-volatility__grid"
+            />
+            <text :x="plot.left - 12" :y="yForTick(tick) + 4" text-anchor="end">
+              {{ tick.toFixed(1) }}%
+            </text>
+          </g>
+          <template v-if="priceVisible">
+            <text
+              v-for="tick in priceTicks"
+              :key="`price-${tick}`"
+              :x="plot.right + 12"
+              :y="yForPrice(tick) + 4"
+              text-anchor="start"
+              class="cumulative-volatility__price-tick"
+            >
+              {{ formatPrice(tick) }}
+            </text>
+          </template>
+          <text
+            v-if="priceVisible"
+            :x="plot.right"
+            :y="plot.top - 14"
+            text-anchor="end"
+            class="cumulative-volatility__price-tick cumulative-volatility__price-axis-title"
+          >
+            价格
+          </text>
+          <text
+            v-for="tick in dateTicks"
+            :key="`date-${tick.date}`"
+            :x="xForDate(tick.date)"
+            :y="plot.bottom + 24"
+            :text-anchor="
+              tick.position === 0
+                ? 'start'
+                : tick.position === dateTicks.length - 1
+                ? 'end'
+                : 'middle'
+            "
+          >
+            {{ formatDate(tick.date) }}
+          </text>
           <line
             :x1="plot.left"
             :x2="plot.right"
-            :y1="yForTick(tick)"
-            :y2="yForTick(tick)"
-            class="cumulative-volatility__grid"
+            :y1="plot.bottom"
+            :y2="plot.bottom"
+            class="cumulative-volatility__axis"
           />
-          <text :x="plot.left - 12" :y="yForTick(tick) + 4" text-anchor="end">
-            {{ tick.toFixed(1) }}%
-          </text>
-        </g>
-        <template v-if="priceVisible">
-          <text
-            v-for="tick in priceTicks"
-            :key="`price-${tick}`"
-            :x="plot.right + 12"
-            :y="yForPrice(tick) + 4"
-            text-anchor="start"
-            class="cumulative-volatility__price-tick"
-          >
-            {{ formatPrice(tick) }}
-          </text>
-        </template>
-        <text
-          v-if="priceVisible"
-          :x="plot.right + 12"
-          :y="plot.top - 8"
-          text-anchor="start"
-          class="cumulative-volatility__price-tick cumulative-volatility__price-axis-title"
-        >
-          价格
-        </text>
-        <text
-          v-for="tick in dateTicks"
-          :key="`date-${tick.date}`"
-          :x="xForDate(tick.date)"
-          y="344"
-          :text-anchor="
-            tick.position === 0
-              ? 'start'
-              : tick.position === dateTicks.length - 1
-              ? 'end'
-              : 'middle'
-          "
-        >
-          {{ formatDate(tick.date) }}
-        </text>
-        <line
-          :x1="plot.left"
-          :x2="plot.right"
-          :y1="yForValue(0)"
-          :y2="yForValue(0)"
-          class="cumulative-volatility__zero"
-        />
-        <path
-          v-for="series in plottedSeries"
-          :key="series.key"
-          :d="series.path"
-          fill="none"
-          :stroke="series.color"
-          stroke-width="1.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-        <path
-          v-if="priceVisible && pricePath"
-          :d="pricePath"
-          fill="none"
-          stroke="#111111"
-          stroke-width="3"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-        <line
+          <line
+            :x1="plot.left"
+            :x2="plot.right"
+            :y1="yForValue(0)"
+            :y2="yForValue(0)"
+            class="cumulative-volatility__zero"
+          />
+          <g data-chart-kind="line">
+            <path
+              v-for="series in plottedSeries"
+              :key="series.key"
+              :d="series.path"
+              fill="none"
+              :stroke="series.color"
+              stroke-width="1.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              v-if="priceVisible && pricePath"
+              :d="pricePath"
+              fill="none"
+              stroke="#111111"
+              stroke-width="2.3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </g>
+          <line
+            v-if="hoverIndex !== null"
+            :x1="xForSlot(hoverIndex)"
+            :x2="xForSlot(hoverIndex)"
+            :y1="plot.top"
+            :y2="plot.bottom"
+            class="cumulative-volatility__hover-line"
+          />
+        </svg>
+        <div
           v-if="hoverIndex !== null"
-          :x1="xForSlot(hoverIndex)"
-          :x2="xForSlot(hoverIndex)"
-          :y1="plot.top"
-          :y2="plot.bottom"
-          class="cumulative-volatility__hover-line"
-        />
-      </svg>
-      <div v-if="hoverIndex !== null" class="cumulative-volatility__tooltip" role="status">
-        <strong>{{ hoverSessionDate }} · 各盘第 {{ hoverSampleIndex + 1 }} 个采样点（UTC）</strong>
-        <span v-for="series in plottedSeries" :key="series.key">
-          <i :style="{ background: series.color }"></i>{{ series.label }}：{{
-            valueAt(series, hoverIndex)
-          }}
-        </span>
-        <span v-if="priceVisible && hoverPrice !== null">
-          <i class="cumulative-volatility__tooltip-price-dot"></i>{{ title }}价格：{{
-            formatPrice(hoverPrice)
-          }}
-        </span>
+          class="cumulative-volatility__tooltip"
+          :style="tooltipPosition"
+        >
+          <strong>{{ hoverSessionDate }} · 各盘第 {{ hoverSampleIndex + 1 }} 个采样点</strong>
+          <span v-for="series in plottedSeries" :key="series.key">
+            <i :style="{ background: series.color }"></i>{{ series.label.slice(0, 3) }}
+            <b>{{ valueAt(series, hoverIndex) }}</b>
+          </span>
+          <span v-if="priceVisible && hoverPrice !== null">
+            <i class="cumulative-volatility__tooltip-price-dot"></i>价格
+            <b>{{ formatPrice(hoverPrice, true) }}</b>
+          </span>
+        </div>
       </div>
     </div>
 
-    <ChartRangeSelector
-      v-if="allDates.length > 1"
-      :labels="allDates"
-      :values="rangeValues"
-      :start-index="startIndex"
-      :end-index="endIndex"
-      :min-window-size="minWindowSize"
-      :on-start-change="onRangeStartChange"
-      :on-end-change="onRangeEndChange"
-    />
+    <div
+      class="cumulative-volatility__navigator"
+      :style="{
+        marginInlineStart: plot.left + 'px',
+        marginInlineEnd: plotWidth - plot.right + 'px',
+      }"
+    >
+      <ChartRangeSelector
+        v-if="allDates.length > 1"
+        :labels="rangeLabels"
+        :values="rangeValues"
+        :timeline="timeline"
+        :start-index="startIndex"
+        :end-index="endIndex"
+        :min-window-size="minWindowSize"
+        :on-start-change="onRangeStartChange"
+        :on-end-change="onRangeEndChange"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+
   import {
     computed,
     defineComponent,
@@ -214,6 +248,10 @@
       startIndex: { type: Number, required: true },
       endIndex: { type: Number, required: true },
       minWindowSize: { type: Number, required: true },
+      timeline: {
+        type: Object as PropType<{ positions: number[]; previewPath: string }>,
+        required: true,
+      },
       onStartChange: {
         type: Function as PropType<(value: number) => void>,
         required: true,
@@ -231,6 +269,7 @@
           startIndex: props.startIndex,
           endIndex: props.endIndex,
           minWindowSize: props.minWindowSize,
+          timeline: props.timeline,
           onStartChange: props.onStartChange,
           onEndChange: props.onEndChange,
         });
@@ -265,7 +304,14 @@
   const loadingFull = ref(false);
   let rangeTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const plot = { left: 76, right: 1120, top: 22, bottom: 300 };
+  const plotWidth = ref(1200);
+  const plotHeight = computed(() => Math.max(300, Math.min(420, plotWidth.value * 0.36)));
+  const plot = computed(() => ({
+    left: plotWidth.value < 480 ? 47 : 60,
+    right: plotWidth.value - (priceVisible.value ? 70 : 18),
+    top: 36,
+    bottom: plotHeight.value - 40,
+  }));
   const sessionSeries = [
     { key: 'asia', label: '亚洲盘 23:00–07:00', color: '#f0c015' },
     { key: 'europe', label: '欧洲盘 07:00–15:00', color: '#2ca02c' },
@@ -298,10 +344,33 @@
       return values.length ? Math.max(...values.map((value) => Math.abs(value))) : 0;
     }),
   );
+  const rangeLabels = computed(() =>
+    allDates.value.map((date) => date.slice(0, 16).replace('T', ' ')),
+  );
+  const timeline = computed(() => {
+    const times = allDates.value.map((date) => Date.parse(date));
+    const start = times[0] ?? 0;
+    const duration = (times.at(-1) ?? start) - start || 1;
+    const positions = times.map((time) => (time - start) / duration);
+    const buckets = Array<number | null>(361).fill(null);
+    positions.forEach((position, index) => {
+      const bin = Math.round(position * 360);
+      buckets[bin] = Math.max(buckets[bin] ?? 0, rangeValues.value[index]);
+    });
+    const maximum = Math.max(1e-6, ...buckets.map((value) => value ?? 0));
+    const previewPath = buckets
+      .map((value, index) => {
+        if (value === null) return '';
+        const y = (21 - (value / maximum) * 18).toFixed(1);
+        return buckets[index - 1] != null ? `L${index},${y}` : `M${index},${y}h0.5`;
+      })
+      .join('');
+    return { positions, previewPath };
+  });
   const bounds = computed(() => {
     if (!allValues.value.length) return { min: -1, max: 1 };
-    const min = Math.min(0, ...allValues.value);
-    const max = Math.max(0, ...allValues.value);
+    const min = allValues.value.reduce((limit, value) => Math.min(limit, value), 0);
+    const max = allValues.value.reduce((limit, value) => Math.max(limit, value), 0);
     const padding = Math.max((max - min) * 0.1, 0.5);
     return { min: min - padding, max: max + padding };
   });
@@ -398,10 +467,14 @@
   );
   const dateTicks = computed(() => {
     const datesForTicks = visibleSessionDates.value;
-    if (datesForTicks.length <= 7)
+    const count = Math.max(
+      3,
+      Math.min(7, Math.floor((plot.value.right - plot.value.left) / 85) + 1),
+    );
+    if (datesForTicks.length <= count)
       return datesForTicks.map((date, index) => ({ date, index, position: index }));
-    return Array.from({ length: 7 }, (_, index) => {
-      const dateIndex = Math.round((index * (datesForTicks.length - 1)) / 6);
+    return Array.from({ length: count }, (_, index) => {
+      const dateIndex = Math.round((index * (datesForTicks.length - 1)) / (count - 1));
       return { date: datesForTicks[dateIndex], index: dateIndex, position: index };
     });
   });
@@ -488,7 +561,8 @@
   });
 
   function xForSlot(slot: number) {
-    return plot.left + ((plot.right - plot.left) * slot) / plotSlotCount.value;
+    const { left, right } = plot.value;
+    return left + ((right - left) * slot) / plotSlotCount.value;
   }
 
   function xForDate(sessionDate: string) {
@@ -499,7 +573,8 @@
 
   function yForValue(value: number) {
     const { min, max } = bounds.value;
-    return plot.bottom - ((value - min) / Math.max(max - min, 0.01)) * (plot.bottom - plot.top);
+    const { bottom, top } = plot.value;
+    return bottom - ((value - min) / Math.max(max - min, 0.01)) * (bottom - top);
   }
 
   function yForTick(value: number) {
@@ -508,7 +583,8 @@
 
   function yForPrice(value: number) {
     const { min, max } = priceBounds.value;
-    return plot.bottom - ((value - min) / Math.max(max - min, 0.01)) * (plot.bottom - plot.top);
+    const { bottom, top } = plot.value;
+    return bottom - ((value - min) / Math.max(max - min, 0.01)) * (bottom - top);
   }
 
   function toggleSession(key: string) {
@@ -539,9 +615,9 @@
     return value == null ? '—' : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
   }
 
-  function formatPrice(value: number) {
+  function formatPrice(value: number, detail = false) {
     if (!Number.isFinite(value)) return '—';
-    return value >= 1000
+    return value >= 1000 && !detail
       ? value.toLocaleString('zh-CN', { maximumFractionDigits: 0 })
       : value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
   }
@@ -549,17 +625,31 @@
   function onMove(event: MouseEvent) {
     if (!dates.value.length) return;
     const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 1200;
-    const ratio = Math.max(0, Math.min(1, (x - plot.left) / (plot.right - plot.left)));
+    if (!rect.width) return;
+    const x = ((event.clientX - rect.left) / rect.width) * plotWidth.value;
+    const { left, right } = plot.value;
+    const ratio = Math.max(0, Math.min(1, (x - left) / (right - left)));
     hoverIndex.value = Math.round(ratio * plotSlotCount.value);
   }
 
+  const tooltipPosition = computed(() => {
+    const x = xForSlot(hoverIndex.value ?? 0);
+    const width = Math.min(226, plotWidth.value - 16);
+    const left = x > plotWidth.value / 2 ? x - width - 12 : x + 12;
+    return {
+      width: `${width}px`,
+      left: `${Math.max(8, Math.min(plotWidth.value - width - 8, left))}px`,
+    };
+  });
+
   function onRangeStartChange(value: number) {
+    reveal.cancel();
     startIndex.value = value;
     customRangeApplied.value = true;
   }
 
   function onRangeEndChange(value: number) {
+    reveal.cancel();
     endIndex.value = value;
     customRangeApplied.value = true;
   }
@@ -574,7 +664,12 @@
     applyPresetIndices();
   }
 
+  let fullController: AbortController | undefined;
+  let windowController: AbortController | undefined;
   async function load() {
+    fullController?.abort();
+    windowController?.abort();
+    fullController = new AbortController();
     clearTimeout(rangeTimer);
     const serial = ++loadSerial;
     ++windowSerial;
@@ -582,7 +677,13 @@
     status.value = 'loading';
     hoverIndex.value = null;
     try {
-      const result = await getCumulativeVolatility(props.asset, 0, precision.value);
+      const result = await getCumulativeVolatility(
+        props.asset,
+        0,
+        precision.value,
+        undefined,
+        fullController.signal,
+      );
       if (serial !== loadSerial) return;
       const previousWindow = customRangeApplied.value
         ? {
@@ -642,9 +743,21 @@
     const window = { start: allDates.value[startIndex.value], end: allDates.value[endIndex.value] };
     const asset = props.asset;
     const interval = precision.value;
+    windowController?.abort();
+    if (
+      startIndex.value === 0 &&
+      endIndex.value === allDates.value.length - 1 &&
+      fullResponse.value
+    ) {
+      response.value = fullResponse.value;
+      status.value = 'ready';
+      return;
+    }
+    windowController = new AbortController();
+    const signal = windowController.signal;
     rangeTimer = setTimeout(async () => {
       try {
-        const result = await getCumulativeVolatility(asset, 0, interval, window);
+        const result = await getCumulativeVolatility(asset, 0, interval, window, signal);
         if (serial !== windowSerial) return;
         response.value = result.data;
         status.value = 'ready';
@@ -656,244 +769,155 @@
   }
 
   onMounted(load);
+  const motionPlot = ref<SVGElement>();
+  watch(
+    motionPlot,
+    (element, _, onCleanup) => {
+      if (!element || typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(([entry]) => {
+        if (entry.contentRect.width > 0) plotWidth.value = entry.contentRect.width;
+      });
+      observer.observe(element);
+      onCleanup(() => observer.disconnect());
+    },
+    { flush: 'post' },
+  );
+  const reveal = useChartReveal(motionPlot);
+  watch([response, days, hiddenSessions, priceVisible], () => void reveal(points.value.length), {
+    flush: 'post',
+  });
   watch([precision, () => props.asset], load);
   watch([startIndex, endIndex], scheduleWindowRead);
   onBeforeUnmount(() => {
+    fullController?.abort();
+    windowController?.abort();
     clearTimeout(rangeTimer);
     loadSerial += 1;
     windowSerial += 1;
   });
 </script>
 
+<style scoped lang="less" src="../charts/macroSeriesChart.less"></style>
 <style scoped lang="less">
   .cumulative-volatility {
     min-width: 0;
-    padding: 4px 18px 18px;
-    color: var(--hedge-cool-text, #111);
+    padding: 4px 16px 12px;
+    color: #24384b;
   }
 
-  .cumulative-volatility__toolbar,
   .cumulative-volatility__controls,
   .cumulative-volatility__control-group,
   .cumulative-volatility__legend {
     display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .cumulative-volatility__toolbar {
     flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .cumulative-volatility__custom-range {
-    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    border: 1px solid #d9e2ec;
-    border-radius: 8px;
-    background: #fbfdff;
-    color: #6d8293;
-    font-size: 12px;
-  }
-
-  .cumulative-volatility__custom-range label {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
-  }
-
-  .cumulative-volatility__custom-range input {
-    width: 132px;
-    height: 26px;
-    padding: 0 6px;
-    border: 1px solid #cfdbe8;
-    border-radius: 5px;
-    background: #fff;
-    color: #111;
-    font: inherit;
-  }
-
-  .cumulative-volatility__custom-apply,
-  .cumulative-volatility__custom-cancel {
-    height: 26px;
-    padding: 0 9px;
-    border-radius: 5px;
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .cumulative-volatility__custom-apply {
-    border: 1px solid #4f7bf5;
-    background: #4f7bf5;
-    color: #fff;
-  }
-
-  .cumulative-volatility__custom-cancel {
-    border: 1px solid #cfdbe8;
-    background: #fff;
-    color: #6d8293;
-  }
-
-  .cumulative-volatility__legend,
-  .cumulative-volatility__legend-note {
-    color: var(--hedge-cool-muted, #6d8293);
-    font-size: 11px;
-  }
-
-  .cumulative-volatility__legend-price {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--hedge-cool-text, #111);
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .cumulative-volatility__legend-price i {
-    width: 16px;
-    height: 3px;
-    border-radius: 0;
-    background: #111;
+    gap: 6px;
   }
 
   .cumulative-volatility__controls {
-    flex-wrap: wrap;
-  }
-
-  .cumulative-volatility__control-group button {
-    min-height: 26px;
-    padding: 3px 9px;
-    border: 1px solid rgb(109 130 147 / 28%);
-    border-radius: 999px;
-    background: #fff;
-    color: var(--hedge-cool-muted, #526b7d);
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .cumulative-volatility__control-group button.active,
-  .cumulative-volatility__control-group button:hover,
-  .cumulative-volatility__control-group button:focus-visible {
-    border-color: rgb(22 93 255 / 42%);
-    outline: none;
-    background: rgb(22 93 255 / 8%);
-    color: #165dff;
-  }
-
-  .cumulative-volatility__message {
-    margin: 10px 0 0;
-    color: var(--hedge-cool-muted, #6d8293);
-    font-size: 11px;
-  }
-
-  .cumulative-volatility__stage {
-    position: relative;
-    margin-top: 10px;
-  }
-
-  .cumulative-volatility__svg {
-    display: block;
-    width: 100%;
-    min-height: 250px;
-    overflow: visible;
-  }
-
-  .cumulative-volatility__svg text {
-    fill: var(--hedge-cool-muted, #6d8293);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .cumulative-volatility__grid {
-    stroke-dasharray: 3 5;
-    stroke: rgb(193 207 220 / 54%);
-  }
-
-  .cumulative-volatility__zero {
-    stroke-dasharray: 4 4;
-    stroke: rgb(82 107 125 / 50%);
-  }
-
-  .cumulative-volatility__price-tick {
-    fill: #111 !important;
-    font-weight: 700;
-  }
-
-  .cumulative-volatility__hover-line {
-    stroke-dasharray: 4 4;
-    stroke: rgb(82 107 125 / 68%);
-  }
-
-  .cumulative-volatility__tooltip {
-    display: grid;
-    position: absolute;
-    top: 8px;
-    right: 18px;
-    min-width: 170px;
-    padding: 9px 11px;
-    border: 1px solid rgb(193 207 220 / 88%);
-    border-radius: 10px;
-    background: rgb(255 255 255 / 96%);
-    box-shadow: 0 8px 24px rgb(31 41 55 / 8%);
-    color: var(--hedge-cool-muted, #526b7d);
-    font-size: 11px;
-    pointer-events: none;
-    gap: 5px;
-  }
-
-  .cumulative-volatility__tooltip strong {
-    color: var(--hedge-cool-text, #111);
-  }
-
-  .cumulative-volatility__tooltip span {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+    gap: 8px 16px;
   }
 
   .cumulative-volatility__legend {
-    flex-wrap: wrap;
-    margin-top: 2px;
-  }
-
-  .cumulative-volatility__legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+    margin: 12px 0 4px;
+    gap: 6px 14px;
   }
 
   .cumulative-volatility__legend-toggle {
     display: inline-flex;
     align-items: center;
+    gap: 6px;
+    min-height: 24px;
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--hedge-cool-muted, #6d8293);
-    font: inherit;
+    color: #405870;
+    font-size: 12px;
     cursor: pointer;
-    gap: 5px;
   }
 
   .cumulative-volatility__legend-toggle.is-muted {
-    opacity: 0.38;
-    text-decoration: line-through;
+    opacity: 0.45;
   }
 
-  .cumulative-volatility__legend-toggle:focus-visible {
+  .cumulative-volatility__legend i {
+    width: 14px;
+    height: 2px;
+    border-radius: 2px;
+    background: #111;
+  }
+
+  .cumulative-volatility__legend-price i {
+    height: 3px;
+  }
+
+  .cumulative-volatility__legend-note {
+    margin-left: auto;
+    color: #627488;
+    font-size: 11px;
+  }
+
+  .cumulative-volatility__plot {
+    position: relative;
+  }
+
+  .cumulative-volatility__svg {
+    display: block;
+    width: 100%;
+    font-family: inherit;
+  }
+
+  .cumulative-volatility__svg text {
+    fill: #627488;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cumulative-volatility__grid {
+    stroke: #e6edf4;
+  }
+
+  .cumulative-volatility__axis {
+    stroke: #d7e0e9;
+  }
+
+  .cumulative-volatility__zero,
+  .cumulative-volatility__hover-line {
+    stroke-dasharray: 4 4;
+    stroke: #8496ab;
+  }
+
+  .cumulative-volatility__zero {
+    opacity: 0.68;
+  }
+
+  .cumulative-volatility__tooltip {
+    display: grid;
+    position: absolute;
+    top: 44px;
+    gap: 5px;
+    box-sizing: border-box;
+    padding: 9px 11px;
+    border: 1px solid #dbe4ec;
     border-radius: 6px;
-    outline: 1px solid #165dff;
-    outline-offset: 3px;
+    background: #fff;
+    box-shadow: 0 4px 14px rgb(31 41 55 / 10%);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
   }
 
-  .cumulative-volatility__legend i,
-  .cumulative-volatility__tooltip i,
-  .cumulative-volatility__legend-toggle i {
-    display: inline-block;
+  .cumulative-volatility__tooltip span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .cumulative-volatility__tooltip b {
+    margin-left: auto;
+  }
+
+  .cumulative-volatility__tooltip i {
     width: 7px;
     height: 7px;
     border-radius: 50%;
@@ -903,33 +927,99 @@
     background: #111;
   }
 
-  .cumulative-volatility__legend-note {
-    margin-left: auto;
+  .cumulative-volatility__navigator :deep(.chart-range) {
+    margin-top: 0;
   }
 
-  :deep(.chart-range__label--start) {
-    left: 0 !important;
+  .cumulative-volatility__navigator :deep(.chart-range__labels) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    height: auto !important;
+    min-height: 14px;
+    color: #627488 !important;
+    gap: 4px 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__label) {
+    position: static !important;
     transform: none !important;
   }
 
-  :deep(.chart-range__label--end) {
-    right: 0;
-    left: auto !important;
-    transform: none !important;
+  .cumulative-volatility__navigator :deep(.chart-range__viewport) {
+    touch-action: none;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__rail),
+  .cumulative-volatility__navigator :deep(.chart-range__selection) {
+    height: 24px !important;
+    box-shadow: none !important;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__rail) {
+    background: #f5f8fb !important;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__selection) {
+    border-color: rgb(71 123 194 / 42%) !important;
+    background: rgb(22 93 255 / 10%) !important;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__preview) {
+    position: absolute;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    stroke-width: 1;
+    stroke: #a2b9dc;
+    pointer-events: none;
+    inset: 0;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__handle) {
+    width: 8px !important;
+    height: 20px !important;
+    border: 1px solid #477bc2 !important;
+    border-radius: 3px !important;
+    background: #dce8f8 !important;
+    box-shadow: none !important;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__handle--start) {
+    left: -4px !important;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__handle--end) {
+    right: -4px !important;
+  }
+
+  .cumulative-volatility__navigator :deep(.chart-range__handle:focus-visible) {
+    outline: 2px solid #477bc2;
+    outline-offset: 3px;
+  }
+
+  .cumulative-volatility__message {
+    margin: 8px 0 0;
+    color: #627488;
+    font-size: 11px;
   }
 
   .cumulative-volatility__empty {
     display: grid;
     min-height: 240px;
     place-content: center;
-    color: var(--hedge-cool-muted, #6d8293);
+    color: #627488;
     font-size: 13px;
   }
 
-  @media (max-width: 760px) {
-    .cumulative-volatility__legend-note {
-      width: 100%;
-      margin-left: 0;
+  @media (max-width: 600px) {
+    .cumulative-volatility {
+      padding-inline: 8px;
+    }
+
+    .cumulative-volatility__legend {
+      gap: 4px 10px;
     }
   }
 </style>

@@ -17,6 +17,7 @@ import { useBreakpoint } from '@/hooks/event/useBreakpoint';
 import echarts from '@/utils/lib/echarts';
 import { useRootSetting } from '@/hooks/setting/useRootSetting';
 import { useMenuSetting } from '@/hooks/setting/useMenuSetting';
+import { motionOptions, useChartReveal } from './chartMotion';
 
 export function useECharts(
   elRef: Ref<HTMLDivElement>,
@@ -24,6 +25,7 @@ export function useECharts(
 ) {
   const { getDarkMode: getSysDarkMode } = useRootSetting();
   const { getCollapsed } = useMenuSetting();
+  const reveal = useChartReveal(elRef, false);
 
   const getDarkMode = computed(() => {
     return theme === 'default' ? getSysDarkMode.value : theme;
@@ -100,8 +102,11 @@ export function useECharts(
     if (disposed || !active || !nearViewport || !el?.offsetWidth || !el.offsetHeight) return;
     if (!chartInstance && pending) initCharts(getDarkMode.value as 'default');
     if (!chartInstance || !pending) return;
-    if (clearPending) chartInstance.clear();
-    chartInstance.setOption(unref(getOptions));
+    reveal.cancel();
+    const options = motionOptions(unref(getOptions));
+    // One atomic replacement removes obsolete series without a separate blank frame.
+    chartInstance.setOption(options, { notMerge: clearPending });
+    if (!options.animation) void reveal();
     pending = false;
     clearPending = false;
   }

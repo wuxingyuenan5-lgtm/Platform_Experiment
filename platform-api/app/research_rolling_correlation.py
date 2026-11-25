@@ -1,4 +1,4 @@
-"""Paired native-close returns over common market sessions, never weekend zero-fill."""
+"""Synchronous US equity open/close returns, including overnight opening gaps."""
 
 from collections import deque
 from datetime import UTC, datetime
@@ -29,9 +29,9 @@ def positive_points(rows):
 
 
 def rolling(btc, benchmark, n, today=None):
-    today = today or datetime.now(UTC).date().isoformat()
-    # Benchmark session dates define the grid; BTC weekend moves accrue into
-    # the next common-session return (Friday -> Monday, not Sunday -> Monday).
+    today = today or datetime.now(UTC).isoformat()
+    # The price artifact owns the common clock. Consecutive close -> next open
+    # pairs retain all overnight/weekend movement as the opening gap.
     days = sorted(d for d in benchmark if d < today)
     pairs, out = deque(maxlen=n), []
     previous = None
@@ -63,48 +63,36 @@ def rolling(btc, benchmark, n, today=None):
 
 
 def read_rolling(n, benchmark):
-    btc = read_local_json("public/v1/crypto/series/binance_btc_spot.json")
-    if benchmark == "xau":
-        other = read_local_json("public/v1/commodity/series/xauusd_daily_close.json")
-    else:
-        import json
+    document = read_local_json("public/v1/crypto/us-session-prices.json")
+    if document.get("alignment") != "synchronous-us-equity-open-close":
+        return {"rows": [], "window": n, "benchmark": benchmark, "sources": [], "note": ""}
 
-        from app.database_connection import read_only_connection
+    def valid(value):
+        try:
+            result = Decimal(str(value))
+            return result if result.is_finite() and result > 0 else None
+        except InvalidOperation:
+            return None
 
-        first = (
-            min(p["date"] for p in btc.get("observations", []))
-            if btc.get("observations")
-            else "9999-12-31"
-        )
-        with read_only_connection() as db:
-            records = db.execute(
-                "SELECT observed_at,payload_json FROM research_a_share_history "
-                "WHERE dataset='market_price' AND entity_code='Yahoo Finance:^NDX' "
-                "AND observed_at>=? ORDER BY observed_at LIMIT 15000",
-                (first,),
-            ).fetchall()
-        other = {
-            "source": "Yahoo Finance",
-            "sourceUrl": "https://finance.yahoo.com/quote/%5ENDX/history/",
-            "history": [
-                {"date": r["observed_at"], "close": json.loads(r["payload_json"]).get("close")}
-                for r in records
-            ],
-        }
-    points = other.get("observations", other.get("history", []))
-    rows = rolling(positive_points(btc.get("observations", [])), positive_points(points), n)
+    records = document.get("rows", [])
+    btc = {r["date"]: valid(r.get("btc")) for r in records}
+    other = {r["date"]: valid(r.get(benchmark)) for r in records}
+    rows = rolling(btc, other, n)
+    phases = {r["date"]: r["phase"] for r in records}
+    for row in rows:
+        row["phase"] = phases[row["date"]]
+    sources = document.get("sources", [])
     return {
         "rows": rows,
         "window": n,
         "benchmark": benchmark,
-        "alignment": "common-session-native-close",
-        "btcSource": btc.get("source"),
-        "benchmarkSource": other.get("source"),
+        "alignment": document["alignment"],
         "asOf": rows[-1]["date"] if rows else None,
-        "sources": [btc.get("sourceUrl"), other.get("sourceUrl")],
-        "note": (
-            "按对手市场交易日计算同区间简单收益率的Pearson相关性；周末BTC变动计入下个交易日，"
-            "不补零、不前向填充。N指共同交易区间数。BTC为UTC日收盘，NDX为纽约收盘、"
-            "XAU为MT5日收盘，存在日内收盘时差，并非同步时刻相关性。"
-        ),
+        "sources": [sources[0], sources[1 if benchmark == "ndx" else 2]]
+        if len(sources) == 3
+        else [],
+        "status": document.get("status"),
+        "retrievedAt": document.get("retrievedAt"),
+        "coverage": document.get("coverage"),
+        "note": "",
     }

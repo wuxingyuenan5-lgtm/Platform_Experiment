@@ -48,6 +48,9 @@ function mountPanel(points, options = {}) {
       },
     },
     '../charts/chartRange': { renderChartRangeSelector() {} },
+    '@/hooks/web/chartMotion': {
+      useChartReveal: () => Object.assign(async () => {}, { cancel() {} }),
+    },
   };
   const module = { exports: {} };
   new Function('require', 'module', 'exports', code)(
@@ -111,9 +114,8 @@ test('presets, slider and custom window request backend rebasing and retain full
       end: points[200].timestamp,
     });
     assert.equal(panel.customRangeApplied.value, true);
-    panel.customStartDate.value = '2026-08-15';
-    panel.customEndDate.value = '2026-08-20';
-    panel.applyCustomRange();
+    panel.onRangeStartChange(points.findIndex(p => p.timestamp.startsWith('2026-08-15')));
+    panel.onRangeEndChange(points.findLastIndex(p => p.timestamp.startsWith('2026-08-20')));
     await settle();
     assert.equal(calls.at(-1).window.start.slice(0, 10), '2026-08-15');
     assert.equal(calls.at(-1).window.end.slice(0, 10), '2026-08-20');
@@ -135,7 +137,7 @@ test('hover reads aligned session slots and remains bounded for a year of sample
     await panel.load();
     await settle();
     const event = {
-      clientX: 76,
+      clientX: panel.plot.value.left,
       currentTarget: { getBoundingClientRect: () => ({ left: 0, width: 1200 }) },
     };
     panel.onMove(event);
@@ -192,6 +194,8 @@ test('calendar gaps and missing sample slots stay empty instead of being compres
     const step=panel.xForDate('2026-08-26')-panel.xForDate('2026-08-25');
     assert.ok(panel.xForDate('2026-08-25')-panel.xForDate('2025-10-16') > step*300);
     assert.ok(panel.missingDayCount.value > 300);
+    assert.ok(panel.timeline.value.positions[1] > 0.99);
+    assert.equal((panel.timeline.value.previewPath.match(/M/g) || []).length, 2);
     const path=panel.plottedSeries.value.find(s=>s.key==='europe').path;
     assert.equal((path.match(/M/g)||[]).length,4); // both interday and intraday gaps break
     assert.ok(panel.dateTicks.value.every((t,i,a)=>!i||t.date>a[i-1].date));
@@ -209,5 +213,18 @@ test('a failed precision load can be retried from an existing range button witho
     panel.selectPresetRange(30); await settle();
     assert.equal(panel.status.value,'ready');
     assert.ok(panel.points.value.length);
+  } finally {close();}
+});
+
+
+test('the full retained window reuses its already rebased response', async () => {
+  const {panel,calls,close}=mountPanel(points);
+  try {
+    await panel.load(); await settle();
+    assert.equal(calls.length,1);
+    panel.selectPresetRange(0); await settle();
+    assert.equal(calls.length,1);
+    panel.selectPresetRange(7); await settle();
+    assert.equal(calls.length,2);
   } finally {close();}
 });

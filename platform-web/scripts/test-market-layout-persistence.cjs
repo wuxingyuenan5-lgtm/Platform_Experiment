@@ -4,6 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 const ts = require('typescript');
 const vue = require('vue');
+const createLoader = require('./load-strategy-module.cjs');
 const { parse, compileScript } = require('vue/compiler-sfc');
 
 function mountPanel(api) {
@@ -14,12 +15,13 @@ function mountPanel(api) {
   const user = vue.reactive({ getUserInfo: { userId: 'alice' } });
   const cleanups = [];
   const mocks = {
-    vue: { ...vue, onBeforeUnmount(fn) { cleanups.push(fn); } },
+    vue: { ...vue, inject: () => null, onMounted() {}, onBeforeUnmount(fn) { cleanups.push(fn); } },
     '@/api/hedgeResearch': api,
     '@/store/modules/user': { useUserStore: () => user },
   };
+  const load = createLoader(mocks);
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', code)((name) => mocks[name] || require(name), module, module.exports);
+  new Function('require', 'module', 'exports', code)((name) => mocks[name] || (name.startsWith('.') ? load(path.resolve(path.dirname(filename), name + '.ts')) : require(name)), module, module.exports);
   const props = vue.reactive({ marketId: 'us', readonly: false, columns: [], rotationHeatmap: [], groups: [{
     label: '指数', rows: [{ id: 'us-spy', name: '标普', symbol: 'SPY', spark: [10,11], price: '$11', d1: '+1%' }],
   }] });
@@ -111,6 +113,7 @@ test('research writes restore missing in-memory CSRF after reload and fail close
       async getCurrentAuthentication() { refreshes++; if (fail) throw new Error('session expired'); token = 'current-csrf'; },
       clearUserSystemSessionMemory() { token = ''; }, UserSystemApiError: Error,
     };
+    if (name === './dashboardSnapshotCache') return createLoader()('src/api/dashboardSnapshotCache.ts');
     return require(name);
   }, module, module.exports);
   const headers = new Map();

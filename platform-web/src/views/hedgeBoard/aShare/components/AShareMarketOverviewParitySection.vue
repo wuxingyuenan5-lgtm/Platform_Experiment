@@ -1,125 +1,126 @@
 <template>
   <section id="a-share-market-overview" class="overview-card">
-    <template v-if="mode !== 'crowding'">
-      <header class="overview-header">
-        <div><p class="eyebrow">MARKET OVERVIEW</p><h2>市场情绪与资金</h2></div>
-        <span v-if="updatedAt" class="updated">更新于 {{ formatDate(updatedAt) }}</span>
-      </header>
-      <div class="overview-grid">
-        <article class="metric-panel">
-          <div class="panel-title"
-            ><h3>市场情绪</h3
-            ><ResearchSourceState v-if="dashboard?.breadth" :meta="dashboard.breadth.meta"
-          /></div>
-          <div v-if="breadth" class="metric-grid"
-            ><component
-              :is="item.label === '市场宽度' ? 'button' : 'div'"
-              v-for="item in breadthMetrics"
-              :key="item.label"
-              class="metric-cell"
-              :aria-expanded="item.label === '市场宽度' ? marketBreadthOpen : undefined"
-              @click="item.label === '市场宽度' && (marketBreadthOpen = !marketBreadthOpen)"
-              ><span>{{ item.label }}</span
-              ><strong :class="item.tone">{{ item.value }}</strong
-              ><small>{{
-                item.label === '市场宽度' ? '点击查看历史' : item.note
-              }}</small></component
-            ></div
+    <AShareLegacyTerminalSection
+      v-if="dashboard && mode !== 'crowding'"
+      :dashboard="dashboard"
+      view="overview"
+      :refresh-key="refreshKey"
+    >
+      <template #breadth>
+        <div class="overview-meta-grid">
+          <button
+            type="button"
+            class="meta-action"
+            :disabled="!marketAmountRows.length"
+            title="点击查看全A成交额历史统计"
+            @click="marketAmountHistoryOpen = true"
+            ><span>全A成交额</span
+            ><strong>{{ formatHundredMillion(latestHistory?.total_amount_100m) }}</strong
+            ><small>点击查看历史</small></button
           >
-          <div v-if="latestHistory || turnoverData" class="overview-meta-grid">
-            <button
-              type="button"
-              class="meta-action"
-              :disabled="!marketAmountRows.length"
-              title="点击查看全A成交额历史统计"
-              @click="marketAmountHistoryOpen = true"
-              ><span>全A成交额 · 点击查看历史</span
-              ><strong>{{ formatHundredMillion(latestHistory?.total_amount_100m) }}</strong></button
-            >
-            <button
-              type="button"
-              class="meta-action"
-              :disabled="hotStockCount == null"
-              @click="hotMatrixOpen = true"
-              ><span>百亿成交股</span
-              ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong></button
-            >
-            <button
-              type="button"
-              class="meta-action"
-              :aria-expanded="marketBreadthOpen"
-              @click="marketBreadthOpen = !marketBreadthOpen"
-              title="沪深A；（上涨家数－下跌家数）/（上涨家数＋下跌家数），不含平盘"
-              ><span>沪深A市场宽度</span
-              ><strong>{{ formatPct(latestHistory?.market_breadth, true) }}</strong></button
-            >
-          </div>
-          <div v-if="!breadth" class="empty">暂无市场情绪数据</div>
-        </article>
-        <article class="metric-panel">
-          <div class="panel-title"
-            ><h3>短线情绪</h3
-            ><ResearchSourceState v-if="dashboard?.emotion" :meta="dashboard.emotion.meta"
-          /></div>
-          <div v-if="emotion" class="metric-grid"
-            ><div v-for="item in emotionMetrics" :key="item.label" class="metric-cell"
-              ><span>{{ item.label }}</span
-              ><strong :class="item.tone">{{ item.value }}</strong
-              ><small>{{ item.note }}</small></div
-            ></div
+          <button
+            type="button"
+            class="meta-action"
+            :disabled="hotStockCount == null"
+            @click="hotMatrixOpen = true"
+            ><span>百亿成交股</span
+            ><strong>{{ hotStockCount == null ? '—' : `${hotStockCount}只` }}</strong
+            ><small>点击查看明细</small></button
           >
-          <div v-else class="empty">暂无短线情绪数据</div>
-          <div v-if="emotion" class="emotion-detail">
-            <button
-              type="button"
-              class="emotion-subpanel ladder-trigger"
-              :disabled="!ladderRows.length"
-              @click="ladderOpen = true"
-            >
-              <span class="subpanel-heading"
-                ><strong>连板梯队</strong
-                ><span>{{
-                  ladderRows.length ? '点击查看连板股明细' : '暂无二板及以上个股'
-                }}</span></span
-              >
-              <span v-if="ladderRows.length" class="ladder-list">
-                <span v-for="row in ladderRows" :key="row.boardCount" class="ladder-row"
-                  ><span>{{ row.boardCount }}</span
-                  ><i class="ladder-track"
-                    ><b :style="{ width: `${ladderWidth(row.stockCount)}%` }"></b></i
-                  ><strong>{{ row.stockCount }}</strong></span
-                >
-              </span>
-            </button>
-          </div>
-        </article>
+          <button
+            type="button"
+            class="meta-action"
+            :aria-expanded="marketBreadthOpen"
+            @click="marketBreadthOpen = !marketBreadthOpen"
+            title="沪深A；（上涨家数－下跌家数）/（上涨家数＋下跌家数），不含平盘"
+            ><span>市场宽度</span
+            ><strong>{{ formatPct(latestHistory?.market_breadth, true) }}</strong
+            ><small>{{ breadth?.breadthState || '—' }}</small></button
+          >
+        </div>
+      </template>
+    </AShareLegacyTerminalSection>
+    <section
+      v-if="dashboard && mode !== 'crowding'"
+      class="market-structure"
+      aria-label="市场涨跌结构"
+    >
+      <div class="structure-sources">
+        <ResearchSourceState v-if="dashboard.breadth" :meta="dashboard.breadth.meta" />
+        <ResearchSourceState v-if="dashboard.emotion" :meta="dashboard.emotion.meta" />
       </div>
-    </template>
+      <div class="structure-summary">
+        <div v-for="item in structureMetrics" :key="item.label" class="structure-metric">
+          <span>{{ item.label }}</span
+          ><strong :class="item.tone">{{ item.value ?? '—' }}</strong>
+        </div>
+        <button
+          type="button"
+          class="structure-metric structure-ladder"
+          :disabled="!ladderRows.length"
+          @click="ladderOpen = true"
+        >
+          <span>连板梯队</span>
+          <strong>{{
+            ladderRows.length
+              ? ladderRows.map((row) => `${row.boardCount}：${row.stockCount}只`).join(' · ')
+              : '—'
+          }}</strong>
+        </button>
+      </div>
+      <VibeTrendCharts
+        v-if="allHistoryRows.length > 1"
+        mode="overview"
+        :show-breadth="false"
+        :rows="allHistoryRows"
+      />
+    </section>
     <VibeTrendCharts
-      v-if="allHistoryRows.length > 1"
-      :mode="mode || 'overview'"
-      :show-breadth="marketBreadthOpen"
+      v-if="mode === 'crowding' && allHistoryRows.length > 1"
+      mode="crowding"
+      :show-breadth="false"
       :rows="allHistoryRows"
       :crowding-rows="dashboard?.crowding?.data?.history"
       :innovation-rows="dashboard?.crowding?.data?.innovationHistory"
     />
-    <slot></slot>
-
+    <Modal
+      v-if="marketBreadthOpen"
+      v-model:open="marketBreadthOpen"
+      title="市场宽度"
+      :footer="null"
+      width="min(1050px, calc(100vw - 32px))"
+      :get-container="false"
+    >
+      <VibeTimeChart
+        title="市场宽度"
+        y-label="（上涨－下跌）/（上涨＋下跌）× 100%"
+        :dates="allHistoryRows.map((row) => row.date)"
+        :series="[
+          {
+            name: '市场宽度',
+            values: allHistoryRows.map((row) => row.market_breadth),
+            type: 'line',
+            color: '#123d68',
+            percent: true,
+            domain: [-1, 1],
+            ticks: [1, 0.5, 0, -0.5, -1],
+          },
+        ]"
+      />
+    </Modal>
     <template v-if="mode !== 'crowding'">
-      <div class="overview-grid">
-        <article class="panel">
+      <div class="fund-flow-layout" role="region" aria-label="行业资金与成交额">
+        <article class="panel industry-flow-panel">
           <div class="panel-title"
             ><div><h3>一级行业资金榜</h3></div
             ><ResearchSourceState :meta="sectorFlowMeta"
           /></div>
-          <button
-            v-if="sectorRows.length > 7"
-            type="button"
-            class="link-button"
-            @click="sectorsExpanded = !sectorsExpanded"
-            >{{ sectorsExpanded ? '收起' : '查看完整' }} →</button
-          >
-          <div v-if="sectorRows.length" class="table-shell"
+          <div
+            v-if="sectorRows.length"
+            class="table-shell funds-table-scroll"
+            tabindex="0"
+            role="region"
+            aria-label="一级行业资金榜明细"
             ><table
               ><thead
                 ><tr
@@ -127,7 +128,7 @@
                   ><th>家数</th></tr
                 ></thead
               ><tbody
-                ><tr v-for="row in visibleSectorRows" :key="row.name"
+                ><tr v-for="row in sectorRows" :key="row.name"
                   ><td class="is-left"
                     ><strong>{{ row.name }}</strong></td
                   ><td :class="tone(row.pct)">{{ formatPct(row.pct) }}</td
@@ -136,79 +137,82 @@
                 ></tbody
               ></table
             ></div
-          ><div v-else class="empty">暂无板块资金数据</div>
+          ><div v-else class="empty">{{ sectorEmptyText || '暂无板块资金数据' }}</div>
         </article>
-        <article class="panel"
-          ><div class="panel-title"
-            ><div><h3>资金轮动</h3></div></div
-          ><div v-if="rotationRows.length" class="rotation-grid"
-            ><div class="rotation-column"
-              ><h4 class="is-positive">↑ 流入 Top</h4
-              ><div v-for="row in rotationInflow" :key="`in-${row.name}`" class="rotation-row"
-                ><span>{{ row.name }}</span
-                ><b :class="tone(row.pct)">{{ formatPct(row.pct) }}</b
-                ><em class="is-positive">{{ formatYi(row.netYi) }}</em></div
-              ><p v-if="!rotationInflow.length" class="empty-inline">暂无净流入数据</p></div
-            ><div class="rotation-column"
-              ><h4 class="is-negative">↓ 流出 Top</h4
-              ><div v-for="row in rotationOutflow" :key="`out-${row.name}`" class="rotation-row"
-                ><span>{{ row.name }}</span
-                ><b :class="tone(row.pct)">{{ formatPct(row.pct) }}</b
-                ><em class="is-negative">{{ formatYi(row.netYi) }}</em></div
-              ><p v-if="!rotationOutflow.length" class="empty-inline">暂无净流出数据</p></div
-            ></div
-          ><div v-else class="empty">暂无资金轮动数据</div></article
-        >
+        <div class="fund-flow-right">
+          <article class="panel rotation-panel"
+            ><div class="panel-title"
+              ><div><h3>资金轮动</h3></div></div
+            ><div
+              v-if="rotationRows.length"
+              class="rotation-grid funds-table-scroll"
+              tabindex="0"
+              role="region"
+              aria-label="资金轮动明细"
+              ><div class="rotation-column"
+                ><h4 class="is-positive">↑ 流入 Top</h4
+                ><div v-for="row in rotationInflow" :key="`in-${row.name}`" class="rotation-row"
+                  ><span>{{ row.name }}</span
+                  ><b :class="tone(row.pct)">{{ formatPct(row.pct) }}</b
+                  ><em class="is-positive">{{ formatYi(row.netYi) }}</em></div
+                ><p v-if="!rotationInflow.length" class="empty-inline">暂无净流入数据</p></div
+              ><div class="rotation-column"
+                ><h4 class="is-negative">↓ 流出 Top</h4
+                ><div v-for="row in rotationOutflow" :key="`out-${row.name}`" class="rotation-row"
+                  ><span>{{ row.name }}</span
+                  ><b :class="tone(row.pct)">{{ formatPct(row.pct) }}</b
+                  ><em class="is-negative">{{ formatYi(row.netYi) }}</em></div
+                ><p v-if="!rotationOutflow.length" class="empty-inline">暂无净流出数据</p></div
+              ></div
+            ><div v-else class="empty">{{ sectorEmptyText || '暂无资金轮动数据' }}</div></article
+          >
+          <article class="panel turnover-panel"
+            ><div class="panel-title"
+              ><div><h3>全市场成交额榜</h3><ResearchSourceState :meta="turnoverMeta" /></div></div
+            ><div
+              v-if="turnoverRows.length"
+              class="table-shell funds-table-scroll turnover-table-scroll"
+              tabindex="0"
+              role="region"
+              aria-label="全市场成交额榜明细"
+              ><table
+                ><thead
+                  ><tr
+                    ><th>#</th><th class="is-left">名称 / 代码</th><th>现价</th><th>涨跌%</th
+                    ><th>成交额</th><th>总市值</th><th>行业</th></tr
+                  ></thead
+                ><tbody
+                  ><tr v-for="(row, index) in turnoverRows.slice(0, 20)" :key="row.securityCode"
+                    ><td>{{ index + 1 }}</td
+                    ><td class="is-left"
+                      ><button
+                        type="button"
+                        class="stock-name-button"
+                        @click="emit('query', row.securityCode)"
+                        >{{ row.securityName }}</button
+                      ><small>{{ row.securityCode }}</small></td
+                    ><td>{{ row.price ?? '—' }}</td
+                    ><td :class="tone(row.returnPct)">{{ formatPct(row.returnPct) }}</td
+                    ><td>{{ formatYi(row.turnoverYi) }}</td
+                    ><td>{{ formatYi(row.marketCapYi) }}</td
+                    ><td>{{ row.industry || '—' }}</td></tr
+                  ></tbody
+                ></table
+              ></div
+            ><div v-else class="empty"
+              >{{ turnoverLoading ? '正在读取成交额榜…' : turnoverError || '暂无成交额榜数据'
+              }}<button
+                v-if="!turnoverLoading"
+                type="button"
+                class="link-button"
+                @click="loadLiveTurnover"
+                >重试</button
+              ></div
+            ></article
+          >
+        </div>
       </div>
-      <article class="panel wide-panel"
-        ><div class="panel-title"
-          ><div><h3>全市场成交额榜</h3><ResearchSourceState :meta="turnoverMeta" /></div
-          ><div class="turnover-actions"
-            ><button
-              v-for="n in [10, 20]"
-              :key="n"
-              type="button"
-              :class="{ active: topN === n }"
-              @click="topN = n as 10 | 20"
-              >T{{ n }}</button
-            ></div
-          ></div
-        ><div v-if="turnoverRows.length" class="table-shell"
-          ><table
-            ><thead
-              ><tr
-                ><th>#</th><th class="is-left">名称 / 代码</th><th>现价</th><th>涨跌%</th
-                ><th>成交额</th><th>总市值</th><th>行业</th></tr
-              ></thead
-            ><tbody
-              ><tr v-for="(row, index) in turnoverRows.slice(0, topN)" :key="row.securityCode"
-                ><td>{{ index + 1 }}</td
-                ><td class="is-left"
-                  ><button
-                    type="button"
-                    class="stock-name-button"
-                    @click="emit('query', row.securityCode)"
-                    >{{ row.securityName }}</button
-                  ><small>{{ row.securityCode }}</small></td
-                ><td>{{ row.price ?? '—' }}</td
-                ><td :class="tone(row.returnPct)">{{ formatPct(row.returnPct) }}</td
-                ><td>{{ formatYi(row.turnoverYi) }}</td
-                ><td>{{ formatYi(row.marketCapYi) }}</td
-                ><td>{{ row.industry || '—' }}</td></tr
-              ></tbody
-            ></table
-          ></div
-        ><div v-else class="empty"
-          >{{ turnoverError || '暂无成交额榜数据'
-          }}<button
-            type="button"
-            class="link-button"
-            :disabled="turnoverLoading"
-            @click="loadLiveTurnover"
-            >重试</button
-          ></div
-        ></article
-      >
+      <slot v-if="dashboard"></slot>
       <Modal
         v-if="hotMatrixOpen"
         v-model:open="hotMatrixOpen"
@@ -328,24 +332,39 @@
             <table>
               <thead>
                 <tr>
-                  <th class="is-left">交易日</th>
-                  <th class="is-right">全A成交额（亿元）</th>
-                  <th class="is-right">较前一归档日</th>
-                  <th class="is-left">数据来源</th>
+                  <th>交易日</th>
+                  <th title="括号内为成交额相对20日日均的变化率">全A成交额（亿元）</th>
+                  <th>20日日均（亿元）</th>
+                  <th>数据来源</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="row in pagedMarketAmountRows" :key="row.observedAt">
-                  <td class="is-left">{{ row.observedAt }}</td>
-                  <td class="is-right">{{
-                    formatHundredMillion(
-                      row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
-                    )
-                  }}</td>
-                  <td class="is-right" :class="tone(row.amountChangePct)">
-                    {{ formatPct(row.amountChangePct) }}
+                  <td>{{ row.observedAt }}</td>
+                  <td>
+                    {{
+                      formatHundredMillion(
+                        row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
+                      )
+                    }}
+                    <span
+                      v-if="row.deviationFromAverage != null"
+                      class="market-amount-deviation"
+                      :class="tone(row.deviationFromAverage)"
+                      title="相对20日日均"
+                      >（{{ formatPct(row.deviationFromAverage, true) }}）</span
+                    >
                   </td>
-                  <td class="is-left source-cell" :title="row.source || '来源未记录'">
+                  <td>
+                    {{
+                      formatHundredMillion(
+                        row.amount20dAverageYuan == null
+                          ? null
+                          : Number(row.amount20dAverageYuan) / 1e8,
+                      )
+                    }}
+                  </td>
+                  <td class="source-cell" :title="row.source || '来源未记录'">
                     {{ row.source || '来源缺失' }}
                   </td>
                 </tr>
@@ -421,7 +440,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+  import { computed, onDeactivated, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+  import { useDashboardRefresh } from '../../useDashboardRefresh';
   import {
     getAShareLiveSectorFundFlow,
     getAShareLiveMarketTurnover,
@@ -434,7 +454,9 @@
   } from '@/api/hedgeResearch';
   import { Modal } from 'ant-design-vue';
   import ResearchSourceState from '../../research/components/ResearchSourceState.vue';
+  import AShareLegacyTerminalSection from './AShareLegacyTerminalSection.vue';
   import VibeTrendCharts from './VibeTrendCharts.vue';
+  import VibeTimeChart from './VibeTimeChart.vue';
 
   import { useResearchViewState, useResearchSnapshots } from '../../composables/researchWorkspace';
 
@@ -474,16 +496,12 @@
     marketCapYi: number | null;
     industry?: string | null;
   };
-  const sectorsExpanded = useResearchViewState('sectorsExpanded', true);
   const liveSectorFlow = shallowRef<AShareLiveSectorFundFlowResponse | null>(null);
   const turnoverData = shallowRef<AShareMarketTurnoverResponse | null>(null);
   const liveSectorFlowError = ref('');
   const liveSectorFlowLoading = ref(false);
-  let liveTimer: number | undefined;
-  let lastLiveLoad = 0;
   const turnoverLoading = ref(false);
   const turnoverError = ref('');
-  const topN = useResearchViewState<10 | 20>('topN', 10);
   const marketBreadthOpen = ref(false);
   const ladderOpen = ref(false);
   const hotMatrixOpen = ref(false);
@@ -510,8 +528,8 @@
       advance: row.up,
       decline: row.down,
       flat: row.flat,
-      limit_up: row.limitUp,
-      limit_down: row.limitDown,
+      limit_up: row.allALimitUp,
+      limit_down: row.allALimitDown,
       total_amount_100m: row.totalAmountYuan == null ? null : Number(row.totalAmountYuan) / 1e8,
       market_breadth: row.marketBreadthPct == null ? null : Number(row.marketBreadthPct) / 100,
       csi300Close: row.csi300Close == null ? null : Number(row.csi300Close),
@@ -519,34 +537,43 @@
   );
   const marketAmountRows = computed(() => {
     if (marketAmountData.value) return marketAmountData.value.rows;
-    const sourceRows = props.dashboard?.marketHistory || [];
+    const sourceRows = [...(props.dashboard?.marketHistory || [])].sort((a, b) =>
+      a.observedAt.localeCompare(b.observedAt),
+    );
     const rows = sourceRows
-      .map((row, index) => ({
-        ...row,
-        amountChangePct:
-          row.amountChangePct ??
-          (index > 0 &&
-          row.totalAmountYuan != null &&
-          sourceRows[index - 1]?.totalAmountYuan != null
-            ? ((Number(row.totalAmountYuan) - Number(sourceRows[index - 1].totalAmountYuan)) /
-                Number(sourceRows[index - 1].totalAmountYuan)) *
-              100
-            : null),
-      }))
-      .sort((a, b) => b.observedAt.localeCompare(a.observedAt));
+      .map((row, index) => {
+        const window = sourceRows.slice(Math.max(0, index - 19), index + 1);
+        return {
+          ...row,
+          amount20dAverageYuan:
+            window.length === 20 && window.every((item) => item.totalAmountYuan != null)
+              ? window.reduce((sum, item) => sum + Number(item.totalAmountYuan), 0) / 20
+              : null,
+        };
+      })
+      .reverse();
     return rows;
   });
   const marketAmountPageCount = computed(() =>
     Math.max(1, Math.ceil((marketAmountData.value?.total ?? marketAmountRows.value.length) / 100)),
   );
-  const pagedMarketAmountRows = computed(() =>
-    marketAmountData.value
+  const pagedMarketAmountRows = computed(() => {
+    const rows = marketAmountData.value
       ? marketAmountRows.value
       : marketAmountRows.value.slice(
           (marketAmountPage.value - 1) * 100,
           marketAmountPage.value * 100,
-        ),
-  );
+        );
+    return rows.map((row) => {
+      const amount = numeric(row.totalAmountYuan);
+      const average = numeric(row.amount20dAverageYuan);
+      return {
+        ...row,
+        deviationFromAverage:
+          amount != null && average != null && average > 0 ? (amount - average) / average : null,
+      };
+    });
+  });
   let historyController: AbortController | undefined;
   async function loadMarketAmountHistory() {
     historyController?.abort();
@@ -577,7 +604,6 @@
   });
   const latestHistory = computed(() => allHistoryRows.value.at(-1) || null);
   const hotStockCount = computed(() => turnoverData.value?.highTurnoverCount ?? null);
-  const updatedAt = computed(() => props.dashboard?.generatedAt || '');
   const breadth = computed(() => {
     return props.dashboard?.breadth.data || null;
   });
@@ -594,10 +620,9 @@
     }));
   });
   const ladderRows = computed(() => emotion.value?.ladder || []);
-  const maxLadderCount = computed(() => Math.max(1, ...ladderRows.value.map((r) => r.stockCount)));
-  function ladderWidth(c: number) {
-    return Math.max(4, (c / maxLadderCount.value) * 100);
-  }
+  const sectorEmptyText = computed(() =>
+    liveSectorFlowLoading.value ? '正在读取板块资金流…' : liveSectorFlowError.value,
+  );
   const sectorFlowMeta = computed<ResearchSourceMeta>(() => ({
     source: liveSectorFlow.value?.source || '板块资金流',
     fetchedAt: liveSectorFlow.value?.fetchedAt || '',
@@ -636,9 +661,6 @@
       outflowYi: Number(row.outflowYuan) / 1e8,
       firms: row.firmCount ?? null,
     })),
-  );
-  const visibleSectorRows = computed(() =>
-    sectorsExpanded.value ? sectorRows.value : sectorRows.value.slice(0, 7),
   );
   const rotationRows = computed(() =>
     sectorRows.value
@@ -689,7 +711,6 @@
       return;
     }
     if (document.visibilityState === 'hidden') return;
-    lastLiveLoad = Date.now();
     const flow = reuse && snapshots.get<AShareLiveSectorFundFlowResponse>('sector-flow');
     const turnover = reuse && snapshots.get<AShareMarketTurnoverResponse>('turnover');
     if (flow) liveSectorFlow.value = flow;
@@ -700,23 +721,29 @@
     ]);
     if (!controller.signal.aborted) emit('ready');
   }
-  function resumeLive() {
-    if (Date.now() - lastLiveLoad >= 5 * 60 * 1000) void loadLive();
-  }
+  onDeactivated(() => {
+    marketBreadthOpen.value =
+      ladderOpen.value =
+      hotMatrixOpen.value =
+      marketAmountHistoryOpen.value =
+        false;
+  });
+  useDashboardRefresh(() => loadLive(), {
+    intervalMs: 300_000,
+    immediate: false,
+    enabled: () =>
+      props.mode !== 'crowding' && !liveSectorFlowLoading.value && !turnoverLoading.value,
+  });
   watch(
     () => props.refreshKey,
     () => void loadLive(),
   );
   onMounted(() => {
     void loadLive(true);
-    liveTimer = window.setInterval(resumeLive, 5 * 60 * 1000);
-    document.addEventListener('visibilitychange', resumeLive);
   });
   onBeforeUnmount(() => {
     controller.abort();
     historyController?.abort();
-    if (liveTimer != null) window.clearInterval(liveTimer);
-    document.removeEventListener('visibilitychange', resumeLive);
   });
   const turnoverRows = computed<TurnoverRow[]>(() => {
     return (turnoverData.value?.rows || []).map((r) => ({
@@ -750,65 +777,16 @@
   function hotStockBarWidth(value: number | null) {
     return Math.max(4, ((value || 0) / highTurnoverMaxYi.value) * 100);
   }
-  const breadthMetrics = computed(() => {
-    const v = breadth.value;
-    if (!v) return [];
-    return [
-      { label: '上涨', value: v.up, note: '当日上涨家数', tone: 'up' },
-      { label: '下跌', value: v.down, note: '当日下跌家数', tone: 'down' },
-      { label: '平盘', value: v.flat, note: '当日平盘家数', tone: '' },
-      {
-        label: '涨停 / 真实涨停',
-        value: `${v.limitUp ?? '—'} / ${v.realLimitUp ?? '—'}`,
-        note: '来源原始口径',
-        tone: 'up',
-      },
-      {
-        label: '跌停 / 真实跌停',
-        value: `${v.limitDown ?? '—'} / ${v.realLimitDown ?? '—'}`,
-        note: '来源原始口径',
-        tone: 'down',
-      },
-      {
-        label: '活跃度',
-        value: formatActivity(v.activityPct),
-        note: '赚钱效应活跃度',
-        tone: '',
-      },
-      { label: '市场宽度', value: v.breadthState, note: v.tradeDate || '最新交易日', tone: '' },
-      { label: '题材投机', value: v.speculationState, note: '按真实涨停数量分类', tone: '' },
-    ];
-  });
-  const emotionMetrics = computed(() => {
-    const v = emotion.value;
-    if (!v) return [];
-    return [
-      { label: '涨停', value: v.limitUpCount, note: v.tradeDate || '最新交易日', tone: 'up' },
-      { label: '炸板', value: v.brokenBoardCount, note: '触板后未封住', tone: 'down' },
-      { label: '跌停', value: v.limitDownCount, note: '当日跌停池', tone: 'down' },
-      { label: '最高连板', value: `${v.highestBoardCount}板`, note: '涨停池最高', tone: '' },
-      { label: '二板及以上', value: v.consecutiveBoardCount, note: '当日连板股数量', tone: '' },
-      {
-        label: '封板率',
-        value: formatRate(v.sealRatePct),
-        note: '涨停 /（涨停＋炸板）',
-        tone: 'up',
-      },
-      {
-        label: '炸板率',
-        value: formatRate(v.breakRatePct),
-        note: '炸板 /（涨停＋炸板）',
-        tone: 'down',
-      },
-      {
-        label: '晋级率',
-        value: formatRate(v.promotionRatePct),
-        note: '今日二板+ / 昨日涨停',
-        tone: '',
-      },
-    ];
-  });
+  const structureMetrics = computed(() => [
+    { label: '上涨', value: breadth.value?.up, tone: 'up' },
+    { label: '下跌', value: breadth.value?.down, tone: 'down' },
+    { label: '涨停', value: emotion.value?.limitUpCount, tone: 'up' },
+    { label: '跌停', value: emotion.value?.limitDownCount, tone: 'down' },
+    { label: '炸板', value: emotion.value?.brokenBoardCount, tone: 'down' },
+    { label: '封板率', value: formatRate(emotion.value?.sealRatePct), tone: 'up' },
+  ]);
   function numeric(v: unknown) {
+    if (v == null || v === '') return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   }
@@ -822,11 +800,6 @@
     const n = numeric(v);
     return n == null ? '—' : `${n.toFixed(1)}%`;
   }
-  function formatActivity(v: unknown) {
-    if (v == null) return '—';
-    const text = String(v);
-    return text.endsWith('%') ? text : `${text}%`;
-  }
   function formatYi(v: unknown) {
     const n = numeric(v);
     return n == null ? '—' : `${n.toFixed(2)}亿`;
@@ -839,14 +812,67 @@
     const n = numeric(v);
     return n == null ? '' : n > 0 ? 'up' : n < 0 ? 'down' : '';
   }
-  function formatDate(v: string | null | undefined) {
-    if (!v) return '最新交易日';
-    const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN', { hour12: false });
-  }
 </script>
 
 <style scoped lang="less">
+  .market-structure {
+    min-width: 0;
+  }
+
+  .structure-sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-bottom: 8px;
+  }
+
+  .structure-summary {
+    display: flex;
+    align-items: stretch;
+    margin-bottom: 10px;
+    overflow-x: auto;
+    border: 1px solid var(--strategy-border);
+    border-radius: 10px;
+    background: var(--strategy-surface);
+  }
+
+  .structure-metric {
+    display: flex;
+    flex: 1 0 auto;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 14px;
+    color: var(--strategy-text-3);
+    font-size: 12px;
+    white-space: nowrap;
+    gap: 8px;
+  }
+
+  .structure-metric + .structure-metric {
+    border-left: 1px solid var(--strategy-border);
+  }
+
+  .structure-metric strong {
+    color: var(--strategy-text-1);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .structure-ladder {
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .structure-ladder:hover:not(:disabled) {
+    background: var(--strategy-accent-soft);
+  }
+
+  .structure-ladder:disabled {
+    cursor: default;
+  }
+
   .overview-card,
   .panel {
     padding: 18px;
@@ -869,7 +895,6 @@
     min-width: 0;
   }
 
-  .overview-header,
   .panel-title {
     display: flex;
     align-items: flex-start;
@@ -877,29 +902,12 @@
     gap: 12px;
   }
 
-  .eyebrow {
-    margin: 0 0 3px;
-    color: var(--strategy-text-4);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-  }
-
-  .overview-header h2,
   .panel h3 {
     margin: 0;
     color: var(--strategy-text-1);
-  }
-
-  .overview-header h2 {
-    font-size: 20px;
-  }
-
-  .panel h3 {
     font-size: 15px;
   }
 
-  .updated,
   .panel-title p,
   .source-note {
     margin: 0;
@@ -912,10 +920,89 @@
     font-size: 11px;
   }
 
-  .overview-grid {
+  .fund-flow-layout {
+    --rotation-height: 280px;
+    --turnover-height: 560px;
+    --fund-gap: 14px;
+
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    min-width: 0;
+    height: calc(var(--rotation-height) + var(--turnover-height) + var(--fund-gap));
+    gap: var(--fund-gap);
+  }
+
+  .fund-flow-right {
+    display: grid;
+    grid-template-rows: var(--rotation-height) var(--turnover-height);
+    gap: var(--fund-gap);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .industry-flow-panel,
+  .rotation-panel,
+  .turnover-panel {
+    display: flex;
+    box-sizing: border-box;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    gap: 12px;
+  }
+
+  .fund-flow-layout .panel-title {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+  }
+
+  .fund-flow-layout .funds-table-scroll {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .fund-flow-layout .rotation-grid {
+    margin-top: 0;
+  }
+
+  .fund-flow-layout th {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+  }
+
+  .fund-flow-layout table {
+    min-width: 460px;
+  }
+
+  .turnover-table-scroll table {
+    min-width: 680px;
+  }
+
+  .turnover-table-scroll th {
+    box-sizing: border-box;
+    height: 32px;
+    padding: 5px 8px;
+  }
+
+  .turnover-table-scroll td {
+    box-sizing: border-box;
+    height: 42px;
+    padding: 5px 8px;
+    line-height: 16px;
+  }
+
+  .turnover-table-scroll td small {
+    line-height: 12px;
+  }
+
+  .funds-table-scroll:focus-visible {
+    outline: 2px solid var(--strategy-accent-strong);
+    outline-offset: -2px;
   }
 
   .metric-panel {
@@ -959,57 +1046,6 @@
     margin: 5px 0 2px;
     color: var(--strategy-text-1);
     font-size: 18px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .overview-meta-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 9px;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid var(--strategy-border);
-  }
-
-  .overview-meta-grid > div {
-    padding: 8px;
-    border-radius: 8px;
-    background: var(--strategy-surface);
-    text-align: center;
-  }
-
-  .overview-meta-grid .meta-action {
-    display: block;
-    width: 100%;
-    padding: 8px;
-    border: 0;
-    border-radius: 8px;
-    background: var(--strategy-surface);
-    color: inherit;
-    text-align: center;
-    cursor: pointer;
-  }
-
-  .overview-meta-grid .meta-action:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
-  }
-
-  .overview-meta-grid .meta-action:hover:not(:disabled) {
-    background: var(--strategy-accent-soft);
-  }
-
-  .overview-meta-grid span {
-    display: block;
-    color: var(--strategy-text-3);
-    font-size: 10px;
-  }
-
-  .overview-meta-grid strong {
-    display: block;
-    margin-top: 4px;
-    color: var(--strategy-text-1);
-    font-size: 15px;
     font-variant-numeric: tabular-nums;
   }
 
@@ -1447,6 +1483,10 @@
     white-space: nowrap;
   }
 
+  .market-amount-deviation {
+    font-variant-numeric: tabular-nums;
+  }
+
   .market-amount-pagination {
     display: flex;
     align-items: center;
@@ -1587,28 +1627,6 @@
     gap: 12px;
   }
 
-  .turnover-actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .turnover-actions button {
-    padding: 2px 7px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 6px;
-    background: var(--strategy-surface-2);
-    color: var(--strategy-text-3);
-    font-size: 11px;
-    cursor: pointer;
-  }
-
-  .turnover-actions button.active {
-    border-color: var(--strategy-accent-strong);
-    background: var(--strategy-accent-soft);
-    color: var(--strategy-accent-strong);
-  }
-
   .panel :deep(.research-source-state),
   .metric-panel :deep(.research-source-state) {
     white-space: nowrap;
@@ -1641,8 +1659,13 @@
   }
 
   @media (max-width: 900px) {
-    .overview-grid {
+    .fund-flow-layout {
       grid-template-columns: minmax(0, 1fr);
+      height: auto;
+    }
+
+    .industry-flow-panel {
+      height: var(--turnover-height);
     }
 
     .emotion-detail {
@@ -1679,14 +1702,6 @@
 
     .metric-grid {
       grid-template-columns: minmax(0, 1fr);
-    }
-
-    .overview-meta-grid {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .overview-header {
-      flex-direction: column;
     }
   }
 </style>

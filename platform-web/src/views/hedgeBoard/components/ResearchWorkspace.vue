@@ -2,7 +2,7 @@
   <div class="board-workspace" :class="{ 'is-collapsed': collapsed }">
     <ResearchSidebar
       :items="pages"
-      :active="active"
+      :active="sidebarActive ?? active"
       :label="label"
       :collapsed="collapsed"
       @toggle="collapsed = !collapsed"
@@ -17,7 +17,10 @@
       @touchstart.passive="restoring = false"
       @keydown="restoring = false"
     >
-      <div ref="content" class="board-workspace__content" :key="`${account}:${active}`"
+      <div
+        ref="content"
+        class="board-workspace__content"
+        :key="`${account}:${contentKey ?? active}`"
         ><slot></slot
       ></div>
     </main>
@@ -32,10 +35,14 @@
   const props = defineProps<{
     pages: Array<{ key: string; label: string; short?: string; path?: string }>;
     active: string;
+    sidebarActive?: string;
     label: string;
+    contentKey?: string;
   }>();
   const currentTitle = computed(
-    () => props.pages.find((p) => p.key === props.active)?.label || props.label,
+    () =>
+      props.pages.find((p) => p.key === (props.sidebarActive ?? props.active))?.label ||
+      props.label,
   );
   const collapsed = ref(false);
   const viewport = ref<HTMLElement>();
@@ -47,6 +54,7 @@
   let restoring = true;
   let observer: ResizeObserver | undefined;
   let frame = 0;
+  let observation = 0;
   function saveScroll() {
     if (!restoring && viewport.value) positions.set(props.active, viewport.value.scrollTop);
   }
@@ -58,9 +66,10 @@
     if (Math.abs(viewport.value.scrollTop - target) < 2) restoring = false;
   }
   async function observeContent() {
+    const current = ++observation;
     observer?.disconnect();
     await nextTick();
-    if (!content.value) return;
+    if (current !== observation || !content.value) return;
     observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(restore);
@@ -68,6 +77,13 @@
     observer.observe(content.value);
     restore();
   }
+  function restoreScroll(page: string) {
+    if (page === props.active && restoring) void observeContent();
+  }
+  defineExpose({
+    restoreScroll,
+    clearSnapshots: () => workspace.snapshots.clear(),
+  });
   watch(
     () => props.active,
     () => {
@@ -86,6 +102,7 @@
   });
   onMounted(observeContent);
   onBeforeUnmount(() => {
+    observation++;
     observer?.disconnect();
     cancelAnimationFrame(frame);
   });
@@ -98,7 +115,7 @@
   .board-workspace {
     display: grid;
     grid-template-columns: 150px minmax(0, 1fr);
-    gap: 16px;
+    gap: var(--strategy-space-3);
     min-width: 0;
   }
 

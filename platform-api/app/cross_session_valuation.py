@@ -126,6 +126,33 @@ def _day_session(database_path, instance_id, day, latest_at, count):
         if latest.get("mt5", {}).get("marketStatus") not in {"open", "closed"}:
             legacy = legacy_observation(db, instance_id, latest_at)
             return legacy, latest, False
+        if valid_observation(latest):
+            # Preserve the archive query's selection when multiple marks share
+            # an observed timestamp.
+            duplicate = db.execute(
+                "SELECT 1 FROM market_spread_snapshots "
+                "WHERE strategy_key='cross_venue_spread' AND strategy_instance_id=? "
+                "AND observed_at=? LIMIT 1 OFFSET 1",
+                (instance_id, latest_at),
+            ).fetchone()
+            if duplicate is None:
+                return latest, latest, False
+        closed = latest.get("mt5", {}).get("marketStatus") == "closed"
+        last_candidate_at = latest_at
+        if closed:
+            # The last non-closed mark bounds the search for a valid open mark.
+            # On a fully closed day this avoids a second scan of the same payloads.
+            non_closed = db.execute(
+                "SELECT observed_at FROM market_spread_snapshots "
+                "WHERE strategy_key='cross_venue_spread' AND strategy_instance_id=? "
+                "AND observed_at>=? AND observed_at<=? "
+                "AND COALESCE(json_extract(payload_json,'$.mt5.marketStatus'),'unknown') "
+                "!='closed' ORDER BY observed_at DESC LIMIT 1",
+                (instance_id, start, latest_at),
+            ).fetchone()
+            if non_closed is None:
+                return None, latest, True
+            last_candidate_at = non_closed[0]
         row = db.execute(
             "SELECT payload_json FROM market_spread_snapshots "
             "WHERE strategy_key='cross_venue_spread' AND strategy_instance_id=? "
@@ -138,20 +165,9 @@ def _day_session(database_path, instance_id, day, latest_at, count):
             "!='quote_stale' "
             "AND COALESCE(json_extract(payload_json,'$.bybit.executionBlockReason'),'') "
             "!='quote_stale' ORDER BY observed_at DESC LIMIT 1",
-            (instance_id, start, latest_at),
+            (instance_id, start, last_candidate_at),
         ).fetchone()
-        non_closed = None
-        if row is None:
-            non_closed = db.execute(
-                "SELECT 1 FROM market_spread_snapshots "
-                "WHERE strategy_key='cross_venue_spread' AND strategy_instance_id=? "
-                "AND observed_at>=? AND observed_at<=? "
-                "AND COALESCE(json_extract(payload_json,'$.mt5.marketStatus'),'unknown') "
-                "!='closed' LIMIT 1",
-                (instance_id, start, latest_at),
-            ).fetchone()
-    closed_only = latest.get("mt5", {}).get("marketStatus") == "closed" and not non_closed
-    return json.loads(row[0]) if row else None, latest, closed_only
+    return json.loads(row[0]) if row else None, latest, False
 
 
 def reporting_day(occurred_at, observations):

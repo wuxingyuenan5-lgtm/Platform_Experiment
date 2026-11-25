@@ -12,7 +12,8 @@ from app.research_market_capture import create_research_market_router
 pytestmark = pytest.mark.unit
 
 
-def test_native_closed_bars_use_fixed_worker_and_exclude_forming_bar(monkeypatch):
+@pytest.mark.parametrize('timeframe,limit', [('D1', 2000), ('M30', 35000)])
+def test_native_closed_bars_use_fixed_worker_and_exclude_forming_bar(monkeypatch, timeframe, limit):
     calls = []
     rates = np.array(
         [(1792108800, 4200.1, 4250.2, 4190.0, 4240.12)],
@@ -22,6 +23,7 @@ def test_native_closed_bars_use_fixed_worker_and_exclude_forming_bar(monkeypatch
         account_info=lambda: SimpleNamespace(login=1, server="fixture", company="fixture"),
         terminal_info=lambda: SimpleNamespace(connected=True),
         TIMEFRAME_D1=1440,
+        TIMEFRAME_M30=30,
         copy_rates_from_pos=lambda *args: calls.append(args) or rates,
     )
     checked = []
@@ -34,17 +36,19 @@ def test_native_closed_bars_use_fixed_worker_and_exclude_forming_bar(monkeypatch
         module, "resolve_mt5_symbol", lambda **_: SimpleNamespace(symbol="XAUUSD.s")
     )
     monkeypatch.setattr(module, "with_mt5_read_session", lambda **kw: kw["callback"](None))
-    result = module.read_daily_rates(adapter, account_id="fixed", count=1500)
+    read = module.read_daily_rates if timeframe == 'D1' else module.read_intraday_rates
+    result = read(adapter, account_id="fixed", count=1500)
     assert checked == ["fixed"]
-    assert calls == [("XAUUSD.s", 1440, 1, 1500)]
+    assert calls == [("XAUUSD.s", 1440 if timeframe == 'D1' else 30, 1, 1500)]
+    assert result['timeframe'] == timeframe
     assert result["closedOnly"] is True and result["rows"][0]["close"] == "4240.12"
     assert result["symbol"] == "XAUUSD.s" and result["server"] == "fixture"
-    for count in (0, 2001):
+    for count in (0, limit + 1):
         with pytest.raises(GatewayConfigurationError):
-            module.read_daily_rates(adapter, account_id="fixed", count=count)
+            read(adapter, account_id="fixed", count=count)
     adapter.settings.live_write_enabled = True
     with pytest.raises(GatewayConfigurationError):
-        module.read_daily_rates(adapter, account_id="fixed")
+        read(adapter, account_id="fixed")
     assert len(calls) == 1
 
 
@@ -55,7 +59,8 @@ def test_daily_route_bounds_fixed_account_and_live_write_gate():
             mt5_primary_account_id="fixed", mt5_accounts={"fixed": {}}, live_write_enabled=False
         ),
         gateway=SimpleNamespace(
-            get_research_daily_rates=lambda **kw: calls.append(kw) or {"rows": []}
+            get_research_daily_rates=lambda **kw: calls.append(kw) or {"rows": []},
+            get_research_intraday_rates=lambda **kw: calls.append(kw) or {"rows": []},
         ),
     )
     app = FastAPI()
@@ -64,12 +69,16 @@ def test_daily_route_bounds_fixed_account_and_live_write_gate():
         assert client.get("/v1/market-data/xauusd-daily?count=10").status_code == 200
         assert calls == [{"account_id": "fixed", "count": 10}]
         assert client.get("/v1/market-data/xauusd-daily?count=2001").status_code == 422
+        assert client.get('/v1/market-data/xauusd-intraday?count=10').status_code == 200
+        assert client.get('/v1/market-data/xauusd-intraday?count=35001').status_code == 422
         capture.settings.live_write_enabled = True
         assert client.get("/v1/market-data/xauusd-daily").status_code == 503
-        assert len(calls) == 1
+        assert client.get('/v1/market-data/xauusd-intraday').status_code == 503
+        assert len(calls) == 2
 
 
-def test_worker_daily_research_yields_before_starting_for_busy_or_live_account():
+@pytest.mark.parametrize('method', ['get_research_daily_rates', 'get_research_intraday_rates'])
+def test_worker_daily_research_yields_before_starting_for_busy_or_live_account(method):
     from app.config import Settings
     from app.mt5_account_worker import Mt5AccountWorkerClient
 
@@ -77,12 +86,12 @@ def test_worker_daily_research_yields_before_starting_for_busy_or_live_account()
         settings=Settings(live_write_enabled=True), account_id="fixed", terminal_path=None
     )
     with pytest.raises(GatewayConfigurationError, match="yielded"):
-        client.get_research_daily_rates(account_id="fixed", count=10)
+        getattr(client, method)(account_id="fixed", count=10)
     client.settings.live_write_enabled = False
     client._lock.acquire()
     try:
         with pytest.raises(GatewayConfigurationError, match="yielded"):
-            client.get_research_daily_rates(account_id="fixed", count=10)
+            getattr(client, method)(account_id="fixed", count=10)
     finally:
         client._lock.release()
     assert client._process is None

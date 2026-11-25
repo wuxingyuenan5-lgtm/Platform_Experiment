@@ -114,7 +114,7 @@ function component(relative) {
     if (name === '@/store/modules/user')
       return { useUserStore: () => ({ authentication: { user: { role: 'ceo' } } }) };
     if (name.startsWith('@/api/')) return {};
-    if (name === './FundingBasisPanel.vue') return { default: { render: () => null } };
+    if (['./FundingBasisPanel.vue', './FundingExitSettings.vue'].includes(name)) return { default: { render: () => null } };
     return require(name);
   };
   new Function('require', 'module', 'exports', code)(dependencies, mod, mod.exports);

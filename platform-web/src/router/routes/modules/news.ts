@@ -40,7 +40,7 @@ const news: AppRouteModule = {
     {
       path: 'wealth',
       name: 'NewsCalendarWealth',
-      redirect: '/hedge-board/crypto',
+      redirect: '/hedge-board/crypto?view=wealth',
       meta: {
         title: '理财信息',
         hideMenu: true,

@@ -52,6 +52,22 @@ def seed_run():
     return _seed
 
 
+def test_iv_recovery_requires_measured_complete_day_and_preserves_lineage(overseas_db, seed_run):
+    run = seed_run('overseas-crypto_iv-recovery')
+    terms = {expiry: {'daysToExpiry': days, 'iv': value}
+             for expiry, days, value in [('2026-10-30', 38, 36.79), ('2026-11-27', 66, 38.4),
+                                          ('2027-03-26', 185, 39.84), ('2027-06-25', 276, 40.57)]}
+    repository.write_overseas_series(run, 'crypto_iv_term', '2026-09-22', terms, source='Deribit')
+    assert repository.recover_iv_snapshots_from_terms(['2026-09-14', '2026-09-22']) == ['2026-09-22']
+    assert repository.read_iv_snapshot_history('3M')[0]['iv'] == 38.4
+    assert repository.recover_iv_snapshots_from_terms(['2026-09-22']) == []
+    with connection() as db:
+        import json
+        row = db.execute("SELECT payload_json FROM research_a_share_history WHERE dataset='crypto_iv_snapshot' AND entity_code='3M'").fetchone()
+        payload = json.loads(row[0])
+    assert payload['recoveredFrom'] == 'crypto_iv_term' and payload['expiry'] == '2026-11-27'
+
+
 # ---------------------------------------------------------------------------
 # 1. 网络层安全
 # ---------------------------------------------------------------------------
@@ -597,15 +613,11 @@ def test_one_failed_source_does_not_block_the_others(overseas_db, monkeypatch) -
     monkeypatch.setattr(refresh, "fetch_etf_flow", _flow)
     monkeypatch.setattr(
         refresh,
-        "fetch_deribit_iv",
-        lambda: {"index": 60000.0, "term": []},
-    )
-    monkeypatch.setattr(
-        refresh,
         "fetch_btc_iv_snapshot",
         lambda: {
             "index": 60000.0,
             "dvol": 41.2,
+            "term": [],
             "observedAt": "2026-09-10",
             "tenors": [
                 {
@@ -778,6 +790,27 @@ def test_iv_history_is_ascending_and_bounded_by_days(overseas_db, seed_run) -> N
     assert [p["iv"] for p in history] == [35.0, 36.0, 37.0]
 
     assert len(repository.read_iv_snapshot_history("1M", 2)) == 2
+
+
+def test_iv_history_exposes_calendar_gap_without_creating_database_values(overseas_db, seed_run):
+    for day in ['2026-09-13', '2026-09-15']:
+        seed_run(day)
+        repository.write_iv_snapshot(day, day, {'index': 60000, 'dvol': 40, 'observedAt': day,
+            'tenors': [{'tenor': '1M', 'iv': 35, 'expiry': '2026-10-01', 'daysToExpiry': 20, 'strike': 60000}]}, source='fixture')
+    assert repository.read_iv_snapshot_history('1M', 365) == [
+        {'observedAt': '2026-09-13', 'iv': 35}, {'observedAt': '2026-09-14', 'iv': None},
+        {'observedAt': '2026-09-15', 'iv': 35}]
+    with connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM research_a_share_history WHERE dataset='crypto_iv_snapshot' AND entity_code='1M'").fetchone()[0] == 2
+
+
+def test_overseas_health_ignores_other_source_failure_and_tracks_own_failure(overseas_db, seed_run):
+    seed_run('overseas-crypto_etf_flow-ok')
+    repository.write_overseas_series('overseas-crypto_etf_flow-ok', 'crypto_etf_flow', '2026-11-06', {'IBIT': {'flow': 10}}, source='fixture')
+    seed_run('overseas-macro_fedwatch-failed', 'error')
+    assert repository.read_dataset_health('crypto_etf_flow')['status'] == 'ready'
+    seed_run('overseas-crypto_etf_flow-failed', 'error')
+    assert repository.read_dataset_health('crypto_etf_flow')['status'] == 'stale'
 
 
 # ---------------------------------------------------------------------------

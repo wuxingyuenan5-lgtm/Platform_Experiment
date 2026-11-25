@@ -1,11 +1,13 @@
 <template>
-  <details class="reference-snapshots" :open="group === 'options'">
-    <summary>原图快照 · {{ group === 'options' ? '未落地' : '待补功能' }}</summary>
+  <details class="reference-snapshots" :open="group === 'options' && !optionsReady">
+    <summary>原图快照 · {{ group === 'options' && !optionsReady ? '未落地' : '待补功能' }}</summary>
     <div class="reference-grid">
       <figure v-for="item in items" :key="item.file">
         <figcaption
           ><strong>{{ item.title }}</strong
-          ><span>未落地</span></figcaption
+          ><span>{{
+            optionsReady && group === 'options' ? '部分实现' : '未落地'
+          }}</span></figcaption
         >
         <p>{{ item.missing }}</p>
         <a
@@ -16,7 +18,7 @@
         >
           <img
             :src="`/images/gold-references/${item.file}.png`"
-            :alt="`${item.title}，用户提供的参考截图，未落地`"
+            :alt="`${item.title}，用户提供的参考截图`"
             loading="lazy"
           />
         </a>
@@ -28,7 +30,7 @@
 <script setup lang="ts">
   import { computed } from 'vue';
 
-  const props = defineProps<{ group: 'options' | 'factors' | 'cot' }>();
+  const props = defineProps<{ group: 'options' | 'factors' | 'cot'; optionsReady?: boolean }>();
   const catalog = {
     options: [
       {
@@ -87,7 +89,19 @@
       },
     ],
   };
-  const items = computed(() => catalog[props.group]);
+  const items = computed(() =>
+    catalog[props.group].map((item) => {
+      if (props.group !== 'options' || !props.optionsReady) return item;
+      const notes: Record<string, string> = {
+        'put-call-ema30': '日度成交已接通；连续历史不足30个观察时不显示EMA30。',
+        'call-volume-ema30': '全部合约月成交已接通；待积累EMA30历史及匹配金银价格。',
+        'put-volume-ema30': '全部合约月成交已接通；待积累EMA30历史及匹配金银价格。',
+        'max-pain-current': '完整期权链与静态最大痛点已接通；待匹配期货结算价及多日对比。',
+        'max-pain-history': '日度期权链开始归档；历史、溢折价、ΔIV仍待补齐。',
+      };
+      return { ...item, missing: notes[item.file] || item.missing };
+    }),
+  );
 </script>
 <style scoped>
   .reference-snapshots {

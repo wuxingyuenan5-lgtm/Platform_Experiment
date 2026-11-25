@@ -1,0 +1,240 @@
+.object-workspace {
+  min-width: 0;
+  color: var(--strategy-text-2, #354d68);
+}
+.object-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  margin-bottom: 14px;
+  border: 1px solid #d9e3ee;
+  border-radius: 12px;
+  background: #fff;
+}
+.object-tabs button,
+.object-button {
+  min-height: 35px;
+  padding: 7px 13px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #526880;
+  cursor: pointer;
+}
+.object-tabs button[aria-pressed='true'] {
+  background: #eaf2ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+.object-tabs button:hover,
+.object-button:hover {
+  background: #f1f6ff;
+  color: #1d4ed8;
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+.object-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #d9e3ee;
+  border-radius: 12px;
+  background: #fff;
+}
+.object-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.object-heading h2,
+.object-heading h3 {
+  margin: 0;
+  color: #10233d;
+  font-size: 20px;
+}
+.object-heading p,
+.object-source {
+  margin: 6px 0;
+  color: #60758f;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.object-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.object-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.object-controls input,
+.object-controls select {
+  min-height: 34px;
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #d9e3ee;
+  border-radius: 6px;
+  background: white;
+  color: inherit;
+}
+.object-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.object-summary article {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #e1e7ef;
+  border-radius: 10px;
+  background: #fff;
+}
+.object-summary span,
+.object-summary small {
+  display: block;
+  color: #60758f;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.object-summary strong {
+  display: block;
+  margin: 6px 0;
+  color: #10233d;
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+}
+.object-columns {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.4fr);
+  gap: 14px;
+  align-items: start;
+}
+.object-facts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  margin: 16px 0 0;
+  font-size: 13px;
+}
+.object-facts dt {
+  color: #60758f;
+}
+.object-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: #10233d;
+  text-align: right;
+}
+.object-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.object-links button {
+  padding: 9px 12px;
+  border: 1px solid #d9e3ee;
+  border-radius: 8px;
+  background: #f7f9fc;
+  color: #1d4ed8;
+  cursor: pointer;
+  text-align: left;
+}
+.object-links small {
+  display: block;
+  margin-top: 4px;
+  color: #60758f;
+}
+.object-table {
+  max-width: 100%;
+  overflow: auto;
+  margin-top: 12px;
+}
+.object-table table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.object-table th,
+.object-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #edf1f6;
+  text-align: right;
+}
+.object-table th:first-child,
+.object-table td:first-child {
+  text-align: left;
+}
+.object-table thead {
+  color: #60758f;
+  background: #f7f9fc;
+}
+.object-table button {
+  border: 0;
+  background: transparent;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+.object-table small {
+  display: block;
+  color: #60758f;
+  font-weight: normal;
+}
+.object-note {
+  padding: 10px 13px;
+  background: #fff8ed;
+  color: #8f5517;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.positive {
+  color: #cc504a !important;
+}
+.negative {
+  color: #13866b !important;
+}
+@media (max-width: 1200px) {
+  .object-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 850px) {
+  .object-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .object-card {
+    padding: 13px;
+  }
+  .object-tabs {
+    gap: 3px;
+    padding: 5px;
+  }
+  .object-tabs button {
+    padding: 7px 9px;
+    font-size: 12px;
+  }
+  .object-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .object-summary article {
+    padding: 10px;
+  }
+  .object-summary strong {
+    font-size: 19px;
+  }
+}

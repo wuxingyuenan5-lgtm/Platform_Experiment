@@ -1,0 +1,1887 @@
+{
+  "sourceRevision": "3399f41cd961b37023997cf180e8a2d2ccfec806",
+  "cases": [
+    {
+      "name": "all",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "TLT",
+        "GLD",
+        "SGOV",
+        "QQQ",
+        "SQQQ",
+        "NVDA",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "AAPL",
+        "IBIT"
+      ],
+      "eventCount": 3046,
+      "eventHash": "97437525871c81eac990fca9943c455dc1ef9b2d9b0ff71eb2381971d4e45719"
+    },
+    {
+      "name": "stocks",
+      "settings": {
+        "kind": "stock",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "NVDA",
+        "AAPL"
+      ],
+      "eventCount": 558,
+      "eventHash": "cc7cfbd6b9fe9b63fe51a01ffac8fae0539191bb632d368c0c7d609c008d0c1e"
+    },
+    {
+      "name": "etfs",
+      "settings": {
+        "kind": "etf",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "TLT",
+        "GLD",
+        "SGOV",
+        "QQQ",
+        "SQQQ",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "IBIT"
+      ],
+      "eventCount": 2488,
+      "eventHash": "915759f1bee4336caa5c52d212e24e6c6e7c5f110c4061609f98a89f1c635129"
+    },
+    {
+      "name": "query",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "NVDA",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "NVDA"
+      ],
+      "eventCount": 258,
+      "eventHash": "7110fb6c4f6c9f668396fd5f67ca65fc8990d2f3225168f38c64f8104baefb23"
+    },
+    {
+      "name": "caps",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "10000",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "NVDA",
+        "AAPL"
+      ],
+      "eventCount": 558,
+      "eventHash": "cc7cfbd6b9fe9b63fe51a01ffac8fae0539191bb632d368c0c7d609c008d0c1e"
+    },
+    {
+      "name": "caps-etfs",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "10000",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": true,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "TLT",
+        "GLD",
+        "SGOV",
+        "QQQ",
+        "SQQQ",
+        "NVDA",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "AAPL",
+        "IBIT"
+      ],
+      "eventCount": 3046,
+      "eventHash": "97437525871c81eac990fca9943c455dc1ef9b2d9b0ff71eb2381971d4e45719"
+    },
+    {
+      "name": "pma-events",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "pma",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "TLT",
+        "GLD",
+        "SGOV",
+        "QQQ",
+        "SQQQ",
+        "NVDA",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "AAPL",
+        "IBIT"
+      ],
+      "eventCount": 0,
+      "eventHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "original-events",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "original",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "TLT",
+        "GLD",
+        "SGOV",
+        "QQQ",
+        "SQQQ",
+        "NVDA",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "AAPL",
+        "IBIT"
+      ],
+      "eventCount": 1348,
+      "eventHash": "215ad4f8fb58048137b23c07ea4eace55a9173e69c8fcc366953a7546628baf3"
+    },
+    {
+      "name": "monthly-events",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "M",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "TLT",
+        "GLD",
+        "SGOV",
+        "QQQ",
+        "SQQQ",
+        "NVDA",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "AAPL",
+        "IBIT"
+      ],
+      "eventCount": 254,
+      "eventHash": "b9d91a2afb59a9b5af52859136004cb26c810796c78d575462177e30a34f3746"
+    },
+    {
+      "name": "bull-signals",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "多"
+      },
+      "symbols": [
+        "SPY",
+        "TLT",
+        "GLD",
+        "SGOV",
+        "QQQ",
+        "SQQQ",
+        "NVDA",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "AAPL",
+        "IBIT"
+      ],
+      "eventCount": 902,
+      "eventHash": "83cc9d92fca7c4f2e77d53999c283cea895f08da030c4cd69a9494650ef177a0"
+    },
+    {
+      "name": "symbol-sort",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "symbol",
+          "order": "asc",
+          "frame": "matched"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "AAPL",
+        "GLD",
+        "IBIT",
+        "JEPI",
+        "NVDA",
+        "QQQ",
+        "SGOV",
+        "SPY",
+        "SQQQ",
+        "TLT",
+        "TQQQ",
+        "USO"
+      ],
+      "eventCount": 3046,
+      "eventHash": "97437525871c81eac990fca9943c455dc1ef9b2d9b0ff71eb2381971d4e45719"
+    },
+    {
+      "name": "monthly-sort",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "order": "asc",
+          "frame": "M"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "NVDA",
+        "QQQ",
+        "SPY",
+        "AAPL",
+        "SGOV",
+        "TLT",
+        "USO",
+        "JEPI",
+        "TQQQ",
+        "GLD",
+        "SQQQ",
+        "IBIT"
+      ],
+      "eventCount": 3046,
+      "eventHash": "97437525871c81eac990fca9943c455dc1ef9b2d9b0ff71eb2381971d4e45719"
+    },
+    {
+      "name": "daily-bull",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "多",
+              "turn": "多",
+              "from": "any",
+              "lookback": 0
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "1D",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "USO",
+        "AAPL"
+      ],
+      "eventCount": 2,
+      "eventHash": "e84d09d24786982edc91242f96ab71f48fe36a0df28f7a204f889a6459389e54"
+    },
+    {
+      "name": "daily-bear",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "空",
+              "turn": "空",
+              "from": "any",
+              "lookback": 0
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "空",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "空",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "1D",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [],
+      "eventCount": 0,
+      "eventHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "weekly-bull",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "多",
+              "turn": "多",
+              "from": "any",
+              "lookback": 0
+            },
+            "M": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "1W",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "AAPL",
+        "USO"
+      ],
+      "eventCount": 2,
+      "eventHash": "9e1b894e042ae88e0c2ff3e8cb270842a896b24cc5c8e31f7247be71a21f51ac"
+    },
+    {
+      "name": "pullback",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "空",
+              "turn": "空",
+              "from": "any",
+              "lookback": 0
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "1D",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [],
+      "eventCount": 0,
+      "eventHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "recent-多",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "多",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "多",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "多",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "多",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "any",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "TLT",
+        "SGOV",
+        "SQQQ",
+        "TQQQ"
+      ],
+      "eventCount": 4,
+      "eventHash": "f5f6405ff5efcbe581919277929f50dc3e100206842b68ea3bcf1bbe8b02368f"
+    },
+    {
+      "name": "recent-空",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "空",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "空",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "空",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "空",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "any",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "GLD",
+        "QQQ",
+        "SQQQ"
+      ],
+      "eventCount": 5,
+      "eventHash": "a9b53ddf181e3993009425bb3f3f3dec021500bb65f0f8552d6338a7c86886db"
+    },
+    {
+      "name": "recent-震荡",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "震荡",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "震荡",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "震荡",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "震荡",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "any",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "NVDA",
+        "QQQ",
+        "SQQQ",
+        "TQQQ",
+        "SGOV",
+        "TLT",
+        "JEPI",
+        "GLD"
+      ],
+      "eventCount": 16,
+      "eventHash": "2892789ae73b321acf939e7832e95c1b652dbcdc833ae87bf56f73df84abe01c"
+    },
+    {
+      "name": "custom-all-true",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "changed",
+              "from": "多",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [],
+      "eventCount": 0,
+      "eventHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "custom-any-true",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "changed",
+              "from": "多",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "any",
+          "stillCurrent": true
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "AAPL",
+        "IBIT",
+        "USO"
+      ],
+      "eventCount": 0,
+      "eventHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "custom-all-false",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "changed",
+              "from": "多",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": false
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [],
+      "eventCount": 0,
+      "eventHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "custom-any-false",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "changed",
+              "from": "多",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "多",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "any",
+          "stillCurrent": false
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "composite",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "AAPL",
+        "IBIT",
+        "USO"
+      ],
+      "eventCount": 0,
+      "eventHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "all-history-1D",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "changed",
+              "from": "震荡",
+              "lookback": 0
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": false
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "original",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SPY",
+        "TLT",
+        "GLD",
+        "SGOV",
+        "QQQ",
+        "SQQQ",
+        "NVDA",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "AAPL",
+        "IBIT"
+      ],
+      "eventCount": 506,
+      "eventHash": "e7f1641a5098589867f9dc10e8dc5e94b17d9109333806a159dd25f57cbfcefe"
+    },
+    {
+      "name": "all-history-3D",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "changed",
+              "from": "震荡",
+              "lookback": 0
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": false
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "original",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SGOV",
+        "GLD",
+        "SPY",
+        "JEPI",
+        "TQQQ",
+        "QQQ",
+        "SQQQ",
+        "AAPL",
+        "TLT",
+        "IBIT",
+        "USO",
+        "NVDA"
+      ],
+      "eventCount": 408,
+      "eventHash": "673b9b49c42c5af6efe69c51db2846a274c006765a92256004e71acf60a4f94f"
+    },
+    {
+      "name": "all-history-1W",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "changed",
+              "from": "震荡",
+              "lookback": 0
+            },
+            "M": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            }
+          },
+          "match": "all",
+          "stillCurrent": false
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "original",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "JEPI",
+        "GLD",
+        "TQQQ",
+        "IBIT",
+        "AAPL",
+        "QQQ",
+        "SQQQ",
+        "NVDA",
+        "SGOV",
+        "USO",
+        "TLT",
+        "SPY"
+      ],
+      "eventCount": 328,
+      "eventHash": "504f025dd2de844b21099dac7ab2c6e92ab4b7cf1f893d6625f7b60b95cd17b1"
+    },
+    {
+      "name": "all-history-M",
+      "settings": {
+        "kind": "all",
+        "scope": "all",
+        "structure": "all",
+        "query": "",
+        "filters": {
+          "rules": {
+            "1D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "3D": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "1W": {
+              "state": "any",
+              "turn": "any",
+              "from": "any",
+              "lookback": 5
+            },
+            "M": {
+              "state": "any",
+              "turn": "changed",
+              "from": "震荡",
+              "lookback": 0
+            }
+          },
+          "match": "all",
+          "stillCurrent": false
+        },
+        "sort": {
+          "by": "event",
+          "frame": "matched",
+          "order": "desc"
+        },
+        "assetScreen": {
+          "sectors": [],
+          "industries": [],
+          "etfs": [],
+          "min": "",
+          "max": "",
+          "unit": 100000000,
+          "includeUnknown": false,
+          "includeStale": false,
+          "keepEtfs": false,
+          "date": ""
+        },
+        "eventSystem": "original",
+        "eventFrame": "all",
+        "eventSide": "all"
+      },
+      "symbols": [
+        "SQQQ",
+        "TQQQ",
+        "JEPI",
+        "USO",
+        "TLT",
+        "AAPL",
+        "NVDA",
+        "QQQ",
+        "SPY",
+        "SGOV",
+        "GLD"
+      ],
+      "eventCount": 104,
+      "eventHash": "ec78fe0736b64875360cec39f40dc09e45c2765d3076d3ff413c8d4f0018ca46"
+    }
+  ]
+}

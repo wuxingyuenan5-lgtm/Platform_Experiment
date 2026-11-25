@@ -16,6 +16,7 @@ def run_component(
 ) -> dict[str, object]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(root / component)
+    env["PYTHON_DOTENV_DISABLED"] = "1"
     env["PHASE4_ITERATIONS"] = str(iterations)
     result = subprocess.run(
         [sys.executable, "-c", code],
@@ -169,11 +170,28 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.main import app
-import app.trade_command_execution as execution
+from app.database import connection, initialize_database
+from app import runtime_transport
 
 iterations = max(10, int(os.environ["PHASE4_ITERATIONS"]) // 4)
 temporary_root = Path(tempfile.mkdtemp())
-get_settings().database_path = str(temporary_root / "platform.db")
+settings = get_settings()
+settings.database_path = str(temporary_root / "platform.db")
+settings.strategy_research_database_path = str(temporary_root / "research.db")
+settings.environment = "development"
+settings.auth_mode = "development"
+settings.development_roles = "admin"
+settings.live_trading_enabled = False
+settings.research_refresh_enabled = False
+settings.strategy_research_enabled = False
+settings.runtime_base_url = "http://127.0.0.1:1"
+initialize_database()
+# A separate unbound simulation account exercises the generic order route.
+with connection() as db:
+    account = dict(db.execute("SELECT * FROM accounts WHERE id='account_sim_usdt'").fetchone())
+    account.update(id="account_benchmark", account_code="BENCHMARK", status="active")
+    db.execute(f"INSERT INTO accounts ({','.join(account)}) VALUES ({','.join('?' for _ in account)})", tuple(account.values()))
+
 
 
 class Response:
@@ -213,9 +231,9 @@ class Response:
         ]
 
 
-execution.httpx.post = lambda *args, **kwargs: Response(kwargs["json"])
+runtime_transport.post = lambda *args, **kwargs: Response(kwargs["json"])
 payload = {
-    "accountId": "account_sim_usdt",
+    "accountId": "account_benchmark",
     "instrumentId": "instrument_btc_usdt",
     "symbol": "BTCUSDT",
     "side": "buy",
@@ -223,7 +241,8 @@ payload = {
     "quantity": "1",
     "price": "100",
 }
-with TestClient(app) as client:
+client = TestClient(app)
+try:
     started = time.perf_counter()
     for index in range(iterations):
         request = dict(payload)
@@ -231,6 +250,8 @@ with TestClient(app) as client:
         response = client.post("/api/v1/trading/orders", json=request)
         assert response.status_code == 200, response.text
     platform_trading_route_seconds = time.perf_counter() - started
+finally:
+    client.close()
 
 print(
     json.dumps(

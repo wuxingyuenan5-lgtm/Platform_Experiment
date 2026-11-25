@@ -1,3 +1,4 @@
+import { useChartReveal } from '@/hooks/web/chartMotion';
 import { defineComponent, h, type PropType, ref, watch } from 'vue';
 
 import MetricStrip from '../components/MetricStrip';
@@ -36,6 +37,13 @@ export default defineComponent({
     windowSize: { type: Number, default: 8 },
   },
   setup(props) {
+    const motionPlot = ref<SVGElement>();
+    const reveal = useChartReveal(motionPlot);
+    watch(
+      () => props.rows,
+      () => void reveal(props.rows.length * 2),
+      { immediate: true, deep: true },
+    );
     const startIndex = ref(0);
     const endIndex = ref(0);
 
@@ -124,6 +132,7 @@ export default defineComponent({
           h(
             'svg',
             {
+              ref: motionPlot,
               viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`,
               class: 'local-chart-svg',
               role: 'img',
@@ -177,6 +186,7 @@ export default defineComponent({
                 props.leftAsBars
                   ? h(
                       'g',
+                      { 'data-chart-kind': 'bar', style: { transformOrigin: `0px ${zeroY}px` } },
                       visibleRows.map((row, index) => {
                         const y = scaleY(row.left, leftRange.min, leftRange.max, innerHeight);
                         return h('rect', {
@@ -195,6 +205,7 @@ export default defineComponent({
                       }),
                     )
                   : h('path', {
+                      'data-chart-kind': 'line',
                       d: leftLinePath,
                       fill: 'none',
                       stroke: props.leftColor,
@@ -203,6 +214,7 @@ export default defineComponent({
                       strokeLinejoin: 'round',
                     }),
                 h('path', {
+                  'data-chart-kind': 'line',
                   d: rightLinePath,
                   fill: 'none',
                   stroke: props.rightColor,
@@ -222,8 +234,14 @@ export default defineComponent({
               startIndex: startIndex.value,
               endIndex: endIndex.value,
               minWindowSize: minSpan,
-              onStartChange: (value) => (startIndex.value = value),
-              onEndChange: (value) => (endIndex.value = value),
+              onStartChange: (value) => {
+                reveal.cancel();
+                startIndex.value = value;
+              },
+              onEndChange: (value) => {
+                reveal.cancel();
+                endIndex.value = value;
+              },
             })
           : null,
       ]);

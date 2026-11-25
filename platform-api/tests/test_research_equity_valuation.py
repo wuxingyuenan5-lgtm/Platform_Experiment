@@ -2,6 +2,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.research_choice_index_values import parse_css_batch, publish_css_batches
 from app.research_equity_sources import parse_multpl
 from app.research_equity_valuation import (
     build_valuation_charts,
@@ -147,6 +148,45 @@ def test_cn_uses_same_index_price_and_keeps_valuation_sources_separate():
     assert chart["prices"] == [{"date": "2026-10-21", "value": "4000"}]
     assert chart["metrics"][0]["history"] == [{"date": "2026-10-21", "value": "12"}]
     assert chart["metrics"][1]["history"] == [{"date": "2026-10-22", "value": "1.5"}]
+    assert chart["metrics"][1]["prices"] == []
+
+
+def test_cn_valuation_chart_pairs_only_existing_same_session_prices():
+    chart = build_valuation_charts({
+        "csi_history_000300": {"rows": [
+            {"date": "2021-10-11", "close": "4920"},
+            {"date": "2021-10-12", "close": "4880"},
+        ]},
+        "choice_index_000300": {"rows": [
+            {"date": "2021-10-12", "pb": "1.5"},
+            {"date": "2021-10-13", "pb": "1.6"},
+        ]},
+    }, "cn")[0]
+    pb = next(item for item in chart["metrics"] if item["id"] == "pb")
+    assert pb["history"] == [{"date": "2021-10-12", "value": "1.5"}]
+    assert pb["prices"] == [{"date": "2021-10-12", "value": "4880"}]
+
+
+def test_long_choice_pe_keeps_official_pe_as_a_separate_chart_metric():
+    chart = build_valuation_charts(
+        {
+            "csi_history_000300": {
+                "rows": [{"date": "2026-11-16", "pe": "12", "close": "4000"}]
+            },
+            "choice_index_000300": {
+                "rows": [
+                    {"date": "2011-11-16", "pe": "11", "pb": "1.5", "close": "2600"},
+                    {"date": "2026-11-16", "pe": "13", "close": "4000"},
+                ]
+            },
+        },
+        "cn",
+    )[0]
+    metrics = {item["id"]: item for item in chart["metrics"]}
+    assert [row["value"] for row in metrics["pe"]["history"]] == ["11", "13"]
+    assert [row["date"] for row in chart["prices"]] == ["2011-11-16", "2026-11-16"]
+    assert metrics["official_pe"]["history"] == [{"date": "2026-11-16", "value": "12"}]
+    assert metrics["pb"]["prices"] == [{"date": "2011-11-16", "value": "2600"}]
 
 
 def test_choice_test_bootstrap_is_small_and_existing_history_incremental():
@@ -224,3 +264,36 @@ def test_choice_refresh_accumulates_history_and_failure_keeps_lkg(monkeypatch):
     monkeypatch.setattr(valuation.subprocess, "run", fail)
     failed = valuation.collect_choice_indices()
     assert all(d["status"] == "stale" and len(d["rows"]) == 2 for d in failed.values())
+
+def test_choice_css_archives_dated_values_and_preserves_monthly_scope(monkeypatch):
+    from app import research_equity_sources
+
+    saved = {}
+    monkeypatch.setattr(research_equity_sources, "archive", lambda *args: "batch-sha")
+    monkeypatch.setattr(research_equity_sources, "publish_artifact", saved.__setitem__)
+    batch = {
+        "day": "2026-11-16",
+        "codes": ["HSI.HI"],
+        "fetchedAt": "2026-11-17T03:00:00+00:00",
+        "response": [{
+            "CODES": "HSI.HI", "DATES": "2026-11-16", "CLOSE": "23753.84", "PETTM": "10.6657",
+            "DIVIDENDRATETTM": "3.8346", "DIVIDENDYIELDTTM": "2.00",
+        }],
+    }
+    key = "choice_index_HSI"
+    original = {"rows": [{"date": "2026-10-30", "close": "23500", "pe": "10"}]}
+    docs = publish_css_batches({key: original}, [batch])
+    assert saved["sources/" + key]["rows"] == [
+        {"date": "2026-10-30", "close": "23500", "pe": "10"},
+        {"date": "2026-11-16", "close": "23753.84", "pe": "10.6657", "dividend": "3.8346"},
+    ]
+    assert docs[key]["rawSha256"] == "batch-sha"
+    assert original["rows"] == [{"date": "2026-10-30", "close": "23500", "pe": "10"}]
+    hsi = next(chart for chart in build_valuation_charts(docs, "cn") if chart["id"] == "HSI")
+    assert all(metric["rankFrequency"] == "month" for metric in hsi["metrics"])
+    dividend = next(metric for metric in hsi["metrics"] if metric["id"] == "dividend")
+    assert dividend["prices"] == [{"date": "2026-11-16", "value": "23753.84"}]
+
+    batch["response"][0]["DATES"] = "2026-11-17"
+    with pytest.raises(ValueError, match="unexpected response identity"):
+        list(parse_css_batch(batch))

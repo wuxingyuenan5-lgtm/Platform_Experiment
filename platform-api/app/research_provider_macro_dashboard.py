@@ -144,6 +144,44 @@ class MacroDashboardResponse(ResearchApiModel):
         return result
 
 
+class DashboardGroupReader:
+    """Decode each artifact revision once; validate only requested chart groups."""
+    def __init__(self, path, domain):
+        from collections import OrderedDict
+        self.path, self.domain = path, domain
+        self.revision = None
+        self.document = None
+        self.views = OrderedDict()
+
+    def load(self, groups):
+        revision = local_json_revision(self.path)
+        if revision is None or revision != self.revision or self.document is None:
+            document = read_local_json(self.path)
+            if document.get("schemaVersion") != "1.0" or not any(document.get("groups", {}).values()):
+                raise ResearchProviderError(self.domain + "_dashboard_invalid_artifact")
+            self.document, self.revision = document, revision
+        key = tuple(sorted(set(groups.split(","))))
+        cached = self.views.get(key)
+        if cached and revision is not None and cached[0] == revision:
+            value = cached[1]
+        else:
+            document = self.document
+            selected = {**document, "groups": {k:v for k,v in document["groups"].items() if k in key},
+                "optionDistribution": document.get("optionDistribution", {}) if "optionDistribution" in key else {},
+                "optionExposure": document.get("optionExposure", {}) if "optionExposure" in key else {}}
+            value = MacroDashboardResponse.model_validate(selected)
+            self.views[key] = (revision, value)
+        self.views.move_to_end(key)
+        while len(self.views) > 32:
+            self.views.popitem(last=False)
+        value.apply_freshness()
+        return value
+
+    def retained(self, groups):
+        cached = self.views.get(tuple(sorted(set(groups.split(",")))))
+        return cached[1].stale_copy() if cached else None
+
+
 class MacroDashboardProvider:
     def __init__(self, *, timeout_seconds: float, user_agent: str) -> None:
         self._timeout_seconds = timeout_seconds
@@ -151,6 +189,7 @@ class MacroDashboardProvider:
         self._last_known_good: MacroDashboardResponse | None = None
         self._revision: tuple[str, int, int, int] | None = None
         self._load_lock = asyncio.Lock()
+        self._group_reader = DashboardGroupReader("public/v1/macro/dashboard.json", "macro")
 
     def _load(self) -> MacroDashboardResponse:
         path = "public/v1/macro/dashboard.json"
@@ -173,14 +212,20 @@ class MacroDashboardProvider:
         self._revision = revision
         return contract
 
-    async def get(self) -> MacroDashboardResponse:
+    async def get(self, groups: str | None = None) -> MacroDashboardResponse:
         async with self._load_lock:
             try:
                 # JSON decoding and Decimal validation must not block the API event loop.
+                if groups is not None:
+                    return await asyncio.to_thread(self._group_reader.load, groups)
                 return await asyncio.to_thread(self._load)
             except Exception as exc:
+                if groups is not None:
+                    retained = self._group_reader.retained(groups)
+                    if retained is not None:
+                        return retained
                 if self._last_known_good is not None:
-                    return self._last_known_good.stale_copy()
+                    return self._last_known_good.select_groups(groups).stale_copy()
                 if isinstance(exc, ResearchProviderError):
                     raise
                 raise ResearchProviderError(

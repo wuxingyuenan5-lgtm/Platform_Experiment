@@ -13,6 +13,7 @@
     "e2e/platform-visual/**/*.ts",
     "e2e/hedge-board/**/*.ts",
     "e2e/strategy/**/*.ts",
+    "e2e/user-system/**/*.ts",
     "types/**/*.d.ts",
     "types/**/*.ts"
   ],

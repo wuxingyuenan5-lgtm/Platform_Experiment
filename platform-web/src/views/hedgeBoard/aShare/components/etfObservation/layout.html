@@ -1,6 +1,6 @@
 <div class="wrap">
   <header class="top">
-    <h1>20只重点ETF资金观测看板</h1>
+    <h1>25只重点ETF资金观测看板</h1>
     <nav>
       <a href="#etf-observation-part1">① 盘中分钟观测</a>
       <a href="#etf-observation-part2">② 托底信号对比</a>
@@ -10,16 +10,10 @@
 
   <section class="part" id="etf-observation-part1">
     <h2 class="pt">第一部分 · 盘中分钟观测</h2>
-    <div class="status">
-      <span class="tag" id="tagDate">--</span>
-      <span class="tag" id="tagUpdate">未加载</span>
-      <span class="tag" id="tagCountdown" style="display: none"></span>
-      <button id="btnRefresh" type="button">立即刷新</button>
-      <button id="btnPause" type="button">暂停自动刷新</button>
-    </div>
     <section class="chart-wrap"><div id="chart"></div></section>
     <section class="chart-wrap"><div class="chart" id="chartCum"></div></section>
-    <h2 class="pt" style="margin-top: 18px">20大ETF放量案例</h2>
+    <div id="allATurnoverForecast"></div>
+    <h2 class="pt" style="margin-top: 18px">历史20只ETF放量案例</h2>
     <section class="chart-wrap"><div class="chart" id="chartTypCase"></div></section>
     <section class="chart-wrap"><div class="chart" id="chartTypNorm"></div></section>
     <section class="table-wrap">
@@ -37,10 +31,11 @@
       </div>
     </section>
     <footer>
-      口径说明：柱状图为20只ETF每分钟二级市场成交金额加总；折线为上证综指分钟收盘点位，虚线为上一交易日收盘。横轴为
+      口径说明：柱状图为25只ETF每分钟二级市场成交金额加总；折线为沪深300分钟收盘点位，虚线为上一交易日收盘。横轴为
       09:30~15:00 全时段。<br />
-      典型日内走势对照：放量案例日 = 单日净流入（申赎口径）&gt; 100亿元的交易日，常态日 =
-      其余交易日；上证综指为相对当日开盘涨跌幅均值。昨日与近20日累计均线由5分钟历史插值得到，非逐分钟原始观测。<br />
+      历史20只样本的典型日内走势对照（2026-07-10至2026-10-13）：放量案例日 =
+      单日净流入（申赎口径）&gt; 100亿元的交易日，常态日 =
+      其余交易日；沪深300为15分钟收盘相对当日首区间开盘涨跌幅的跨日均值。累计成交额保留行情所属交易日累计、近5日均值和近20日均值三条线，统一5分钟精度，行情日期在图内标明；历史均值不含当前北京时间日期。<br />
     </footer>
   </section>
 
@@ -66,7 +61,7 @@
   <section class="part" id="etf-observation-part3">
     <h2 class="pt">第三部分 · 日度资金全景</h2>
     <div class="sub"
-      ><span id="dailyRange"></span>｜柱：20只ETF日度成交额 /
+      ><span id="dailyRange"></span>｜柱：25只ETF日度成交额 /
       净流入（申赎口径）｜线：上证综指收盘</div
     >
     <section class="chart-wrap"><div class="chart" id="chartDAmt"></div></section>
@@ -81,8 +76,8 @@
     </section>
     <footer>
       口径说明：<br />
-      · 20只ETF日度成交额与净流入（申赎口径 = 当日份额变动×单位净值）历史序列。<br />
-      · 全市场宽基ETF日度净流入按跟踪指数堆积：沪深300 / 中证500 / 中证1000 / 中证A500 / 创业板指 /
+      · 25只ETF日度成交额与净流入（申赎口径 = 当日份额变动×单位净值）历史序列。<br />
+      · 宽基ETF日度净流入按跟踪指数堆积：沪深300 / 中证500 / 中证1000 / 中证A500 / 创业板指 /
       创业板50 / 科创50 / 双创50 / 上证50 / 中证2000 / 国证2000 /
       其他宽基，共12类；右轴黑线为2026年以来累计净流入。<br />
       · 数据区间 <span id="broadRange"></span>。<br />

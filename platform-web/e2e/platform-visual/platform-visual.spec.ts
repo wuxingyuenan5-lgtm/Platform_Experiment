@@ -37,8 +37,8 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   },
   {
     key: 'research-macro',
-    route: '/hedge-board/macro',
-    marker: '市场预期与事件概率',
+    route: '/hedge-board/macro?view=expectations',
+    marker: 'polymarket',
     markerKind: 'heading',
     evidenceSource: 'deterministic research fixture; not a real Provider acceptance result',
   },
@@ -59,7 +59,7 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   {
     key: 'strategy-cross-spread',
     route: '/strategy/platform?desk=crossSpread',
-    marker: '跨所价差研究',
+    marker: '市场报价',
     markerKind: 'heading',
     evidenceSource:
       'reference spread research with current CrossVenue execution workspace retained',
@@ -74,14 +74,14 @@ const EMPLOYEE_PAGES: readonly VisualPage[] = [
   {
     key: 'financial-ai',
     route: '/financial-ai/index',
-    marker: '研究辅助与情景推演中枢',
+    marker: '当日市场复盘',
     markerKind: 'heading',
     evidenceSource: 'reference financial AI layout; Provider unavailable and no generated answer',
   },
   {
     key: 'news-digest',
     route: '/news-calendar/news',
-    marker: '新闻日历与理财',
+    marker: '资讯雷达',
     markerKind: 'heading',
     evidenceSource: 'reference news digest hierarchy with visible non-real-time sample state',
   },

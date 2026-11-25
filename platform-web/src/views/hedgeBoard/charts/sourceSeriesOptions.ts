@@ -254,6 +254,60 @@ export function buildSourceSeriesOptions(
   };
 }
 
+/** Each inventory series retains its own scale while sharing the observation window. */
+export function buildIndependentSeriesOptions(
+  series: MacroDashboardSeries[],
+  colors: string[],
+  overrideUnit?: string,
+) {
+  const base = buildSourceSeriesOptions(series, colors, overrideUnit);
+  const times = series
+    .flatMap((item) => item.observations.map((row) => Date.parse(row.date)))
+    .filter(Number.isFinite);
+  const rowHeight = 78 / Math.max(series.length, 1);
+  return {
+    ...base,
+    title: series.map((item, index) => ({
+      text: item.label,
+      left: 80,
+      top: `${2 + index * rowHeight}%`,
+      textStyle: { fontSize: 12, fontWeight: 500, color: colors[index] },
+    })),
+    grid: series.map((_, index) => ({
+      left: 12,
+      right: 22,
+      top: `${8 + index * rowHeight}%`,
+      height: `${rowHeight - 9}%`,
+      containLabel: true,
+    })),
+    xAxis: series.map((_, index) => ({
+      ...base.xAxis,
+      gridIndex: index,
+      min: times.length ? Math.min(...times) : undefined,
+      max: times.length ? Math.max(...times) : undefined,
+    })),
+    yAxis: series.map((item, index) => ({
+      ...base.yAxis[0],
+      gridIndex: index,
+      name: unitText(overrideUnit || item.unit),
+      nameTextStyle: { color: colors[index], fontSize: 11 },
+      axisLabel: { ...base.yAxis[0].axisLabel, color: colors[index] },
+      scale: true,
+      splitNumber: 3,
+    })),
+    axisPointer: { link: [{ xAxisIndex: 'all' }] },
+    dataZoom: base.dataZoom.map((zoom) => ({
+      ...zoom,
+      xAxisIndex: series.map((_, index) => index),
+    })),
+    series: base.series.map((item, index) => ({
+      ...item,
+      xAxisIndex: index,
+      yAxisIndex: index,
+    })),
+  };
+}
+
 export function regionalFlowColor(seriesId: string): string {
   if (seriesId === 'xauusd_daily_close') return '#111111';
   const palette: Record<string, string> = {

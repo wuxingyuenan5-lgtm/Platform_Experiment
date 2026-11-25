@@ -1103,6 +1103,43 @@ def test_cross_session_freeze_and_reopen_preserves_real_costs():
     assert load_sessions(FUNDING) is None
 
 
+def test_closed_session_tail_keeps_last_valid_open_mark():
+    from app.cross_session_valuation import _day_session
+    from app.pnl_reporting import day_start, reporting_date
+
+    day = reporting_date(datetime.now(UTC)) - timedelta(days=1)
+    start = day_start(day)
+    marks = [
+        (1, "open", None),
+        (2, "open", "quote_stale"),
+        (3, "closed", None),
+        (4, "closed", None),
+    ]
+    with connection() as db:
+        for hour, market_status, block in marks:
+            at = (start + timedelta(hours=hour)).isoformat()
+            payload = {
+                "asOf": at,
+                "mt5": {"marketStatus": market_status, "status": "available",
+                        "executionBlockReason": block},
+                "bybit": {"marketStatus": "open", "status": "available"},
+            }
+            db.execute(
+                "INSERT INTO market_spread_snapshots (id,strategy_key,strategy_instance_id,"
+                "left_venue_code,left_symbol,right_venue_code,right_symbol,status,payload_json,"
+                "observed_at,created_at) VALUES "
+                "(?,'cross_venue_spread',?,'bybit','XAUTUSDT','mt5','XAUUSD','available',?,?,?)",
+                (f"mixed-session-{hour}", CROSS, json.dumps(payload), at, at),
+            )
+    _day_session.cache_clear()
+    valid, latest, closed_only = _day_session(
+        "mixed-session-test", CROSS, day.isoformat(), at, len(marks),
+    )
+    assert valid["asOf"] == (start + timedelta(hours=1)).isoformat()
+    assert latest["asOf"] == at
+    assert not closed_only
+
+
 def test_session_observation_ignores_exit_guard_but_rejects_stale_quotes():
     from app.cross_session_valuation import valid_observation
 
@@ -1262,6 +1299,11 @@ def test_monitor_database_checks_do_not_run_on_event_loop(
     monkeypatch.setattr(module, "connection", observed_connection)
     monkeypatch.setattr(module, worker, lambda: False)
     if hasattr(module, "prepare_keys"):
+        from concurrent.futures import ThreadPoolExecutor
+
+        # The production spawn is covered by test_management_projection_monitor.
+        # Keep this test's patched connection visible to the executor.
+        monkeypatch.setattr(module, "ProcessPoolExecutor", lambda **_: ThreadPoolExecutor(max_workers=1))
         monkeypatch.setattr(module, "prepare_keys", lambda: None)
     monkeypatch.setattr(module.monitor_health, "finish", finished)
     with pytest.raises(asyncio.CancelledError):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Annotated, NoReturn
+from typing import Annotated, Literal, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.encoders import jsonable_encoder
@@ -14,6 +14,7 @@ from app.auth import Principal, require_permission
 from app.config import get_settings
 from app.research_a_share_refresh import refresh_a_share_research
 from app.research_a_share_repository import (
+    read_crowding_market_history,
     read_index_history,
     read_market_amount_page,
     read_refresh_status,
@@ -21,7 +22,7 @@ from app.research_a_share_repository import (
     read_stock_pool,
     update_stock_pool_membership,
 )
-from app.research_cn_financing import broad_etfs, domestic_financing
+from app.research_cn_financing import ETF_GROUPS, broad_etfs, domestic_financing
 from app.research_cross_asset import read_cross_asset
 from app.research_cumulative_volatility import read_cumulative_volatility
 from app.research_data_schemas import (
@@ -32,6 +33,7 @@ from app.research_data_schemas import (
 )
 from app.research_equity_observatory import read_equity_observatory
 from app.research_etf_observation import read_observation as etf_observation
+from app.research_etf_turnover import read_turnover
 from app.research_etf_tracking import catalog as etf_catalog
 from app.research_etf_tracking import detail as etf_detail
 from app.research_mutual_funds import overview as mutual_fund_overview
@@ -137,15 +139,24 @@ def ai_industry(_: ResearchPrincipal):
 
 
 @router.get("/a-share/market-monitor")
-def cn_market_monitor(_: ResearchPrincipal, section: str | None = Query(default=None, pattern="^(risk|breadth|macroValue|valuation)$"), keys: str | None = Query(default=None, max_length=200, pattern="^[a-zA-Z0-9_,]+$")):
+def cn_market_monitor(
+    _: ResearchPrincipal,
+    section: str | None = Query(default=None, pattern="^(risk|breadth|macroValue|valuation)$"),
+    keys: str | None = Query(default=None, max_length=200, pattern="^[a-zA-Z0-9_,]+$"),
+):
     from app.research_cn_monitor import read_monitor
     from app.research_cn_context import read_context
 
     try:
-        result = read_context(section) if section else read_monitor(keys.split(',') if keys else None)
+        result = (
+            read_context(section) if section else read_monitor(keys.split(",") if keys else None)
+        )
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc)) from exc
-    return JSONResponse(content=jsonable_encoder(result, custom_encoder={Decimal: str}), headers={"Cache-Control": "no-store"})
+    return JSONResponse(
+        content=jsonable_encoder(result, custom_encoder={Decimal: str}),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/equity-styles/{market}")
@@ -153,6 +164,7 @@ def equity_styles(market: str, _: ResearchPrincipal):
     if market not in {"cn", "us"}:
         raise HTTPException(422, "Unsupported market")
     from app.research_equity_sources import read_artifact
+
     data = read_artifact(market)
     themes = data.get("themes") or {}
     return {"styles": themes.get("styles"), "benchmark": themes.get("benchmark")}
@@ -162,32 +174,47 @@ def equity_styles(market: str, _: ResearchPrincipal):
 def macro_liquidity_lens(_: ResearchPrincipal):
     from app.research_liquidity_lens import read_liquidity_lens
 
-    return JSONResponse(content=jsonable_encoder(read_liquidity_lens(), custom_encoder={Decimal: str}), headers={"Cache-Control": "no-store"})
+    return JSONResponse(
+        content=jsonable_encoder(read_liquidity_lens(), custom_encoder={Decimal: str}),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/chart-catalog")
 def chart_catalog(_: ResearchPrincipal):
     from app.research_chart_catalog import series_catalog
+
     return series_catalog()
 
 
 @router.get("/chart-series/{series_id}")
 def chart_series(series_id: str, _: ResearchPrincipal):
     from app.research_chart_catalog import series_data
+
     return series_data(series_id)
 
 
 @router.get("/crypto/rolling-correlation")
-def crypto_rolling_correlation(_: ResearchPrincipal, n: int = Query(default=20, ge=10, le=252), benchmark: str = Query(default="ndx", pattern="^(ndx|xau)$")):
+def crypto_rolling_correlation(
+    _: ResearchPrincipal,
+    n: int = Query(default=20, ge=10, le=252),
+    benchmark: str = Query(default="ndx", pattern="^(ndx|xau)$"),
+):
     from app.research_rolling_correlation import read_rolling
+
     return jsonable_encoder(read_rolling(n, benchmark), custom_encoder={Decimal: str})
 
 
 @router.get("/equity/history-risk")
-def equity_history_risk(_: ResearchPrincipal, instrument: str = Query(default="spy", pattern="^(spy|ndx|dow|soxx|xlk)$")):
+def equity_history_risk(
+    _: ResearchPrincipal, instrument: str = Query(default="spy", pattern="^(spy|ndx|dow|soxx|xlk)$")
+):
     from app.research_history_risk import read_history_risk
 
-    return JSONResponse(content=jsonable_encoder(read_history_risk(instrument), custom_encoder={Decimal: str}), headers={"Cache-Control": "no-store"})
+    return JSONResponse(
+        content=jsonable_encoder(read_history_risk(instrument), custom_encoder={Decimal: str}),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/equity/ai/{ticker}")
@@ -212,13 +239,21 @@ def macro_narratives(_: ResearchPrincipal, response: Response):
 
 
 @router.get("/equity-observatory/{market}")
-def equity_observatory(market: str, _: ResearchPrincipal, response: Response, view: str | None = Query(None, pattern="^(overview|themes|valuation|crowding|structure|hk)$")):
+def equity_observatory(
+    market: str,
+    _: ResearchPrincipal,
+    response: Response,
+    theme: str | None = Query(None, max_length=100),
+    view: str | None = Query(None, pattern="^(overview|themes|valuation|crowding|structure|hk)$"),
+):
     if market not in {"cn", "us"}:
         raise HTTPException(422, detail="Unsupported equity market")
     response.headers["Cache-Control"] = "no-store"
     # Published JSON already preserves financial Decimal values as text. Avoid
     # recursively encoding the large history tree a second time on every read.
-    return JSONResponse(content=read_equity_observatory(market, view), headers=dict(response.headers))
+    return JSONResponse(
+        content=read_equity_observatory(market, view, theme), headers=dict(response.headers)
+    )
 
 
 @router.get("/a-share/financing")
@@ -227,9 +262,50 @@ def a_share_financing(_: ResearchPrincipal, response: Response):
     return JSONResponse(content=domestic_financing(), headers=dict(response.headers))
 
 
+@router.get("/a-share/crowding-research")
+def a_share_crowding_research(_: ResearchPrincipal, include_market_history: bool = False):
+    from app.research_cn_crowding import read_crowding
+    from app.data_audit_calendar import cached_sessions
+
+    data = read_crowding()
+    # Raw response manifests stay in local storage, not the chart payload.
+    sources = {
+        key: {k: v for k, v in source.items() if k != "manifest"}
+        for key, source in data.get("sources", {}).items()
+    }
+    for source in sources.values():
+        source["data"] = [
+            {k: v for k, v in row.items() if k != "manifest"} for row in source.get("data", [])
+        ]
+    calendar = cached_sessions(datetime.now(UTC).date().isoformat())
+    history = read_crowding_market_history() if include_market_history else {}
+    return JSONResponse(
+        content={
+            **data,
+            "sources": sources,
+            **history,
+            "calendar": calendar if include_market_history else [d for d in calendar if d >= "2018-01-01"],
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/a-share/capital")
+def a_share_capital(_: ResearchPrincipal):
+    from app.research_cn_capital import read_capital
+
+    return JSONResponse(content=read_capital(), headers={"Cache-Control": "no-store"})
+
+
 @router.get("/a-share/broad-etfs/{key}")
-def a_share_broad_etfs(key: str, _: ResearchPrincipal, response: Response):
-    if key not in {
+def a_share_broad_etfs(
+    key: str,
+    _: ResearchPrincipal,
+    response: Response,
+    days: int = Query(0, ge=0, le=36500),
+    include_history: bool = True,
+):
+    if key not in ETF_GROUPS and key not in {
         "hs300",
         "sse50",
         "sse180",
@@ -242,13 +318,30 @@ def a_share_broad_etfs(key: str, _: ResearchPrincipal, response: Response):
     }:
         raise HTTPException(422, detail="Unsupported broad index")
     response.headers["Cache-Control"] = "no-store"
-    return broad_etfs(key)
+    return JSONResponse(
+        content=broad_etfs(key, days=days, include_history=include_history),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/a-share/etf-observation")
 def a_share_etf_observation(_: ResearchPrincipal, response: Response):
     response.headers["Cache-Control"] = "no-store"
     return etf_observation()
+
+
+@router.get("/a-share/turnover-forecast")
+def a_share_turnover_forecast(_: ResearchPrincipal, response: Response):
+    from app.research_all_a_turnover import read_forecast
+
+    response.headers["Cache-Control"] = "no-store"
+    return read_forecast()
+
+
+@router.get("/a-share/etf-turnover")
+def a_share_etf_turnover(_: ResearchPrincipal, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return read_turnover()
 
 
 @router.get("/a-share/mutual-funds")
@@ -271,17 +364,76 @@ def a_share_mutual_fund(code: str, _: ResearchPrincipal, response: Response):
         raise HTTPException(404, detail="Fund not collected") from exc
 
 
+@router.get("/a-share/etf-flow-analysis")
+def a_share_etf_flow_analysis(
+    _: ResearchPrincipal, response: Response,
+    start: str | None = None, end: str | None = None,
+    previous_start: str | None = None, previous_end: str | None = None,
+    days: int = Query(default=20, ge=1, le=1500),
+):
+    from app.research_etf_flows import flow_analysis
+
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return flow_analysis(start, end, previous_start, previous_end, days)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+
+
 @router.get("/a-share/etf-tracking")
 def a_share_etf_catalog(_: ResearchPrincipal, response: Response):
     response.headers["Cache-Control"] = "no-store"
     return etf_catalog()
 
 
+@router.get("/a-share/theme-etfs")
+def a_share_theme_etfs(
+    _: ResearchPrincipal,
+    response: Response,
+    include_series: bool = True,
+    theme: str | None = Query(None, max_length=100),
+    days: int = Query(0, ge=0, le=36500),
+):
+    from app.research_theme_etfs import panorama
+
+    response.headers["Cache-Control"] = "no-store"
+    return JSONResponse(
+        content=panorama(include_series=include_series, theme=theme, days=days),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.get("/a-share/etf-tracking/{code}")
-def a_share_etf_detail(code: str, _: ResearchPrincipal, response: Response):
+def a_share_etf_detail(
+    code: str, _: ResearchPrincipal, response: Response, include_group: bool = Query(True)
+):
     response.headers["Cache-Control"] = "no-store"
     try:
-        return etf_detail(code)
+        from app.research_theme_etfs import reference_detail, reference_funds
+
+        try:
+            detail = etf_detail(code, include_group=include_group)
+        except KeyError:
+            ref = reference_funds().get(code)
+            if include_group or not ref:
+                raise
+            detail = reference_detail(code, ref)
+        else:
+            if not include_group and not detail["series"] and code in reference_funds():
+                detail = {
+                    **detail,
+                    **reference_detail(code, detail["meta"]),
+                    "disclosures": detail["disclosures"],
+                }
+        if not include_group:
+            from app.data_audit_calendar import cached_sessions
+
+            dates = [r["date"] for r in detail["series"] if r.get("date")]
+            detail["sessions"] = []
+            if dates:
+                first, last = min(dates), max(dates)
+                detail["sessions"] = [d for d in cached_sessions(last) if first <= d <= last]
+        return JSONResponse(content=detail, headers={"Cache-Control": "no-store"})
     except ValueError as exc:
         raise HTTPException(422, detail="Invalid ETF code") from exc
     except KeyError as exc:
@@ -499,6 +651,7 @@ async def market_detail(
     market_id: str,
     response: Response,
     _: ResearchPrincipal,
+    include_history: bool = Query(True),
 ) -> MarketDetailResponse:
     try:
         result = await _market_detail_provider.get(market_id)
@@ -508,13 +661,17 @@ async def market_detail(
             detail={"code": "market_detail_unavailable", "message": str(exc)},
         ) from exc
     _cache_header(response, 300)
-    return result
+    return result if include_history else result.for_table()
 
 
 @router.get("/macro/dashboard-v1", response_model=MacroDashboardResponse)
-async def macro_dashboard_v1(response: Response, _: ResearchPrincipal, groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$")) -> MacroDashboardResponse:
+async def macro_dashboard_v1(
+    response: Response,
+    _: ResearchPrincipal,
+    groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$"),
+) -> MacroDashboardResponse:
     try:
-        result = await _macro_dashboard_provider.get()
+        result = await _macro_dashboard_provider.get(groups)
     except ResearchProviderError as exc:
         raise HTTPException(
             status_code=503,
@@ -524,12 +681,30 @@ async def macro_dashboard_v1(response: Response, _: ResearchPrincipal, groups: s
     return result.select_groups(groups)
 
 
+@router.get("/macro/weekly-supplement")
+async def weekly_report_supplement(
+    response: Response,
+    _: ResearchPrincipal,
+    section: str = Query(..., max_length=40),
+    indicator: str | None = Query(None, max_length=80),
+):
+    from app.research_weekly_indicators import read_supplement
+
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return await asyncio.to_thread(read_supplement, section, indicator)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="unknown_weekly_indicator") from exc
+
+
 @router.get("/commodity/dashboard-v1", response_model=MacroDashboardResponse)
 async def commodity_dashboard_v1(
-    response: Response, _: ResearchPrincipal, groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$")
+    response: Response,
+    _: ResearchPrincipal,
+    groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$"),
 ) -> MacroDashboardResponse:
     try:
-        result = await _commodity_dashboard_provider.get()
+        result = await _commodity_dashboard_provider.get(groups)
     except ResearchProviderError as exc:
         raise HTTPException(
             status_code=503,
@@ -589,9 +764,13 @@ def gold_analysts(
 
 
 @router.get("/crypto/dashboard-v1", response_model=MacroDashboardResponse)
-async def crypto_dashboard_v1(response: Response, _: ResearchPrincipal, groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$")) -> MacroDashboardResponse:
+async def crypto_dashboard_v1(
+    response: Response,
+    _: ResearchPrincipal,
+    groups: str | None = Query(None, max_length=1500, pattern="^[A-Za-z0-9_,]+$"),
+) -> MacroDashboardResponse:
     try:
-        result = await _crypto_dashboard_provider.get()
+        result = await _crypto_dashboard_provider.get(groups)
     except ResearchProviderError as exc:
         raise HTTPException(
             status_code=503,
@@ -663,18 +842,40 @@ async def cumulative_volatility(
     asset: str = Query("btc", pattern="^(btc|gold)$"),
     days: int = Query(365, ge=0, le=365),
     interval: str = Query("15m", pattern="^(15m|1h|4h)$"),
+    compact: bool = Query(False),
     start: datetime | None = Query(None),
     end: datetime | None = Query(None),
-) -> dict[str, object]:
+) -> Response:
     """读取共享 Bybit 行情经后端计算的 UTC 盘口累计波动与价格叠加。"""
     response.headers["Cache-Control"] = "no-store"
     try:
-        data = await asyncio.to_thread(
-            read_cumulative_volatility, asset, days, interval, start=start, end=end
-        )
+
+        def encoded_window():
+            import json
+
+            data = read_cumulative_volatility(asset, days, interval, start=start, end=end)
+            if compact:
+                data = {
+                    **data,
+                    "points": [
+                        {
+                            key: value
+                            for key, value in point.items()
+                            if key not in {"priceBaseline", "priceChangePct"}
+                        }
+                        for point in data["points"]
+                    ],
+                }
+            return json.dumps(
+                {"data": data}, ensure_ascii=False, allow_nan=False, separators=(",", ":")
+            )
+
+        body = await asyncio.to_thread(encoded_window)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"data": data}
+    return Response(
+        content=body, media_type="application/json", headers={"Cache-Control": "no-store"}
+    )
 
 
 @router.get("/crypto/iv-term", tags=["research"])
@@ -741,6 +942,12 @@ async def crypto_iv_history(
         "data": {
             "tenor": tenor,
             "history": history,
+            "coverage": {
+                "firstDate": history[0]["observedAt"] if history else None,
+                "lastDate": history[-1]["observedAt"] if history else None,
+                "missingDates": [point["observedAt"] for point in history if point.get("iv") is None],
+                "historyType": "collected_snapshot",
+            },
             "stats": stats,
             "status": health["status"],
             "lastError": health["lastError"],
@@ -836,15 +1043,49 @@ async def treasury_weekly_snapshot_image(_: ResearchPrincipal):
 
 @router.get("/seasonality/{asset}", tags=["research"])
 async def seasonality_history(asset: str, _: ResearchPrincipal) -> dict[str, object]:
-    from app.research_local_data import read_local_json
+    from app.research_seasonality import LOCAL, US, CN, read_seasonality
 
-    paths = {
-        "gold": "public/v1/commodity/series/xauusd_daily_close.json",
-        "btc": "public/v1/crypto/series/binance_btc_spot.json",
-    }
-    if asset not in paths:
+    if asset not in {*LOCAL, *US, *CN}:
         raise HTTPException(status_code=404, detail="Unknown seasonal asset")
-    return await asyncio.to_thread(read_local_json, paths[asset])
+    return await asyncio.to_thread(read_seasonality, asset)
+
+
+@router.get("/cycles", tags=["research"])
+async def research_cycles(_: ResearchPrincipal):
+    from app.research_cycles import read_cycles
+
+    return JSONResponse(
+        content=await asyncio.to_thread(read_cycles), headers={"Cache-Control": "no-store"}
+    )
+
+
+@router.get("/us-options-stress")
+def us_options_stress(_: ResearchPrincipal):
+    from app.research_us_options_stress import read_options_stress
+
+    return JSONResponse(read_options_stress(), headers={"Cache-Control": "private, no-store"})
+
+
+@router.get("/a-share/timing-radar")
+def a_share_timing_radar(_: ResearchPrincipal):
+    from app.research_timing_radar import read_timing_radar
+
+    return JSONResponse(read_timing_radar(), headers={"Cache-Control": "private, no-store"})
+
+
+@router.get("/macro/cross-asset-screening", tags=["research"])
+async def cross_asset_screening(principal: ResearchPrincipal):
+    from app.research_cross_asset_screening import read_screening_archive, read_screening_with_workbooks
+
+    read = (
+        read_screening_with_workbooks
+        if principal.auth_method in {"session", "api_key"}
+        else read_screening_archive
+    )
+    return JSONResponse(
+        content=await asyncio.to_thread(read),
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 @router.get("/reference-boards/{board}")
@@ -852,4 +1093,22 @@ def reference_board(board: str, _: ResearchPrincipal):
     if board not in {"liquidity", "stocks"}:
         raise HTTPException(422, "Unsupported reference board")
     from app.research_reference_boards import read_references
-    return JSONResponse(content=jsonable_encoder(read_references(board), custom_encoder={Decimal:str}), headers={"Cache-Control":"no-store"})
+
+    return JSONResponse(
+        content=jsonable_encoder(read_references(board), custom_encoder={Decimal: str}),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/a-share/national-etf/page")
+def national_etf_page(_: ResearchPrincipal, view: Literal["etf", "futures"] = "etf"):
+    from fastapi.responses import HTMLResponse
+    from app.research_national_etf import page
+
+    return HTMLResponse(
+        page(view),
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-ancestors 'self'",
+        },
+    )

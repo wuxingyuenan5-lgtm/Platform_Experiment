@@ -47,6 +47,17 @@ def test_percentiles_have_minimum_and_neutral_ties():
     }
 
 
+def test_close_top_five_percent_turnover_share():
+    rows = [
+        {"observedAt": "2026-11-20T07:00:00Z", "securityCode": str(index), "turnoverYuan": amount}
+        for index, amount in enumerate([80, 10, *([1] * 19), 0])
+    ]
+    structure, _ = cn_structure(rows, [])
+    assert structure["market"]["top5PctAmountShare"] == Decimal(80) / Decimal(109) * 100
+    rows[-1]["turnoverYuan"] = None
+    assert "top5PctAmountShare" not in cn_structure(rows, [])[0]["market"]
+
+
 def test_mixed_date_and_hk_stocks_do_not_pollute_cn_distribution():
     rows = [
         {"securityCode": "000001", "observedAt": "2026-10-15T07:01:00Z", "pb": "0.8"},
@@ -686,6 +697,7 @@ def test_cn_new_snapshot_retains_last_closed_theme_until_benchmark_catches_up(mo
     )
     monkeypatch.setattr(repository, "read_stored_stock_histories", lambda _: {})
     monkeypatch.setattr(repository, "read_theme_amount_history", lambda: [])
+    monkeypatch.setattr(repository, "read_theme_market_amounts", lambda: [])
     result = module.build_cn("2026-10-29", {})
     assert result["date"] == "2026-10-29" and result["themes"] == old_themes
     assert result["breadth"]["valid"] == 0
@@ -709,3 +721,63 @@ def test_equity_views_keep_their_data_without_unrelated_histories(tmp_path, monk
         if view != "crowding": assert "themeCrowding" not in scoped
     assert read_equity_observatory("cn", "valuation")["valuationCharts"][0]["history"][0]["pb"] is None
     assert read_equity_observatory("cn")["themeCrowding"] == payload["themeCrowding"]
+
+
+def test_crowding_selected_history_does_not_truncate_stored_snapshot(monkeypatch):
+    from app import research_equity_observatory as m
+    import copy
+    doc={"generatedAt":datetime.now(UTC).isoformat(),"themeCrowding":{"items":[{"name":"A","history":[1,2,3],"segments":[]},{"name":"B","history":[4,5,6],"segments":[]}]}}
+    monkeypatch.setattr(m,"read_artifact",lambda name:copy.deepcopy(doc) if name=="cn" else {})
+    result=m.read_equity_observatory("cn","crowding","A")
+    assert result["themeCrowding"]["items"][0]["history"]==[1,2,3]
+    assert result["themeCrowding"]["items"][1]["history"]==[6]
+    assert doc["themeCrowding"]["items"][1]["history"]==[4,5,6]
+
+
+def test_theme_industry_join_respects_codes_dates_conflicts_and_source_immutability(monkeypatch):
+    import copy
+    from app import research_equity_observatory as module
+
+    themes = {"date": "2026-11-06", "items": [{"name": "AI", "members": [
+        {"code": code, "industry": "半导体", "returnPct": None}
+        for code in ["688981", "000001", "000002", "000003", "000004"]
+    ]}]}
+    original = copy.deepcopy(themes)
+    def row(code, industry="801080", start="2026-01-01", end=None):
+        return {"securityCode": code, "swL1Code": industry, "swL1Name": "电子",
+                "effectiveFrom": start, "effectiveTo": end}
+    monkeypatch.setattr(module, "read_dataset", lambda _: [
+        row("688981"), row("000001", start="2026-11-07"),
+        row("000002", end="2026-11-06"), row("000003"), row("000003", industry="801750"),
+        row("000004", end="2026-11-07"),
+    ])
+    result = module._themes_with_industry_memberships(themes)
+    members = result["items"][0]["members"]
+    assert members[0]["industryCode"] == "801080"
+    assert members[0]["industryName"] == "电子"
+    assert members[0]["industry"] == "半导体"
+    assert members[0]["industryAsOf"] == "2026-11-06"
+    assert all(m["industryCode"] is None for m in members[1:4])
+    assert members[4]["industryCode"] == "801080"
+    assert all(m["returnPct"] is None for m in members)
+    assert themes == original
+
+
+def test_theme_industry_join_is_in_read_projection_and_not_other_views(monkeypatch):
+    from app import research_equity_observatory as module
+    doc = {"generatedAt": datetime.now(UTC).isoformat(), "themes": {
+        "date": "2026-11-06", "items": [{"name": "AI", "members": [{"code": "688981"}]}]
+    }}
+    monkeypatch.setattr(module, "local_json_revision", lambda _: None)
+    monkeypatch.setattr(module, "read_artifact", lambda name: doc if name == "cn" else {})
+    reads = []
+    def memberships(name):
+        reads.append(name)
+        return [{"securityCode": "688981", "swL1Code": "801080", "swL1Name": "电子",
+                 "effectiveFrom": "2026-01-01"}]
+    monkeypatch.setattr(module, "read_dataset", memberships)
+    result = module.read_equity_observatory("cn", "themes")
+    assert result["themes"]["items"][0]["members"][0]["industryCode"] == "801080"
+    assert "industryCode" not in doc["themes"]["items"][0]["members"][0]
+    module.read_equity_observatory("cn", "valuation")
+    assert reads == ["memberships"]

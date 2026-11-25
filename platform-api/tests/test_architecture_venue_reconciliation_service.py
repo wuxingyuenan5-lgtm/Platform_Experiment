@@ -172,4 +172,10 @@ def test_composition_root_imports_the_dedicated_venue_router() -> None:
         in source
     )
     assert "from app.venue_reconciliation import router" not in source
-    assert source.count("application.include_router(venue_reconciliation_router)") == 1
+    from app.application import create_application, venue_reconciliation_router
+
+    from unittest.mock import patch
+
+    with patch("fastapi.FastAPI.include_router", autospec=True) as include_router:
+        create_application()
+    assert sum(call.args[1] is venue_reconciliation_router for call in include_router.call_args_list) == 1

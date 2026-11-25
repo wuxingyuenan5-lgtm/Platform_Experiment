@@ -334,3 +334,20 @@ def test_limit_pool_preserves_eastmoney_http_contract(
         "User-Agent": "research-test",
         "Referer": "https://quote.eastmoney.com/",
     }
+
+
+@pytest.mark.parametrize("code,symbol", [("000001", "sh000001"), ("000016", "sh000016")])
+def test_overview_shanghai_indices_use_native_daily_history(monkeypatch, code, symbol):
+    provider = _provider()
+    calls = []
+
+    def fake_json(_opener, url, params, **_kwargs):
+        calls.append((url, params))
+        return {"data": {symbol: {"day": [["2026-11-06", "3000", "3010", "3020", "2990", "100"]]}}}
+
+    monkeypatch.setattr(provider, "_direct_json", fake_json)
+    rows = provider._direct_index_history(code, symbol)
+    assert calls[0][1]["param"] == f"{symbol},day,,,640,qfq"
+    assert rows[0]["date"] == date(2026, 11, 6)
+    assert rows[0]["close"] == Decimal("3010")
+    assert rows[0]["source"] == "tencent-index-daily"

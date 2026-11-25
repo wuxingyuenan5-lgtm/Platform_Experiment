@@ -284,13 +284,14 @@ def test_partial_index_refresh_preserves_prior_series_and_marks_missing_counts(
     original = research_db.index_snapshots
 
     async def benchmarks_only():
-        return (await original())[:4]
+        return (await original())[:6]
 
     monkeypatch.setattr(research_db, "index_snapshots", benchmarks_only)
     research_db.mode = "partial"
     assert asyncio.run(refresh.refresh_a_share_research(force=True)) == "partial"
     dashboard = repository.read_dashboard()
-    assert len(dashboard.market_detail.data) == 8
+    assert len(dashboard.market_detail.data) == 10
+    assert {"000001", "000016"} <= {row["code"] for row in dashboard.market_detail.data}
     assert dashboard.market_detail.meta.status == "partial"
     assert all(code in dashboard.market_detail.meta.message for code in ("931071", "931238", "932082", "H30590"))
     assert dashboard.breadth.data["limitUp"] is None
@@ -650,3 +651,66 @@ def test_hot_history_all_dates_keeps_ninety_day_totals(research_db):
     assert history["industries"][0]["counts"] == [1] * 105
     assert history["industries"][0]["historyTotal"] == 90
     assert len(repository.read_hot_stock_history()["dates"]) == 10
+
+
+def test_chart_projects_full_a_limits_independently_of_sh_sz_counts(research_db):
+    asyncio.run(refresh.refresh_a_share_research(force=True))
+    for universe, up, down, limit_up, limit_down in [
+        ('all_a', 3000, 2000, 118, 10),
+        ('sh_sz_a', 2900, 1900, None, None),
+    ]:
+        repository.write_market_archive(
+            dict(universe_key=universe, trade_date='2030-01-02', up=up, down=down,
+                 limit_up=limit_up, limit_down=limit_down, source_name='fixture',
+                 definition_version='fixture', payload={'universe': universe})
+        )
+    row = next(r for r in repository.read_dashboard().market_history
+               if str(r.observed_at) == '2030-01-02')
+    assert (row.up, row.down) == (2900, 1900)
+    assert (row.limit_up, row.limit_down) == (None, None)
+    assert (row.all_a_limit_up, row.all_a_limit_down) == (118, 10)
+    with connection() as db:
+        original = db.execute(
+            "SELECT limit_up,limit_down,payload_json FROM research_a_share_market_archive "
+            "WHERE universe_key='sh_sz_a' AND trade_date='2030-01-02'"
+        ).fetchone()
+    assert original['limit_up'] is None and original['limit_down'] is None
+    assert json.loads(original['payload_json']) == {'universe': 'sh_sz_a'}
+
+
+def test_refresh_archives_full_benchmark_window_and_preserves_known_prices(research_db):
+    from app.research_data_schemas import AShareIndexHistoryPoint
+
+    asyncio.run(refresh.refresh_a_share_research(force=True))
+    points = research_db.history('000300')
+    with connection() as db:
+        dates = {r[0] for r in db.execute(
+            "SELECT trade_date FROM research_a_share_price_history "
+            "WHERE instrument_code='000300.SH'"
+        )}
+    assert {str(p.observed_at) for p in points}.issubset(dates)
+    existing_day = str(points[-1].observed_at)
+    candidate = AShareIndexHistoryPoint(
+        observed_at=existing_day, close=Decimal('1'), source_name='different-source'
+    )
+    missing = AShareIndexHistoryPoint(
+        observed_at='2030-01-02', close=Decimal('4016.9200'), source_name='fixture-close'
+    )
+    assert repository.archive_csi300_history([candidate, missing], 'fallback') == 1
+    assert repository.archive_csi300_history([candidate, missing], 'fallback') == 0
+    with connection() as db:
+        assert db.execute(
+            "SELECT COUNT(*) FROM research_a_share_price_history "
+            "WHERE instrument_code='000300.SH' AND source_name='different-source'"
+        ).fetchone()[0] == 0
+        assert db.execute(
+            "SELECT close FROM research_a_share_price_history "
+            "WHERE instrument_code='000300.SH' AND trade_date='2030-01-02'"
+        ).fetchone()[0] == '4016.9200'
+
+
+def test_overview_completeness_includes_shanghai_benchmarks():
+    rows = asyncio.run(AShareFixtureProvider().index_snapshots())
+    assert refresh._stale_index_codes(rows, "2026-09-07") == []
+    without_shanghai = [row for row in rows if row.code not in {"000001", "000016"}]
+    assert refresh._stale_index_codes(without_shanghai, "2026-09-07") == ["000001", "000016"]

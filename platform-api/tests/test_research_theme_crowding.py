@@ -30,6 +30,8 @@ def test_same_market_denominator_dedup_and_fixed_base_price(monkeypatch):
     assert t["history"][-1]["price"] == 130  # normalized equal weight, not raw price average
     assert t["history"][3]["shareMa5"] is None
     assert t["history"][4]["shareMa5"] == Decimal(30)
+    assert t["concentration"]["sharePct"] == 100
+    assert [row["code"] for row in t["concentration"]["leaders"]] == ["B", "A"]
 
 
 def test_gaps_do_not_reweight_fill_zero_or_shorten_ma(monkeypatch):
@@ -42,6 +44,8 @@ def test_gaps_do_not_reweight_fill_zero_or_shorten_ma(monkeypatch):
     assert rows[2]["price"] is None and rows[2]["priceCount"] == 1
     assert all(r["shareMa5"] is None for r in rows)
     assert t["segments"][1]["history"][4]["shareMa5"] == 10  # independent coverage
+    incomplete = module.build_theme_crowding(prices, amounts, days, days[2])["items"][0]
+    assert incomplete["concentration"] is None
 
 
 def test_future_amounts_and_prices_are_excluded_and_invalid_denominator_stays_missing(monkeypatch):

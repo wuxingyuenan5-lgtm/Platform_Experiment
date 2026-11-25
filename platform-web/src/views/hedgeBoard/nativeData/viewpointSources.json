@@ -1,0 +1,3062 @@
+[
+  {
+    "id": "22f9598a03ae",
+    "name": "投资TALK君",
+    "url": "https://www.youtube.com/channel/UCRBrH2qS7yKGMNSmjnj8gcw/videos",
+    "platform": "YouTube",
+    "focus": "美股、宏观",
+    "categories": ["us", "macro"],
+    "priority": true
+  },
+  {
+    "id": "228152a1a84e",
+    "name": "StockTalkwithJay美股",
+    "url": "https://www.youtube.com/channel/UCfAcqaaxkb6LJkeOcKlbSJQ/videos",
+    "platform": "YouTube",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "73371de9f540",
+    "name": "RTA-Finance",
+    "url": "https://www.youtube.com/channel/UCiwg-3pIDuI0KTWiH0BCRJA/videos",
+    "platform": "YouTube",
+    "focus": "加密、技术面",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "872bb4d05ec8",
+    "name": "罗晟Criss",
+    "url": "https://www.youtube.com/channel/UC0ME4F7Sn9Xb-LBjGrKWSgg/videos",
+    "platform": "YouTube",
+    "focus": "交易理念、技术面",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "7baa97a5c463",
+    "name": "Vic TALK",
+    "url": "https://www.youtube.com/channel/UC0Qj2CZsALJRivClNuDStlA/videos",
+    "platform": "YouTube",
+    "focus": "新闻热点",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "2980cfb2e382",
+    "name": "加密克里斯",
+    "url": "https://www.youtube.com/channel/UCZhLquM_48SdeVztN0C-jvg/videos",
+    "platform": "YouTube",
+    "focus": "新闻热点",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "d170e772af1a",
+    "name": "美投君 · 美投讲美股",
+    "url": "https://www.youtube.com/channel/UCBUH38E0ngqvmTqdchWunwQ/videos",
+    "platform": "YouTube",
+    "focus": "美股、宏观、新闻热点",
+    "categories": ["us", "macro"],
+    "priority": true
+  },
+  {
+    "id": "25374c0bf5f7",
+    "name": "善一视角",
+    "url": "https://www.youtube.com/channel/UCKxPi7Y9hA-D5rn0_GMBE-Q/videos",
+    "platform": "YouTube",
+    "focus": "宏观、基本面",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "b0035965c5e6",
+    "name": "加密二锅头",
+    "url": "https://www.youtube.com/channel/UCQmDC-DPvMOLs02qOce8oyQ/videos",
+    "platform": "YouTube",
+    "focus": "加密、技术面",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "c00afa304c20",
+    "name": "Shanghao Jin",
+    "url": "https://www.youtube.com/channel/UCTAJ0JnR9oYvILu-mtNcufQ/videos",
+    "platform": "YouTube",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "ba30498633b1",
+    "name": "Benjamin Cowen",
+    "url": "https://www.youtube.com/channel/UCRvqjQPSeaWn-uEx-w0XOIg/videos",
+    "platform": "YouTube",
+    "focus": "加密、技术面、大周期",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "d50c50aeb9ff",
+    "name": "百萬Eric | 比特幣",
+    "url": "https://www.youtube.com/channel/UC3bAlqe4dwupxrJ9xCzYKdA/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "394fe6b3935b",
+    "name": "Joseph Wang",
+    "url": "https://www.youtube.com/channel/UCsJxlgjWIOcuEbOJZ591V3Q/videos",
+    "platform": "YouTube",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "31f7d0b30d4a",
+    "name": "Web3区别地",
+    "url": "https://www.youtube.com/channel/UCympcD9q6yqEROMGhyehJbg/videos",
+    "platform": "YouTube",
+    "focus": "加密、新闻热点、大周期",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "93b6420a18da",
+    "name": "币圈达人",
+    "url": "https://www.youtube.com/channel/UCcgmz4y_OsUHI5Yrt5h9hJQ/videos",
+    "platform": "YouTube",
+    "focus": "加密、大周期",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "4b3519d8a329",
+    "name": "Cr Wise 比特币分析",
+    "url": "https://www.youtube.com/channel/UCT2XxmbjoIdMrKbgNSm5Xgw/videos",
+    "platform": "YouTube",
+    "focus": "加密、大周期",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "2a80a03aaeae",
+    "name": "加密阿尔法 - CryptoAlpha",
+    "url": "https://www.youtube.com/channel/UCBpx5qv6GVsoCk2comSwVKg/videos",
+    "platform": "YouTube",
+    "focus": "加密、新闻热点",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "43b9f6020758",
+    "name": "Crypto投资记录",
+    "url": "https://www.youtube.com/channel/UCbvBpgPixrP9yO_g5ZExhiQ/videos",
+    "platform": "YouTube",
+    "focus": "加密、大周期、交易理念",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "347471c653a8",
+    "name": "李意坚说",
+    "url": "https://www.youtube.com/channel/UC-x-mLjOZTHxadLMspxZRbw/videos",
+    "platform": "YouTube",
+    "focus": "宏观、交易理念",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "d01f511fd7dc",
+    "name": "Mrpixel | 像素先森 | Brian Xue",
+    "url": "https://www.youtube.com/channel/UCuEZMv4FqUmJ4gLmeLkT-sQ/videos",
+    "platform": "YouTube",
+    "focus": "跨资产、技术面、大周期",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "5d594f397e0b",
+    "name": "Trader qianye君",
+    "url": "https://www.youtube.com/channel/UCVZCZlq_H0kiHlg3plIfBSw/videos",
+    "platform": "YouTube",
+    "focus": "加密、金属、中周期",
+    "categories": ["crypto", "metals"],
+    "priority": true
+  },
+  {
+    "id": "929816e570d4",
+    "name": "宋鸿兵鸿学院",
+    "url": "https://www.youtube.com/channel/UCyPZw0U1rXgvW3KJYeuoP0g/videos",
+    "platform": "YouTube",
+    "focus": "宏观、新闻热点",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "df12440fcb11",
+    "name": "宏观洞察",
+    "url": "https://www.youtube.com/channel/UCbJpRVF1AB2KO1cvQoK0S5Q/videos",
+    "platform": "YouTube",
+    "focus": "宏观、新闻热点",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "6c5c36ec196c",
+    "name": "「卢克」加密行情分析",
+    "url": "https://www.youtube.com/channel/UC2kNgaQcuMNrBeP-60w9qhQ/videos",
+    "platform": "YouTube",
+    "focus": "加密、技术面",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "89efca48609d",
+    "name": "Changes",
+    "url": "https://www.youtube.com/channel/UCWi2XZNpJtTOETljojVErKQ/videos",
+    "platform": "YouTube",
+    "focus": "加密、金属、大周期",
+    "categories": ["crypto", "metals"],
+    "priority": true
+  },
+  {
+    "id": "13ba042e63ea",
+    "name": "CryptoInvest",
+    "url": "https://www.youtube.com/channel/UC0BR5r8Vv7MSWKvsz3Beq2w/videos",
+    "platform": "YouTube",
+    "focus": "加密、交易理念",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "5170f9150580",
+    "name": "老厉害",
+    "url": "https://www.youtube.com/channel/UC8gZZWIWmBuCb_gzC8DUrvw/videos",
+    "platform": "YouTube",
+    "focus": "宏观、研报解读",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "b0231009b807",
+    "name": "Jordi Visser",
+    "url": "https://www.youtube.com/channel/UCSLOw8JrFTBb3qF-p4v0v_w/videos",
+    "platform": "YouTube",
+    "focus": "加密、AI",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "e7aa53d4f835",
+    "name": "Ross Cameron - Warrior Trading",
+    "url": "https://www.youtube.com/channel/UCBayuhgYpKNbhJxfExYkPfA/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "2bdf2f7d5dc1",
+    "name": "Camel Finance",
+    "url": "https://www.youtube.com/channel/UCr_DLep7UQ0B_IFhvTORu8A/videos",
+    "platform": "YouTube",
+    "focus": "宏观、跨资产、大周期",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "425321cb5a5e",
+    "name": "趋势达人",
+    "url": "https://www.youtube.com/channel/UCaTJoxLwVn-5479AzU-zqaA/videos",
+    "platform": "YouTube",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "18bcfa3efbe9",
+    "name": "以太坊教授幣哥",
+    "url": "https://www.youtube.com/channel/UC9SeIkP-uTRN-QtSxgj9hlw/videos",
+    "platform": "YouTube",
+    "focus": "加密、技术面、中周期",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "919306153cba",
+    "name": "比特币飞扬",
+    "url": "https://www.youtube.com/channel/UCvuvTVzo8W9I6QOyZCXlubg/videos",
+    "platform": "YouTube",
+    "focus": "加密、技术面",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "ffc411b3a49e",
+    "name": "地缘密码GeoCode",
+    "url": "https://www.youtube.com/channel/UCSciF85ZbN38VWhAqP5MyCw/videos",
+    "platform": "YouTube",
+    "focus": "消息面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "5261b448a227",
+    "name": "视野环球财经",
+    "url": "https://www.youtube.com/channel/UCFQsi7WaF5X41tcuOryDk8w/videos",
+    "platform": "YouTube",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": true
+  },
+  {
+    "id": "e03988c77fc7",
+    "name": "贝拉聊财金",
+    "url": "https://www.youtube.com/channel/UCVomjkM_t0EcctTWSE1Jvxg/videos",
+    "platform": "YouTube",
+    "focus": "新闻热点",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "1ffd812d355c",
+    "name": "偶像派作手",
+    "url": "https://www.youtube.com/channel/UC-c-lWAi6XhIKlSJLXPLx1w/videos",
+    "platform": "YouTube",
+    "focus": "新闻热点",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "dc80471d5380",
+    "name": "區塊鏈日報 Blockchain Daily",
+    "url": "https://www.youtube.com/channel/UCkPc41kPIJfMI0ZCTHqybYA/videos",
+    "platform": "YouTube",
+    "focus": "新闻热点",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "5c2701a9c0bc",
+    "name": "美投侃新闻",
+    "url": "https://www.youtube.com/channel/UCGpj3DO_5_TUDCNUgS9mjiQ/videos",
+    "platform": "YouTube",
+    "focus": "宏观、新闻热点",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "b07569c83633",
+    "name": "锐信财经",
+    "url": "https://www.youtube.com/channel/UCe4innnFqNtV6x4x6GvQV5Q/videos",
+    "platform": "YouTube",
+    "focus": "宏观、新闻热点",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "b96e1b9df787",
+    "name": "解读君",
+    "url": "https://www.youtube.com/channel/UCl6fIbYfUuLB292Jh90raAA/videos",
+    "platform": "YouTube",
+    "focus": "宏观、研报解读",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "30a703176874",
+    "name": "加密阿晨-投研频道",
+    "url": "https://www.youtube.com/channel/UC298G8xVFeaWs5ayJs9GAgA/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "7344d43ecf1e",
+    "name": "TALKCHAIN",
+    "url": "https://www.youtube.com/channel/UCUQr_BG0v4a9Mfiue9IMvUQ/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "da47db1a0a73",
+    "name": "mrblock 區塊先生",
+    "url": "https://www.youtube.com/channel/UCN2hSM8fBcvZBa8OOKc24eg/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "8d4333803aba",
+    "name": "朱老师区块链3000问",
+    "url": "https://www.youtube.com/channel/UCtqP90VE7Z-WnwouJnsrLzw/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "2102b81b5c6f",
+    "name": "3D 加密频道",
+    "url": "https://www.youtube.com/channel/UCBYmgt2ld_9i-xJF2G1ksMw/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "351dabb83845",
+    "name": "區塊鏈遊戲 - AJ GameFi Club",
+    "url": "https://www.youtube.com/channel/UCIddz07eLXLOOwrTkxhXwrQ/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "db662da73873",
+    "name": "深潮TechFlow 小剧场",
+    "url": "https://www.youtube.com/channel/UCMN-hG9y4jcqd0lpFzlTIsg/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "7a2579b5de6c",
+    "name": "链上指南针-chris",
+    "url": "https://www.youtube.com/channel/UClGWgtGhf4KupCxJGnQkNPQ/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "f43be958312b",
+    "name": "加密教父 Crypto Father",
+    "url": "https://www.youtube.com/channel/UCDF77_fpSWzjP8LHc5pf56Q/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "45d290618b19",
+    "name": "Bojji | 加密研究员",
+    "url": "https://www.youtube.com/channel/UCat0uhkspnphcDz0MGU8UyA/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "20bad66c019a",
+    "name": "大方BigFang",
+    "url": "https://www.youtube.com/channel/UCMkk-akdGTugIVu10-bXQEQ/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "eb4787815ad1",
+    "name": "十一地主",
+    "url": "https://www.youtube.com/channel/UCxgNvOSgJCAipt9fFQbrGww/videos",
+    "platform": "YouTube",
+    "focus": "加密一级",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "5072bd7cc409",
+    "name": "打不死的交易员",
+    "url": "https://www.youtube.com/channel/UCJMNwGcJQ--6ZQb4FoST8nQ/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "f730bbc3b5d7",
+    "name": "比特币欧阳",
+    "url": "https://www.youtube.com/channel/UCzZ49DculfIZv6W1X81pLlQ/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "9eb9171e8f12",
+    "name": "颜驰Bit",
+    "url": "https://www.youtube.com/channel/UC1E2aUWv221Wgwi31ezsidg/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "799a491b5667",
+    "name": "比特币军长",
+    "url": "https://www.youtube.com/channel/UCIm6mBJYe1uGg5wPKyO2ZPQ/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "945516a8ed5a",
+    "name": "NaNa说美股",
+    "url": "https://www.youtube.com/channel/UCFhJ8ZFg9W4kLwFTBBNIjOw/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "cff73f536819",
+    "name": "自然法则Crypto's Nature's law",
+    "url": "https://www.youtube.com/channel/UCelAiiHT69SaPjNS-p7323A/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "98a31adb48e9",
+    "name": "加密龐克",
+    "url": "https://www.youtube.com/channel/UCeeeGbipVKpz23A8_c3I3uA/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "310eb17dba44",
+    "name": "易振金银",
+    "url": "https://www.youtube.com/channel/UCZOBgllCToWuHUcCiI4x-eg/videos",
+    "platform": "YouTube",
+    "focus": "金属",
+    "categories": ["metals"],
+    "priority": false
+  },
+  {
+    "id": "d886406e8c99",
+    "name": "刘翔的投资频道",
+    "url": "https://www.youtube.com/channel/UC0e5c4U67Vm6sAVK0vxN3Uw/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "cbcae223565f",
+    "name": "這比特幣保熟嗎?",
+    "url": "https://www.youtube.com/channel/UCXK40Cjs8u-gNfXy3a4g-SA/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "ac6524a4aaca",
+    "name": "美股锅论",
+    "url": "https://www.youtube.com/channel/UCWCMoZktPcRa3aiNA4irWWg/videos",
+    "platform": "YouTube",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "77718114663a",
+    "name": "蟹老闆幣圈敗家史",
+    "url": "https://www.youtube.com/channel/UC1jBXsfi6rKrisKKTLq3Fqg/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "b64030d8eacc",
+    "name": "MrEdvin",
+    "url": "https://www.youtube.com/channel/UCKu8g_nj8xMm7dxuCku_epw/videos",
+    "platform": "YouTube",
+    "focus": "加密、新闻热点",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "883d8817a528",
+    "name": "无漪wuyi",
+    "url": "https://www.youtube.com/channel/UCqmbtXk6QwmOe1bWsvlmIeA/videos",
+    "platform": "YouTube",
+    "focus": "技术面、交易理念",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "617b70862ec8",
+    "name": "币链快报",
+    "url": "https://www.youtube.com/channel/UCRCJkQttdjzJYpbur5Qut6A/videos",
+    "platform": "YouTube",
+    "focus": "新闻热点",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "fa79455c3d63",
+    "name": "美股研究社",
+    "url": "https://www.youtube.com/channel/UC1ZHl6yHVQh579wq89_PoEA/videos",
+    "platform": "YouTube",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "8e39c4878ee9",
+    "name": "投机实验室",
+    "url": "https://www.youtube.com/channel/UCjQfmtuNPsHXVMhK74hFpog/videos",
+    "platform": "YouTube",
+    "focus": "交易策略",
+    "categories": ["quant"],
+    "priority": true
+  },
+  {
+    "id": "8717c0698457",
+    "name": "JC美股分析",
+    "url": "https://www.youtube.com/channel/UCDl1np-Y68j79gNMgSTb52g/videos",
+    "platform": "YouTube",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "c066fb3930f6",
+    "name": "Theoretically Media",
+    "url": "https://www.youtube.com/channel/UC9Ryt3XOGYBoAJVsBHNGDzA/videos",
+    "platform": "YouTube",
+    "focus": "新闻热点",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "e4d1780db544",
+    "name": "Bankless",
+    "url": "https://www.youtube.com/channel/UCAl9Ld79qaZxp9JzEOwd3aA/videos",
+    "platform": "YouTube",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "59e481f0e68b",
+    "name": "幂笈投资",
+    "url": "https://www.youtube.com/channel/UCbI_tAz8drA95Qua5lMHiSg/videos",
+    "platform": "YouTube",
+    "focus": "技术面",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "4efaa99bf76c",
+    "name": "JohnLu谈股",
+    "url": "https://www.youtube.com/channel/UCZ8uQ1mAm-ixl3zzFePcelQ/videos",
+    "platform": "YouTube",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "78f8d7a0a437",
+    "name": "Greg Isenberg",
+    "url": "https://www.youtube.com/channel/UCPjNBjflYl0-HQtUvOx0Ibw/videos",
+    "platform": "YouTube",
+    "focus": "新闻热点",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "5a21443991b3",
+    "name": "币圈所长课堂",
+    "url": "https://www.youtube.com/channel/UCtjaX6UWevjh8UK-IQDgSMg/videos",
+    "platform": "YouTube",
+    "focus": "技术面、加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "167e41b3d1dd",
+    "name": "宝哥职业股民",
+    "url": "https://www.youtube.com/channel/UCdyJicllXSiJnE_NScLDsSg/videos",
+    "platform": "YouTube",
+    "focus": "加密、技术面",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "e5a2e84e83af",
+    "name": "mignolet",
+    "url": "https://x.com/mignoletkr",
+    "platform": "X",
+    "focus": "加密、STRC",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "b4d0ffa58598",
+    "name": "对冲积鲸Reason",
+    "url": "https://x.com/chenreason",
+    "platform": "X",
+    "focus": "加密、美股",
+    "categories": ["crypto", "us"],
+    "priority": false
+  },
+  {
+    "id": "5381b6d4ef24",
+    "name": "Lyra",
+    "url": "https://x.com/web3Lyra",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "ceab94403143",
+    "name": "James Van Straten",
+    "url": "https://x.com/btcjvs",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "3a1d1bba0cea",
+    "name": "Adrian Morris",
+    "url": "https://x.com/_Adrian",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "3b9f1a053b99",
+    "name": "RisingCap",
+    "url": "https://x.com/0xRisingCapital",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "284b8be1d801",
+    "name": "Khing Oei",
+    "url": "https://x.com/khingoei",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "6f2dcf1e9b27",
+    "name": "Quinn Thompson",
+    "url": "https://x.com/qthomp",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "7c7d212bc82e",
+    "name": "Neils Christensen",
+    "url": "https://x.com/neils_C",
+    "platform": "X",
+    "focus": "黄金",
+    "categories": ["metals"],
+    "priority": false
+  },
+  {
+    "id": "cf15eb693f4b",
+    "name": "168X",
+    "url": "https://x.com/168X_Fortune",
+    "platform": "X",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "595cba93e7e3",
+    "name": "华尔街没有名字",
+    "url": "https://x.com/WallStreet0Name",
+    "platform": "X",
+    "focus": "交易向，无关话题较多",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "e1ea39bcbcf5",
+    "name": "华尔街观察 Xtrader",
+    "url": "https://x.com/cnfinancewatch",
+    "platform": "X",
+    "focus": "信息",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "f005a68807d5",
+    "name": "K33 研究",
+    "url": "https://x.com/K33Research",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "27fed8cccd39",
+    "name": "Justin Bechler #BIP-110",
+    "url": "https://x.com/1914ad",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "feba3c03f8a3",
+    "name": "leifu _/",
+    "url": "https://x.com/leifuchen",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "bb8066bd5a1d",
+    "name": "Stephen Stapczynski",
+    "url": "https://x.com/SStapczynski",
+    "platform": "X",
+    "focus": "大宗",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "2472134fec60",
+    "name": "Thierry Bros",
+    "url": "https://x.com/thierry_bros",
+    "platform": "X",
+    "focus": "大宗",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "fd02cfc52d1c",
+    "name": "约巴巴拉",
+    "url": "https://x.com/AzizSapphire",
+    "platform": "X",
+    "focus": "大宗",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "d997e63b61be",
+    "name": "Random Walk",
+    "url": "https://x.com/MosesSternstein",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "73a9938c2c69",
+    "name": "Mike Zaccardi, CFA, CMT",
+    "url": "https://x.com/MikeZaccardi",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "cc5c70aa1cb3",
+    "name": "Maverick Equity Research",
+    "url": "https://x.com/Maverick_Equity",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "6f3935980396",
+    "name": "The Kobeissi Letter",
+    "url": "https://x.com/KobeissiLetter",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "ea9f3a013cfb",
+    "name": "OSINTdefender",
+    "url": "https://x.com/sentdefender",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "eef3a1f74f8e",
+    "name": "Walter Bloomberg",
+    "url": "https://x.com/DeItaone",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "cb6e0d583c10",
+    "name": "Barker",
+    "url": "https://x.com/BarkerMoneyX",
+    "platform": "X",
+    "focus": "加密理财",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "105bc13c10bb",
+    "name": "Jeff Liang",
+    "url": "https://x.com/JeffLia12309881",
+    "platform": "X",
+    "focus": "期权",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "31af4eb3a216",
+    "name": "马克斯Max",
+    "url": "https://x.com/Maxandzero",
+    "platform": "X",
+    "focus": "期权",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "4bf21c606699",
+    "name": "Liz Ann Sonders",
+    "url": "https://x.com/LizAnnSonders",
+    "platform": "X",
+    "focus": "宏观信息",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "444522d149fe",
+    "name": "Killa",
+    "url": "https://x.com/KillaXBT",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "d17ef664e9c9",
+    "name": "李意坚说",
+    "url": "https://x.com/YiZenCap",
+    "platform": "X",
+    "focus": "宏观、大类资产",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "9eb3b179955b",
+    "name": "Arctic",
+    "url": "https://x.com/Arctic0013",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "1626331639be",
+    "name": "CryptoAmsterdam",
+    "url": "https://x.com/damskotrades",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "9f93ff2728d9",
+    "name": "Web3刀哥",
+    "url": "https://x.com/Web3Daoge1",
+    "platform": "X",
+    "focus": "加密理财",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "ad47cd7a4c0d",
+    "name": "Boywus",
+    "url": "https://x.com/Boywus",
+    "platform": "X",
+    "focus": "套利",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "d976f32a4652",
+    "name": "bob coleman",
+    "url": "https://x.com/profitsplusid",
+    "platform": "X",
+    "focus": "白银",
+    "categories": ["metals"],
+    "priority": false
+  },
+  {
+    "id": "e6745f7814af",
+    "name": "victalk",
+    "url": "https://x.com/victalk6886",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "a445641f37ef",
+    "name": "宏观图表",
+    "url": "https://x.com/MacroCharts",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "9d02b6adc51f",
+    "name": "KarelMercx",
+    "url": "https://x.com/KarelMercx",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "56672f208634",
+    "name": "Global Markets Investor",
+    "url": "https://x.com/GlobalMktObserv",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "f90ea3a79064",
+    "name": "Macro Liquidity by Sunil Reddy",
+    "url": "https://x.com/Macrobysunil",
+    "platform": "X",
+    "focus": "信息、流动性",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "8edba8ab4d4c",
+    "name": "SilverTrade",
+    "url": "https://x.com/silvertrade",
+    "platform": "X",
+    "focus": "白银",
+    "categories": ["metals"],
+    "priority": false
+  },
+  {
+    "id": "f72fe1ae5577",
+    "name": "nibage666",
+    "url": "https://x.com/nibage666",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "b2920c6f36eb",
+    "name": "StockTalkWithJay",
+    "url": "https://x.com/stocktalkjay",
+    "platform": "X",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": true
+  },
+  {
+    "id": "bd92b691a3f2",
+    "name": "GoldFishCharts",
+    "url": "https://x.com/GoldFishCharts",
+    "platform": "X",
+    "focus": "黄金",
+    "categories": ["metals"],
+    "priority": false
+  },
+  {
+    "id": "3c2a1099b965",
+    "name": "本杰明·乌萨奇",
+    "url": "https://x.com/Corsica267",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "bf930e55e51a",
+    "name": "比特币橙子交易者",
+    "url": "https://x.com/oragnes",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "82bec5309188",
+    "name": "Dave.𝟎𝐱U",
+    "url": "https://x.com/bc1qDave",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "817cfe8a181d",
+    "name": "Pike时政财经分析",
+    "url": "https://x.com/BigbirdflyChan",
+    "platform": "X",
+    "focus": "美股",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "fdfa0358b590",
+    "name": "TVBee",
+    "url": "https://x.com/blockTVBee",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "86d0f4f5f7c7",
+    "name": "cryptotaka",
+    "url": "https://x.com/cryptotaka0",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "78ec4299b4d5",
+    "name": "Market Beggar 市场观点",
+    "url": "https://x.com/market_beggar",
+    "platform": "X",
+    "focus": "加密链上分析",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "0a4c09b543ee",
+    "name": "AG Thorson，CMT",
+    "url": "https://x.com/GoldPredict",
+    "platform": "X",
+    "focus": "贵金属",
+    "categories": ["metals"],
+    "priority": true
+  },
+  {
+    "id": "9f81f0b98af9",
+    "name": "CryptoQuant",
+    "url": "https://x.com/CryptoQuant_com",
+    "platform": "X",
+    "focus": "加密链上分析",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "c3629d873d5c",
+    "name": "Augur Infinity",
+    "url": "https://x.com/AugurInfinity",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "ef1b251fe912",
+    "name": "ariston地平线",
+    "url": "https://x.com/Ariston_Macro",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "fe5ef9b39314",
+    "name": "swissblock",
+    "url": "https://x.com/swissblock__",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "f64c9e9bc74b",
+    "name": "812.eth",
+    "url": "https://x.com/puregamma",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "1fb5844d6fad",
+    "name": "ToniGhinea",
+    "url": "https://x.com/ToniGhinea",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "4b4a6c591d2c",
+    "name": "華爾街分析猿",
+    "url": "https://x.com/WSTAnalystApe",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "8961ca1d9d42",
+    "name": "Dr.Hash 赛博哈希",
+    "url": "https://x.com/DrHashClub",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "93b3baead3d2",
+    "name": "加密庞克",
+    "url": "https://x.com/crypto_punkX",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "56a4c6b8ae0a",
+    "name": "像素先森",
+    "url": "https://x.com/Mrpixelraf",
+    "platform": "X",
+    "focus": "宏观、跨资产",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "1427340bb309",
+    "name": "终局宏观策略",
+    "url": "https://x.com/onechancefreedm",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "16b5ee6a70cd",
+    "name": "宏观宏观年少传奇",
+    "url": "https://x.com/apralky",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "87d196e94ab5",
+    "name": "外汇交易员",
+    "url": "https://x.com/fxtrader",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "38b8e7bd9b48",
+    "name": "3XLabubu",
+    "url": "https://x.com/labubu_trader",
+    "platform": "X",
+    "focus": "交易向",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "c3c26f841b46",
+    "name": "BitcoinTreasuries.NET",
+    "url": "https://x.com/BTCtreasuries",
+    "platform": "X",
+    "focus": "加密资金面",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "9cddf9127004",
+    "name": "加密贝姐LK",
+    "url": "https://x.com/BTC100000015252",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "0f8e5cb9b864",
+    "name": "SantimentData",
+    "url": "https://x.com/SantimentData",
+    "platform": "X",
+    "focus": "加密信息类",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "6056cf165f3a",
+    "name": "t1alpha",
+    "url": "https://x.com/t1alpha",
+    "platform": "X",
+    "focus": "信息类、期权",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "d201725e52de",
+    "name": "飞凡",
+    "url": "https://x.com/feifan7686",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "7779df30a97a",
+    "name": "felixhsu",
+    "url": "https://x.com/Felix_Hsu",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "d2b7918f20de",
+    "name": "CryptoChan",
+    "url": "https://x.com/0xCryptoChan",
+    "platform": "X",
+    "focus": "加密链上分析",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "a7c80ab28f0e",
+    "name": "Jack Kong",
+    "url": "https://x.com/JackClawAI",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "c1aa8e87f7b2",
+    "name": "Jademont",
+    "url": "https://x.com/shanshan521",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "f1523c77e1ef",
+    "name": "Manchurius Hao — Greeks.live首席赌狗",
+    "url": "https://x.com/AntonLaVay",
+    "platform": "X",
+    "focus": "加密期权",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "dbe9ea9893da",
+    "name": "ZTZZ",
+    "url": "https://x.com/ZTZZBTC",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "2f6050cd09c3",
+    "name": "BitcoinMonarq",
+    "url": "https://x.com/BitcoinMonarq",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "9e58bf6424be",
+    "name": "biupa",
+    "url": "https://x.com/biupa",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "1473611fc79a",
+    "name": "Kuang Ren 狂人说趋势",
+    "url": "https://x.com/liujia0224",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "6b76ad3cdcb9",
+    "name": "winchrr",
+    "url": "https://x.com/winchrr",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "7debf5e1ea3c",
+    "name": "AB Kuai.Dong",
+    "url": "https://x.com/_FORAB",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "935d8a4de574",
+    "name": "PANews",
+    "url": "https://x.com/PANewsCN",
+    "platform": "X",
+    "focus": "加密信息类",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "a65e9e36b45a",
+    "name": "洞察君看市场",
+    "url": "https://x.com/DongCha777",
+    "platform": "X",
+    "focus": "宏观、加密",
+    "categories": ["crypto", "macro"],
+    "priority": false
+  },
+  {
+    "id": "d3821afafb47",
+    "name": "Monetary McFly",
+    "url": "https://x.com/Monetaryguy589",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "cd1139d66915",
+    "name": "benjamincowen",
+    "url": "https://x.com/benjamincowen",
+    "platform": "X",
+    "focus": "加密、宏观图表",
+    "categories": ["crypto", "macro"],
+    "priority": true
+  },
+  {
+    "id": "283b4646df26",
+    "name": "憨厚的麦总",
+    "url": "https://x.com/Michael_Liu93",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "abe231c7d3cb",
+    "name": "wealthwolves",
+    "url": "https://x.com/thewealthwolves",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "75d3992415a7",
+    "name": "洪灏",
+    "url": "https://x.com/HAOHONG_CFA",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "bd1c27ebbbdc",
+    "name": "PeterLBrandt",
+    "url": "https://x.com/PeterLBrandt",
+    "platform": "X",
+    "focus": "技术分析",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "b1e2d9aea0c6",
+    "name": "咖啡KZ",
+    "url": "https://x.com/liuwei16602825",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "9965a2ffa4fd",
+    "name": "匿名博士",
+    "url": "https://x.com/Chris_Defi",
+    "platform": "X",
+    "focus": "玄学交易",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "03cfe88f9417",
+    "name": "Adam@Greeks.live",
+    "url": "https://x.com/BTC__options",
+    "platform": "X",
+    "focus": "加密期权",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "b7c57f114dee",
+    "name": "威尔逊·狼部",
+    "url": "https://x.com/wilsonh01256004",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "d4f40544c202",
+    "name": "MasterPandaWu",
+    "url": "https://x.com/MasterPandaWu",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "90280c447d8f",
+    "name": "立方体分析师",
+    "url": "https://x.com/Francoi45297108",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "02dd590b93f9",
+    "name": "follow_clues",
+    "url": "https://x.com/follow_clues",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "f7f446c93eb1",
+    "name": "波浪理论",
+    "url": "https://x.com/wugudehaore",
+    "platform": "X",
+    "focus": "交易向",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "3de72fabaae5",
+    "name": "Exante Data",
+    "url": "https://x.com/ExanteData",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "c050981525b2",
+    "name": "Cato_KT",
+    "url": "https://x.com/Cato_KT",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "54e344708ba6",
+    "name": "0xWizard",
+    "url": "https://x.com/0xcryptowizard",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "30540ce661c0",
+    "name": "愚者",
+    "url": "https://x.com/qubiedi",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "551ed9e39ed3",
+    "name": "BitX_21",
+    "url": "https://x.com/BitX_21",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "073ef66e1242",
+    "name": "Jan Nieuwenhuijs",
+    "url": "https://x.com/JanGold_",
+    "platform": "X",
+    "focus": "黄金分析",
+    "categories": ["metals"],
+    "priority": false
+  },
+  {
+    "id": "f1ec75726d12",
+    "name": "付鹏的财经世界",
+    "url": "https://x.com/fupenglondon",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "1a02e77785e3",
+    "name": "Sober 坤哥",
+    "url": "https://x.com/soberoption",
+    "platform": "X",
+    "focus": "期权",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "eeb964a57175",
+    "name": "Bitwise",
+    "url": "https://x.com/Bitwise",
+    "platform": "X",
+    "focus": "加密信息类",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "acbc5046a177",
+    "name": "凯文",
+    "url": "https://x.com/BlazingKevin_",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "83eb7d5b4954",
+    "name": "比特墨子",
+    "url": "https://x.com/bitcoinmozi",
+    "platform": "X",
+    "focus": "加密信息类",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "b6205439b2be",
+    "name": "彼得·希夫",
+    "url": "https://x.com/PeterSchiff",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "ff9cf7af0ddb",
+    "name": "华尔街日报中文网",
+    "url": "https://x.com/ChineseWSJ",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "be29f39de938",
+    "name": "宏观边际",
+    "url": "https://x.com/MacroMargin",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "95d0d1172624",
+    "name": "百万埃里克",
+    "url": "https://x.com/CycleStudies",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "8963dd269339",
+    "name": "亚特兰大联储",
+    "url": "https://x.com/AtlantaFed",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "6f43e1b5901a",
+    "name": "川沐｜Trumoo",
+    "url": "https://x.com/xiaomustock",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "fb6431d70a84",
+    "name": "安娜·王",
+    "url": "https://x.com/AnnaEconomist",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "cc41b8c430d4",
+    "name": "Murphy Chen",
+    "url": "https://x.com/Murphychen888",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "ceeb78585030",
+    "name": "Crypto投资记录",
+    "url": "https://x.com/cryptoinvestrec",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "c60b659cc676",
+    "name": "帕尔",
+    "url": "https://x.com/Patrade_Buer",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "b39f4644b100",
+    "name": "ye.koi",
+    "url": "https://x.com/yekoikoi",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "7072f0fc2364",
+    "name": "KelseyWeb3VC",
+    "url": "https://x.com/KelseyWeb3VC",
+    "platform": "X",
+    "focus": "交易向",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "d8b69f823223",
+    "name": "JoshMandell6",
+    "url": "https://x.com/JoshMandell6",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "029d7535479c",
+    "name": "最喜欢吃兽奶的兔",
+    "url": "https://x.com/0xMilkRabbit",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "a1b8dc5ef6fa",
+    "name": "macro_dose",
+    "url": "https://x.com/macro_dose",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "4a26b82a694c",
+    "name": "迈克尔·林奇",
+    "url": "https://x.com/DtDS_WSS",
+    "platform": "X",
+    "focus": "大宗",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "b7feb68a010e",
+    "name": "缺德道人",
+    "url": "https://x.com/Trader_S18",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "9949c0d7ed8d",
+    "name": "DC大于C",
+    "url": "https://x.com/DL_W59",
+    "platform": "X",
+    "focus": "宏观、交易向",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "9a16192a8cd8",
+    "name": "淑芬",
+    "url": "https://x.com/shufen46250836",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "fb96ce6b4298",
+    "name": "Traderqianye",
+    "url": "https://x.com/Traderqianye",
+    "platform": "X",
+    "focus": "交易向",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "63c491d271b0",
+    "name": "Michael Saylor",
+    "url": "https://x.com/saylor",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "b4ff852a1fa3",
+    "name": "吴说区块链",
+    "url": "https://x.com/wublockchain12",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "8ef1b96c3b8d",
+    "name": "Amy6Tina",
+    "url": "https://x.com/Amy6Tina",
+    "platform": "X",
+    "focus": "期权",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "3dc5646e6a0b",
+    "name": "wower",
+    "url": "https://x.com/wower_w",
+    "platform": "X",
+    "focus": "期权",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "089588fd1dd5",
+    "name": "Herman Jin",
+    "url": "https://x.com/ShanghaoJin",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "65c2e3c3f574",
+    "name": "rick awsb",
+    "url": "https://x.com/rickawsb",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "0776300ad3dd",
+    "name": "highFree",
+    "url": "https://x.com/highFree2028",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "db294663fec1",
+    "name": "ZnQ_626",
+    "url": "https://x.com/ZnQ_626",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "c743b9ca0cef",
+    "name": "vivienna.btc",
+    "url": "https://x.com/viviennaBTC",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "8d164e6cb132",
+    "name": "PhyrexNi",
+    "url": "https://x.com/PhyrexNi",
+    "platform": "X",
+    "focus": "加密、信息类",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "16219267b6e0",
+    "name": "帕克·罗斯",
+    "url": "https://x.com/Econ_Parker",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "3dd7260fe1b3",
+    "name": "qinbafrank",
+    "url": "https://x.com/qinbafrank",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "0d794fe31102",
+    "name": "Owen.btc",
+    "url": "https://x.com/OwenJin12",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "36c0d154a462",
+    "name": "投资TALK君",
+    "url": "https://x.com/TJ_Research",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "cf99d4ad1d14",
+    "name": "陈剑Jason",
+    "url": "https://x.com/jason_chen998",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "c89e9f382b76",
+    "name": "杰夫·多尔曼",
+    "url": "https://x.com/jdorman81",
+    "platform": "X",
+    "focus": "加密信息类",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "00ab87a82ee0",
+    "name": "Moon bobo｜期权交易员",
+    "url": "https://x.com/0xBoboCrypto",
+    "platform": "X",
+    "focus": "期权",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "f3c4abae5cb1",
+    "name": "乔伊·卢",
+    "url": "https://x.com/Joylou1209",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "4458d09241fd",
+    "name": "杀破狼 WolfyXBT",
+    "url": "https://x.com/wolfyxbt",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "f8d1c39fb29b",
+    "name": "trader_maxey",
+    "url": "https://x.com/trader_maxey",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "1437739f234c",
+    "name": "0xSun",
+    "url": "https://x.com/0xSunNFT",
+    "platform": "X",
+    "focus": "信息类",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "607c52f77aa0",
+    "name": "Arthur Hayes",
+    "url": "https://x.com/CryptoHayes",
+    "platform": "X",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "a0d513e8c0a4",
+    "name": "煌道 | 交易之道",
+    "url": "https://x.com/huangdaobtc",
+    "platform": "X",
+    "focus": "加密交易向",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "1817fd0adc16",
+    "name": "NickTimiraos",
+    "url": "https://x.com/NickTimiraos",
+    "platform": "X",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "ac975c0a24f7",
+    "name": "thepfund",
+    "url": "https://x.com/thepfund",
+    "platform": "X",
+    "focus": "加密资金",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "43854b86a64e",
+    "name": "新生代投研社",
+    "url": "https://mp.weixin.qq.com/s/TZJehBVkdy4_4zxJVELs4g",
+    "platform": "微信公众号",
+    "focus": "A股、游资、板块轮动",
+    "categories": ["a-share"],
+    "priority": true
+  },
+  {
+    "id": "9806ce7b2f04",
+    "name": "橙子不糊涂",
+    "url": "https://mp.weixin.qq.com/s/I-NSVNrodWpajR9NhlFrJw",
+    "platform": "微信公众号",
+    "focus": "科技",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "037dc8db8bed",
+    "name": "波浪理论学习",
+    "url": "https://m.weibo.cn/u/1644724561?wm=3333_2001&from=10F1293010&sourcetype=weixin&s_trans=7101261740_&s_channel=4",
+    "platform": "微信公众号",
+    "focus": "波浪理论分析各标的",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "2209d613fd9d",
+    "name": "培风客",
+    "url": "https://mp.weixin.qq.com/s/U-oIdiQqlAUrXVv7qt_9-w",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "0d13cf216b50",
+    "name": "BFC汇谈",
+    "url": "https://mp.weixin.qq.com/s/kc0Zi7V8D1C24ZdA70IdHQ",
+    "platform": "微信公众号",
+    "focus": "宏观、大类资产",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "815a9387614e",
+    "name": "地平线全球策略",
+    "url": "https://mp.weixin.qq.com/s/R9-QlwObYmOds_-JKm05cw",
+    "platform": "微信公众号",
+    "focus": "宏观、大类资产",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "c51060e25943",
+    "name": "郁言债市",
+    "url": "https://mp.weixin.qq.com/s/8eQIEwKb6zpfC1FLVopwqw",
+    "platform": "微信公众号",
+    "focus": "宏观、债券",
+    "categories": ["macro", "quant"],
+    "priority": true
+  },
+  {
+    "id": "eb4ec021a619",
+    "name": "momo-Au",
+    "url": "https://mp.weixin.qq.com/s/YA3nkAUQvqnPmDuPdktknA",
+    "platform": "微信公众号",
+    "focus": "黄金、技术分析",
+    "categories": ["metals"],
+    "priority": true
+  },
+  {
+    "id": "caf9ad81b858",
+    "name": "风起于斯",
+    "url": "https://mp.weixin.qq.com/s/rPfjoVWNxErpQpHM_0gXxA",
+    "platform": "微信公众号",
+    "focus": "宏观、商品",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "281963961ca8",
+    "name": "东函西数",
+    "url": "https://mp.weixin.qq.com/s/ynCLtv9q0AXUVDT2r2qqwg",
+    "platform": "微信公众号",
+    "focus": "A股、技术分析",
+    "categories": ["a-share"],
+    "priority": true
+  },
+  {
+    "id": "7056b6c579a0",
+    "name": "半份杂谈",
+    "url": "https://mp.weixin.qq.com/s/ikDyYfB72VF52Hei9p75-A",
+    "platform": "微信公众号",
+    "focus": "宏观、大类资产",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "552ed3aae6a1",
+    "name": "粗浅日记",
+    "url": "https://mp.weixin.qq.com/s/90mG9yt4Bp3iWZKxak72bQ",
+    "platform": "微信公众号",
+    "focus": "宏观、大类资产",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "a92844eaa449",
+    "name": "像鳄鱼一样思考",
+    "url": "https://mp.weixin.qq.com/s/nP2j3RtjY8KcSD_A8pkmBg",
+    "platform": "微信公众号",
+    "focus": "A股、游资、板块轮动",
+    "categories": ["a-share"],
+    "priority": true
+  },
+  {
+    "id": "6d5c6d6a4c17",
+    "name": "卫斯李的投研笔记",
+    "url": "https://mp.weixin.qq.com/s/tsC7BGfMQJsu7LWhWC09IQ",
+    "platform": "微信公众号",
+    "focus": "宏观、大类资产",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "9f5e99fa7915",
+    "name": "港龍財眼",
+    "url": "https://mp.weixin.qq.com/s/78MRpjefONaAeH6IBxn6kw",
+    "platform": "微信公众号",
+    "focus": "宏观、A股、港股",
+    "categories": ["macro", "a-share"],
+    "priority": false
+  },
+  {
+    "id": "eb16c34dfe53",
+    "name": "王开AI投研",
+    "url": "https://mp.weixin.qq.com/s/88NV9yjc5FioS_1Kta9V0A",
+    "platform": "微信公众号",
+    "focus": "AI投研、资产配置",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "dd34eaf98823",
+    "name": "坦途宏观",
+    "url": "https://mp.weixin.qq.com/s/JgLq-6Ahs4otokM3N60TCg",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "19eb27ed58bf",
+    "name": "Yaqi的宏观策略观点",
+    "url": "https://mp.weixin.qq.com/s/o0jHEK8l6T8YO0NMjlyaBg",
+    "platform": "微信公众号",
+    "focus": "宏观、大类资产",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "72783ef2711c",
+    "name": "RMB交易与研究",
+    "url": "https://mp.weixin.qq.com/s/yu7ABnsA7eC8UEC6PpYR1w",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "38aa8ada8854",
+    "name": "丹湖渔翁",
+    "url": "https://mp.weixin.qq.com/s/KgYBkl9aOktcBpHSgcQQ-A",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "1463e5b1cdfa",
+    "name": "中金宏观",
+    "url": "https://mp.weixin.qq.com/s/W0aFkxt79alSQBO-oWAehg",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "9f758f5f6adb",
+    "name": "GTJAI宏观研究",
+    "url": "https://mp.weixin.qq.com/s/oD310RFmREpdBz1a6l69PA",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "4c25c7b8d0e7",
+    "name": "投资喵喵喵",
+    "url": "https://mp.weixin.qq.com/s/tI51tS4M384TQFt36zwv_w",
+    "platform": "微信公众号",
+    "focus": "宏观，注意其不常更新，但更新了一定要关注",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "1b8296ab5edc",
+    "name": "陈兴宏观研究",
+    "url": "https://mp.weixin.qq.com/s/R3EDNiTXgZMJs-1KrpBeHA",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "3a13a5ee8229",
+    "name": "伍戈经济笔记",
+    "url": "https://mp.weixin.qq.com/s/bSFn_zXJiZKAYIapyxqNVA",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "ebfddce2253a",
+    "name": "赵伟宏观探索",
+    "url": "https://mp.weixin.qq.com/s/B1FuUZJrtf7I_FXxkJJYYg",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "4e00491120db",
+    "name": "沧海一土狗",
+    "url": "https://mp.weixin.qq.com/s/ID_BSNKiAh55qx17hO6NlQ",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "de6d4de98717",
+    "name": "于博宏观札记",
+    "url": "https://mp.weixin.qq.com/s/3ZjSk8eCqWGaGdx6fXRrOQ",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "975b01f00582",
+    "name": "CSC研究 宏观团队",
+    "url": "https://mp.weixin.qq.com/s/eTF_jz1_ZetIbs4_VJkGtA",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": true
+  },
+  {
+    "id": "f64bca484ac7",
+    "name": "北向牧风",
+    "url": "https://mp.weixin.qq.com/s/gVyA8mZZ42hn7mCYLKnniA",
+    "platform": "微信公众号",
+    "focus": "海外宏观、科技",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "69514bc00166",
+    "name": "FICC菁益求精",
+    "url": "https://mp.weixin.qq.com/s/nI1HCbHuArGQmKVGU8Fwdw",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "b8802fcc7f09",
+    "name": "秦小明",
+    "url": "https://mp.weixin.qq.com/s/AFffa-S6JW8FVwbeOCXflw",
+    "platform": "微信公众号",
+    "focus": "宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "53f6b2b4f856",
+    "name": "红色碉堡",
+    "url": "https://mp.weixin.qq.com/s/xSYYS319mLS3zXaBWeajcQ",
+    "platform": "微信公众号",
+    "focus": "商品，偏教学向",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "4a1eb17baf93",
+    "name": "资本小论",
+    "url": "https://mp.weixin.qq.com/s/e32PSFdyuIk4rzRjJS6NpA",
+    "platform": "微信公众号",
+    "focus": "商品",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "d760154f11dc",
+    "name": "套利trader",
+    "url": "https://mp.weixin.qq.com/s/5SEe7b5wXWpmajejHhVvIQ",
+    "platform": "微信公众号",
+    "focus": "商品",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "fba61fa79d62",
+    "name": "华泰期货研究院",
+    "url": "https://mp.weixin.qq.com/s/_UrSTO241tZVRzQF6rvn_Q",
+    "platform": "微信公众号",
+    "focus": "商品，每天更新内容较多，直接整合即可",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "156244d5272f",
+    "name": "海证期货研究院",
+    "url": "https://mp.weixin.qq.com/s/2OSpiQyrXqPdFMez7e662A",
+    "platform": "微信公众号",
+    "focus": "商品，每天更新内容较多，直接整合即可",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "19e8b142ebbb",
+    "name": "季节性数据",
+    "url": "https://mp.weixin.qq.com/s/PP3HumfxfgQsHqy_71DzrA",
+    "platform": "微信公众号",
+    "focus": "商品",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "c4a1a8c5fa69",
+    "name": "中信期货研究",
+    "url": "https://mp.weixin.qq.com/s/_5oQPagL4hsi-gpd17eMjg",
+    "platform": "微信公众号",
+    "focus": "商品，每天更新内容较多，直接整合即可",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "3817abf58b7f",
+    "name": "宏观与商品",
+    "url": "https://mp.weixin.qq.com/s/bFFxtfts8oIrZIPbAv_mEQ",
+    "platform": "微信公众号",
+    "focus": "商品，每天更新内容较多，直接整合即可",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "6f574732ad4a",
+    "name": "范蠡学社",
+    "url": "https://mp.weixin.qq.com/s/Hp2wf0Ki4ohOrYQib8dF4Q",
+    "platform": "微信公众号",
+    "focus": "商品",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "2b95994eeaa4",
+    "name": "交易修行路",
+    "url": "https://mp.weixin.qq.com/s/EYggxqemzZnuaH_vh_mrCQ",
+    "platform": "微信公众号",
+    "focus": "商品",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "6645bdf0df0b",
+    "name": "地心共振",
+    "url": "https://mp.weixin.qq.com/s/knBoGw8S4BzutUEY5WVZzw",
+    "platform": "微信公众号",
+    "focus": "商品",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "76f242527951",
+    "name": "商品智贸",
+    "url": "https://mp.weixin.qq.com/s/FljYQQZvtHEFTCYnccqtUg",
+    "platform": "微信公众号",
+    "focus": "商品、宏观",
+    "categories": ["macro"],
+    "priority": false
+  },
+  {
+    "id": "8a14a5ac4b16",
+    "name": "交易法门Pro",
+    "url": "https://mp.weixin.qq.com/s/0IpqoYCXBbsuZxd11C7zeA",
+    "platform": "微信公众号",
+    "focus": "商品",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "bb50a5040b45",
+    "name": "见微知著杂谈",
+    "url": "https://mp.weixin.qq.com/s/5ByKcYLhAZmeKe-YfCfT_g",
+    "platform": "微信公众号",
+    "focus": "铜",
+    "categories": ["metals"],
+    "priority": true
+  },
+  {
+    "id": "21d1351e64b0",
+    "name": "云儿大宗杂谈坊",
+    "url": "https://mp.weixin.qq.com/s/ids0cnDlj1tRgUAKxM4m9Q",
+    "platform": "微信公众号",
+    "focus": "有色",
+    "categories": ["metals"],
+    "priority": true
+  },
+  {
+    "id": "69a5de22296a",
+    "name": "洛楹观察",
+    "url": "https://mp.weixin.qq.com/s/e1T1tbR6VySjNb50HKnTMg",
+    "platform": "微信公众号",
+    "focus": "商品",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "53c4e772f00a",
+    "name": "老魏一凡",
+    "url": "https://mp.weixin.qq.com/s/yR_LoKwR4F2dZ-jAlBrLng",
+    "platform": "微信公众号",
+    "focus": "商品，教学向",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "c559cf009c6e",
+    "name": "陈李lichen",
+    "url": "https://mp.weixin.qq.com/s/UlKSdQxZ2iNaYVCbtGoyBg",
+    "platform": "微信公众号",
+    "focus": "宏观、海外市场",
+    "categories": ["us", "macro"],
+    "priority": true
+  },
+  {
+    "id": "b2d6cc119f37",
+    "name": "EBoversea",
+    "url": "https://mp.weixin.qq.com/s/bg7ME8bk5tpCMv06JkZdZw",
+    "platform": "微信公众号",
+    "focus": "海外市场",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "2ffd14204375",
+    "name": "博美的Max",
+    "url": "https://mp.weixin.qq.com/s/5vQYyoKZ7H7fvusrWnZkNw",
+    "platform": "微信公众号",
+    "focus": "海外市场",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "9cb680116f42",
+    "name": "行知美股",
+    "url": "https://mp.weixin.qq.com/s/vEFhAM18bn2tDQDiGuO2QA",
+    "platform": "微信公众号",
+    "focus": "宏观、海外市场",
+    "categories": ["us", "macro"],
+    "priority": false
+  },
+  {
+    "id": "15c661cd2b02",
+    "name": "M2M研究",
+    "url": "https://mp.weixin.qq.com/s/z5pcZoaKJbTBZ9Ie1uFNJw",
+    "platform": "微信公众号",
+    "focus": "海外市场",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "33a2c53d961f",
+    "name": "尧望后势",
+    "url": "https://mp.weixin.qq.com/s/Lqjxt8K-OO82iP80CCCZ2Q",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "d07a59415ced",
+    "name": "中金点晴",
+    "url": "https://mp.weixin.qq.com/s/XKS2JPPgJzIEKv9Ty_zyTA",
+    "platform": "微信公众号",
+    "focus": "A股、宏观",
+    "categories": ["macro", "a-share"],
+    "priority": false
+  },
+  {
+    "id": "279a9384cb51",
+    "name": "吉时通信",
+    "url": "https://mp.weixin.qq.com/s/yDHb0tWD7MIqdPD6BSC39A",
+    "platform": "微信公众号",
+    "focus": "A股、通信",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "f85a1b60bfb2",
+    "name": "策略研究",
+    "url": "https://mp.weixin.qq.com/s/IgcVz8RcBFUI1OHd-Ktncw",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "49f4d9601e6f",
+    "name": "中信证券研究",
+    "url": "https://mp.weixin.qq.com/s/NwCW0QCneZDYtfewXX-0Bw",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "dfbb85ac469e",
+    "name": "风动幡动还是心动",
+    "url": "https://mp.weixin.qq.com/s/IirpE6s-kXby0zUAwZCVdA",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "1692d928ddeb",
+    "name": "股有旦吸惑复",
+    "url": "https://mp.weixin.qq.com/s/Mrd-Z0tbsvvm2ATBMziqyw",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "53b6d83a10f1",
+    "name": "控盘猫频道",
+    "url": "https://mp.weixin.qq.com/s/_NTA6BF_h8caPIlrtbALmg",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "6e069b037335",
+    "name": "章老师投研",
+    "url": "https://mp.weixin.qq.com/s/BiH9KKBsPJwEkNT5NG5SKg",
+    "platform": "微信公众号",
+    "focus": "A股、大宗",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "1cf8b5076191",
+    "name": "姚佩策略探索",
+    "url": "https://mp.weixin.qq.com/s/pKllQFPcjOr8k25F_eUGVQ",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "d6d71a052d08",
+    "name": "荀玉根思考",
+    "url": "https://mp.weixin.qq.com/s/jGusXvBLg8EkIItkQRbeFg",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "e3c3535e7076",
+    "name": "华泰睿思",
+    "url": "https://mp.weixin.qq.com/s/5IHnmVqgD6-P-fcPh8D5Pg",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": false
+  },
+  {
+    "id": "2a793ea7650d",
+    "name": "我们对A股的思考",
+    "url": "https://mp.weixin.qq.com/s/EEFaNPrs3fc_1eWwyvq0mg",
+    "platform": "微信公众号",
+    "focus": "A股",
+    "categories": ["a-share"],
+    "priority": true
+  },
+  {
+    "id": "acdbf5303008",
+    "name": "华泰证券固收研究",
+    "url": "https://mp.weixin.qq.com/s/1U_g2Om9xRJ6Vsx0BGLxEQ",
+    "platform": "微信公众号",
+    "focus": "固收",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "8aefc7d9fbd2",
+    "name": "靳毅投资思考",
+    "url": "https://mp.weixin.qq.com/s/wxnBFWEP6yEAnHUSz1nehQ",
+    "platform": "微信公众号",
+    "focus": "固收",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "13241db465e0",
+    "name": "PKUEPA",
+    "url": "https://mp.weixin.qq.com/s/a_BkMK_Nlj6Sq8DheFgGSA",
+    "platform": "微信公众号",
+    "focus": "固收",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "a2c89c641554",
+    "name": "覃汉研究笔记",
+    "url": "https://mp.weixin.qq.com/s/7oVH-ICwuPwkUAVAACGknw",
+    "platform": "微信公众号",
+    "focus": "固收",
+    "categories": ["quant"],
+    "priority": true
+  },
+  {
+    "id": "d5fcb4bb21b1",
+    "name": "随率而动的因子工厂",
+    "url": "https://mp.weixin.qq.com/s/bU2jXJ0efg2uW439a05C2g",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "aaa7b01df0da",
+    "name": "我爱程序化",
+    "url": "https://mp.weixin.qq.com/s/s0j7KCtPqqzc5FGb4k4ejA",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": true
+  },
+  {
+    "id": "ecb6c12ba287",
+    "name": "白龙量化",
+    "url": "https://mp.weixin.qq.com/s/BP7bAPQgPVAdZmFe95Q69g",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "fc3336c2ed6d",
+    "name": "低波套利交易策略",
+    "url": "https://mp.weixin.qq.com/s/8tYxoVHn_z01aSOgC0ajhQ",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": true
+  },
+  {
+    "id": "04ac398f6930",
+    "name": "尔乐量化",
+    "url": "https://mp.weixin.qq.com/s/_4RZSBal7HhqA8EmSR53jw",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": true
+  },
+  {
+    "id": "0353853f266b",
+    "name": "跟puppy玩量化",
+    "url": "https://mp.weixin.qq.com/s/MHwRLpNxBSrOL-XumgL8Vg",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "d3c7e6c40528",
+    "name": "githubstore",
+    "url": "http://mp.weixin.qq.com/s?__biz=MzkxNjQ4MzMyOA==&mid=2247495521&idx=1&sn=1fd46441980a27fc94c5c29db92a7310&chksm=c079a4063e7d6f2f8267e413241b46e2e815e96ac8822f388ee6f551a3dc178b56f48d004762&scene=126&sessionid=1781523523&subscene=227&clicktime=1781523526&enterid=1781523526#rd",
+    "platform": "微信公众号",
+    "focus": "开源程序项目",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "e627c320155b",
+    "name": "广发金融工程研究",
+    "url": "https://mp.weixin.qq.com/s/Jh-5jw7Z1sXVPCsyBKblag",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "303e40717ae8",
+    "name": "华泰证券金融工程",
+    "url": "https://mp.weixin.qq.com/s/fEkXhDeLrvOVk9NNF7eFVQ",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "197483d1a15a",
+    "name": "量化投资与机器学习",
+    "url": "https://mp.weixin.qq.com/s/3cG3v8nV6InMMAEBBVJZJw",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "1dfd76d27c09",
+    "name": "留富兵法",
+    "url": "https://mp.weixin.qq.com/s/TVtM60T6MyD1_0SiDQ3ztw",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "07c6064cb928",
+    "name": "人工智能量化实验室",
+    "url": "https://mp.weixin.qq.com/s/JGx6u1cGsW7qI9xQSLaSSw",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "1da743bb5959",
+    "name": "硅基生命的创作",
+    "url": "https://mp.weixin.qq.com/s/gHAKWDRfFkApqfRbFJFUaw",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "ecb5f44d2c59",
+    "name": "金融学前沿论文速递",
+    "url": "https://mp.weixin.qq.com/s/BXRO4tvfwCbm1-qn9xkKKA",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "d2be06aa1918",
+    "name": "量化OK投研交流",
+    "url": "http://mp.weixin.qq.com/s?__biz=Mzg5NTc0NDczMQ==&mid=2247485302&idx=1&sn=a6d0fad4e8137a958f379d91bb048381&chksm=c1427e5bf0fb8570115fd0236e95c4b5e0c8a216e20e8b312ecd3035757004313a3d79864877&scene=126&sessionid=1781523980&subscene=227&clicktime=1781523981&enterid=1781523981#rd",
+    "platform": "微信公众号",
+    "focus": "量化",
+    "categories": ["quant"],
+    "priority": false
+  },
+  {
+    "id": "85a15acb8594",
+    "name": "webx投研",
+    "url": "https://mp.weixin.qq.com/s/rskUiaiCE4VcjZqTNLdflA",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "7ddcf1a6d47f",
+    "name": "创世之力",
+    "url": "https://mp.weixin.qq.com/s/Il9E4PXC-u2E5_92XkjJrQ",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "5ffcd2f122b1",
+    "name": "The Alpha Pulse",
+    "url": "https://mp.weixin.qq.com/s/JOoiZmMXJAQY-9n981fd8g",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "5150f476fe27",
+    "name": "链上RWA",
+    "url": "https://mp.weixin.qq.com/s/JsFDqE7kQo4VT7APIp_SkA",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "a4cf79c57f02",
+    "name": "岳小鱼",
+    "url": "https://mp.weixin.qq.com/s/URIDPJWO5yAe1PpKVzLyvg",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "367ebea2ba86",
+    "name": "美国往事",
+    "url": "https://mp.weixin.qq.com/s/VlXD8TqEbIVwzGjgVwwJTQ",
+    "platform": "微信公众号",
+    "focus": "加密、美股",
+    "categories": ["crypto", "us"],
+    "priority": false
+  },
+  {
+    "id": "c81803978331",
+    "name": "孟岩的区块链思考",
+    "url": "https://mp.weixin.qq.com/s/HYSTjtstmNmPU3bm5yHReA",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "5574c905457a",
+    "name": "Bitpush",
+    "url": "https://mp.weixin.qq.com/s/yN6Q-BPT8DsO6Mvdum1jiA",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "db2323c917a9",
+    "name": "Layer2研习社",
+    "url": "https://mp.weixin.qq.com/s/ljjqrWZuZiI70Do39v09iA",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "3ad9bebd843f",
+    "name": "Web3.0新手村",
+    "url": "https://mp.weixin.qq.com/s/nR2BX2rmq-05bX4s2NtbLw",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "cd14fa2bdef6",
+    "name": "吴说Real",
+    "url": "https://mp.weixin.qq.com/s/F4mC_lvqymntuZ2QIsbShA",
+    "platform": "微信公众号",
+    "focus": "加密",
+    "categories": ["crypto"],
+    "priority": true
+  },
+  {
+    "id": "6b447793a02e",
+    "name": "华尔街情报圈",
+    "url": "https://mp.weixin.qq.com/s/V4KhKKoEvkwrTeIHlBZRGg",
+    "platform": "微信公众号",
+    "focus": "市场信息",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "a60ce8471d13",
+    "name": "华尔街见闻",
+    "url": "https://mp.weixin.qq.com/s/h-BRsDKZZq5Aotkci9Nr1g",
+    "platform": "微信公众号",
+    "focus": "市场信息",
+    "categories": ["other"],
+    "priority": true
+  },
+  {
+    "id": "b1196c1c826e",
+    "name": "固收交易台",
+    "url": "https://mp.weixin.qq.com/s/68-FuXn0P-xOgf3se8TzHg",
+    "platform": "微信公众号",
+    "focus": "市场信息",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "2d5de2a8c52f",
+    "name": "边际Lab",
+    "url": "https://mp.weixin.qq.com/s/HjjtnOuhhgUoRJw7cCzFEQ",
+    "platform": "微信公众号",
+    "focus": "市场信息",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "518deeaca770",
+    "name": "追风交易台",
+    "url": "https://mp.weixin.qq.com/s/4ZUHnhZNUcKqCug8UOhG0Q",
+    "platform": "微信公众号",
+    "focus": "市场信息",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "aedc57a705e6",
+    "name": "180K",
+    "url": "https://mp.weixin.qq.com/s/bvuH4C-wYr_W-xjR8M8d_Q",
+    "platform": "微信公众号",
+    "focus": "市场信息",
+    "categories": ["other"],
+    "priority": false
+  },
+  {
+    "id": "168e3abab0e2",
+    "name": "Glassnode Week On-chain",
+    "url": "https://research.glassnode.com/the-week-onchain-week-18-2026/",
+    "platform": "Glassnode",
+    "focus": "链上与周期",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "f9caf9665890",
+    "name": "Unbias Analysts",
+    "url": "https://unbias.fyi/analysts?source=all",
+    "platform": "网站",
+    "focus": "加密研究观点",
+    "categories": ["crypto"],
+    "priority": false
+  },
+  {
+    "id": "648dbdced895",
+    "name": "Seeking Alpha",
+    "url": "https://seekingalpha.com/",
+    "platform": "网站",
+    "focus": "美股研究",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "f349b11c0f9d",
+    "name": "The Long Investor",
+    "url": "https://x.com/TheLongInvest",
+    "platform": "X",
+    "focus": "美股长期研究",
+    "categories": ["us"],
+    "priority": false
+  },
+  {
+    "id": "bfd3e827985f",
+    "name": "Substack",
+    "url": "https://substack.com/",
+    "platform": "网站",
+    "focus": "投资研究通讯",
+    "categories": ["us", "macro"],
+    "priority": false
+  }
+]

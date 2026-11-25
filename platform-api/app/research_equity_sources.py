@@ -516,6 +516,10 @@ async def collect_sources(*, force=False):
         for s, r in zip(source_specs(), results, strict=True)
     }
 
+    from app.research_choice_index_values import collect_choice_css_indices
     from app.research_equity_valuation import collect_choice_indices
 
-    return {**documents, **(await asyncio.to_thread(collect_choice_indices))}
+    # Keep the licensed SDK sessions sequential. CSS and CSD have separate quotas.
+    daily = await asyncio.to_thread(collect_choice_indices)
+    monthly = await asyncio.to_thread(collect_choice_css_indices)
+    return {**documents, **daily, **monthly}

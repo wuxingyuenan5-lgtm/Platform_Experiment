@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import type { MacroExpectationResponse } from '../../src/api/hedgeResearch';
 
 import { mockResearchRoutes } from '../hedge-board/researchFixtures';
 
@@ -12,81 +13,47 @@ function fulfill(route: Route, payload: unknown): Promise<void> {
   });
 }
 
-function sourceMeta(source: string) {
-  return {
-    source,
-    sourceTimestamp: '2026-07-30T00:30:00+00:00',
-    fetchedAt: '2026-07-30T00:31:00+00:00',
-    status: 'ready',
-    isStale: false,
-    errorCode: null,
-    message: null,
-  };
-}
-
 export async function mockPlatformVisualRoutes(page: Page): Promise<void> {
   await mockResearchRoutes(page);
 
   await page.route(/\/api\/v1\/research\/macro\/expectations(?:\?.*)?$/, (route) =>
     fulfill(route, {
-      generatedAt: '2026-07-30T00:31:00+00:00',
-      events: {
-        meta: sourceMeta('E2E事件概率夹具'),
-        data: [
-          {
-            eventId: 'fed-cut-september',
-            category: 'monetary_policy',
-            title: '美联储9月降息',
-            outcome: '是',
-            currentProbabilityPct: 64.2,
-            change1dPctPoints: 1.4,
-            change7dPctPoints: 4.8,
-            liquidityLabel: '高',
-            expiryAt: '2026-09-17T00:00:00+00:00',
-            sourceUrl: 'https://example.invalid/fed-cut',
-            history: [
-              { observedAt: '2026-07-24T00:00:00+00:00', probabilityPct: 59.4 },
-              { observedAt: '2026-07-27T00:00:00+00:00', probabilityPct: 62.1 },
-              { observedAt: '2026-07-30T00:00:00+00:00', probabilityPct: 64.2 },
-            ],
-          },
-          {
-            eventId: 'us-recession-2027',
-            category: 'macro',
-            title: '美国在2027年前进入衰退',
-            outcome: '是',
-            currentProbabilityPct: 27.8,
-            change1dPctPoints: -0.6,
-            change7dPctPoints: -2.1,
-            liquidityLabel: '中',
-            expiryAt: '2026-12-31T00:00:00+00:00',
-            sourceUrl: 'https://example.invalid/recession',
-            history: [
-              { observedAt: '2026-07-24T00:00:00+00:00', probabilityPct: 31.0 },
-              { observedAt: '2026-07-27T00:00:00+00:00', probabilityPct: 29.2 },
-              { observedAt: '2026-07-30T00:00:00+00:00', probabilityPct: 27.8 },
-            ],
-          },
-          {
-            eventId: 'geopolitical-risk',
-            category: 'geopolitics',
-            title: '主要地缘风险在季度内缓和',
-            outcome: '是',
-            currentProbabilityPct: 41.5,
-            change1dPctPoints: 0.2,
-            change7dPctPoints: 3.0,
-            liquidityLabel: '中',
-            expiryAt: '2026-09-30T00:00:00+00:00',
-            sourceUrl: 'https://example.invalid/geopolitics',
-            history: [
-              { observedAt: '2026-07-24T00:00:00+00:00', probabilityPct: 38.5 },
-              { observedAt: '2026-07-27T00:00:00+00:00', probabilityPct: 40.0 },
-              { observedAt: '2026-07-30T00:00:00+00:00', probabilityPct: 41.5 },
-            ],
-          },
-        ],
-      },
-    }),
+      status: 'ready',
+      source: 'E2E事件概率夹具',
+      updatedAt: '2026-07-30T00:31:00+00:00',
+      sourceUrl: 'https://example.invalid/events',
+      events: [
+        {
+          id: 'fed-cut-september',
+          category: 'monetary_policy',
+          label: '美联储9月降息',
+          probability: 64.2,
+          history: [{ observedAt: '2026-07-30T00:00:00+00:00', probability: 64.2 }],
+        },
+        {
+          id: 'us-recession-2027',
+          category: 'macro',
+          label: '美国在2027年前进入衰退',
+          probability: 27.8,
+          history: [
+            { observedAt: '2026-07-24T00:00:00+00:00', probability: 31.0 },
+            { observedAt: '2026-07-27T00:00:00+00:00', probability: 29.2 },
+            { observedAt: '2026-07-30T00:00:00+00:00', probability: 27.8 },
+          ],
+        },
+        {
+          id: 'geopolitical-risk',
+          category: 'geopolitics',
+          label: '主要地缘风险在季度内缓和',
+          probability: 41.5,
+          history: [
+            { observedAt: '2026-07-24T00:00:00+00:00', probability: 38.5 },
+            { observedAt: '2026-07-27T00:00:00+00:00', probability: 40.0 },
+            { observedAt: '2026-07-30T00:00:00+00:00', probability: 41.5 },
+          ],
+        },
+      ],
+    } satisfies MacroExpectationResponse),
   );
 
   // Account identities come from the isolated seeded Platform API.

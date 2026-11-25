@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>跨所价差 · 行情分析新版</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f4f7fb;
+      }
+
+      #app {
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      @media (max-width: 560px) {
+        #app {
+          padding: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="platform-page"></div>
+    <script type="module" src="/src/views/strategy/spread-carry/market-demo/preview.ts"></script>
+  </body>
+</html>

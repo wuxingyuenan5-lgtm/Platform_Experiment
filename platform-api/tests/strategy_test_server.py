@@ -2,10 +2,11 @@
 
 import asyncio
 import json
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from app import application, live_venue_snapshot_sync
+from app import application, cross_spread_live_read_client, live_venue_snapshot_sync
 from app.config import get_settings
 from app.database import connection
 from app.live_venue_snapshot_sync import _persist_account_risk, _persist_venue_snapshot
@@ -145,12 +146,43 @@ application.initialize_database = lambda: None
 live_venue_snapshot_sync.discover_live_accounts = lambda: [
     "account_crypto_test", "account_mt5_demo", "account_sim_usdt"
 ]
+
+# FakeGateway exposes a net position ID, while this single-position MT5 fixture
+# models an opening-order ticket. Keep the actual Runtime quantities and prices.
+_runtime_position_rows = cross_spread_live_read_client.list_position_rows
+
+
+def isolated_ticket_positions(account_id):
+    rows = _runtime_position_rows(account_id)
+    if account_id != "account_mt5_demo":
+        return rows
+    with connection() as db:
+        plans = db.execute(
+            "SELECT mt5_position_id FROM cross_spread_exit_plans WHERE status!='closed'"
+        ).fetchall()
+    if rows and plans:
+        if len(rows) != 1 or len(plans) != 1:
+            raise ValueError("The isolated MT5 fixture supports exactly one open position")
+        rows = [{**rows[0], "externalPositionId": plans[0]["mt5_position_id"]}]
+    return rows
+
+
+cross_spread_live_read_client.list_position_rows = isolated_ticket_positions
 app = application.create_application()
 
 
 @app.middleware("http")
 async def isolated_response_delay(request, call_next):
     """A one-use file fixture holds the response after the real test write finishes."""
+    # This host is guarded by seed() as test mode and an isolated .e2e database.
+    # Model a continuing FakeGateway feed instead of relaxing native quote freshness.
+    if request.url.path.startswith("/api/v1/trading/cross-spread/"):
+        journal = Path(get_settings().database_path).parent / "runtime.db"
+        with sqlite3.connect(f"{journal.as_uri()}?mode=rw", uri=True) as runtime_db:
+            runtime_db.execute(
+                "UPDATE fake_venue_quotes SET updated_at=?",
+                (datetime.now(UTC).isoformat(),),
+            )
     fixture = Path(get_settings().database_path).parent / "response-delay.json"
     delay = 0
     if (

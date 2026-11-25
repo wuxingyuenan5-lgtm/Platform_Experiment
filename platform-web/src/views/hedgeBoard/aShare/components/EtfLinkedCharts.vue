@@ -3,28 +3,21 @@
     <div
       ref="chartRef"
       class="linked-chart"
-      :style="{ height: `${plots.length * 186 + 22}px` }"
+      :style="{ height: `${plots.length * 186 + 60}px` }"
       role="img"
       tabindex="0"
-      :aria-label="
-        flowsOnly
-          ? 'ETF申赎历史图：日度申赎份额及净申赎占指数成交额。Ctrl加滚轮缩放，拖动平移。'
-          : 'ETF联动历史图：价格、成交额、份额及融资。Ctrl加滚轮缩放，拖动平移。'
-      "
+      aria-label="ETF联动历史图：价格与份额、融资及成交额，可使用范围滚轴缩放。"
       @pointerenter="bindEvents"
       @wheel.capture="allowPageScroll"
       @focus="bindEvents"
       @keydown.left.prevent="moveCursor(-1)"
       @keydown.right.prevent="moveCursor(1)"
     ></div>
-    <p class="chart-help"
-      >各图共享日期轴与十字线 · Ctrl + 滚轮缩放 · 拖动平移 · 左右方向键查看数据</p
-    >
   </div>
 </template>
 
 <script setup lang="ts">
-  import { ref, watch, nextTick, onMounted, type Ref } from 'vue';
+  import { computed, ref, watch, nextTick, onMounted, type Ref } from 'vue';
   import type { EChartsOption } from 'echarts';
   import { useECharts } from '@/hooks/web/useECharts';
   import type { EtfDetail } from '@/api/etfTracking';
@@ -35,7 +28,6 @@
     start: string;
     end: string;
     tooltip: boolean;
-    flowsOnly?: boolean;
     mode?: 'price' | 'flows' | 'financing';
   }>();
   const emit = defineEmits<{ (event: 'range', start: string, end: string): void }>();
@@ -47,30 +39,19 @@
     ink = '#27364c';
   let cursor = 0;
   let bound: ReturnType<typeof chart.getInstance> = null;
-  const plots =
-    props.flowsOnly || props.mode === 'flows'
-      ? ([
-          ...(props.mode === 'flows'
-            ? [['日线 ETF 份额走势', 'qfq_total_units_yi', '亿份', false] as const]
-            : []),
-          ['日度 ETF 申购赎回份额', 'qfq_delta_units_yi', '亿份', true],
-          ['净申赎金额 / 指数成交额', 'flow_to_index_pct', '%', true],
-        ] as const)
-      : (
-          [
-            ['日线价格走势', 'etf_qfq_close', '元', false],
-            ['日度 ETF 成交额（估算）', 'etf_qfq_turnover_est_yi', '亿元', true],
-            ['日线 ETF 份额走势 · 圆点为持仓披露', 'qfq_total_units_yi', '亿份', false],
-            ['ETF 融资余额与融资净买入', 'financing_balance_yi', '亿元', false],
-            ['指数成分股融资余额与融资净买入', 'index_financing_balance_yi', '亿元', false],
-          ] as const
-        ).filter(
-          (p) =>
-            !props.mode ||
-            (props.mode === 'price'
-              ? ['etf_qfq_close', 'etf_qfq_turnover_est_yi'].includes(p[1])
-              : ['financing_balance_yi', 'index_financing_balance_yi'].includes(p[1])),
-        );
+  const allPlots = [
+    ['日线价格与ETF份额走势', 'etf_qfq_close', '元', false],
+    ['ETF 融资余额与融资净买入', 'financing_balance_yi', '亿元', false],
+    ['指数成分股融资余额与融资净买入', 'index_financing_balance_yi', '亿元', false],
+    ['日度 ETF 成交额（估算）', 'etf_qfq_turnover_est_yi', '亿元', true],
+  ] as const;
+  const plots = computed(() => {
+    if (props.mode === 'price') return [allPlots[0], allPlots[3]];
+    if (props.mode === 'financing') return [allPlots[0], allPlots[1], allPlots[2]];
+    if (props.mode === 'flows')
+      return [allPlots[0], ['ETF日净申赎（估算）', 'flow_yi', '亿元', true] as const];
+    return allPlots;
+  });
   const numberFormat = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 4 });
   const showNumber = (value: unknown) => {
     const n = numeric(value as number | null);
@@ -81,7 +62,7 @@
     const dates = rows.map((r) => r.date);
     const margin = new Map(props.detail.margin.map((r) => [r.date, r]));
     const groupMargin = new Map(props.detail.groupMargin.map((r) => [r.date, r]));
-    const values = plots.map((plot) =>
+    const values = plots.value.map((plot) =>
       rows.map((r) =>
         numeric(
           plot[1] === 'financing_balance_yi'
@@ -92,7 +73,7 @@
         ),
       ),
     );
-    const xAxis = plots.map((_, i) => ({
+    const xAxis = plots.value.map((_, i) => ({
       type: 'category',
       gridIndex: i,
       data: dates,
@@ -106,9 +87,12 @@
         hideOverlap: true,
         formatter: (v: string) => v.slice(2),
       },
-      axisPointer: { show: true, label: { show: i === plots.length - 1, backgroundColor: blue } },
+      axisPointer: {
+        show: true,
+        label: { show: i === plots.value.length - 1, backgroundColor: blue },
+      },
     }));
-    const yAxis: any[] = plots.map((plot, i) => ({
+    const yAxis: any[] = plots.value.map((plot, i) => ({
       type: 'value',
       gridIndex: i,
       scale: !plot[3],
@@ -119,9 +103,9 @@
       splitLine: { lineStyle: { color: '#e2e7f0' } },
       axisPointer: { show: false },
     }));
-    const series: any[] = plots.map((plot, i) => ({
+    const series: any[] = plots.value.map((plot, i) => ({
       id: plot[1],
-      name: plot[0],
+      name: i === 0 ? 'ETF价格' : plot[0],
       type: plot[3] ? 'bar' : 'line',
       xAxisIndex: i,
       yAxisIndex: i,
@@ -144,7 +128,7 @@
         true,
       ],
     ] as const) {
-      const gridIndex = plots.findIndex((plot) => plot[1] === balanceField);
+      const gridIndex = plots.value.findIndex((plot) => plot[1] === balanceField);
       if (gridIndex < 0) continue;
       const axisIndex = yAxis.length;
       yAxis.push({
@@ -173,6 +157,30 @@
         barMaxWidth: 10,
       });
     }
+    const sharesAxisIndex = yAxis.length;
+    yAxis.push({
+      type: 'value',
+      gridIndex: 0,
+      position: 'right',
+      scale: true,
+      name: '亿份',
+      splitNumber: 3,
+      nameTextStyle: { color: '#b2842f', fontSize: 10 },
+      axisLabel: { color: '#b2842f', fontSize: 10 },
+      splitLine: { show: false },
+    });
+    series.push({
+      id: 'qfq_total_units_yi',
+      name: 'ETF总份额',
+      type: 'line',
+      xAxisIndex: 0,
+      yAxisIndex: sharesAxisIndex,
+      data: rows.map((r) => numeric(r.qfq_total_units_yi)),
+      showSymbol: false,
+      connectNulls: false,
+      itemStyle: { color: '#b2842f' },
+      lineStyle: { width: 1.6, color: '#b2842f' },
+    });
     const disclosures = props.detail.disclosures.flatMap((d) => {
       const day = dates.filter((day) => day <= d.report_date).at(-1);
       const value = numeric(d.total_shares_yi_qfq);
@@ -180,32 +188,30 @@
         ? [{ value: [day, value], ratio: d.combined_ratio_pct, report: d.report_date }]
         : [];
     });
-    const sharesIndex = plots.findIndex((plot) => plot[1] === 'qfq_total_units_yi');
-    if (sharesIndex >= 0)
-      series.push({
-        id: 'disclosures',
-        name: '持仓披露',
-        type: 'scatter',
-        xAxisIndex: sharesIndex,
-        yAxisIndex: sharesIndex,
-        symbolSize: 8,
-        itemStyle: { color: '#fff', borderColor: blue, borderWidth: 2 },
-        label: {
-          show: true,
-          position: 'top',
-          color: '#667b9c',
-          fontSize: 10,
-          formatter: (p: any) => `${showNumber(p.data.ratio)}%`,
-        },
-        data: disclosures,
-        tooltip: {
-          trigger: 'item',
-          formatter: (p: any) =>
-            `报告期 ${p.data.report}\n披露占比 ${showNumber(p.data.ratio)}%\n份额 ${showNumber(
-              p.value[1],
-            )} 亿份`,
-        },
-      });
+    series.push({
+      id: 'disclosures',
+      name: '持仓披露',
+      type: 'scatter',
+      xAxisIndex: 0,
+      yAxisIndex: sharesAxisIndex,
+      symbolSize: 8,
+      itemStyle: { color: '#fff', borderColor: blue, borderWidth: 2 },
+      label: {
+        show: true,
+        position: 'top',
+        color: '#667b9c',
+        fontSize: 10,
+        formatter: (p: any) => `${showNumber(p.data.ratio)}%`,
+      },
+      data: disclosures,
+      tooltip: {
+        trigger: 'item',
+        formatter: (p: any) =>
+          `报告期 ${p.data.report}\n披露占比 ${showNumber(p.data.ratio)}%\n份额 ${showNumber(
+            p.value[1],
+          )} 亿份`,
+      },
+    });
     const start = Math.max(
       0,
       dates.findIndex((d) => !props.start || d >= props.start),
@@ -221,7 +227,8 @@
       },
       animation: false,
       backgroundColor: '#fff',
-      title: plots.map((plot, i) => ({
+      legend: { data: ['ETF价格', 'ETF总份额'], top: 12, right: 70, textStyle: { fontSize: 11 } },
+      title: plots.value.map((plot, i) => ({
         text: plot[0],
         left: 18,
         top: i * 186 + 12,
@@ -229,7 +236,7 @@
         subtext: values[i].some((v) => v != null) ? '' : '暂无数据',
         subtextStyle: { fontSize: 11, color: '#8b97a9' },
       })),
-      grid: plots.map((_, i) => ({ top: i * 186 + 47, height: 126, left: 64, right: 64 })),
+      grid: plots.value.map((_, i) => ({ top: i * 186 + 47, height: 126, left: 64, right: 64 })),
       xAxis,
       yAxis,
       axisPointer: {
@@ -249,10 +256,10 @@
           const index = dates.indexOf(day);
           return [
             day,
-            ...plots.map(
+            ...plots.value.map(
               (plot, i) => `${plot[0].split(' · ')[0]}  ${showNumber(values[i][index])} ${plot[2]}`,
             ),
-            `估算净申赎金额  ${showNumber(rows[index]?.flow_yi)} 亿元`,
+            `ETF总份额  ${showNumber(rows[index]?.qfq_total_units_yi)} 亿份`,
           ].join('\n');
         },
       },
@@ -260,19 +267,28 @@
         {
           id: 'linked-window',
           type: 'inside',
-          xAxisIndex: plots.map((_, i) => i),
+          xAxisIndex: plots.value.map((_, i) => i),
           filterMode: 'filter',
           startValue: start,
           endValue: end,
           zoomOnMouseWheel: 'ctrl',
           moveOnMouseWheel: false,
-          moveOnMouseMove: true,
+        },
+        {
+          id: 'linked-slider',
+          type: 'slider',
+          xAxisIndex: plots.value.map((_, i) => i),
+          filterMode: 'filter',
+          startValue: start,
+          endValue: end,
+          height: 20,
+          bottom: 10,
         },
       ],
       series,
     } as EChartsOption;
     chart.getInstance()?.dispatchAction({ type: 'hideTip' });
-    await chart.setOptions(option, false);
+    await chart.setOptions(option, true);
     await nextTick();
     bindEvents();
   }
@@ -305,7 +321,7 @@
     cursor = Math.max(first, Math.min(last < 0 ? rows.length - 1 : last, cursor + direction));
     chart.getInstance()?.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: cursor });
   }
-  watch(() => [props.detail, props.tooltip], render, { deep: false });
+  watch(() => [props.detail, props.tooltip, props.mode], render, { deep: false });
   watch(
     () => [props.start, props.end],
     () => {

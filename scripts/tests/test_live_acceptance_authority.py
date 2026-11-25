@@ -46,12 +46,12 @@ class LiveAcceptanceAuthorityTests(unittest.TestCase):
     def test_runbook_retains_instruction_bounds_and_owner_approved_chase_parameters(self) -> None:
         runbook = read("docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md")
         required_contract = (
-            "Each CEO instruction fixes both leg quantities and creates at most one execution batch",
-            "cumulative external fills may not exceed those instruction quantities",
-            "global one-active-execution serialization",
-            "`result_unknown` forbids blind retry",
+            "One instruction creates at most one batch",
+            "cumulative external fills may not exceed its quantities",
+            "Resource serialization",
+            "Unknown outcomes prohibit blind retry, duplicate intent and blind rollback",
             "Kill Switch",
-            "forced read-only reset",
+            "proof of forced reset",
             "15-second total chase TTL",
             "one-second evaluation cadence",
             "at most five amend or cancel-repost mutations",
@@ -73,27 +73,23 @@ class LiveAcceptanceAuthorityTests(unittest.TestCase):
         )
         self.assertNotIn("`retain`, `relax` or `remove`", safeguards)
 
-    def test_legacy_fixed_cap_code_and_public_session_type_remain_explicit_blockers(self) -> None:
-        current_state = read("docs/BASELINE.md")
+    def test_normal_authorization_retires_acceptance_caps_but_preserves_live_gates(self) -> None:
+        baseline = read("docs/BASELINE.md")
         runbook = read("docs/operations/LIVE_ACCEPTANCE_RUNBOOK.md")
-        auth_contract = read("docs/contracts/AUTHORIZATION.md")
-        adapter_contract = read("docs/contracts/VENUE_ADAPTERS.md")
-        platform_sessions = read("platform-api/app/live_trading_sessions.py")
-
-        for authority in (current_state, runbook):
-            self.assertIn("fixed-notional-cap code", authority)
-            self.assertIn("controlled-live readiness blocker", authority)
-
-        self.assertIn("`minimum_size_acceptance`", auth_contract)
-        self.assertIn("legacy compatibility", auth_contract)
+        auth = read("docs/contracts/AUTHORIZATION.md")
+        self.assertIn("Legacy acceptance sessions and temporary windows are not normal trading prerequisites", baseline)
+        self.assertIn("Normal CEO execution no longer applies temporary acceptance quantity/notional", baseline)
+        self.assertIn("Legacy `LiveTradingSession` records do not participate in normal trading admission", runbook)
+        self.assertIn("Platform and Runtime Live Write remain independent, default-off", runbook)
+        self.assertIn("does not authorize a real order", runbook)
+        for safeguard in ("Kill Switch", "idempotency", "result_unknown"):
+            self.assertIn(safeguard, baseline)
+        self.assertIn("CEO", auth)
+        # Retained legacy records cannot become a permission gate for normal trading.
         self.assertIn(
             'Literal["minimum_size_acceptance", "existing_limits", "scale_change"]',
-            platform_sessions,
+            read("platform-api/app/live_trading_sessions.py"),
         )
-        self.assertIn("VG_RUNTIME_LIVE_MAX_ORDER_NOTIONAL", adapter_contract)
-        self.assertIn("VG_RUNTIME_LIVE_MAX_DAILY_NOTIONAL", adapter_contract)
-        self.assertIn("legacy compatibility", adapter_contract)
-        self.assertIn("controlled-live readiness blocker", adapter_contract)
 
 
 if __name__ == "__main__":

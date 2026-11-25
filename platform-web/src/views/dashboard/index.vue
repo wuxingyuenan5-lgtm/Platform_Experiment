@@ -1,6 +1,7 @@
 <template>
   <PageWrapper dense :content-style="{ overflow: 'visible' }">
     <main
+      ref="motionPlot"
       class="home-dashboard"
       data-testid="dashboard-original-structure"
       aria-label="全球变量首页"
@@ -28,6 +29,7 @@
                   <span>{{ item.label }}</span>
                   <svg viewBox="0 0 78 22" preserveAspectRatio="none" aria-hidden="true">
                     <polyline
+                      data-chart-kind="line"
                       :points="item.spark"
                       fill="none"
                       :stroke="item.color"
@@ -69,10 +71,16 @@
 </template>
 
 <script setup lang="ts">
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { onMounted, ref } from 'vue';
   import { RightOutlined } from '@ant-design/icons-vue';
   import { PageWrapper } from '@/components/Page';
   import PersonalWorkspace from './workspace/PersonalWorkspace.vue';
   import { marketOverviewItems } from '@/data/sample/dashboard';
+
+  const motionPlot = ref<HTMLElement>();
+  const reveal = useChartReveal(motionPlot);
+  onMounted(() => void reveal());
 </script>
 
 <style scoped lang="less">

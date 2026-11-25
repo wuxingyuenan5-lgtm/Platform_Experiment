@@ -1,0 +1,144 @@
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1><span class="dot"></span>汪汪队ETF跟踪器</h1>
+      <div class="sub">宽基 ETF 成交额与资金动向 · 用来判断今日国家队是否上班</div>
+    </div>
+    <div class="status">
+      <span class="badge" id="badge"><i></i><span id="badgeText">载入中</span></span>
+      <span class="stamp num" id="stamp">—</span>
+    </div>
+  </header>
+  <section class="verdict" id="verdict">
+    <div class="vhead">
+      <div>
+        <div class="vlabel" id="vlabel">今日结论</div>
+        <div class="vtitle" id="vtitle">正在计算…</div>
+        <div class="vreason" id="vreason">—</div>
+      </div>
+      <div class="vstamp">
+        <b class="num" id="vstampNum">—</b>
+        <span id="vstampLabel">较20日均额</span>
+      </div>
+    </div>
+    <div class="mgrid" id="mgrid"></div>
+    <div class="caveat" id="caveat">
+      名单为 2025 年报历史标签，非当前持仓；所有结论均为量价推测。<a href="#notes"
+        >完整口径与合规说明 ↓</a
+      >
+    </div>
+  </section>
+  <section class="charts">
+    <div class="chartcard">
+      <div class="chead">
+        <div>
+          <h3>重点ETF每日份额变化估算</h3>
+          <div class="csub">单位：亿份 · 正数份额增加，负数份额减少 · 参考站20只重点ETF样本</div>
+        </div>
+        <div class="rng" id="rngDelta" data-target="delta">
+          <button data-n="60">近3月</button><button data-n="120">近6月</button
+          ><button data-n="242" class="on">近1年</button>
+        </div>
+      </div>
+      <div class="chartbox" id="chartDelta"><div class="chart-tip"></div></div>
+      <div class="chart-note" id="chartDeltaNote"></div>
+    </div>
+    <div class="chartcard">
+      <div class="chead">
+        <div>
+          <h3>重点ETF份额指数估算</h3>
+          <div class="csub">区间首日 = 100 · 高于 100 为估算净加仓，低于 100 为估算净减仓</div>
+        </div>
+        <div class="rng" id="rngIndex" data-target="index">
+          <button data-n="60">近3月</button><button data-n="120">近6月</button
+          ><button data-n="242" class="on">近1年</button>
+        </div>
+      </div>
+      <div class="chartbox" id="chartIndex"><div class="chart-tip"></div></div>
+      <div class="chart-note" id="chartIndexNote"></div>
+    </div>
+  </section>
+  <div class="controls">
+    <div class="grp">
+      <span class="muted" style="font-size: 12px">排序</span>
+      <select id="sort" aria-label="ETF排序">
+        <option value="huijin">汇金历史持仓 → 规模优先</option>
+        <option value="amount">今日成交额</option>
+        <option value="ratio">放量倍数</option>
+        <option value="net">主动净买入</option>
+        <option value="mktcap">最新规模</option>
+      </select>
+    </div>
+    <div class="grp">
+      <span class="muted" style="font-size: 12px">范围</span>
+      <select id="scope" aria-label="ETF范围">
+        <option value="all">全部</option>
+        <option value="core">仅汪汪队重点关注</option>
+        <option value="watch">仅扩展观察</option>
+      </select>
+    </div>
+    <input type="text" id="q" aria-label="ETF搜索" placeholder="搜代码 / 名称 / 指数" />
+    <button class="primary" id="refresh">立即刷新</button>
+    <label class="toggle"><input type="checkbox" id="auto" checked />自动刷新</label>
+    <div class="meta" id="meta">—</div>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead
+        ><tr>
+          <th>ETF</th><th>跟踪指数</th><th>规模(亿)</th><th>成交额(亿)</th>
+          <th id="thRatio">较20日均</th>
+          <th title="外盘−内盘 逐笔主动买卖推算，非资金流向、非申赎、不含大宗"
+            >主动净买入<sup>①</sup></th
+          >
+          <th>涨跌</th>
+          <th title="腾讯行情场内份额，下方为与上一份快照的份额变化估值">份额(亿份)<sup>②</sup></th>
+          <th>近30日成交额</th><th>汇金持仓(25年报·亿份)</th>
+        </tr></thead
+      >
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="tnote">
+    <div
+      ><b>① 主动净买入</b> = (外盘 − 内盘) ÷ (外盘 + 内盘) ×
+      成交额。外盘是主动买（成交在卖价）、内盘是主动卖（成交在买价），所以这只是<b>逐笔成交方向的推算</b>：<b>不是资金净流入，不是基金申赎净流入，也不含大宗交易与协议转让</b>。
+      ETF
+      有一二级市场套利对冲，同一笔申赎会在二级市场产生反向成交，会稀释该信号；机构调仓、做市双边报价同样会干扰。别把它当「国家队买了多少钱」。</div
+    >
+    <div
+      ><b>② 份额 / 申赎</b> = 腾讯行情披露的场内份额；下方申赎 = (本次快照份额 − 上一份快照份额) ×
+      现价，<b>是份额变化的市值估算，不是基金公司公布的申赎数据</b>，需要前后两次可比快照才有值。<br />
+      <b>为什么有的是 0：</b>2026-11-03 实测，沪市 15 只 ETF 份额全部与上一快照一模一样，深市 9 只里
+      8
+      只有变化——这种「整片市场同时不动」不可能反映真实申赎，是行情商的份额字段对沪市未按日更新。页面因此加了自检：<b
+        >同一市场 ≥70% 标的两日份额完全相同时，该市场一律标「份额源未日更」而不给数字</b
+      >，避免把数据源滞后说成「没有申赎」。只有差异化的市场才显示具体申赎值。任何情况下都以基金公司公告为准。</div
+    >
+  </div>
+  <footer id="notes">
+    <h3>名单与统计口径</h3>
+    <p
+      >本页沿用参考站20只重点ETF与4只扩展观察的独立样本。2025年报持有人名单是历史标签，不代表当前持仓；量价信号不能确认任何机构当日交易。</p
+    >
+    <p
+      >同时点倍数＝当前累计成交额 ÷（参考站20日均额 ×
+      历史同时点累计成交占比）。该占比由参考站5分钟分布线性对齐到当前时点，并非新增的原始分钟观测；20日均额及日内分布沿用参考快照，快照日期与实时行情日期分别显示。</p
+    >
+    <p
+      >每日份额变化及份额指数沿用参考站历史序列；原始缺项按其方法沿用最近值，属于估算。份额变化可能来自任何投资者，不能视为特定机构的实际交易。区间首日定为100，不是持仓比例。</p
+    >
+    <p
+      >主动净买入为（外盘−内盘）÷（外盘＋内盘）×成交额，属于成交方向估算；与平台ETF总览的交易所份额变动×单位净值申赎口径不同。行情份额变化×价格也是估值，行情源滞后时不显示为零申赎。</p
+    >
+    <p
+      >参考页面：<a
+        href="https://etf-turnover-tracker.app.workbuddy.host/?sharecode=2V35TELSL4"
+        target="_blank"
+        rel="noopener noreferrer"
+        >ETF成交额跟踪器 ↗</a
+      >。来源为第三方公开行情，保留实际观测日期及失败状态。</p
+    >
+    <div class="sign" id="footerSign">—</div></footer
+  ></div
+>

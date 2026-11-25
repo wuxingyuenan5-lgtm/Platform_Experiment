@@ -82,7 +82,7 @@
           <span class="matrix-legend--lagging">弱势回落 {{ quadrants.lagging }}</span>
         </div>
         <div v-if="map.points.length" class="narrative-map">
-          <svg viewBox="0 0 1100 500" role="img" aria-label="宏观叙事轮动地图">
+          <svg ref="motionPlot" viewBox="0 0 1100 500" role="img" aria-label="宏观叙事轮动地图">
             <rect
               x="65"
               y="65"
@@ -296,7 +296,8 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
   import { getMacroNarratives, type MacroNarratives } from '@/api/macroNarratives';
   import { colorFor, narrativeMap } from './narrativeOptions';
   import MacroNarrativeLines from './MacroNarrativeLines.vue';
@@ -431,6 +432,9 @@
       evidence: '需要生产率、单位劳动力成本等独立证据。',
     },
   ];
+  const motionPlot = ref<SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watch([data, market, years], () => void reveal(), { flush: 'post' });
 </script>
 <style scoped lang="less">
   .macro-narratives {

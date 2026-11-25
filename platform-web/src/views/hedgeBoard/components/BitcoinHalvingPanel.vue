@@ -9,7 +9,7 @@
             v-for="days in [365, 730, 1095, 0]"
             :key="days"
             :aria-pressed="windowDays === days"
-            @click="windowDays = days"
+            @click="selectWindow(days)"
           >
             {{ days === 1095 ? '3年' : days ? `${days}天` : '全部' }}
           </button>
@@ -37,6 +37,7 @@
             </button>
           </div>
           <svg
+            ref="motionPlot"
             :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
             :style="{ height: `${chartHeight}px` }"
             role="img"
@@ -63,15 +64,17 @@
               </text>
             </g>
             <text x="60" y="12" class="axis">价格指数</text>
-            <path
-              v-for="(cycle, index) in cycles"
-              :key="cycle.seriesId"
-              v-show="!hiddenCycles.has(cycle.seriesId)"
-              :d="path(cycle)"
-              fill="none"
-              :stroke="colors[index]"
-              stroke-width="2"
-            />
+            <g data-chart-kind="line">
+              <path
+                v-for="(cycle, index) in cycles"
+                :key="cycle.seriesId"
+                v-show="!hiddenCycles.has(cycle.seriesId)"
+                :d="path(cycle)"
+                fill="none"
+                :stroke="colors[index]"
+                stroke-width="2"
+              />
+            </g>
             <line
               :x1="x(cursorDay)"
               :x2="x(cursorDay)"
@@ -95,28 +98,34 @@
               减半后天数
             </text>
           </svg>
-          <label class="halving-slider"
-            >显示起点：第 {{ rangeStart }} 天
+          <label class="halving-slider">
+            <span>显示起点：第 {{ rangeStart }} 天</span>
             <input
-              v-model.number="rangeStart"
               type="range"
               min="0"
-              :max="rangeEnd - 1"
-              aria-label="减半周期显示起点"
-            />
-          </label>
-          <label class="halving-slider"
-            >显示终点：第 {{ rangeEnd }} 天
-            <input
-              v-model.number="rangeEnd"
-              type="range"
-              :min="rangeStart + 1"
               :max="maxDay"
-              aria-label="减半周期显示终点"
+              :value="rangeStart"
+              step="1"
+              aria-label="减半周期显示起点"
+              :aria-valuetext="`第 ${rangeStart} 天`"
+              @input="setRangeStart"
             />
           </label>
-          <label class="halving-slider"
-            >减半后第 {{ cursorDay }} 天
+          <label class="halving-slider">
+            <span>显示终点：第 {{ rangeEnd }} 天</span>
+            <input
+              type="range"
+              min="0"
+              :max="maxDay"
+              :value="rangeEnd"
+              step="1"
+              aria-label="减半周期显示终点"
+              :aria-valuetext="`第 ${rangeEnd} 天`"
+              @input="setRangeEnd"
+            />
+          </label>
+          <label class="halving-slider">
+            <span>减半后第 {{ cursorDay }} 天</span>
             <input
               v-model.number="cursorDay"
               type="range"
@@ -124,6 +133,7 @@
               :max="rangeEnd"
               step="1"
               aria-label="减半后天数"
+              :aria-valuetext="`第 ${cursorDay} 天`"
             />
           </label>
         </div>
@@ -167,6 +177,7 @@
   import { useDashboardRefresh } from '../useDashboardRefresh';
 
   import { useElementSize } from '@vueuse/core';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
   import { computed, ref, shallowRef, watch } from 'vue';
   import { getCryptoDashboardV1, type MacroDashboardSeries } from '@/api/hedgeResearch';
 
@@ -215,14 +226,34 @@
     ),
   );
   const rangeStart = ref(0),
-    rangeEnd = ref(1095);
+    rangeEnd = ref(1);
+  const clamp = (value: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, Math.round(value)));
+  function setRangeStart(event: Event) {
+    reveal.cancel();
+    const input = event.currentTarget as HTMLInputElement;
+    rangeStart.value = clamp(Number(input.value), 0, rangeEnd.value - 1);
+    input.value = String(rangeStart.value);
+  }
+  function setRangeEnd(event: Event) {
+    reveal.cancel();
+    const input = event.currentTarget as HTMLInputElement;
+    rangeEnd.value = clamp(Number(input.value), rangeStart.value + 1, maxDay.value);
+    input.value = String(rangeEnd.value);
+  }
+  function selectWindow(days: number) {
+    windowDays.value = days;
+    rangeStart.value = 0;
+    rangeEnd.value = maxDay.value;
+  }
   watch(
     maxDay,
-    (days) => {
-      rangeStart.value = 0;
-      rangeEnd.value = days;
+    (days, previous) => {
+      const wasFullRange = rangeStart.value === 0 && rangeEnd.value === previous;
+      rangeStart.value = clamp(rangeStart.value, 0, days - 1);
+      rangeEnd.value = wasFullRange ? days : clamp(rangeEnd.value, rangeStart.value + 1, days);
     },
-    { immediate: true },
+    { flush: 'sync' },
   );
   watch([rangeStart, rangeEnd], () => {
     cursorDay.value = Math.max(rangeStart.value, Math.min(rangeEnd.value, cursorDay.value));
@@ -232,9 +263,13 @@
       Math.round(rangeStart.value + (rangeEnd.value - rangeStart.value) * fraction),
     ),
   );
-  watch(maxDay, (days) => {
-    cursorDay.value = Math.min(cursorDay.value, days);
-  });
+  const motionPlot = ref<SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watch(
+    [cycles, hiddenCycles, windowDays, logScale],
+    () => void reveal(cycles.value.reduce((sum, cycle) => sum + cycle.points.length, 0)),
+    { flush: 'post' },
+  );
   const cutoff = computed(
     () =>
       cycles.value
@@ -440,15 +475,22 @@
   }
 
   .halving-slider {
-    display: flex;
+    display: grid;
+    grid-template-columns: 145px minmax(0, 1fr);
     align-items: center;
     gap: 12px;
     font-size: 12px;
   }
 
-  input {
-    flex: 1;
-    min-width: 90px;
+  .halving-slider span {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .halving-slider input {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
   }
 
   table {
@@ -549,7 +591,8 @@
     }
 
     .halving-slider {
-      flex-wrap: wrap;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 4px;
     }
 
     svg {

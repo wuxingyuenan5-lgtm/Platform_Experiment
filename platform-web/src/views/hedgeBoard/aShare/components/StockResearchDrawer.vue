@@ -20,6 +20,24 @@
         >{{ error }} <Button size="small" @click="load">重试</Button></div
       >
       <template v-else-if="detail">
+        <FinancingChart
+          v-if="detail.stock.industryComparison"
+          title="近5个交易日 · 个股与行业"
+          :rows="detail.stock.industryComparison.points"
+          :lines="[
+            { key: 'stock', name: detail.stock.name, unit: '基期100', color: '#2864ec' },
+            {
+              key: 'industry',
+              name: detail.stock.industryComparison.name,
+              unit: '基期100',
+              color: '#ad762d',
+            },
+          ]"
+          :note="
+            detail.stock.industryComparison.name + ' · ' + detail.stock.industryComparison.code
+          "
+          allow-table
+        />
         <p class="stock-meta"
           >{{ observedLabel }} · {{ detail.stock.currency === 'HKD' ? '港币' : '人民币' }}</p
         >
@@ -39,13 +57,14 @@
         >
         <template v-if="points.length > 1">
           <svg
+            ref="motionPlot"
             viewBox="0 0 480 190"
             role="img"
             :aria-label="`${code}复权收盘价，${points.length}个交易日`"
           >
             <line x1="32" y1="150" x2="464" y2="150" class="chart-axis" />
             <line x1="32" y1="24" x2="464" y2="24" class="chart-axis" />
-            <polyline :points="polyline" class="price-line" />
+            <polyline data-chart-kind="line" :points="polyline" class="price-line" />
             <text x="32" y="18">{{ number(domain[1]) }}</text>
             <text x="32" y="167">{{ number(domain[0]) }}</text>
             <text x="32" y="187">{{ points[0].observedAt }}</text>
@@ -76,8 +95,10 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { watch as watchMotion, computed, ref, watch } from 'vue';
   import { Button, Drawer } from 'ant-design-vue';
+  import FinancingChart from './FinancingChart.vue';
   import { getPoolStockDetail, type StockDetail } from '@/api/platform/aShareStockPool';
 
   const props = defineProps<{ code: string }>();
@@ -109,6 +130,7 @@
       range.value = 60;
       void load();
     },
+    { immediate: true },
   );
   const number = (value: unknown) =>
     value == null || !Number.isFinite(Number(value))
@@ -166,6 +188,9 @@
       )
       .join(' '),
   );
+  const motionPlot = ref<HTMLElement | SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion([detail, range], () => void reveal(), { flush: 'post', deep: true });
 </script>
 
 <style scoped lang="less">
@@ -173,85 +198,102 @@
     color: #354d68;
     font-variant-numeric: tabular-nums;
   }
+
   .stock-meta {
     color: #60758f;
     font-size: 12px;
   }
+
   .stock-metrics {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin: 20px 0;
   }
+
   .stock-metrics div {
     padding: 14px;
-    background: #f3f7fb;
     border: 1px solid #d9e3ee;
     border-radius: 10px;
+    background: #f3f7fb;
   }
+
   .stock-metrics span {
     display: block;
     color: #60758f;
     font-size: 12px;
   }
+
   .stock-metrics strong {
     display: block;
     margin-top: 6px;
-    font-size: 19px;
     color: #10233d;
+    font-size: 19px;
   }
+
   .history-heading {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     margin-top: 24px;
   }
+
   .history-heading h3 {
-    font-size: 15px;
     color: #10233d;
+    font-size: 15px;
   }
+
   select {
     padding: 5px 8px;
     border: 1px solid #d9e3ee;
     border-radius: 6px;
     background: white;
   }
+
   svg {
     width: 100%;
     margin: 12px 0;
     overflow: visible;
   }
+
   svg text {
-    font-size: 10px;
     fill: #60758f;
+    font-size: 10px;
   }
+
   .chart-axis {
-    stroke: #d9e3ee;
     stroke-dasharray: 3;
+    stroke: #d9e3ee;
   }
+
   .price-line {
-    stroke: #1d4ed8;
     stroke-width: 2;
+    stroke: #1d4ed8;
     fill: none;
   }
+
   .empty {
     padding: 30px 0;
-    text-align: center;
     color: #60758f;
+    text-align: center;
   }
+
   table {
     width: 100%;
     margin-top: 12px;
     text-align: right;
   }
+
   td,
   th {
     padding: 6px 10px;
     border-bottom: 1px solid #e7edf4;
   }
+
   summary {
     cursor: pointer;
   }
+
   @media (max-width: 480px) {
     .stock-metrics {
       grid-template-columns: repeat(2, 1fr);

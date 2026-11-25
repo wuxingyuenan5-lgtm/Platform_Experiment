@@ -37,7 +37,6 @@ from app.research_overseas_repository import (
 )
 from app.research_provider_overseas import (
     fetch_btc_iv_snapshot,
-    fetch_deribit_iv,
     fetch_etf_flow,
     fetch_fedwatch,
 )
@@ -108,7 +107,7 @@ async def _collect_fedwatch(force: bool) -> tuple[str, str]:
         and read_latest_series(dataset).get("__meta__", {}).get("methodology") == METHODOLOGY
     ):
         return "up_to_date", ""
-    run_id = uuid4().hex
+    run_id = "overseas-macro_fedwatch-" + uuid4().hex
     observed_at = _hourly_observed_at()
     async with RESEARCH_DB_WRITE_LOCK:
         await asyncio.to_thread(start_refresh, run_id, None)
@@ -167,7 +166,7 @@ async def _collect_etf_flow(force: bool, asset: str = "btc") -> tuple[str, str]:
     dataset = "crypto_etf_flow" if asset_key == "btc" else "crypto_eth_etf_flow"
     if not force and _already_refreshed_within(dataset, timedelta(hours=2)):
         return "up_to_date", ""
-    run_id = uuid4().hex
+    run_id = f"overseas-{dataset}-" + uuid4().hex
     async with RESEARCH_DB_WRITE_LOCK:
         await asyncio.to_thread(start_refresh, run_id, None)
     try:
@@ -230,12 +229,13 @@ async def _collect_deribit_iv(force: bool) -> tuple[str, str]:
     already_done = _already_refreshed_today(dataset_term) and _already_refreshed_today(dataset_snap)
     if not force and already_done:
         return "up_to_date", ""
-    run_id = uuid4().hex
+    run_id = "overseas-crypto_iv-" + uuid4().hex
     async with RESEARCH_DB_WRITE_LOCK:
         await asyncio.to_thread(start_refresh, run_id, None)
     try:
-        # 1. 抓 IV 期限结构（用旧 fetcher，标准化 1W/2W/1M/2M/3M/6M/9M 桶）
-        term_data = await asyncio.to_thread(fetch_deribit_iv)
+        # Both projections share one native option-book snapshot.
+        snap = await asyncio.to_thread(fetch_btc_iv_snapshot)
+        term_data = {'index': snap['index'], 'term': snap['term']}
         series = {"__meta__": {"index": term_data["index"]}}
         for point in term_data["term"]:
             series[point["expiry"]] = {
@@ -247,8 +247,7 @@ async def _collect_deribit_iv(force: bool) -> tuple[str, str]:
             await asyncio.to_thread(
                 write_overseas_series, run_id, dataset_term, today, series, source=_SOURCE_IV
             )
-        # 2. 抓 1M/3M/6M/1Y 快照（按日累积）
-        snap = await asyncio.to_thread(fetch_btc_iv_snapshot)
+        # Store the four major tenors from that same capture.
         async with RESEARCH_DB_WRITE_LOCK:
             await asyncio.to_thread(write_iv_snapshot, run_id, today, snap, source=_SOURCE_IV)
             await asyncio.to_thread(finish_refresh, run_id, "ready")
@@ -318,6 +317,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     equity_task = asyncio.create_task(run_equity_periodic())
     etf_task = asyncio.create_task(run_etf_periodic())
     etf_observation_task = asyncio.create_task(run_etf_observation_periodic())
+    from app.research_all_a_turnover import run_periodic as run_turnover_forecast
+
+    turnover_forecast_task = asyncio.create_task(run_turnover_forecast())
     from app.research_ai import run_periodic as run_ai_periodic
 
     ai_task = asyncio.create_task(run_ai_periodic())
@@ -327,8 +329,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     from app.research_cn_context import run_periodic as run_cn_context_periodic
 
     cn_context_task = asyncio.create_task(run_cn_context_periodic())
+    from app.research_cn_capital import run_periodic as run_cn_capital_periodic
+
+    cn_capital_task = asyncio.create_task(run_cn_capital_periodic())
     from app.research_reference_boards import run_periodic as run_reference_periodic
     reference_task = asyncio.create_task(run_reference_periodic())
+    from app.research_weekly_indicators import run_periodic as run_weekly_periodic
+    weekly_task = asyncio.create_task(run_weekly_periodic())
     try:
         yield
     finally:
@@ -337,20 +344,26 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         equity_task.cancel()
         etf_task.cancel()
         etf_observation_task.cancel()
+        turnover_forecast_task.cancel()
         ai_task.cancel()
         cn_monitor_task.cancel()
         cn_context_task.cancel()
+        cn_capital_task.cancel()
         reference_task.cancel()
+        weekly_task.cancel()
         await asyncio.gather(
             task,
             market_task,
             equity_task,
             etf_task,
             etf_observation_task,
+            turnover_forecast_task,
             ai_task,
             cn_monitor_task,
             cn_context_task,
+            cn_capital_task,
             reference_task,
+            weekly_task,
             return_exceptions=True,
         )
 

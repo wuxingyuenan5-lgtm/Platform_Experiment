@@ -28,193 +28,133 @@
         </div>
       </section>
       <div v-if="productionMessage" role="status">{{ productionMessage }}</div>
-      <div class="research-workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
-        <ResearchSidebar
-          :items="pages"
-          :active="activePage"
-          :collapsed="sidebarCollapsed"
-          @toggle="sidebarCollapsed = !sidebarCollapsed"
-        />
-        <main
-          ref="viewport"
-          class="research-viewport"
-          tabindex="0"
-          :aria-label="pageTitle"
-          @scroll.passive="saveScroll"
-        >
-          <div class="research-page" :key="`${account}:${activePage}`">
-            <div v-if="needsDashboard && dashboardError" class="dashboard-error" role="alert">
-              {{ dashboardError }}<button type="button" @click="refreshAll">重试</button>
-            </div>
-            <p v-if="needsDashboard && !dashboard && dashboardLoading" role="status"
-              >正在读取{{ pageTitle }}…</p
-            >
-            <template v-if="activePage === 'overview'">
-              <AShareMarketOverviewSection
-                :dashboard="dashboard"
-                :refresh-key="refreshKey"
-                @query="selectedCode = $event"
-                @ready="restoreScroll"
-                ><AShareLegacyTerminalSection :dashboard="dashboard"
-              /></AShareMarketOverviewSection>
-            </template>
-            <template v-else-if="activePage === 'crowding'">
-              <EquityObservatoryPanel
-                market="cn"
-                view="crowding"
-                :refresh-key="refreshKey"
-                @ready="restoreScroll"
-              />
-              <AShareMarketOverviewSection
-                mode="crowding"
-                :dashboard="dashboard"
-                :refresh-key="refreshKey"
-                @ready="restoreScroll"
-              />
-            </template>
-            <VibeStockPoolSection
-              v-else-if="activePage === 'stocks'"
-              :refresh-key="refreshKey"
-              @query="selectedCode = $event"
-              @ready="restoreScroll"
-            />
-            <DomesticFinancingPanel
-              v-else-if="activePage === 'financing'"
-              :refresh-key="refreshKey"
-              @ready="restoreScroll"
-            />
-            <EtfTrackingPanel
-              v-else-if="activePage === 'etf'"
-              :refresh-key="refreshKey"
-              @ready="restoreScroll"
-            />
-            <MutualFundPanel
-              v-else-if="activePage === 'funds'"
-              :refresh-key="refreshKey"
-              @ready="restoreScroll"
-            />
-            <EquityObservatoryPanel
-              v-else
-              market="cn"
-              :view="activePage"
-              :refresh-key="refreshKey"
-              @ready="restoreScroll"
-            />
-            <MarketMonitorPanel
-              v-for="section in studySections[activePage] || []"
-              :key="section"
-              :section="section"
-              :refresh-key="refreshKey"
-            />
-          </div>
-        </main>
-      </div>
-      <StockResearchDrawer :code="selectedCode" @close="selectedCode = ''" />
+      <ResearchWorkspace
+        ref="workspace"
+        :pages="pages"
+        :active="activePage"
+        label="A股研究"
+        content-key="a-share-pages"
+      >
+        <KeepAlive :key="account" :max="3">
+          <ASharePageContent
+            :key="activePage"
+            :page="activePage"
+            :title="pageTitle"
+            :dashboard="dashboard"
+            :dashboard-error="dashboardError"
+            :dashboard-loading="dashboardLoading"
+            :refresh-key="refreshKey"
+            @ready="onPageReady"
+            @query="selectedCode = $event"
+            @refresh="refreshAll"
+          />
+        </KeepAlive>
+      </ResearchWorkspace>
+      <StockResearchDrawer :code="selectedCode" @close="closeStock" />
     </div>
   </PageWrapper>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch, nextTick, defineAsyncComponent } from 'vue';
+  import { computed, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
+  import ASharePageContent from './ASharePageContent.vue';
   import { PageWrapper } from '@/components/Page';
   import { hasPermission } from '@/access/userAccess';
   import { useUserStore } from '@/store/modules/user';
   import { refreshAShareResearch } from '@/api/hedgeResearch';
-  import ResearchSidebar from '../components/ResearchSidebar.vue';
-  import { provideResearchWorkspace } from '../composables/researchWorkspace';
+  import ResearchWorkspace from '../components/ResearchWorkspace.vue';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import StockResearchDrawer from './components/StockResearchDrawer.vue';
   import { useAShareResearch } from './useAShareResearch';
+  import { provideDomesticFinancing } from './components/useDomesticFinancing';
 
-  const AShareLegacyTerminalSection = defineAsyncComponent(
-    () => import('./components/AShareLegacyTerminalSection.vue'),
-  );
-  const AShareMarketOverviewSection = defineAsyncComponent(
-    () => import('./components/AShareMarketOverviewParitySection.vue'),
-  );
-  const VibeStockPoolSection = defineAsyncComponent(
-    () => import('./components/VibeStockPoolSection.vue'),
-  );
-  const EquityObservatoryPanel = defineAsyncComponent(
-    () => import('../components/EquityObservatoryPanel.vue'),
-  );
-  const DomesticFinancingPanel = defineAsyncComponent(
-    () => import('./components/DomesticFinancingPanel.vue'),
-  );
-  const EtfTrackingPanel = defineAsyncComponent(() => import('./components/EtfTrackingPanel.vue'));
-  const MutualFundPanel = defineAsyncComponent(() => import('./components/MutualFundPanel.vue'));
-  const MarketMonitorPanel = defineAsyncComponent(
-    () => import('./components/MarketMonitorPanel.vue'),
-  );
+  const domesticFinancing = provideDomesticFinancing();
 
   const router = useRouter();
   const route = useRoute();
-  const sidebarCollapsed = ref(false);
   const pages = [
     { key: 'overview', label: '市场总览', short: '总览' },
-    { key: 'themes', label: '主题与行业', short: '主题' },
-    { key: 'valuation', label: '估值', short: '估值' },
-    { key: 'crowding', label: '拥挤度', short: '拥挤' },
-    { key: 'etf', label: 'ETF跟踪', short: 'ETF' },
-    { key: 'financing', label: '两融与衍生品', short: '两融' },
+    { key: 'themes', label: '主题研究', short: '主题' },
+    { key: 'capital', label: '资金面', short: '资金' },
+    { key: 'derivatives', label: '衍生品', short: '衍生品' },
+    { key: 'timing-radar', label: '择时雷达', short: '择时' },
     { key: 'stocks', label: '股票池', short: '股票' },
     { key: 'hk', label: '港股观察', short: '港股' },
-    { key: 'funds', label: '公募持仓', short: '公募' },
   ];
-  const studySections: Record<
-    string,
-    Array<'dividend' | 'fund' | 'growth' | 'crowding' | 'risk' | 'breadth' | 'macroValue'>
-  > = {
-    overview: ['breadth'],
-    valuation: ['dividend', 'growth', 'macroValue'],
-    funds: ['fund'],
-    crowding: ['crowding', 'risk'],
-  };
-  const activePage = computed(
-    () => pages.find((p) => p.key === route.query.view)?.key || 'overview',
+  watch(
+    () => [route.query.view, route.query.section],
+    ([view, section]) => {
+      if (view === 'capital' && section === 'derivatives')
+        void router.replace({ query: { ...route.query, view: 'derivatives', section: undefined } });
+      else if (view === 'capital' && section === 'liquidity')
+        void router.replace({
+          path: '/hedge-board/macro',
+          query: { view: 'macro-details', section: 'macro-liquidity', subsection: 'cn' },
+        });
+      else if (view === 'valuation' || view === 'crowding')
+        void router.replace({ query: { ...route.query, view: 'themes', section: view } });
+      else if (view === 'etf')
+        void router.replace({ query: { ...route.query, view: 'capital', section: 'etf' } });
+      else if (view === 'financing')
+        void router.replace({ query: { ...route.query, view: 'capital', section: 'margin' } });
+      else if (view === 'funds')
+        void router.replace({ query: { ...route.query, view: 'capital', section: 'funds' } });
+    },
+    { immediate: true },
   );
+  const activePage = computed(() =>
+    ['etf', 'financing', 'funds'].includes(String(route.query.view))
+      ? 'capital'
+      : ['valuation', 'crowding'].includes(String(route.query.view))
+      ? 'themes'
+      : pages.find((p) => p.key === route.query.view)?.key || 'overview',
+  );
+  const needsDashboard = computed(() => activePage.value === 'overview');
   const pageTitle = computed(() => pages.find((p) => p.key === activePage.value)!.label);
-  const needsDashboard = computed(() => ['overview', 'crowding'].includes(activePage.value));
-  const workspace = provideResearchWorkspace(() => activePage.value);
-  const viewport = ref<HTMLElement>();
-  const positions = new Map<string, number>();
+  const workspace = ref<InstanceType<typeof ResearchWorkspace>>();
+  const readTimes = new Map<string, number>();
   const pageLoading = ref(true);
-  let restoring = true;
-  function saveScroll() {
-    if (!restoring && viewport.value) positions.set(activePage.value, viewport.value.scrollTop);
-  }
-  async function restoreScroll() {
-    pageLoading.value = false;
-    if (!restoring) return;
-    await nextTick();
-    requestAnimationFrame(() => {
-      if (viewport.value) viewport.value.scrollTop = positions.get(activePage.value) || 0;
-      restoring = false;
-    });
+  function onPageReady(page: string, readAt: number) {
+    if (page === activePage.value) {
+      readTimes.set(page, readAt);
+      pageLoading.value = false;
+      workspace.value?.restoreScroll(page);
+    }
   }
   watch(
     activePage,
-    () => {
-      restoring = true;
+    (page) => {
       pageLoading.value = true;
       selectedCode.value = '';
-      if (viewport.value) viewport.value.scrollTop = 0;
+      if (readTimes.has(page) && Date.now() - readTimes.get(page)! >= 60_000) refreshKey.value++;
     },
     { flush: 'sync' },
   );
   const user = useUserStore();
   const account = computed(() => String(user.getUserInfo.userId || 'anonymous'));
   watch(account, () => {
-    workspace.states.clear();
-    workspace.snapshots.clear();
-    positions.clear();
+    domesticFinancing.reset();
+    readTimes.clear();
   });
   const canProduce = computed(() =>
     hasPermission(user.getAuthentication?.permissions || [], 'research.write'),
   );
   const refreshKey = ref(0);
   const selectedCode = ref('');
+  watch(
+    () => [activePage.value, route.query.stock],
+    ([page, code]) => {
+      if (page === 'stocks' && typeof code === 'string' && /^\d{5,6}$/.test(code))
+        selectedCode.value = code;
+      else selectedCode.value = '';
+    },
+    { immediate: true },
+  );
+  function closeStock() {
+    selectedCode.value = '';
+    if (route.query.stock) void router.replace({ query: { ...route.query, stock: undefined } });
+  }
   const producing = ref(false);
   const productionMessage = ref('');
   const marketTabs = [
@@ -241,14 +181,17 @@
   watch(
     [dashboardLoading, activePage],
     () => {
-      if (activePage.value === 'overview' && !dashboardLoading.value) void restoreScroll();
+      if (activePage.value === 'overview' && !dashboardLoading.value) {
+        pageLoading.value = false;
+        workspace.value?.restoreScroll(activePage.value);
+      }
     },
     { flush: 'post' },
   );
   async function refreshAll() {
     pageLoading.value = true;
     refreshKey.value += 1;
-    workspace.snapshots.clear();
+    workspace.value?.clearSnapshots();
     if (needsDashboard.value) await loadDashboard();
   }
   async function produce() {
@@ -277,174 +220,12 @@
 </script>
 
 <style lang="less">
+  @import '../hedgeBoardTheme.less';
+
   // The legacy desktop shell has a 1280px minimum; this page owns a responsive layout.
   #app:has(.a-share-board) {
     min-width: 0;
   }
 </style>
 
-<style scoped lang="less">
-  .a-share-board {
-    --strategy-bg: #fbfcfe;
-    --strategy-surface: #fff;
-    --strategy-surface-2: #f7f9fc;
-    --strategy-border: #d9e3ee;
-    --strategy-text-1: #10233d;
-    --strategy-text-2: #354d68;
-    --strategy-text-3: #60758f;
-    --strategy-text-4: #7b8da4;
-    --strategy-accent: #1d4ed8;
-    --strategy-accent-soft: #eaf2ff;
-    --strategy-accent-strong: #1d4ed8;
-    --strategy-accent-ring: rgb(29 78 216 / 16%);
-    --strategy-up: #df4b47;
-    --strategy-down: #0e9f78;
-    --strategy-radius-card: 14px;
-    --strategy-radius-control: 8px;
-    --strategy-tab-height: 36px;
-    --strategy-font-base: 13px;
-    --strategy-shadow: 0 12px 28px rgb(26 54 93 / 6%);
-    --strategy-shadow-soft: 0 3px 12px rgb(26 54 93 / 4%);
-
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    min-width: 0;
-    padding: 4px 0 32px;
-    background: transparent;
-    color: var(--strategy-text-2);
-    gap: 18px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .research-workspace {
-    display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
-    gap: 16px;
-    min-width: 0;
-  }
-
-  .research-workspace.sidebar-collapsed {
-    grid-template-columns: 76px minmax(0, 1fr);
-  }
-
-  .research-viewport {
-    min-width: 0;
-    height: calc(100dvh - 270px);
-    min-height: 420px;
-    overflow: auto;
-    scrollbar-gutter: stable;
-    overscroll-behavior: contain;
-  }
-
-  .research-page {
-    min-width: 0;
-    padding: 0 4px 24px;
-  }
-
-  .research-page > :deep(:first-child) {
-    margin-top: 0;
-  }
-
-  @media (max-width: 900px) {
-    .research-workspace,
-    .research-workspace.sidebar-collapsed {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 10px;
-    }
-
-    .research-viewport {
-      height: calc(100dvh - 320px);
-    }
-  }
-
-  .board-toolbar,
-  .board-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .board-toolbar {
-    --strategy-accent: #da5b5b;
-    --strategy-accent-soft: #fbf2f2;
-    --strategy-accent-strong: #c94848;
-    --strategy-accent-ring: rgb(201 72 72 / 14%);
-    --strategy-border: #e5ebf3;
-    --strategy-radius-card: 16px;
-    --strategy-radius-control: 10px;
-    --strategy-tab-height: 34px;
-    --strategy-font-base: 14px;
-    --strategy-text-3: #485667;
-    --strategy-shadow: 0 10px 24px rgb(17 34 68 / 4.5%);
-
-    justify-content: space-between;
-    padding: 10px 12px;
-    border: 1px solid #e5ebf3;
-    border-radius: 20px;
-    background: #fff;
-    box-shadow: 0 8px 24px rgb(15 23 42 / 4%);
-  }
-
-  .refresh-button {
-    min-height: 36px;
-    padding: 7px 14px;
-    border: 1px solid var(--strategy-border);
-    border-radius: 8px;
-    background: white;
-    color: var(--strategy-text-2);
-    cursor: pointer;
-  }
-
-  .refresh-button--primary {
-    border-color: var(--strategy-accent-ring);
-    background: var(--strategy-accent-soft);
-    color: var(--strategy-accent);
-  }
-
-  .refresh-button:disabled {
-    opacity: 0.6;
-    cursor: wait;
-  }
-
-  .refresh-button:focus-visible {
-    outline: 2px solid var(--strategy-accent);
-    outline-offset: 3px;
-  }
-
-  .dashboard-error {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 16px;
-    border: 1px solid #f5d6b5;
-    border-radius: 8px;
-    background: #fff8ed;
-    color: #8f5517;
-  }
-
-  .dashboard-error button {
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-  }
-
-  #a-share-index-overview,
-  :deep(#a-share-market-overview),
-  :deep(#a-share-watchlist-pool) {
-    scroll-margin-top: 80px;
-  }
-
-  @media (max-width: 680px) {
-    .board-actions {
-      width: 100%;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :deep(*) {
-      scroll-behavior: auto;
-    }
-  }
-</style>
+<style scoped lang="less" src="./aSharePage.less"></style>

@@ -98,6 +98,17 @@ def test_auditor_stall_is_not_healthy(store):
     assert audit.read_report()["monitorStale"]
 
 
+def test_header_summary_keeps_counts_and_staleness_without_detailed_report(store):
+    now = datetime.now(UTC) - timedelta(minutes=20)
+    audit.persist_report([audit.check("x", "test", "test", "error", "stopped")], now)
+    full = audit.read_report()
+    small = audit.read_report(summary_only=True)
+    assert small == {key: full[key] for key in ("checkedAt", "summary", "monitorStale")}
+    assert small["summary"]["error"] == 1 and small["monitorStale"] is True
+    assert "checks" not in small and "alerts" not in small
+    assert len(full["checks"]) == 1 and len(full["alerts"]) == 1
+
+
 def test_received_status_does_not_hide_stale_source():
     now = datetime.now(UTC)
     assert (
@@ -286,16 +297,33 @@ def test_history_inventory_seeks_boundaries_without_archive_scan():
 
 def test_weekly_released_daily_fx_uses_publication_tolerance(monkeypatch):
     from app import research_local_data
+
     now = datetime(2026, 11, 2, 17, tzinfo=UTC)
-    row = {"seriesId": "eurusd", "label": "EUR/USD", "frequency": "daily_weekly_release",
-        "retrievedAt": "2026-10-27T03:04:13Z", "observationDate": "2026-10-23", "status": "ready"}
-    monkeypatch.setattr(research_local_data, "read_local_json", lambda _: {"groups": {"majorFx": [row]}})
+    row = {
+        "seriesId": "eurusd",
+        "label": "EUR/USD",
+        "frequency": "daily_weekly_release",
+        "retrievedAt": "2026-10-27T03:04:13Z",
+        "observationDate": "2026-10-23",
+        "status": "ready",
+    }
+    monkeypatch.setattr(
+        research_local_data, "read_local_json", lambda _: {"groups": {"majorFx": [row]}}
+    )
     checks = audit.inspect_artifacts(now)
     fx = [c for c in checks if c["key"] == "artifact.macro.eurusd"][0]
     assert fx["status"] == "healthy"
-    late = [c for c in audit.inspect_artifacts(datetime(2026, 11, 7, 17, tzinfo=UTC)) if c["key"] == fx["key"]][0]
+    late = [
+        c
+        for c in audit.inspect_artifacts(datetime(2026, 11, 7, 17, tzinfo=UTC))
+        if c["key"] == fx["key"]
+    ][0]
     assert late["status"] == "warning"
     row["isStale"] = True
-    assert [c for c in audit.inspect_artifacts(now) if c["key"] == fx["key"]][0]["status"] == "warning"
+    assert [c for c in audit.inspect_artifacts(now) if c["key"] == fx["key"]][0][
+        "status"
+    ] == "warning"
     row["retrievedAt"] = "2026-10-01T00:00:00Z"
-    assert [c for c in audit.inspect_artifacts(now) if c["key"] == fx["key"]][0]["status"] == "error"
+    assert [c for c in audit.inspect_artifacts(now) if c["key"] == fx["key"]][0][
+        "status"
+    ] == "error"

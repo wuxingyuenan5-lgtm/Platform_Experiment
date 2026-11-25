@@ -1243,7 +1243,11 @@ PLATFORM_MIGRATIONS += (
 
 PLATFORM_MIGRATIONS += (
     Migration(version=47, name="personal-workspace-documents", statements=(
-        "CREATE TABLE user_workspace_documents (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL CHECK(kind IN ('cards','events')), payload_json TEXT NOT NULL, row_version INTEGER NOT NULL CHECK(row_version>0), updated_at TEXT NOT NULL, PRIMARY KEY(user_id,kind))",
+        "CREATE TABLE user_workspace_documents (user_id TEXT NOT NULL "
+        "REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL "
+        "CHECK(kind IN ('cards','events')), payload_json TEXT NOT NULL, "
+        "row_version INTEGER NOT NULL CHECK(row_version>0), updated_at TEXT NOT NULL, "
+        "PRIMARY KEY(user_id,kind))",
     )),
 )
 

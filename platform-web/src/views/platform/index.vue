@@ -19,9 +19,15 @@
         </div>
       </section>
 
+      <FundingAnalysisDemo v-if="currentKey === 'funding' && activeSection === 'analysisDemo'" />
+
+      <CrossSpreadMarketDemo
+        v-else-if="currentKey === 'crossSpread' && activeSection === 'analysisDemo'"
+      />
+
       <FundingCarryWorkspace
-        v-if="currentKey === 'funding'"
-        :active-section="activeSection"
+        v-else-if="currentKey === 'funding'"
+        :active-section="legacySection"
         :selected-exchange="selectedVenue as any"
         :selected-symbol="selectedFundingSymbol as any"
         :selected-resolution="selectedResolution"
@@ -29,7 +35,7 @@
 
       <SpreadCarryWorkspace
         v-else
-        :active-section="activeSection"
+        :active-section="legacySection"
         :selected-venue="selectedVenue"
         :left-leg-symbol="selectedMainLeg"
         :right-leg-symbol="selectedHedgeLeg"
@@ -41,13 +47,20 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref, watch } from 'vue';
+  import { computed, defineAsyncComponent, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import { PageWrapper } from '@/components/Page';
   import CompactSegmentTabs from '@/views/strategy/shared/CompactSegmentTabs.vue';
   import FundingCarryWorkspace from '@/views/strategy/funding-carry/index.vue';
   import SpreadCarryWorkspace from '@/views/strategy/spread-carry/index.vue';
   import type { SpreadWorkspaceVariant } from '@/views/strategy/spread-carry/types';
+
+  const FundingAnalysisDemo = defineAsyncComponent(
+    () => import('@/views/strategy/funding-carry/analysisDemo/index.vue'),
+  );
+  const CrossSpreadMarketDemo = defineAsyncComponent(
+    () => import('@/views/strategy/spread-carry/market-demo/CrossSpreadMarketDemo.vue'),
+  );
 
   type DeskKey = 'funding' | 'crossSpread' | 'domesticOverseas';
 
@@ -66,10 +79,14 @@
   const pageTitle = '\u4ea4\u6613\u5e73\u53f0';
 
   const fundingVenueOptions = ['Bybit', 'Binance', 'OKX'];
-  const platformSections = [
+  const platformSections = computed(() => [
     { key: 'analysis', label: '\u884c\u60c5\u5206\u6790' },
+    ...(currentKey.value === 'crossSpread'
+      ? [{ key: 'analysisDemo', label: '行情分析 · 新版' }]
+      : []),
+    ...(currentKey.value === 'funding' ? [{ key: 'analysisDemo', label: '行情分析（新）' }] : []),
     { key: 'execution', label: '\u4ea4\u6613\u6267\u884c' },
-  ];
+  ]);
 
   const desks: DeskConfig[] = [
     {
@@ -110,12 +127,20 @@
   const selectedMainLeg = ref('XAUTUSDT');
   const selectedHedgeLeg = ref('XAUUSD');
   const selectedResolution = ref('\u0033\u0030\u5206\u949f');
-  const activeSection = computed<'analysis' | 'execution'>({
-    get: () => (route.query.section === 'analysis' ? 'analysis' : 'execution'),
+  const activeSection = computed<'analysis' | 'analysisDemo' | 'execution'>({
+    get: () =>
+      route.query.section === 'analysisDemo' && currentKey.value !== 'domesticOverseas'
+        ? 'analysisDemo'
+        : route.query.section === 'analysis' || route.query.section === 'analysisDemo'
+        ? 'analysis'
+        : 'execution',
     set: (section) => {
       void router.replace({ query: { ...route.query, section } });
     },
   });
+  const legacySection = computed(() =>
+    activeSection.value === 'execution' ? 'execution' : 'analysis',
+  );
 
   const currentKey = computed<DeskKey>(() => {
     if (route.query.desk === 'domesticOverseas') return 'domesticOverseas';

@@ -1,13 +1,6 @@
 <template>
   <div class="vibe-trend-charts">
-    <VibeTimeChart
-      v-if="mode !== 'crowding'"
-      title="市场涨跌结构"
-      y-label="上涨/下跌家数（家）"
-      right-label="涨停/跌停家数（家）"
-      :dates="dates"
-      :series="marketSeries"
-    />
+    <MarketStructureChart v-if="mode !== 'crowding'" :rows="rows" />
     <VibeTimeChart
       v-if="mode !== 'crowding' && showBreadth"
       title="市场宽度"
@@ -44,6 +37,7 @@
 
 <script setup lang="ts">
   import { computed } from 'vue';
+  import MarketStructureChart from './MarketStructureChart.vue';
   import VibeTimeChart, { type Series } from './VibeTimeChart.vue';
 
   interface HistoryRow {
@@ -82,62 +76,6 @@
     innovationRows?: InnovationRow[];
   }>();
   const dates = computed(() => props.rows.map((row) => row.date));
-  const marketSeries = computed<Series[]>(() => [
-    {
-      name: '上涨家数',
-      values: props.rows.map((row) => row.advance),
-      type: 'bar',
-      color: '#ef4444',
-      unit: '家',
-      domain: [-6000, 6000],
-      ticks: [4000, 2000, 0, -2000, -4000],
-    },
-    {
-      name: '下跌家数',
-      values: props.rows.map((row) => row.decline),
-      type: 'bar',
-      color: '#10b981',
-      sign: -1,
-      unit: '家',
-      domain: [-6000, 6000],
-      ticks: [4000, 2000, 0, -2000, -4000],
-    },
-    {
-      name: '涨停家数',
-      values: props.rows.map((row) => row.limit_up),
-      type: 'line',
-      axis: 'right',
-      color: '#ef4444',
-      unit: '家',
-      domain: [-300, 300],
-      ticks: [200, 100, 0, -100, -200],
-    },
-    {
-      name: '沪深300',
-      values: props.rows.map((row) => {
-        const value = row.csi300Close;
-        return value == null || value === '' || !Number.isFinite(Number(value))
-          ? null
-          : Number(value);
-      }),
-      type: 'line',
-      axis: 'hidden-price',
-      color: '#7c3aed',
-      unit: '点',
-      lineWidth: 3,
-    },
-    {
-      name: '跌停家数',
-      values: props.rows.map((row) => row.limit_down),
-      type: 'line',
-      axis: 'right',
-      color: '#10b981',
-      sign: -1,
-      unit: '家',
-      domain: [-300, 300],
-      ticks: [200, 100, 0, -100, -200],
-    },
-  ]);
   const breadthSeries = computed<Series[]>(() => [
     {
       name: '市场宽度',

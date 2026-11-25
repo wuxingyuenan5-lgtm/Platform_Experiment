@@ -33,7 +33,12 @@
         </div>
       </div>
       <div v-if="matrixPoints.length" class="matrix-wrap">
-        <svg viewBox="0 0 1000 420" preserveAspectRatio="xMidYMid meet" aria-label="主题强弱矩阵">
+        <svg
+          ref="motionPlot"
+          viewBox="0 0 1000 420"
+          preserveAspectRatio="xMidYMid meet"
+          aria-label="主题强弱矩阵"
+        >
           <rect x="52" y="52" width="448" height="158" class="matrix-zone matrix-zone--improving" />
           <rect x="500" y="52" width="448" height="158" class="matrix-zone matrix-zone--leader" />
           <rect x="52" y="210" width="448" height="158" class="matrix-zone matrix-zone--lagging" />
@@ -123,7 +128,8 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { computed, ref } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { computed, ref, watch as watchMotion } from 'vue';
   import type { EquityTheme } from '@/api/equityObservatory';
   import { themeStrengthRows, strengthRanking, strengthMatrix } from './themeStrength';
 
@@ -150,6 +156,13 @@
   const formatPct = (n: number | null) =>
     n === null ? '—' : `${n > 0 ? '+' : ''}${(n * 100).toFixed(2)}%`;
   const tone = (n: number | null) => (n === null ? '' : n > 0 ? 'up' : n < 0 ? 'down' : '');
+  const motionPlot = ref<SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion(
+    () => props.themes,
+    () => void reveal(),
+    { flush: 'post', deep: true },
+  );
 </script>
 <style scoped lang="less">
   .theme-strength {

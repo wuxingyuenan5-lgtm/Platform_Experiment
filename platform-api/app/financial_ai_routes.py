@@ -9,10 +9,10 @@ import importlib.util
 import json
 import os
 import re
-import shutil
 import time
 import xml.etree.ElementTree as element_tree
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, Mapping
+from contextlib import aclosing
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path as FilePath
@@ -24,6 +24,9 @@ from pydantic import BaseModel, Field, HttpUrl, SecretStr, model_validator
 
 from app.auth import Principal, require_permission
 from app.config import get_settings
+from app.financial_ai_cli import CLI_COMMANDS as _CLI
+from app.financial_ai_cli import cli_executable as _cli_executable
+from app.financial_ai_cli import cli_stream
 
 settings = get_settings()
 router = APIRouter(prefix=f"{settings.api_prefix}/financial-ai", tags=["financial-ai"])
@@ -76,14 +79,6 @@ def _require_gateway_key(x_financial_ai_access_key: str | None = Header(default=
 _gateway = Depends(_require_gateway_key)
 
 
-_CLI = {
-    "claude": (["claude", "openclaude"], ["-p", "--disallowedTools", "Bash,Write,Edit"]),
-    "qwen": (["qwen"], ["--yolo"]),
-    "deepseek": (["deepseek", "codewhale"], ["exec", "--auto"]),
-    "codex": (["codex"], ["exec", "--skip-git-repo-check", "-"]),
-}
-
-
 class AiConnection(BaseModel):
     mode: str = "api"
     cli: str = "codex"
@@ -112,7 +107,7 @@ class AiChatRequest(BaseModel):
     context: str = Field(min_length=1, max_length=48_000)
 
 
-def _event(payload: dict[str, object]) -> bytes:
+def _event(payload: Mapping[str, object]) -> bytes:
     return f"{json.dumps(payload, ensure_ascii=False)}\n".encode()
 
 
@@ -168,10 +163,11 @@ def _deployment_status() -> dict[str, object]:
     }
 
 
-async def _chat_stream(request: AiChatRequest) -> AsyncIterator[bytes]:
+async def _chat_stream(request: AiChatRequest) -> AsyncGenerator[bytes, None]:
     if request.connection.mode == "subscription":
-        async for event in _cli_stream(request):
-            yield event
+        async with aclosing(_cli_stream(request)) as events:
+            async for event in events:
+                yield event
         return
     deployment = _deployment_configuration()
     if not deployment:
@@ -225,62 +221,19 @@ async def _chat_stream(request: AiChatRequest) -> AsyncIterator[bytes]:
         yield _event({"type": "error", "message": f"模型服务不可用：{exc}"})
 
 
-def _cli_executable(cli: str) -> str | None:
-    definition = _CLI.get(cli)
-    return (
-        next((path for name in definition[0] if (path := shutil.which(name))), None)
-        if definition
-        else None
-    )
-
-
-async def _cli_stream(request: AiChatRequest) -> AsyncIterator[bytes]:
-    executable = _cli_executable(request.connection.cli)
-    if not executable:
-        yield _event(
-            {
-                "type": "error",
-                "message": f"本机未检测到 {request.connection.cli} CLI，或尚未登录订阅账号。",
-            }
-        )
-        return
+async def _cli_stream(request: AiChatRequest) -> AsyncGenerator[bytes, None]:
     prompt = f"{_SYSTEM}\n\n任务：{request.prompt}\n\n事实底稿：\n{request.context}"
-    args = [executable, *_CLI[request.connection.cli][1]]
-    if request.connection.cli != "codex":
-        args.append(prompt)
-    process = await asyncio.create_subprocess_exec(
-        *args,
-        stdin=asyncio.subprocess.PIPE if request.connection.cli == "codex" else None,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    try:
-        if process.stdin:
-            process.stdin.write(prompt.encode("utf-8"))
-            await process.stdin.drain()
-            process.stdin.close()
-        assert process.stdout
-        while chunk := await asyncio.wait_for(process.stdout.read(1024), timeout=300):
-            yield _event({"type": "delta", "text": chunk.decode("utf-8", errors="replace")})
-        return_code = await process.wait()
-        if return_code:
-            detail = (
-                (await process.stderr.read()).decode("utf-8", errors="replace")[-800:]
-                if process.stderr
-                else ""
-            )
-            yield _event({"type": "error", "message": detail or f"CLI 退出码 {return_code}"})
-            return
-        yield _event({"type": "done"})
-    except TimeoutError:
-        process.kill()
-        yield _event({"type": "error", "message": "CLI 运行超过 300 秒，已停止。"})
+    async with aclosing(cli_stream(request.connection.cli, prompt)) as events:
+        async for event in events:
+            yield _event(event)
 
 
 @router.post("/chat")
 async def chat(
     request: AiChatRequest, _: Principal = _principal, __: None = _gateway
 ) -> StreamingResponse:
+    if request.connection.mode == "subscription":
+        require_permission("settings.write")(_)
     return StreamingResponse(_chat_stream(request), media_type="application/x-ndjson")
 
 
@@ -324,6 +277,9 @@ async def test_connection(
     connection: AiConnection, _: Principal = _principal, __: None = _gateway
 ) -> dict[str, object]:
     if connection.mode == "subscription":
+        require_permission("settings.write")(_)
+        if _CLI[connection.cli] is None:
+            return {"ok": False, "message": "该 CLI 尚不支持受限分析调用，请使用 API 接入。"}
         available = _cli_executable(connection.cli) is not None
         return {
             "ok": available,
@@ -395,16 +351,17 @@ async def capabilities(_: Principal = _principal, __: None = _gateway) -> dict[s
             "key": key,
             "name": key.title(),
             "available": _cli_executable(key) is not None,
-            "status": "已安装" if _cli_executable(key) else "未检测到",
+            "status": ("未开放受限调用" if _CLI[key] is None else
+                       "已安装" if _cli_executable(key) else "未检测到"),
         }
         for key in _CLI
     ]
-    providers = await asyncio.gather(
+    providers = list(await asyncio.gather(
         _provider_probe("tencent", "Tencent", "https://qt.gtimg.cn/q=sh000001"),
         _provider_probe(
             "eastmoney", "Eastmoney", "https://push2.eastmoney.com/api/qt/stock/get?secid=1.000001"
         ),
-    )
+    ))
     providers.append(
         {
             "key": "akshare",
@@ -661,7 +618,7 @@ async def _feed(
             (fields[key] for key in ("pubDate", "published", "updated") if key in fields), None
         )
         try:
-            date = parsedate_to_datetime(date_node.text if date_node is not None else "")
+            date = parsedate_to_datetime((date_node.text or "") if date_node is not None else "")
             timestamp = int(date.timestamp()) if date else 0
             shown = date.astimezone().strftime("%m-%d %H:%M") if date else "—"
         except (TypeError, ValueError):
@@ -705,7 +662,7 @@ async def news_radar(
                 "name": name,
                 "accent": accent,
                 "items": sorted(
-                    grouped[key], key=lambda item: int(item["timestamp"]), reverse=True
+                    grouped[key], key=lambda item: int(str(item["timestamp"])), reverse=True
                 )[:20],
             }
             for key, name, accent in _GROUPS

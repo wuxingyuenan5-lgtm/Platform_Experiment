@@ -146,3 +146,14 @@ def test_single_indicator_table_saved_per_account(storage, monkeypatch):
     assert client.get("/api/v1/me/workspace/cards").json()["items"][0]["display"]=="table"
     assert read_document("bob","cards")["items"]==[]
     with pytest.raises(ValueError): Card(**{**card,"display":"full-page"})
+
+def test_synchronous_opening_gap_uses_previous_session_close():
+    days=['2026-11-06T14:30:00+00:00','2026-11-06T21:00:00+00:00',
+          '2026-11-09T14:30:00+00:00','2026-11-09T21:00:00+00:00']
+    days += [f'2026-11-{day:02}T{hour}+00:00' for day in range(10,14) for hour in ['14:30:00','21:00:00']]
+    prices=dict(zip(days,map(Decimal,['100','110','220','242','250','270','280','295','300','330','360','370'])))
+    out=rolling(prices,prices,10,'2027-01-01')
+    assert out[9]['correlation'] is None
+    assert out[10]['samples']==10 and abs(out[10]['correlation']-1)<Decimal('1e-25')
+    missing=dict(prices);missing[days[2]]=None
+    assert rolling(missing,prices,10,'2027-01-01')[-1]['correlation'] is None

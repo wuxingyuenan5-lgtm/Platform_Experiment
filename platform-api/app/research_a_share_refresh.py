@@ -17,6 +17,7 @@ from app.config import get_settings
 from app.data_audit_calendar import calendar_snapshot
 from app.database_connection import read_only_connection
 from app.research_a_share_repository import (
+    archive_csi300_history,
     finish_refresh,
     publish_refresh,
     read_dataset,
@@ -393,7 +394,15 @@ def _crowding(
     )
 
 
-def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, trade_date):
+def _build_stock_rows(
+    codes, quotes, histories, prior_by_code, member_by_code, trade_date,
+    history_requested_codes=(),
+):
+    failed_history_codes = (
+        set(history_requested_codes) - set(histories)
+        if isinstance(histories, dict)
+        else set(codes)
+    )
     histories = histories if isinstance(histories, dict) else {}
     stored_histories = read_stored_stock_histories(
         [code for code in codes if code not in histories]
@@ -439,7 +448,9 @@ def _build_stock_rows(codes, quotes, histories, prior_by_code, member_by_code, t
         observed = _quote_date(quote)
         aligned = bool(history and observed and str(history[-1].observed_at) == observed)
         status = (
-            "ready" if aligned and code in histories and quote.return_pct is not None else "partial"
+            "ready"
+            if aligned and code not in failed_history_codes and quote.return_pct is not None
+            else "partial"
         )
         if observed and trade_date and observed < trade_date:
             status = "stale"
@@ -484,7 +495,7 @@ def _stale_index_codes(rows: list[Any], trade_date: str) -> list[str]:
         raw = row.model_dump(mode="json", by_alias=True) if hasattr(row, "model_dump") else row
         days = [str(point.get("observedAt", "")) for point in raw.get("history", [])]
         latest[raw.get("code")] = max(days, default="")
-    return [code for code, _, _ in INDEX_DEFINITIONS[:8] if latest.get(code, "") != trade_date]
+    return [code for code, _, _ in INDEX_DEFINITIONS if latest.get(code, "") != trade_date]
 
 
 async def refresh_a_share_research(*, force: bool = False) -> str:
@@ -538,7 +549,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 current_codes = {row.code for row in indices}
                 missing = [
                     (code, name)
-                    for code, name, _ in INDEX_DEFINITIONS[:8]
+                    for code, name, _ in INDEX_DEFINITIONS
                     if code not in current_codes
                 ]
                 if missing:
@@ -567,7 +578,9 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 stale_indices = _stale_index_codes(indices, trade_date)
                 if stale_indices:
                     dashboard.market_detail.meta.status = "partial"
-                    dashboard.market_detail.meta.message = "指数未取得同日收盘历史：" + "、".join(stale_indices)
+                    dashboard.market_detail.meta.message = "指数未取得同日收盘历史：" + "、".join(
+                        stale_indices
+                    )
             dashboard.shenwan.meta.source_timestamp = (
                 datetime.fromisoformat(trade_date).replace(hour=15, tzinfo=_CHINA)
                 if trade_date
@@ -646,19 +659,13 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
             if isinstance(indices, list):
                 for item in indices:
                     if item.code == "000300" and item.history:
-                        point = item.history[-1]
                         try:
-                            await _write_price_archive_locked(
-                                {
-                                    "instrument_code": "000300.SH",
-                                    "trade_date": point.observed_at,
-                                    "close": point.close,
-                                    "source_name": point.source_name
-                                    or dashboard.market_detail.meta.source,
-                                    "definition_version": "close-v1",
-                                    "payload": point,
-                                }
-                            )
+                            async with RESEARCH_DB_WRITE_LOCK:
+                                await asyncio.to_thread(
+                                    archive_csi300_history,
+                                    item.history,
+                                    dashboard.market_detail.meta.source,
+                                )
                         except Exception:
                             _LOGGER.warning("a_share_benchmark_archive_write_failed", exc_info=True)
             if sectors_closed and isinstance(sector_quotes, list):
@@ -738,6 +745,7 @@ async def refresh_a_share_research(*, force: bool = False) -> str:
                 prior_by_code,
                 member_by_code,
                 trade_date,
+                history_codes,
             )
             # Shared history storage also serves research baskets. These symbols
             # do not become the user's personal stock-pool selections.

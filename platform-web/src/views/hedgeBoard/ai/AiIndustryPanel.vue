@@ -4,7 +4,7 @@
       ><div
         ><p class="eyebrow">AI INDUSTRY · US EQUITIES</p><h2>AI产业</h2
         ><p class="muted">资本投入 → 需求兑现 → 现金回报 → 信用与融资</p></div
-      ><div class="head-right"
+      ><div v-if="tab !== 'report'" class="head-right"
         ><span>{{
           data?.generatedAt ? '更新检查 ' + new Date(data.generatedAt).toLocaleString('zh-CN') : ''
         }}</span
@@ -13,9 +13,22 @@
         }}</button></div
       ></header
     >
-    <p v-if="error" class="error" role="alert">{{ error }} <button @click="load">重试</button></p>
-    <p v-if="loading && !data" class="loading">正在读取AI产业研究数据…</p>
-    <template v-if="data">
+    <p v-if="error && tab !== 'report'" class="error" role="alert"
+      >{{ error }} <button @click="load">重试</button></p
+    >
+    <p v-if="loading && !data && tab !== 'report'" class="loading">正在读取AI产业研究数据…</p>
+    <nav class="tabs" aria-label="AI研究分区"
+      ><button
+        v-for="item in tabs"
+        :key="item.key"
+        :class="{ active: tab === item.key }"
+        :aria-pressed="tab === item.key"
+        @click="tab = item.key"
+        >{{ item.name }}</button
+      ></nav
+    >
+    <AiInvestmentReport v-if="tab === 'report'" />
+    <template v-if="data && tab !== 'report'">
       <div class="stats"
         ><article
           ><small>产业链覆盖</small
@@ -38,16 +51,6 @@
           ><strong>{{ arrCoverage }} / {{ data.cds.length }}</strong
           ><span>公司数；不同产品ARR不相加</span></article
         ></div
-      >
-      <nav class="tabs" aria-label="AI研究分区"
-        ><button
-          v-for="item in tabs"
-          :key="item.key"
-          :class="{ active: tab === item.key }"
-          :aria-pressed="tab === item.key"
-          @click="tab = item.key"
-          >{{ item.name }}</button
-        ></nav
       >
       <div class="filters"
         ><label
@@ -511,7 +514,7 @@
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, onMounted, ref, watch } from 'vue';
+  import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
   import { researchRequest } from '@/api/hedgeResearch';
   import Safe from '../components/WidgetErrorBoundary';
   import AiChart, { type AiLine } from './AiChart.vue';
@@ -526,6 +529,7 @@
     percentage,
   } from './model';
 
+  const AiInvestmentReport = defineAsyncComponent(() => import('./AiInvestmentReport.vue'));
   const data = ref<AiDashboard | null>(null),
     loading = ref(false),
     error = ref('');
@@ -543,6 +547,7 @@
   const sortKey = ref('revenue'),
     descending = ref(true);
   const tabs = [
+    { key: 'report', name: '兴证AI投资专题 · 本次新增' },
     { key: 'overview', name: '产业总览' },
     { key: 'capex', name: '资本开支' },
     { key: 'demand', name: 'ARR与订单' },

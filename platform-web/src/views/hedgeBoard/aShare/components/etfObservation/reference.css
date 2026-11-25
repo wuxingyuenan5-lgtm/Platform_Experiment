@@ -5,9 +5,9 @@
 }
 .etf-observation {
   font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
-  background: #f5f6f8;
+  background: transparent;
   color: #1c2330;
-  padding: 16px;
+  padding: 0;
   scroll-behavior: smooth;
 }
 .etf-observation .wrap {
@@ -43,6 +43,9 @@
 }
 .etf-observation .part {
   margin-top: 26px;
+}
+.etf-observation .wrap > .part:first-child {
+  margin-top: 0;
 }
 .etf-observation .part .pt {
   font-size: 18px;

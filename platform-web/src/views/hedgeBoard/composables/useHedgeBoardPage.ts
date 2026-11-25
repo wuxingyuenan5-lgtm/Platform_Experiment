@@ -42,16 +42,16 @@ export const hedgeBoardNav: ReadonlyArray<{
 ];
 
 const sectionLabelOverrides: Record<string, { title?: string }> = {
-  'macro-market': { title: '宏观市场明细' },
+  'macro-market': { title: '市场总览' },
   'macro-rates': { title: '利率' },
   'macro-fx': { title: '汇率与海外利差' },
   'macro-liquidity': { title: '流动性' },
   'macro-inflation': { title: '通胀' },
   'macro-growth': { title: '经济' },
   'macro-risk-appetite': { title: '风险偏好' },
-  'gold-flows': { title: 'ETF与资金面' },
+  'gold-flows': { title: '资金面' },
   'gold-rates': { title: '金价驱动分析' },
-  'crypto-etf': { title: '加密资金面' },
+  'crypto-etf': { title: '资金面' },
 };
 
 const macroSectionOrder = [
@@ -66,14 +66,7 @@ const macroSectionOrder = [
 
 const researchSectionOrder: Partial<Record<HedgeCategory, readonly string[]>> = {
   macro: macroSectionOrder,
-  gold: [
-    'gold-market',
-    'gold-flows',
-    'gold-cftc',
-    'gold-rates',
-    'gold-browser-toolbox',
-    'gold-research-analysts',
-  ],
+  gold: ['gold-market', 'gold-flows', 'gold-rates'],
   crypto: [
     'crypto-market',
     'crypto-etf',

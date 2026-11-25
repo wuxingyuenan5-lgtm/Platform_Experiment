@@ -108,19 +108,33 @@ def test_funding_plan_is_perpetual_first_post_only_with_incremental_spot_release
     assert spot.release_cap == Decimal("1.25")
 
 
-def test_funding_plan_rejects_market_policy_override() -> None:
-    with pytest.raises(ValueError, match="post_only_chase"):
+@pytest.mark.parametrize("policy", ["market", "post_only_chase", "fok"])
+def test_funding_plan_retains_requested_policy_and_incremental_release(policy) -> None:
+    parameters = {
+        "perpetualSymbol": "BTCUSDT", "perpetualQuantity": "1",
+        "spotSymbol": "BTC", "spotQuantity": "1", "accountId": "account_sim_usdt",
+        "executionPolicy": policy,
+    }
+    if policy == "fok":
+        parameters["perpetualLimitPrice"] = "100"
+    plan = build_funding_carry_plan(
+        action="open", parameters=parameters, created_at=datetime(2026, 8, 22, tzinfo=UTC),
+    )
+    assert plan.legs[0].execution_policy is ExecutionPolicy(policy)
+    assert plan.legs[1].release_condition is ReleaseCondition.INCREMENTAL_CUMULATIVE_FILL
+    assert plan.legs[1].release_ratio == Decimal("1")
+    assert plan.legs[0].limit_price == (Decimal("100") if policy == "fok" else None)
+
+
+@pytest.mark.parametrize("policy,price", [("invalid", None), ("fok", None), ("market", "100")])
+def test_funding_plan_rejects_invalid_policy_or_price_pair(policy, price) -> None:
+    with pytest.raises(ValueError):
         build_funding_carry_plan(
-            action="open",
-            parameters={
-                "perpetualSymbol": "BTCUSDT",
-                "perpetualQuantity": "1",
-                "spotSymbol": "BTC",
-                "spotQuantity": "1",
-                "accountId": "account_sim_usdt",
-                "executionPolicy": "market",
-            },
-            created_at=datetime(2026, 8, 22, tzinfo=UTC),
+            action="open", parameters={
+                "executionPolicy": policy, "perpetualLimitPrice": price,
+                "perpetualSymbol": "BTCUSDT", "perpetualQuantity": "1",
+                "spotSymbol": "BTC", "spotQuantity": "1", "accountId": "account_sim_usdt",
+            }, created_at=datetime(2026, 8, 22, tzinfo=UTC),
         )
 
 
@@ -152,6 +166,19 @@ def test_live_funding_and_cross_spread_can_bind_the_same_logical_bybit_account(
         get_settings(), "database_path", str(tmp_path / "shared-bybit-binding.db")
     )
     initialize_database()
+
+    def native_spec(url, *, params, **kwargs):
+        import httpx
+        return httpx.Response(200, request=httpx.Request("GET", url), json={
+            **params, "symbol": url.rsplit("/", 1)[1],
+            "status": "Trading", "dataQualityState": "complete",
+            "minQuantity": "0.001", "quantityStep": "0.001", "priceTick": "0.01",
+            "contractMultiplier": "1",
+            "accessChecks": {"readOnly": False, "ipBound": True,
+                             "orderPermission": True, "positionPermission": True},
+        })
+
+    monkeypatch.setattr("app.runtime_transport.get", native_spec)
     with connection() as db:
         db.execute(
             """
@@ -168,7 +195,7 @@ def test_live_funding_and_cross_spread_can_bind_the_same_logical_bybit_account(
             "perpetualSymbol": "BTCUSDT",
             "perpetualQuantity": "1",
             "spotSymbol": "BTCUSDT",
-            "spotQuantity": "1",
+            "spotQuantity": "1.001",
         },
     )
     with connection() as db:

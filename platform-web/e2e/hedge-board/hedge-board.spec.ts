@@ -14,7 +14,7 @@ async function login(page: Page, username: string) {
   expect(result.ok()).toBeTruthy();
   const csrf = (await result.json()).csrfToken;
   await expect(page).not.toHaveURL(/\/login/);
-  await page.goto(`${origin}/#/hedge-board/a-share`);
+  await page.goto(`${origin}/#/hedge-board/a-share?view=stocks`);
   await expect(page.getByRole('heading', { name: '自选股与核心股票池' })).toBeVisible();
   await expect(page.getByText(/核心池 \d+ 只/)).toBeVisible();
   return csrf;
@@ -58,6 +58,8 @@ test('real API and SQLite: shared core pool, private focus, reload, chart contro
   await page.reload();
   await expect(pool.getByText(/近期关注 2 只/)).toBeVisible();
   await pool.getByLabel('范围', { exact: true }).selectOption('__focus__');
+  if (await pool.getByRole('button', { name: '展开明细', exact: true }).count())
+    await pool.getByRole('button', { name: '展开明细', exact: true }).click();
   await expect(pool.locator('tbody tr')).toHaveCount(2);
   const second = await browser.newContext();
   const employee = await second.newPage();
@@ -66,7 +68,7 @@ test('real API and SQLite: shared core pool, private focus, reload, chart contro
   await employee.getByPlaceholder('请输入密码').fill(password);
   await employee.getByRole('button', { name: '登录', exact: true }).click();
   await expect(employee).not.toHaveURL(/\/login/);
-  await employee.goto(`${origin}/#/hedge-board/a-share`);
+  await employee.goto(`${origin}/#/hedge-board/a-share?view=stocks`);
   await expect(employee.getByText(/核心池 6 只 · 近期关注 0 只/)).toBeVisible();
   await expect(employee.getByRole('button', { name: '管理核心池', exact: true })).toHaveCount(0);
   await second.close();
@@ -77,6 +79,8 @@ test('real API and SQLite: shared core pool, private focus, reload, chart contro
   await expect(pool.getByText(/核心池 5 只 · 近期关注 2 只/)).toBeVisible();
   await pool.getByPlaceholder('名称 / 行业 / 代码').fill('');
   await pool.getByLabel('范围', { exact: true }).selectOption('__focus__');
+  if (await pool.getByRole('button', { name: '展开明细', exact: true }).count())
+    await pool.getByRole('button', { name: '展开明细', exact: true }).click();
   await expect(pool.locator('tbody tr')).toHaveCount(2);
   await pool.locator('tbody').getByRole('button', { name: '腾讯控股', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -84,6 +88,8 @@ test('real API and SQLite: shared core pool, private focus, reload, chart contro
   await page.getByLabel('个股日线范围').selectOption('20');
   await expect(page.getByRole('img', { name: '00700复权收盘价，20个交易日' })).toBeVisible();
   await page.keyboard.press('Escape');
+  await page.getByRole('link', { name: '市场总览', exact: true }).click();
+  await page.getByRole('button', { name: /^市场宽度 .*点击查看历史$/ }).click();
   const chart = page
     .locator('.vibe-time-chart')
     .filter({ has: page.getByRole('heading', { name: '市场宽度', exact: true }) });
@@ -96,12 +102,13 @@ test('real API and SQLite: shared core pool, private focus, reload, chart contro
   await legend.click();
   await expect(legend).toHaveAttribute('aria-pressed', 'false');
   await legend.click();
-  await chart.locator('svg').focus();
+  await chart.getByRole('img', { name: /^市场宽度，/ }).focus();
   await page.keyboard.press('ArrowLeft');
   await page.screenshot({
     path: test.info().outputPath('desktop-charts.png'),
     animations: 'disabled',
   });
+  await page.getByRole('link', { name: '股票池', exact: true }).click();
   await mode(page, csrf, 'partial');
   await page.getByRole('button', { name: '更新收盘数据', exact: true }).click();
   await expect(
@@ -128,8 +135,17 @@ test('responsive A-share board has readable sections and no page overflow', asyn
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
-    await page.keyboard.press('Escape');
+    // Wait for the desktop-to-drawer transition before dismissing it.
+    if (viewport.width === 768) await expect(page.locator('.ant-drawer-left')).toHaveCount(1);
+    const sidebar = page.locator('.ant-drawer-left.ant-drawer-open');
+    if (await sidebar.count()) {
+      await sidebar.press('Escape');
+      await expect(sidebar).toHaveCount(0);
+    }
+    await page.getByRole('link', { name: '股票池', exact: true }).click();
     await expect(page.getByRole('heading', { name: '自选股与核心股票池' })).toBeVisible();
+    await page.locator('#a-share-watchlist-pool .heavy-visuals-anchor').scrollIntoViewIfNeeded();
+    await expect(page.locator('#a-share-watchlist-pool .matrix-panel')).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
     ).toBeTruthy();
@@ -156,11 +172,14 @@ test('responsive A-share board has readable sections and no page overflow', asyn
           }),
       );
     expect(clippedPanels).toEqual([]);
-    await page.locator('#a-share-index-overview').scrollIntoViewIfNeeded();
+    await page.getByRole('link', { name: '市场总览', exact: true }).click();
+    await page.locator('#a-share-market-overview').scrollIntoViewIfNeeded();
     await page.screenshot({
       path: test.info().outputPath(`overview-${viewport.width}.png`),
       animations: 'disabled',
     });
+    await page.getByRole('link', { name: '股票池', exact: true }).click();
+    await page.locator('#a-share-watchlist-pool .heavy-visuals-anchor').scrollIntoViewIfNeeded();
     await page.locator('#a-share-watchlist-pool .matrix-panel').scrollIntoViewIfNeeded();
     await page.screenshot({
       path: test.info().outputPath(`pool-${viewport.width}.png`),

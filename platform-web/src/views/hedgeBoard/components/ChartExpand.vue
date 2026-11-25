@@ -25,7 +25,7 @@
           <path v-else d="M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4" />
         </svg>
       </button>
-      <slot></slot>
+      <slot :expanded="expanded"></slot>
     </dialog>
   </div>
 </template>
@@ -161,6 +161,10 @@
 
   .chart-expand__surface:modal :deep(.source-series-plot--drivers) {
     min-height: 360px;
+  }
+
+  .chart-expand__surface:modal :deep(.financing-chart > .plot) {
+    height: max(360px, calc(100dvh - 220px));
   }
 
   .chart-expand__surface:modal :deep(.source-series-plot--binance) {

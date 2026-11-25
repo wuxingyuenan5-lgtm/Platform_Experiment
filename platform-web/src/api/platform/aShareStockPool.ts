@@ -14,6 +14,12 @@ export interface Stock {
   price?: number | null;
   change?: number | null;
   change_5d?: number | null;
+  relative_5d_pp?: number | null;
+  industryComparison?: {
+    code: string;
+    name: string;
+    points: Array<{ date: string; stock: string; industry: string }>;
+  };
   change_20d?: number | null;
   ytd?: number | null;
   amount_yi?: number | null;

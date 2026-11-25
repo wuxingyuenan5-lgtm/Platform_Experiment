@@ -46,6 +46,7 @@
       >
       <div v-if="times.length" ref="chartHost" class="fomc-chart"
         ><svg
+          ref="motionPlot"
           :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
           role="img"
           :aria-label="`${meeting.meetingDate} FOMC各结果历史概率`"
@@ -97,7 +98,8 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import { computed, onBeforeUnmount, onMounted, ref, watch, watch as watchMotion } from 'vue';
   import {
     getMacroExpectations,
     type MacroExpectationResponse,
@@ -227,6 +229,12 @@
     } finally {
       loading.value = false;
     }
+  });
+  const motionPlot = ref<SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion([feed, selectedId, selectedYears, hidden], () => void reveal(), {
+    flush: 'post',
+    deep: true,
   });
 </script>
 <style scoped>

@@ -1,0 +1,8 @@
+MPL-2.0 attribution for migrated pure indicators
+
+engine.ts adapts Pulu Moving Averages and Zero Lag MA Trend Levels (ChartPrime).
+Original Pine source files and details are retained in this licenses directory.
+kalman.ts adapts Kalman Price Filter and Kalman Hull Supertrend (BackQuant),
+with upstream indicator URLs preserved in that source file.
+
+Mozilla Public License Version 2.0: https://mozilla.org/MPL/2.0/

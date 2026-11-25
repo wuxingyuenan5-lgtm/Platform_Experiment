@@ -158,3 +158,22 @@ class c:
     assert choice_daily_close("2026-10-09", sdk_root=tmp_path, timeout_seconds=10) == Decimal(
         "8570.51"
     )
+
+
+def test_amount_twenty_day_average_before_pagination_and_nulls(monkeypatch):
+    from contextlib import contextmanager
+    from datetime import timedelta, date
+    from app import research_a_share_repository as repo
+    db = database()
+    for i in range(25):
+        write_market_archive({"universe_key": "all_a", "trade_date": (date(2026, 9, 1) + timedelta(days=i)).isoformat(), "amount_yuan": Decimal(i+1), "source_name": "test", "definition_version": "test", "payload": {}}, db=db)
+    @contextmanager
+    def connection():
+        yield db
+    monkeypatch.setattr(repo, "connection", connection)
+    page = repo.read_market_amount_page(2, 5)
+    assert page["rows"][0]["amount20dAverageYuan"] == Decimal("10.5")
+    assert page["rows"][1]["amount20dAverageYuan"] is None
+    assert repo.read_market_amount_page(1, 5)["rows"][0]["amount20dAverageYuan"] == Decimal("15.5")
+    db.execute("UPDATE research_a_share_market_archive SET amount_yuan=NULL WHERE trade_date='2026-09-10'")
+    assert repo.read_market_amount_page(1, 5)["rows"][0]["amount20dAverageYuan"] is None

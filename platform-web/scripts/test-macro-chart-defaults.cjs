@@ -21,8 +21,8 @@ test('US employment and consumption requirements remain visible in the economy c
     'macro-cn-retail',
   ])
     assert.equal(keys.filter((k) => k === key).length, 1, key);
-  assert.ok(keys.indexOf('macro-us-employment') < keys.indexOf('macro-us-consumption'));
-  assert.ok(keys.indexOf('macro-us-unemployment') < keys.indexOf('macro-us-consumption'));
+  assert.ok(keys.indexOf('macro-us-consumption-momentum') < keys.indexOf('macro-us-employment'));
+  assert.ok(keys.indexOf('macro-us-employment') < keys.indexOf('macro-us-unemployment'));
 });
 
 test('macro defaults honor per-chart windows instead of a blanket five years', () => {

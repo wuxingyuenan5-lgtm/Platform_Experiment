@@ -22,7 +22,14 @@ test('CEO sees native account assets, read-only accounts and unbound BL without 
   await expect(assets.getByText('12,500.00 USD', { exact: true })).toBeVisible();
   await expect(page.getByText('统一交易账户', { exact: true })).toBeVisible();
   await expect(page.getByText('理财', { exact: true })).toBeVisible();
-  await expect(page.getByText('仅读取', { exact: true })).toBeVisible();
+  const bindings = await page.request.get(
+    '/api/v1/strategies/instances/strategy_bottom_fishing_instance_default/accounts',
+  );
+  expect(bindings.ok(), await bindings.text()).toBeTruthy();
+  expect(await bindings.json()).toEqual(
+    expect.arrayContaining([expect.objectContaining({ capability: 'read_only' })]),
+  );
+  await expect(page.locator('[data-write-action="true"]')).toHaveCount(0);
   await page.goto('/#/strategy/management?desk=shortLineTraderL&section=capital');
   await expect(page.getByText('交易账户权益', { exact: true }).first()).toBeVisible();
   await page.goto('/#/strategy/management?desk=shortLineTraderW&section=capital');
@@ -154,7 +161,9 @@ test('CEO Cross confirmation is frozen, cancellation is safe and simulation clos
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByText('确认价差指令', { exact: true })).not.toBeVisible();
   await open.click();
-  await expect(page.getByText('预检完成，可以确认下单', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('strong').filter({ hasText: /^预检完成，可以确认下单$/ }),
+  ).toBeVisible();
   const submitted = page.waitForResponse(
     (r) => r.url().includes('/cross-spread/lifecycle/open') && r.request().method() === 'POST',
   );
@@ -166,7 +175,9 @@ test('CEO Cross confirmation is frozen, cancellation is safe and simulation clos
   expect(opened.executionBatch.status).toBe('hedged');
   await command.getByRole('button', { name: '平仓价差', exact: true }).click();
   await command.getByRole('button', { name: '全平', exact: true }).first().click();
-  await expect(page.getByText('预检完成，可以确认下单', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('strong').filter({ hasText: /^预检完成，可以确认下单$/ }),
+  ).toBeVisible();
   const closing = page.waitForResponse(
     (r) =>
       r.url().includes('/cross-spread/exit-plans/') &&
@@ -184,10 +195,10 @@ test('employee can read strategy accounts but cannot submit funding or Cross ord
 }) => {
   await login(page, 'e2e_employee_1');
   await page.goto('/#/strategy/platform?desk=funding&section=execution');
-  await expect(page.getByRole('button', { name: '提交正套开仓', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '市价开仓', exact: true })).toBeDisabled();
   await page.goto('/#/strategy/platform?desk=crossSpread&section=execution');
   await page.getByRole('button', { name: '开多价差', exact: true }).click();
-  await expect(page.getByText('仅 CEO 可下达交易指令', { exact: true })).toBeVisible();
+  await expect(page.locator('strong').filter({ hasText: /^仅 CEO 可下达交易指令$/ })).toBeVisible();
   await expect(page.getByText('确认价差指令', { exact: true })).not.toBeVisible();
 });
 
@@ -207,16 +218,16 @@ test('CEO funding confirms once, reconciles, partially closes and fully closes t
     path: test.info().outputPath('funding-initial.png'),
     animations: 'disabled',
   });
-  const submit = panel.getByRole('button', { name: '提交正套开仓', exact: true });
+  const submit = panel.getByRole('button', { name: '市价开仓', exact: true });
   await expect(submit).toBeEnabled();
   await submit.click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: '返回修改', exact: true }).click();
   expect(writes).toHaveLength(0);
-  await panel.getByLabel('执行数量', { exact: true }).fill('0.5');
+  await panel.getByLabel('永续目标数量（币）', { exact: true }).fill('0.5');
   await panel.getByRole('button', { name: '刷新行情', exact: true }).click();
   await expect(submit).toBeEnabled();
-  await expect(panel.getByLabel('执行数量', { exact: true })).toHaveValue('0.5');
+  await expect(panel.getByLabel('永续目标数量（币）', { exact: true })).toHaveValue('0.5');
   await submit.click();
   const submitted = page.waitForResponse(
     (r) => r.url().includes('/funding/instructions') && r.request().method() === 'POST',
@@ -247,7 +258,7 @@ test('CEO funding confirms once, reconciles, partially closes and fully closes t
     await panel.getByRole('button', { name: '平仓', exact: true }).click();
     await panel.getByRole('button', { name: '选择', exact: true }).first().click();
     await panel.getByLabel('平仓数量', { exact: true }).fill(quantity);
-    const close = panel.getByRole('button', { name: '执行组合平仓', exact: true });
+    const close = panel.getByRole('button', { name: '市价平仓', exact: true });
     await expect(close).toBeEnabled();
     await close.click();
     const closed = page.waitForResponse(

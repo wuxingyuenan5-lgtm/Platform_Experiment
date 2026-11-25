@@ -26,7 +26,7 @@ def close_amount_points(stocks, date_key, *, closed):
     ]
 
 
-def build_theme_crowding(histories, amount_points, sessions, end):
+def build_theme_crowding(histories, amount_points, sessions, end, *, names=None):
     prices = {
         code: price_map([{"date": str(p.observed_at), "value": p.close} for p in points], end)
         for code, points in histories.items()
@@ -80,8 +80,20 @@ def build_theme_crowding(histories, amount_points, sessions, end):
             (i for i, r in enumerate(rows) if r["sharePct"] is not None or r["price"] is not None),
             max(0, len(rows) - 1),
         )
+        concentration = None
+        latest_amounts = amounts.get(end, {})
+        if codes and all(c in latest_amounts for c in codes):
+            total = sum((latest_amounts[c] for c in codes), Decimal(0))
+            if total > 0:
+                leaders = sorted(codes, key=lambda c: (-latest_amounts[c], c))[:3]
+                concentration = {
+                    "date": end,
+                    "sharePct": sum(latest_amounts[c] for c in leaders) / total * 100,
+                    "leaders": [{"code": c, "name": (names or {}).get(c), "amountYuan": latest_amounts[c]} for c in leaders],
+                }
         return {
             "name": name,
+            "concentration": concentration,
             "expected": expected,
             "priceBaseDate": base,
             "history": rows[first_valid:],

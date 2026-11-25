@@ -1,7 +1,8 @@
 <script setup lang="ts">
+  import { useChartReveal } from '@/hooks/web/chartMotion';
   import { useDashboardRefresh } from '../useDashboardRefresh';
 
-  import { computed, shallowRef, ref } from 'vue';
+  import { computed, shallowRef, ref, watch as watchMotion } from 'vue';
   import { useElementSize } from '@vueuse/core';
   import { getCryptoDashboardV1, type MacroDashboardSeries } from '@/api/hedgeResearch';
 
@@ -27,7 +28,7 @@
   const maxSupply = computed(() => Math.max(1, ...rows.value.map((r) => r.value ?? 0)));
   const active = computed(() => (selected.value === null ? null : rows.value[selected.value]));
   const x = (price: number) => 72 + (price / maxPrice.value) * (rightEdge.value - 72);
-  const y = (supply: number) => 280 - (supply / maxSupply.value) * 240;
+  const y = (supply: number) => 210 - (supply / maxSupply.value) * 170;
   const number = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 8 });
   useDashboardRefresh(async () => {
     try {
@@ -53,6 +54,9 @@
       state.value = 'error';
     }
   });
+  const motionPlot = ref<SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion([series, showTable], () => void reveal(), { flush: 'post', deep: true });
 </script>
 
 <template>
@@ -84,7 +88,12 @@
       </table>
     </div>
     <template v-else>
-      <svg :viewBox="`0 0 ${chartWidth} 330`" role="group" aria-label="UTXO 最后移动价格分布">
+      <svg
+        ref="motionPlot"
+        :viewBox="`0 0 ${chartWidth} 260`"
+        role="group"
+        aria-label="UTXO 最后移动价格分布"
+      >
         <text x="72" y="20">BTC 数量</text>
         <g v-for="fraction in [0, 0.25, 0.5, 0.75, 1]" :key="fraction">
           <line
@@ -97,17 +106,19 @@
           <text x="62" :y="y(maxSupply * fraction) + 4" text-anchor="end">
             {{ Math.round(maxSupply * fraction).toLocaleString('en-US') }}
           </text>
-          <text :x="x(maxPrice * fraction)" y="305" text-anchor="middle">
+          <text :x="x(maxPrice * fraction)" y="234" text-anchor="middle">
             {{ Math.round(maxPrice * fraction).toLocaleString('en-US') }}
           </text>
         </g>
         <template v-for="(row, index) in rows" :key="row.seriesId">
           <rect
+            data-chart-kind="bar"
+            style="transform-origin: 0 210px"
             v-if="row.value !== null"
             :x="x(row.lower)"
             :y="y(row.value)"
             :width="Math.max(0.2, x(row.upper) - x(row.lower) - 0.5)"
-            :height="280 - y(row.value)"
+            :height="210 - y(row.value)"
             :fill="selected === index ? '#165dff' : '#5895c9'"
             tabindex="0"
             :aria-label="`${row.label}: ${number(row.value)} BTC`"
@@ -119,15 +130,23 @@
             <title>{{ row.label }} · {{ number(row.value) }} BTC</title>
           </rect>
         </template>
-        <text :x="rightEdge" y="326" text-anchor="end">最后移动时价格（USD）</text>
+        <text :x="rightEdge" y="254" text-anchor="end">最后移动时价格（USD）</text>
       </svg>
-      <div class="urpd-detail" aria-live="polite">{{
-        active
-          ? `${active.label} · ${active.value === null ? '—' : number(active.value)} BTC`
-          : '按价格区间查看 BTC 数量'
-      }}</div>
+      <div class="urpd-footer"
+        ><span class="urpd-detail" aria-live="polite">{{
+          active
+            ? `${active.label} · ${active.value === null ? '—' : number(active.value)} BTC`
+            : '按价格区间查看 BTC 数量'
+        }}</span>
+        <small
+          ><a :href="rows[0].sourceUrl || undefined" target="_blank" rel="noopener noreferrer"
+            >BGeometrics</a
+          >
+          · UTXO 最后移动时价格，不等同于投资者实际买入成本。</small
+        ></div
+      >
     </template>
-    <small
+    <small v-if="showTable"
       ><a :href="rows[0].sourceUrl || undefined" target="_blank" rel="noopener noreferrer"
         >BGeometrics</a
       >
@@ -141,8 +160,8 @@
     display: grid;
     box-sizing: border-box;
     width: 100%;
-    padding: 12px 20px;
-    gap: 10px;
+    padding: 4px 20px 10px;
+    gap: 6px;
   }
 
   .urpd-controls {
@@ -171,8 +190,15 @@
     font-size: 12px;
   }
 
+  .urpd-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+  }
+
   .urpd-detail {
-    min-height: 20px;
+    min-height: 16px;
     color: #334155;
     font-size: 12px;
   }

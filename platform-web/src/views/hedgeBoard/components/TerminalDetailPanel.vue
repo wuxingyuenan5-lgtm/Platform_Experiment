@@ -1,5 +1,5 @@
 <template>
-  <section class="market-terminal__detail">
+  <section ref="motionPlot" class="market-terminal__detail">
     <div v-if="!readonly" class="market-terminal__panel-head market-terminal__panel-head--detail">
       <div class="market-terminal__detail-actions">
         <button
@@ -210,6 +210,7 @@
                     preserveAspectRatio="none"
                   >
                     <polyline
+                      data-chart-kind="line"
                       :points="compactSparkline(row.spark, 96, 24)"
                       :class="sparkStrokeClass(row.d1)"
                     />
@@ -222,6 +223,7 @@
                   preserveAspectRatio="none"
                 >
                   <polyline
+                    data-chart-kind="line"
                     :points="compactSparkline(row.spark, 96, 24)"
                     :class="sparkStrokeClass(row.d1)"
                   />
@@ -351,14 +353,13 @@
             <div v-if="chartModal.error" class="market-terminal-chart-modal__state is-error">
               {{ chartModal.error }}
             </div>
-            <div v-else-if="chartModal.loading" class="market-terminal-chart-modal__state">
+            <div
+              v-else-if="chartModal.loading"
+              class="market-terminal-chart-modal__state is-loading"
+            >
               正在加载 {{ chartModal.symbol }} 的走势图...
             </div>
-            <div
-              ref="chartContainerRef"
-              class="market-terminal-chart-modal__widget"
-              :class="{ 'is-hidden': chartModal.loading }"
-            ></div>
+            <div ref="chartContainerRef" class="market-terminal-chart-modal__widget"></div>
           </div>
         </div>
       </div>
@@ -367,11 +368,23 @@
 </template>
 
 <script setup lang="ts">
+  import { useChartReveal } from '@/hooks/web/chartMotion';
+  import {
+    watch as watchMotion,
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onDeactivated,
+    onMounted,
+    ref,
+    watch,
+  } from 'vue';
+  import { mountTickerChart } from './tickerChart';
+  import { prepareTradingView } from './tradingViewResources';
   import { useResearchViewState } from '../composables/researchWorkspace';
   import { getMarketLayout, saveMarketLayout, type MarketLayoutGroup } from '@/api/hedgeResearch';
   import { useUserStore } from '@/store/modules/user';
 
-  import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
   import type {
     RotationHeatmapRow,
     TerminalMarketId,
@@ -420,8 +433,6 @@
     },
   );
 
-  const emit = defineEmits<{ (event: 'index-chart', code: string, name: string): void }>();
-
   const userStore = useUserStore();
   const savedLayout = ref<MarketLayoutGroup[] | null>(null);
   const layoutVersion = ref(0);
@@ -454,6 +465,7 @@
   );
   const editMode = ref(false);
   const addFormVisible = ref(false);
+  onMounted(() => prepareTradingView());
   const chartContainerRef = ref<HTMLDivElement | null>(null);
   const chartModal = ref<ChartModalState>({
     visible: false,
@@ -470,7 +482,7 @@
     tvSymbol: '',
   });
 
-  let tradingViewScriptPromise: Promise<void> | null = null;
+  let disposeTickerChart: (() => void) | undefined;
 
   const hasSavedOverrides = computed(() => savedLayout.value !== null);
   const editingBlocked = computed(() => layoutLoading.value || layoutSaving.value);
@@ -951,74 +963,7 @@
     return Boolean(resolveTradingViewSymbol(props.marketId, symbol, tvSymbol));
   }
 
-  async function ensureTradingViewScript() {
-    if (typeof window === 'undefined') return;
-    if (window.document.querySelector('script[data-tv-advanced-chart-script="true"]')) return;
-
-    if (!tradingViewScriptPromise) {
-      tradingViewScriptPromise = new Promise<void>((resolve, reject) => {
-        const script = window.document.createElement('script');
-        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-        script.async = true;
-        script.dataset.tvAdvancedChartScript = 'true';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('TradingView 脚本加载失败'));
-        window.document.head.appendChild(script);
-      });
-    }
-
-    return tradingViewScriptPromise;
-  }
-
-  async function renderTradingViewChart(tvSymbol: string) {
-    await nextTick();
-    const host = chartContainerRef.value;
-    if (!host) return;
-
-    host.innerHTML = '';
-
-    const container = document.createElement('div');
-    container.className = 'tradingview-widget-container';
-
-    const widget = document.createElement('div');
-    widget.className = 'tradingview-widget-container__widget';
-
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.async = true;
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.text = JSON.stringify({
-      autosize: true,
-      symbol: tvSymbol,
-      interval: 'D',
-      timezone: 'Asia/Shanghai',
-      theme: 'light',
-      style: '1',
-      locale: 'zh_CN',
-      allow_symbol_change: true,
-      calendar: false,
-      support_host: 'https://www.tradingview.com',
-      hide_top_toolbar: false,
-      hide_legend: false,
-      save_image: false,
-      details: false,
-      studies: ['Volume@tv-basicstudies'],
-      withdateranges: true,
-      range: '30D',
-      backgroundColor: '#f7fafc',
-      gridColor: 'rgba(101, 119, 139, 0.12)',
-    });
-
-    container.appendChild(widget);
-    container.appendChild(script);
-    host.appendChild(container);
-  }
-
   async function openTickerChart(symbol: string, name: string, tvSymbolOverride?: string) {
-    if (props.readonly && props.marketId === 'aShare') {
-      emit('index-chart', symbol, name);
-      return;
-    }
     const tvSymbol = resolveTradingViewSymbol(props.marketId, symbol, tvSymbolOverride);
     if (!tvSymbol) return;
 
@@ -1032,9 +977,14 @@
     };
 
     try {
-      await ensureTradingViewScript();
-      await renderTradingViewChart(tvSymbol);
-      chartModal.value.loading = false;
+      await nextTick();
+      if (!chartModal.value.visible || chartModal.value.tvSymbol !== tvSymbol) return;
+      disposeTickerChart?.();
+      if (!chartContainerRef.value) return;
+      disposeTickerChart = mountTickerChart(chartContainerRef.value, tvSymbol, (error) => {
+        chartModal.value.loading = false;
+        chartModal.value.error = error || '';
+      });
     } catch (error) {
       chartModal.value.loading = false;
       chartModal.value.error = error instanceof Error ? error.message : '图表加载失败';
@@ -1042,6 +992,8 @@
   }
 
   function closeTickerChart() {
+    disposeTickerChart?.();
+    disposeTickerChart = undefined;
     chartModal.value.visible = false;
     chartModal.value.loading = false;
     chartModal.value.error = '';
@@ -1050,13 +1002,15 @@
       chartContainerRef.value.innerHTML = '';
     }
   }
+  onDeactivated(closeTickerChart);
 
   onBeforeUnmount(() => {
     ++layoutRequestId;
-    if (chartContainerRef.value) {
-      chartContainerRef.value.innerHTML = '';
-    }
+    disposeTickerChart?.();
   });
+  const motionPlot = ref<HTMLElement | SVGElement>();
+  const reveal = useChartReveal(motionPlot);
+  watchMotion(displayGroups, () => void reveal(), { flush: 'post', deep: true });
 </script>
 
 <style lang="less" scoped>
@@ -1519,6 +1473,7 @@
   }
 
   .market-terminal-chart-modal__body {
+    position: relative;
     min-height: min(calc(78vh - 140px), 720px);
     overflow: hidden;
     border: 1px solid rgb(201 213 226 / 82%);
@@ -1528,6 +1483,8 @@
 
   .market-terminal-chart-modal__state {
     display: flex;
+    position: absolute;
+    z-index: 1;
     align-items: center;
     justify-content: center;
     min-height: min(calc(78vh - 140px), 720px);
@@ -1536,6 +1493,7 @@
     color: #73879a;
     font-size: 14px;
     font-weight: 600;
+    inset: 0;
   }
 
   .market-terminal-chart-modal__state.is-error {
@@ -1546,8 +1504,13 @@
     height: min(calc(78vh - 140px), 720px);
   }
 
-  .market-terminal-chart-modal__widget.is-hidden {
-    display: none;
+  .market-terminal-chart-modal__state.is-loading {
+    min-height: 0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    pointer-events: none;
+    inset: 8px 8px auto auto;
   }
 
   :deep(.tradingview-widget-container),

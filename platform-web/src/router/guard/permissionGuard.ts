@@ -104,7 +104,7 @@ export function createPermissionGuard(router: Router) {
         replace: true,
       };
       if (to.path) {
-        redirectData.query = { redirect: to.path };
+        redirectData.query = { redirect: to.fullPath };
       }
       next(redirectData);
       return;
@@ -113,6 +113,7 @@ export function createPermissionGuard(router: Router) {
     if (
       from.path === LOGIN_PATH &&
       PAGE_NOT_FOUND_NAMES.includes(String(to.name || '')) &&
+      !findRouteChainByPath(asyncRoutes, to.path) &&
       to.fullPath !== (userStore.getUserInfo.homePath || PageEnum.BASE_HOME)
     ) {
       next(userStore.getUserInfo.homePath || PageEnum.BASE_HOME);
@@ -150,7 +151,7 @@ export function createPermissionGuard(router: Router) {
           // in-memory dynamic route table cannot. Rebuild known authorized routes
           // before retrying the original URL instead of falling through to 404/home.
           await ensureDynamicRoutes();
-          next({ path: to.fullPath, replace: true, query: to.query });
+          next({ path: to.path, query: to.query, hash: to.hash, replace: true });
           return;
         }
         next();
@@ -167,7 +168,7 @@ export function createPermissionGuard(router: Router) {
         next({ path: FORBIDDEN_PATH, replace: true });
         return;
       }
-      next({ path: to.fullPath, replace: true, query: to.query });
+      next({ path: to.path, query: to.query, hash: to.hash, replace: true });
     } else {
       const redirectPath = ((to.query?.redirect as string) || to.fullPath || to.path) as string;
       const redirect = decodeURIComponent(redirectPath);

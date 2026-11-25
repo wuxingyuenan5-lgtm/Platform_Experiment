@@ -75,15 +75,30 @@ def test_failed_source_does_not_erase_history_or_block_other_sources(monkeypatch
             if '/api/' not in url and 'statistics-data' not in url:
                 return Response(b'<meta name="_csrf" content="public">')
             if 'get-marketcap-gdp' in url:
-                return Response(b'{"data":[{"date":"2026-10-30","marketCap":100,"gdp":200}]}')
+                return Response(b'{"data":['
+                                b'{"date":"2020-12-14","marketCap":100,"gdp":200,"close":4934.84},'
+                                b'{"date":"2020-12-14","marketCap":100,"gdp":200,"close":4945.10},'
+                                b'{"date":"2020-12-16","marketCap":100,"gdp":200,"close":4953.87},'
+                                b'{"date":"2020-12-16","marketCap":100,"gdp":200,"close":4966.14}]}')
             raise TimeoutError('public source unavailable')
     monkeypatch.setattr(context.httpx,'AsyncClient',Client)
+    monkeypatch.setattr(context, "read_artifact", lambda key: {"rows": [
+        {"date": "2020-12-14", "close": "4934.8352"},
+        {"date": "2020-12-15", "close": "4945.1015"},
+    ]} if key == "sources/choice_index_000300" else {})
     async def no_delay(*args): pass
     monkeypatch.setattr(context.asyncio, 'sleep', no_delay)
     result=asyncio.run(context.collect_context(force=True))
     assert result['breadth']['sources']['ma']['status']=='error'
     assert result['breadth']['sources']['ma']['data']==[{"date":"2026-10-09","ma5":"53"}]
-    assert result['macroValue']['sources']['buffett']['status']=='ready'
+    buffett = result["macroValue"]["sources"]["buffett"]
+    assert buffett["status"] == "ready"
+    repaired, unresolved = buffett["data"]
+    assert repaired["close"] == Decimal("4934.84")
+    assert repaired["value"] == Decimal(50)
+    assert repaired["closeSource"] == "choice_index_000300"
+    assert "conflictFields" not in repaired
+    assert unresolved["close"] is None and unresolved["conflictFields"] == "close"
     assert writes
 
 

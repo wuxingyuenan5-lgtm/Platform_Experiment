@@ -515,6 +515,11 @@ class BybitMt5Gateway:
             account_id=account_id, count=count
         )
 
+    def get_research_intraday_rates(self, *, account_id, count=35000):
+        return self._mt5_adapter(account_id).get_research_intraday_rates(
+            account_id=account_id, count=count
+        )
+
     def get_research_ticks(self, *, account_id, symbol, start, end, historical=False):
         return self._mt5_adapter(account_id).get_research_ticks(
             account_id=account_id, symbol=symbol, start=start, end=end, historical=historical

@@ -1,56 +1,65 @@
 <template>
   <section class="mutual-funds" aria-label="公募持仓跟踪">
-    <header class="heading">
-      <div><h2>公募持仓</h2><p>主动权益 · 普通股票、偏股混合与灵活配置</p></div>
-      <label
-        >报告期
-        <select v-model="selectedPeriod" :disabled="loading" @change="load"
-          ><option v-for="d in overview?.dates || []" :key="d" :value="d">{{ d }}</option></select
-        ></label
-      >
-    </header>
     <p v-if="loading" role="status">正在读取公募披露数据…</p>
     <p v-if="error" class="notice" role="alert"
       >{{ error }} <button type="button" @click="load">重试</button></p
     >
-    <template v-if="overview">
-      <p v-if="overview.collectionStatus === 'paused'" class="notice" role="status"
-        >公募持仓已暂停更新，以下为已留存的历史数据。</p
-      >
-      <p class="source"
-        >{{ overview.source || '天天基金公开基金档案' }} · 数据整理于
-        {{ time(overview.generatedAt) }}</p
-      >
-      <p v-if="overview.status !== 'ready'" class="notice" role="status">
-        {{
-          overview.status === 'stale' ? '来源更新延迟，保留已取得的数据。' : '当前为部分覆盖样本。'
-        }}
-        已取得 {{ overview.collectedCount || 0 }} /
-        {{ overview.expectedCount || 0 }} 个同名份额归并组合，已检查
-        {{ overview.attemptedCount || 0 }} 个。
-      </p>
-      <div class="metrics">
-        <article
-          ><span>样本股票仓位</span><strong>{{ fmt(overview.summary?.stockPct, '%') }}</strong
-          ><small
-            >{{ overview.summary?.fundCount || 0 }} 个同日有效组合 · 净资产加权</small
-          ></article
-        >
-        <article
-          ><span>股票仓位环比</span
-          ><strong>{{ signed(overview.summary?.stockChangePp, ' 个百分点') }}</strong
-          ><small>{{ overview.summary?.commonCount || 0 }} 个两期可比组合</small></article
-        >
-        <article
-          ><span>样本净资产</span><strong>{{ yi(overview.summary?.navYuan) }}</strong
-          ><small>同日有效组合 · 亿元</small></article
-        >
-        <article
-          ><span>样本现金占净比</span><strong>{{ fmt(overview.summary?.cashPct, '%') }}</strong
-          ><small>{{ overview.summary?.cashPctCount || 0 }} 个有披露值的组合</small></article
+    <div class="card">
+      <div class="section-heading">
+        <h2>公募持仓</h2>
+        <div class="holding-controls" role="group" aria-label="仓位口径">
+          <button
+            type="button"
+            :aria-pressed="positionView === 'reported'"
+            @click="positionView = 'reported'"
+            >披露仓位</button
+          >
+          <button
+            type="button"
+            :aria-pressed="positionView === 'estimated'"
+            @click="positionView = 'estimated'"
+            >估算仓位</button
+          >
+        </div>
+        <label v-if="positionView === 'reported' && overview">
+          报告期
+          <select v-model="selectedPeriod" aria-label="报告期" :disabled="loading" @change="load">
+            <option v-for="d in overview.dates" :key="d" :value="d">{{ d }}</option>
+          </select>
+        </label>
+        <small
+          v-if="positionView === 'reported' && overview?.collectionStatus === 'paused'"
+          class="source"
+          >历史归档</small
         >
       </div>
-      <div class="card">
+      <MarketMonitorPanel
+        v-if="positionView === 'estimated'"
+        section="fund"
+        :refresh-key="refreshKey"
+      />
+      <template v-else-if="overview">
+        <div class="metrics">
+          <article
+            ><span>样本股票仓位</span><strong>{{ fmt(overview.summary?.stockPct, '%') }}</strong
+            ><small
+              >{{ overview.summary?.fundCount || 0 }} 个同日有效组合 · 净资产加权</small
+            ></article
+          >
+          <article
+            ><span>股票仓位环比</span
+            ><strong>{{ signed(overview.summary?.stockChangePp, ' 个百分点') }}</strong
+            ><small>{{ overview.summary?.commonCount || 0 }} 个两期可比组合</small></article
+          >
+          <article
+            ><span>样本净资产</span><strong>{{ yi(overview.summary?.navYuan) }}</strong
+            ><small>同日有效组合 · 亿元</small></article
+          >
+          <article
+            ><span>样本现金占净比</span><strong>{{ fmt(overview.summary?.cashPct, '%') }}</strong
+            ><small>{{ overview.summary?.cashPctCount || 0 }} 个有披露值的组合</small></article
+          >
+        </div>
         <VibeTimeChart
           v-if="overview.history.length"
           title="样本仓位历史"
@@ -61,11 +70,14 @@
           :dates="overview.history.map((r) => r.date)"
           :series="overviewSeries"
         />
-        <p class="definition"
-          >各期样本数量随披露覆盖变化；环比卡片只比较同一批基金。现金占净比不能直接解释为可继续买入的额度。</p
-        >
         <details
-          ><summary>历史样本覆盖</summary
+          ><summary>历史样本覆盖与来源</summary
+          ><p class="source">
+            {{ overview.source || '天天基金公开基金档案' }}
+            <template v-if="overview.generatedAt"> · {{ time(overview.generatedAt) }}</template>
+            <template v-if="overview.status !== 'ready'">
+              · 覆盖 {{ overview.collectedCount || 0 }} / {{ overview.expectedCount || 0 }} 个组合
+            </template> </p
           ><div class="table-scroll" tabindex="0" role="region" aria-label="公募历史覆盖"
             ><table
               ><thead
@@ -83,7 +95,9 @@
             ></div
           ></details
         >
-      </div>
+      </template>
+    </div>
+    <template v-if="overview">
       <section class="card">
         <div class="section-heading"
           ><h3>行业配置</h3
@@ -161,8 +175,8 @@
           v-if="stockLimit < filteredStocks.length"
           type="button"
           class="more"
-          @click="stockLimit += 50"
-          >再显示50只</button
+          @click="stockLimit += 20"
+          >再显示20只</button
         >
       </section>
       <section class="card">
@@ -172,7 +186,13 @@
             >查找基金
             <input v-model="fundSearch" type="search" placeholder="基金、代码、现任经理" /></label
         ></div>
-        <div class="table-scroll fund-list" tabindex="0" role="region" aria-label="基金列表">
+        <div
+          v-if="fundSearch.trim()"
+          class="table-scroll fund-list"
+          tabindex="0"
+          role="region"
+          aria-label="基金列表"
+        >
           <table
             ><thead
               ><tr
@@ -198,14 +218,11 @@
           >
         </div>
         <button
-          v-if="fundLimit < filteredFunds.length"
+          v-if="fundSearch.trim() && fundLimit < filteredFunds.length"
           type="button"
           class="more"
-          @click="fundLimit += 150"
-          >再显示150只基金</button
-        >
-        <p class="definition"
-          >列表显示各基金最新披露，详情可选历史报告期。同名份额只取一个代表，组合汇总另按已取得的基金全称去重；规模与持仓分母不一致的组合不参与加权。</p
+          @click="fundLimit += 20"
+          >再显示20只基金</button
         >
       </section>
       <section v-if="selectedCode" ref="detailHost" class="card detail" aria-label="单基金历史">
@@ -329,7 +346,16 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+  import {
+    computed,
+    defineAsyncComponent,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    shallowRef,
+    watch,
+  } from 'vue';
   import {
     readFundOverview,
     readFundDetail,
@@ -339,6 +365,8 @@
   } from '@/api/mutualFunds';
   import VibeTimeChart, { type Series } from './VibeTimeChart.vue';
 
+  const MarketMonitorPanel = defineAsyncComponent(() => import('./MarketMonitorPanel.vue'));
+  const positionView = ref<'reported' | 'estimated'>('reported');
   const props = defineProps<{ refreshKey: number }>();
   const emit = defineEmits<{ ready: [] }>();
   const overview = shallowRef<FundOverview>();
@@ -353,8 +381,8 @@
   const fundSearch = ref(''),
     stockSearch = ref(''),
     industryMarket = ref('CN'),
-    stockLimit = ref(50),
-    fundLimit = ref(150);
+    stockLimit = ref(20),
+    fundLimit = ref(20);
   const detailHost = ref<HTMLElement>();
   let overviewController: AbortController | undefined,
     detailController: AbortController | undefined;
@@ -408,11 +436,13 @@
   );
   const stocks = computed(() => filteredStocks.value.slice(0, stockLimit.value));
   const filteredFunds = computed(() =>
-    (overview.value?.funds || []).filter((r) =>
-      `${r.name} ${r.code} ${r.manager || ''} ${r.classes.map((c) => c.code).join(' ')}`
-        .toLowerCase()
-        .includes(fundSearch.value.trim().toLowerCase()),
-    ),
+    !fundSearch.value.trim()
+      ? []
+      : (overview.value?.funds || []).filter((r) =>
+          `${r.name} ${r.code} ${r.manager || ''} ${r.classes.map((c) => c.code).join(' ')}`
+            .toLowerCase()
+            .includes(fundSearch.value.trim().toLowerCase()),
+        ),
   );
   const funds = computed(() => filteredFunds.value.slice(0, fundLimit.value));
   const detailDates = computed(() =>
@@ -485,10 +515,14 @@
     },
   );
   watch(stockSearch, () => {
-    stockLimit.value = 50;
+    stockLimit.value = 20;
   });
   watch(fundSearch, () => {
-    fundLimit.value = 150;
+    fundLimit.value = 20;
+    detailController?.abort();
+    selectedCode.value = '';
+    detail.value = undefined;
+    detailLoading.value = false;
   });
   onMounted(load);
   onBeforeUnmount(() => {
@@ -512,6 +546,24 @@
     justify-content: space-between;
     margin-bottom: 14px;
     gap: 16px;
+  }
+
+  .holding-controls {
+    display: flex;
+    gap: 4px;
+  }
+
+  .holding-controls button {
+    padding: 5px 10px;
+    border: 1px solid #dce4ef;
+    border-radius: 6px;
+    background: white;
+    font-size: 12px;
+  }
+
+  .holding-controls button[aria-pressed='true'] {
+    background: #edf3ff;
+    color: #2563eb;
   }
 
   h2 {

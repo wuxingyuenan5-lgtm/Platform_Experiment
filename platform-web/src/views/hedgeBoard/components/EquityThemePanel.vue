@@ -1,14 +1,14 @@
 <template>
-  <section class="theme-workbench">
-    <header class="page-heading"
+  <section class="theme-workbench" :class="{ embedded }">
+    <header v-if="!embedded" class="page-heading"
       ><div
-        ><h2>主题与行业</h2
+        ><h2>{{ view === 'themes' ? '主题画像' : view === 'styles' ? '风格比较' : '主题研究' }}</h2
         ><p
           >{{ market === 'cn' ? 'A股' : '美股' }} · {{ data.date || '暂无收盘数据' }}
           <span>收盘</span></p
         ></div
       >
-      <div class="view-tabs" role="group" aria-label="观察视角"
+      <div v-if="!view" class="view-tabs" role="group" aria-label="观察视角"
         ><button :aria-pressed="mode === 'themes'" @click="mode = 'themes'">投资主线</button
         ><button :aria-pressed="mode === 'styles'" @click="mode = 'styles'">{{
           market === 'cn' ? '风格跟踪' : '风格轮动'
@@ -18,7 +18,7 @@
         ></div
       >
     </header>
-    <WidgetErrorBoundary widget-title="强弱矩阵">
+    <WidgetErrorBoundary v-if="!embedded" widget-title="强弱矩阵">
       <ThemeStrengthOverview
         v-if="mode === 'themes'"
         :themes="data.items.filter((t) => t.kind !== 'satellite')"
@@ -26,7 +26,22 @@
       />
     </WidgetErrorBoundary>
     <div v-if="mode === 'themes'" class="workspace-grid">
-      <aside class="mainline-nav" aria-label="主线选择">
+      <component
+        :is="embedded && !alwaysExpanded ? 'details' : 'aside'"
+        class="mainline-nav"
+        aria-label="主线选择"
+      >
+        <component
+          :is="alwaysExpanded ? 'h3' : 'summary'"
+          :class="{ 'disclosure-title': alwaysExpanded }"
+          v-if="embedded"
+          >主题强弱与排行</component
+        >
+        <WidgetErrorBoundary v-if="embedded" widget-title="强弱矩阵"
+          ><ThemeStrengthOverview
+            :themes="data.items.filter((t) => t.kind !== 'satellite')"
+            @select="focusTheme"
+        /></WidgetErrorBoundary>
         <div class="nav-heading"
           ><h3>主线强弱</h3
           ><select v-model="order" aria-label="主线排列"
@@ -68,8 +83,11 @@
             ><span v-if="!rankable(row)">样本不足</span><span v-else>查看 →</span></span
           >
         </button>
-        <details class="satellite-nav"
-          ><summary>卫星主题</summary
+        <component :is="alwaysExpanded ? 'section' : 'details'" class="satellite-nav"
+          ><component
+            :is="alwaysExpanded ? 'h3' : 'summary'"
+            :class="{ 'disclosure-title': alwaysExpanded }"
+            >卫星主题</component
           ><button
             v-for="row in data.items.filter((t) => t.kind === 'satellite')"
             :key="row.name"
@@ -77,10 +95,10 @@
             :aria-pressed="active?.name === row.name"
             @click="selectTheme(row.name)"
             >{{ row.name }} <span>→</span></button
-          ></details
+          ></component
         >
         <p class="nav-note">{{ data.uniqueStocks }}只独立股票 · 主线可交叉归属</p>
-      </aside>
+      </component>
       <div v-if="active" ref="detailPane" class="detail-pane">
         <section class="theme-summary">
           <div class="detail-heading"
@@ -112,9 +130,34 @@
             >
           </div>
         </section>
-        <section v-if="active.kind !== 'style'" class="members-panel">
+        <slot name="theme-insights" :theme="active"></slot>
+        <component
+          :is="embedded && !alwaysExpanded ? 'details' : 'section'"
+          v-if="active.kind !== 'style'"
+          class="members-panel"
+          ><component
+            :is="alwaysExpanded ? 'h3' : 'summary'"
+            :class="{ 'disclosure-title': alwaysExpanded }"
+            v-if="embedded"
+            >产业链与成员股票 · {{ active.expected }}只</component
+          >
           <header class="section-heading"
-            ><h4>产业链环节</h4><small>点击环节筛选股票 · 右侧为20日表现</small></header
+            ><h4>产业链环节</h4
+            ><RouterLink
+              v-if="market === 'cn' && !embedded"
+              :to="{
+                path: '/hedge-board/a-share',
+                query: {
+                  view: 'themes',
+                  section: 'themes',
+                  themeView: 'activity',
+                  theme: active.name,
+                  segment: segment || undefined,
+                  themeDate: data.date,
+                },
+              }"
+              >查看{{ segment || active.name }}拥挤度 →</RouterLink
+            ></header
           >
           <div class="segments" role="group" aria-label="产业链环节"
             ><button :aria-pressed="!segment" @click="segment = ''"
@@ -132,8 +175,15 @@
             ><h4
               >{{ segment || '成员股票' }} <small>{{ members.length }}只</small></h4
             ><div
+              ><button
+                v-if="memberIndustry"
+                class="member-industry-filter"
+                type="button"
+                aria-label="清除关联行业筛选"
+                @click="emit('clear-member-industry')"
+                >{{ memberIndustry.name }} ×</button
               ><select v-if="market === 'cn'" v-model="industry" aria-label="主题内行业筛选"
-                ><option value="">全部行业</option
+                ><option value="">{{ memberIndustry ? '全部细分行业' : '全部行业' }}</option
                 ><option v-for="name in industryOptions" :key="name" :value="name">{{
                   name
                 }}</option></select
@@ -217,7 +267,7 @@
               ></div
             ></div
           >
-        </section>
+        </component>
         <div v-if="active.overlaps?.length || active.related?.length" class="connections"
           ><span>关联主线</span
           ><button v-for="item in active.overlaps" :key="item.name" @click="selectTheme(item.name)"
@@ -226,10 +276,16 @@
             >{{ name }} ↗</button
           ></div
         >
-        <details class="reference-panel" :open="active.kind === 'style'" :key="active.name"
-          ><summary
+        <component
+          :is="alwaysExpanded ? 'section' : 'details'"
+          class="reference-panel"
+          :open="active.kind === 'style'"
+          :key="active.name"
+          ><component
+            :is="alwaysExpanded ? 'h3' : 'summary'"
+            :class="{ 'disclosure-title': alwaysExpanded }"
             >参考 ETF
-            <span>{{ active.references?.length || 0 }}个工具 · 独立于个股统计</span></summary
+            <span>{{ active.references?.length || 0 }}个工具 · 独立于个股统计</span></component
           ><div class="table-scroll" tabindex="0" role="region" aria-label="主线参考ETF"
             ><table
               ><thead
@@ -246,7 +302,7 @@
                 ></tbody
               ></table
             ></div
-          ></details
+          ></component
         >
       </div>
     </div>
@@ -255,6 +311,8 @@
       :data="data.styles"
       :benchmark="data.benchmark?.name || ''"
       :market="market"
+      :compact="compactStyle"
+      :observation-date="compactStyle ? data.date : undefined"
     />
     <section v-else class="industry-panel">
       <p class="industry-note">{{
@@ -297,8 +355,11 @@
         ></div
       >
     </section>
-    <details class="method"
-      ><summary>统计口径与覆盖</summary
+    <component v-if="!compactStyle" :is="alwaysExpanded ? 'section' : 'details'" class="method"
+      ><component
+        :is="alwaysExpanded && !compactStyle ? 'h3' : 'summary'"
+        :class="{ 'disclosure-title': alwaysExpanded && !compactStyle }"
+        >统计口径与覆盖</component
       ><p
         >5日、20日为基准交易日窗口内的成员涨跌幅中位数；相对表现为20日涨跌幅减去基准同期涨跌幅。至少3只且覆盖80%成员时参与对应排序。上涨占比只使用当日有效股票，均线占比只使用完整20日历史。样本中位数不是组合收益。</p
       ><p
@@ -311,12 +372,12 @@
       ><p
         >当前目录生效日
         {{ data.effectiveFrom || '—' }}。此前多周期表现为当前成员回溯，不是历史可交易回测。</p
-      ></details
+      ></component
     >
   </section>
 </template>
 <script setup lang="ts">
-  import { computed, nextTick, ref, watch } from 'vue';
+  import { inject, computed, nextTick, ref, watch } from 'vue';
   import type {
     EquityThemes,
     EquityTheme,
@@ -326,25 +387,58 @@
   } from '@/api/equityObservatory';
   import { useResearchViewState } from '../composables/researchWorkspace';
   import VibeTimeChart from '../aShare/components/VibeTimeChart.vue';
+  import { industryCode } from '../aShare/components/industryResearch';
   import ThemeStrengthOverview from './ThemeStrengthOverview.vue';
   import EquityStylePanel from './EquityStylePanel.vue';
   import WidgetErrorBoundary from './WidgetErrorBoundary';
 
+  const alwaysExpanded = inject('themeResearchAlwaysExpanded', false);
   const props = defineProps<{
     market: 'cn' | 'us';
+    view?: 'themes' | 'styles' | 'industries';
+    selectedTheme?: string;
+    memberIndustry?: { code: string; name: string };
+    embedded?: boolean;
+    compactStyle?: boolean;
     data: EquityThemes;
     industries: Array<
       EquityDistribution & { code: string; name: string; amountSharePct: EquityValue }
     >;
   }>();
-  const mode = useResearchViewState('theme-view', 'themes');
+  const emit = defineEmits<{ theme: [name: string]; 'clear-member-industry': [] }>();
+  const localMode = useResearchViewState('theme-view', 'themes');
+  const mode = computed({
+    get: () => props.view || localMode.value,
+    set: (value) => {
+      localMode.value = value;
+    },
+  });
   const selected = useResearchViewState('theme-selected', '');
+  watch(
+    () => props.selectedTheme,
+    (name) => {
+      if (name) selected.value = name;
+    },
+    { immediate: true },
+  );
   const segment = useResearchViewState('theme-segment', '');
   const industry = useResearchViewState('theme-industry', '');
   const search = useResearchViewState('theme-search', '');
   const order = useResearchViewState('theme-order', 'return20');
   const selectedStock = useResearchViewState('theme-stock', '');
   const detailPane = ref<HTMLElement | null>(null);
+  watch(
+    [() => props.selectedTheme, () => props.memberIndustry?.code],
+    ([name, code], [priorName, priorCode]) => {
+      if (code !== priorCode || (name && priorName && name !== priorName)) {
+        segment.value = '';
+        industry.value = '';
+        search.value = '';
+        selectedStock.value = '';
+      }
+    },
+    { immediate: true },
+  );
   const num = (value: EquityValue | undefined): number | null =>
     value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
   const formatter = new Intl.NumberFormat('zh-CN', {
@@ -375,6 +469,7 @@
   );
   function selectTheme(name: string) {
     selected.value = name;
+    emit('theme', name);
     segment.value = '';
     industry.value = '';
     search.value = '';
@@ -385,12 +480,17 @@
     await nextTick();
     detailPane.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  const memberUniverse = computed(() => {
+    const rows = active.value?.members || [];
+    const code = props.memberIndustry?.code;
+    return code ? rows.filter((row) => industryCode(row.industryCode) === code) : rows;
+  });
   const industryOptions = computed(() =>
-    [...new Set((active.value?.members || []).map((row) => row.industry || '待补齐'))].sort(),
+    [...new Set(memberUniverse.value.map((row) => row.industry || '待补齐'))].sort(),
   );
   const members = computed(() => {
     const map = new Map<string, ThemeMember & { segments: string[] }>();
-    for (const row of active.value?.members || []) {
+    for (const row of memberUniverse.value) {
       if (segment.value && row.segment !== segment.value) continue;
       if (industry.value && (row.industry || '待补齐') !== industry.value) continue;
       if (!`${row.name} ${row.code}`.toLowerCase().includes(search.value.trim().toLowerCase()))
@@ -428,6 +528,31 @@
     `${(Math.abs(currentValue(row) || 0) / maxMagnitude.value) * 48}%`;
 </script>
 <style scoped>
+  .embedded .workspace-grid {
+    display: block;
+  }
+
+  .embedded .mainline-nav {
+    position: static;
+    max-height: none;
+    margin-bottom: 16px;
+  }
+
+  .embedded .mainline-nav:not([open]) {
+    padding: 12px 16px;
+  }
+
+  .embedded summary {
+    color: #354d68;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .embedded .members-panel > summary {
+    padding: 14px;
+  }
+
   .theme-workbench {
     min-width: 0;
     padding: 24px;
@@ -809,6 +934,15 @@
     gap: 8px;
   }
 
+  .member-industry-filter {
+    padding: 3px 8px;
+    border: 1px solid #d6e1ec;
+    border-radius: 5px;
+    background: #edf4ff;
+    color: #245da0;
+    white-space: nowrap;
+  }
+
   .member-toolbar input {
     width: 170px;
     background: #f8fafd;
@@ -1143,5 +1277,24 @@
       display: block;
       margin: 7px 0 0 15px;
     }
+  }
+
+  .disclosure-title {
+    margin: 0 0 12px;
+    color: #354d68;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .reference-panel > .disclosure-title {
+    margin: 0;
+    padding: 17px 20px;
+  }
+
+  .reference-panel > .disclosure-title span {
+    margin-left: 12px;
+    color: #8090a5;
+    font-size: 10px;
+    font-weight: 400;
   }
 </style>

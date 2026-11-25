@@ -3,8 +3,13 @@
 状态：`active contract`
 Platform API Prefix：`/api/v1`
 Runtime 根地址：`http://127.0.0.1:8100`
+只读研究行情：`GET /v1/market-data/xauusd-intraday?count=35000` 返回固定账户的闭合XAUUSD M30原生K线（`mt5-intraday-bars.v1`，position=1，最多35000条）；沿用账户协调锁，Live Write开启或账户忙时退让。原D1接口保持独立。同步相关性API读取本地`us-session-prices.v1`快照，价格与时间规则见[研究数据合同](RESEARCH_DATA.md)。
 关联安全规则：[Secrets and Redaction](../operations/SECRETS.md)
 关联实盘验收：`../operations/LIVE_ACCEPTANCE_RUNBOOK.md`
+
+### ETF资金流向分析
+
+`GET /api/v1/research/a-share/etf-flow-analysis` 沿用研究读取权限，仅读取既有原生ETF归档，不联网刷新或写入。参数 `days`（1–1500，默认20）生成最新观察期及前一个等交易日长度比较期；`start/end/previous_start/previous_end` 可显式指定不重叠日期区间，非法区间返回422。返回实际 `date/retrievedAt`、区间、交易日、去重基金明细、分类及大类汇总、来源和范围。`current/previous` 中金额/规模/比例为Decimal字符串或null，`covered/expected` 为基金交易日覆盖；`complete=false` 的flow仅为可得合计，全部未知为null。比例须完整金额与正的完整期初规模，回补率须两期完整且前负后正。无数据返回 `status=no_data` 与空数组。历史持有人元数据按原报告期返回，不等同当前机构持仓；Demo完全在前端生成，不进入该接口。
 
 ## 1. 服务边界
 
@@ -151,6 +156,8 @@ GET  /api/v1/trading/commands/{tradeCommandId}
 ```
 
 Live Command 依次通过 Authentication、RBAC/CEO 权限、Catalog 与账户绑定、Platform Live Gate、Kill Switch/对账风险、Order Insert 和 Runtime Live Gate；不再认领验收会话。
+
+TradeCommand 的持久化幂等身份包括原始 `symbol`，精确区分大小写；同键变更 symbol 与变更账户、标的、方向、数量、价格一样返回 409，包括并发抢占、未知结果重放和未派发命令恢复。迁移48仅从同一命令的唯一订单 symbol 回填旧记录；没有证据或存在冲突时保持空值并拒绝重放，不根据可变目录推测或重派未知命令。
 
 发往 Runtime V1 的订单命令由 Platform 从合约目录补入 `instrument_type`，客户端不能自行覆盖。Runtime 将它与原命令一同持久化，保证同名现货和永续的提交及后续原生读取始终使用正确市场；旧 V1 命令省略该可空字段仍可读取。双端字段及序列化样例由 `runtime-v1.json`、`runtime-v1-golden.json` 共同约束，具体 Bybit 行为见 [Venue Adapter](VENUE_ADAPTERS.md)。
 
@@ -487,6 +494,8 @@ Rotation、Authentication、Session、Kill Switch、RiskAction、Difference、EO
 
 ## 18. 通用规则
 
+宏观跨资产筛选 `GET /api/v1/research/macro/cross-asset-screening` 要求 `research.read`，返回 `snapshot/assets/caps/calendar/legacyResearch/sourceRevision/sourceDate/source/mode/isStale`。凭有效会话或 API 凭据请求时，已生成的本地标的工作簿以 `workbookSnapshot` 返回，包含日期、文件名、表名和两组标的；读取失败时返回 `workbookSnapshotUnavailable`。接口只读历史归档与本地快照，`Cache-Control: private, no-store`。详情见[研究数据合同](RESEARCH_DATA.md#跨资产筛选2026-11-06)。
+
 - 金融数值使用十进制字符串。
 - 时间使用带时区 ISO 8601。
 - Query 与 Command 分离。
@@ -507,6 +516,8 @@ Strategy account history includes nullable decimal-string `equityDrawdown` and `
 The account snapshot accepts optional `includeDetails=false` for a lightweight management read. This keeps balances, risk, equity history and current venue-synced positions, but omits orders, fills and the historical `finance` payload. The default remains `true` for callers that need the full account and audit detail.
 
 The management capital tab requests this summary mode. Non-Cross PnL and order tabs request full details with a distinct query key, so a summary cannot satisfy a detail read. Cross account charts always use summaries; its strategy PnL and orders have separate reads, and the capital tab does not wait for strategy PnL. Overlapping refreshes reuse an in-flight request for the same section; results from an old section or unmounted page cannot overwrite the current view.
+
+管理读取投影的后台预生成覆盖全部策略实例，包括未绑定账户的实例。未绑定状态由正式投影表达，不应因遗漏预生成而在首次访问时误报读取失败；有绑定的实例继续额外生成账户范围摘要。
 
 
 ## Pretrade strategy research

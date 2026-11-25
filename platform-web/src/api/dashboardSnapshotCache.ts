@@ -1,27 +1,22 @@
-import type { MacroDashboardResponse } from './hedgeResearch';
-
-const snapshots = new Map<
-  string,
-  { expiresAt: number; request: Promise<MacroDashboardResponse> }
->();
+const snapshots = new Map<string, { expiresAt: number; request: Promise<unknown> }>();
 let sessionScope = '';
 
 // A minute covers staggered lazy mounts without pinning a page to an old production run.
-export function loadDashboardSnapshot(
+export function loadDashboardSnapshot<T>(
   key: string,
   scope: string,
-  load: () => Promise<MacroDashboardResponse>,
-): Promise<MacroDashboardResponse> {
+  load: () => Promise<T>,
+): Promise<T> {
   if (scope !== sessionScope) {
     snapshots.clear();
     sessionScope = scope;
   }
   const existing = snapshots.get(key);
-  if (existing && Date.now() < existing.expiresAt) return existing.request;
+  if (existing && Date.now() < existing.expiresAt) return existing.request as Promise<T>;
   const expiresAt = Date.now() + 60_000;
   const entry = {
     expiresAt: Infinity,
-    request: undefined as unknown as Promise<MacroDashboardResponse>,
+    request: undefined as unknown as Promise<T>,
   };
   entry.request = load().then(
     (data) => {

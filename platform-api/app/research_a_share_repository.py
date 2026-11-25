@@ -503,11 +503,20 @@ def read_market_amount_page(page: int = 1, page_size: int = 100) -> dict[str, An
         ).fetchall()
     previous = None
     changes: dict[str, Decimal | None] = {}
+    averages: dict[str, Decimal | None] = {}
+    amounts: list[Decimal | None] = []
     for row in all_rows:
         current = Decimal(str(row["amount_yuan"])) if row["amount_yuan"] is not None else None
         changes[row["trade_date"]] = (
             (current / previous - Decimal("1")) * 100
             if current is not None and previous and previous > 0
+            else None
+        )
+        amounts.append(current)
+        window = amounts[-20:]
+        averages[row["trade_date"]] = (
+            sum(window, Decimal("0")) / Decimal("20")
+            if len(window) == 20 and all(value is not None for value in window)
             else None
         )
         previous = current
@@ -517,6 +526,7 @@ def read_market_amount_page(page: int = 1, page_size: int = 100) -> dict[str, An
                 "observedAt": row["trade_date"],
                 "totalAmountYuan": row["amount_yuan"],
                 "amountChangePct": changes.get(row["trade_date"]),
+                "amount20dAverageYuan": averages.get(row["trade_date"]),
                 "source": _display_source(row["source_name"]),
             }
             for row in rows
@@ -723,6 +733,37 @@ def _source_timestamp(value: str | None) -> str | None:
     return f"{value}T15:00:00+08:00" if value and len(value) == 10 else value
 
 
+def archive_csi300_history(points: list[AShareIndexHistoryPoint], source_name: str) -> int:
+    """Fill absent dates without changing any accepted source or conflict record."""
+    inserted = 0
+    with connection() as db:
+        existing = {
+            row[0]
+            for row in db.execute(
+                "SELECT DISTINCT trade_date FROM research_a_share_price_history "
+                "WHERE instrument_code='000300.SH'"
+            )
+        }
+        for point in points:
+            day = point.observed_at.isoformat()
+            if day in existing:
+                continue
+            result = write_price_archive(
+                {
+                    "instrument_code": "000300.SH",
+                    "trade_date": day,
+                    "close": point.close,
+                    "source_name": point.source_name or source_name,
+                    "definition_version": "close-v1",
+                    "payload": point,
+                },
+                db=db,
+            )
+            inserted += result == "inserted"
+            existing.add(day)
+    return inserted
+
+
 def read_dashboard() -> AShareDashboardResponse | None:
     with connection() as db:
         rows = db.execute(
@@ -868,9 +909,15 @@ def read_dashboard() -> AShareDashboardResponse | None:
             )
 
     for row in archive_rows:
-        if row["universe_key"] == "all_a" and row["trade_date"] in by_date:
+        if (
+            row["universe_key"] == "all_a"
+            and row["quality_status"] != "conflict"
+            and row["trade_date"] in by_date
+        ):
             item = by_date[row["trade_date"]]
             item["totalAmountYuan"] = row["amount_yuan"]
+            item["allALimitUp"] = row["limit_up"]
+            item["allALimitDown"] = row["limit_down"]
             item["source"] = _display_source(row["source_name"])
 
     market_history = [by_date[key] for key in sorted(by_date)]
@@ -1137,6 +1184,10 @@ def read_stock_pool(extra_codes: list[str] | None = None) -> dict[str, Any]:
         for code in extra_codes or []
     ]
     payload["configVersion"] = version
+    from app.research_stock_comparison import add_industry_comparisons
+
+    with connection() as db:
+        add_industry_comparisons(db, payload["stocks"] + payload["focusStocks"], payload.get("meta", {}).get("report_date"))
     return summarize_stock_pool(payload)
 
 
@@ -1333,19 +1384,21 @@ def read_tracked_codes() -> list[str]:
     )
 
 
-def read_stored_stock_histories(codes: list[str]) -> dict[str, list[AShareIndexHistoryPoint]]:
+def read_stored_stock_histories(codes: list[str], *, limit_per_code=300) -> dict[str, list[AShareIndexHistoryPoint]]:
     if not codes:
         return {}
     placeholders = ",".join("?" for _ in codes)
-    with connection() as db:
+    from app.database_connection import read_only_connection
+
+    with read_only_connection() as db:
         rows = db.execute(
             f"""SELECT entity_code,observed_at,payload_json FROM (
                 SELECT entity_code,observed_at,payload_json,
                 ROW_NUMBER() OVER(PARTITION BY entity_code ORDER BY observed_at DESC) AS rank
                 FROM research_a_share_history WHERE dataset='stock'
-                AND entity_code IN ({placeholders})) WHERE rank<=300
+                AND entity_code IN ({placeholders})) WHERE rank<=?
                 ORDER BY entity_code,observed_at""",
-            codes,
+            [*codes, max(1, min(int(limit_per_code), 5000))],
         ).fetchall()
     result: dict[str, list[AShareIndexHistoryPoint]] = {}
     for row in rows:
@@ -1367,10 +1420,10 @@ def read_theme_amount_history() -> list[tuple[str, str, dict[str, Any]]]:
     with read_only_connection() as db:
         rows = db.execute(
             """SELECT observed_at,entity_code,payload_json FROM research_a_share_history
-            WHERE dataset='theme_amount' AND observed_at IN (
+            WHERE dataset IN ('theme_amount','theme_amount_public') AND observed_at IN (
                 SELECT DISTINCT observed_at FROM research_a_share_history
-                WHERE dataset='theme_amount' ORDER BY observed_at DESC LIMIT 1500)
-            ORDER BY observed_at,entity_code"""
+                WHERE dataset IN ('theme_amount','theme_amount_public') ORDER BY observed_at DESC LIMIT 1500)
+            ORDER BY observed_at,entity_code,CASE dataset WHEN 'theme_amount_public' THEN 0 ELSE 1 END"""
         ).fetchall()
     return [(r["observed_at"], r["entity_code"], json.loads(r["payload_json"])) for r in rows]
 
@@ -1408,3 +1461,37 @@ def read_index_history(code: str) -> list[dict[str, Any]]:
         {**json.loads(row["payload_json"]), "observedAt": row["observed_at"]}
         for row in reversed(rows)
     ]
+
+
+def read_crowding_market_history() -> dict[str, list[dict[str, Any]]]:
+    """Full accepted archive for weekly crowding, independent of UI table pagination."""
+    from app.database_connection import read_only_connection
+
+    with read_only_connection() as db:
+        amounts = db.execute(
+            """SELECT trade_date AS observedAt, amount_yuan AS totalAmountYuan, source_name
+            FROM research_a_share_market_archive
+            WHERE universe_key='all_a' AND quality_status <> 'conflict'
+            ORDER BY trade_date"""
+        ).fetchall()
+        prices = db.execute(
+            """SELECT trade_date AS date, MIN(close) AS close
+            FROM research_a_share_price_history
+            WHERE instrument_code='000300.SH' AND quality_status='ready' AND close IS NOT NULL
+            GROUP BY trade_date HAVING COUNT(DISTINCT CAST(close AS REAL))=1
+            ORDER BY trade_date"""
+        ).fetchall()
+    return {
+        "amountHistory": [
+            {"observedAt": r["observedAt"], "totalAmountYuan": r["totalAmountYuan"],
+             "source": _display_source(r["source_name"])}
+            for r in amounts
+        ],
+        "benchmarkHistory": [dict(r) for r in prices],
+    }
+
+
+def read_theme_market_amounts():
+    with connection() as db:
+        rows = db.execute("SELECT trade_date,amount_yuan FROM research_a_share_market_archive WHERE universe_key='all_a' AND quality_status<>'conflict' AND amount_yuan IS NOT NULL").fetchall()
+    return [(r["trade_date"], "__market__", {"amountYuan":r["amount_yuan"]}) for r in rows]

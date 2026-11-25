@@ -1,5 +1,6 @@
 import { defineComponent, h, onBeforeUnmount, onMounted, type PropType, ref, watch } from 'vue';
 import type { WidgetConfig } from '../nativeData/dashboardClean';
+import { prepareTradingView } from './tradingViewResources';
 
 const TradingViewWidget = defineComponent({
   name: 'TradingViewWidget',
@@ -87,6 +88,7 @@ const TradingViewWidget = defineComponent({
     };
 
     onMounted(() => {
+      if (props.widget.scriptSrc) prepareTradingView(props.widget.scriptSrc);
       if (typeof ResizeObserver !== 'undefined' && mountRef.value) {
         resizeObserver = new ResizeObserver(() => {
           if (isVisible && !mountRef.value?.childElementCount) scheduleRender();
@@ -102,7 +104,7 @@ const TradingViewWidget = defineComponent({
               scheduleRender();
             }
           },
-          { rootMargin: '160px 0px', threshold: 0.01 },
+          { rootMargin: '600px 0px', threshold: 0.01 },
         );
         intersectionObserver.observe(mountRef.value);
       } else {

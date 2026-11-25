@@ -12,4 +12,10 @@
   .macro-board-page {
     min-width: 0;
   }
+
+  .macro-board-page :deep(.strategy-top-toolbar__left) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+  }
 </style>

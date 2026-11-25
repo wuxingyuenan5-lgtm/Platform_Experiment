@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Synthetic account facts exercise the real Vue page. No account or venue writes occur.
-const now = '2026-09-19T08:00:00Z';
+const now = new Date().toISOString();
 const instance = 'strategy_cross_venue_spread_instance_default';
 const accountIds = ['bybit-live-main', 'mt5-live-main'];
 
@@ -157,7 +157,17 @@ async function fixture(page: Page) {
         timeline: [],
         issues: [],
         dataQualityState: 'complete',
-        strategyDailyPnl: [],
+        strategyDailyPnl: [
+          {
+            date: '2026-09-18',
+            currency: 'USD',
+            pnl: '7',
+            returnRate: '3.5',
+            equityOpen: '200',
+            equityClose: '207',
+            quality: 'estimated',
+          },
+        ],
       });
     return json([]);
   });
@@ -254,7 +264,7 @@ test('account failure is distinct from unbound, refresh restores both legs, and 
   expect(
     state.reads.filter((url) => url.includes('/account-snapshot') && url.includes('accountId=')),
   ).toEqual(expect.arrayContaining([expect.stringContaining('includeDetails=false')]));
-  expect(state.reads.some((url) => url.endsWith(`/${instance}/pnl`))).toBe(false);
+  expect(state.reads.filter((url) => url.endsWith(`/${instance}/pnl`))).toHaveLength(1);
 
   state.failAccount = '';
   await page.getByRole('button', { name: '刷新状态', exact: true }).click();
@@ -264,7 +274,8 @@ test('account failure is distinct from unbound, refresh restores both legs, and 
   await expect(page.locator('.risk-item').filter({ hasText: '数据状态' })).toContainText(
     '全部正常',
   );
-  await expect(page.locator('.pnl-calendar-summary')).toContainText('30.00');
+  await expect(page.locator('.pnl-calendar-summary')).toContainText('7.00');
+  await expect(page.locator('.pnl-calendar-summary')).not.toContainText('30.00');
   await expect(page.locator('.position-distribution-card')).toContainText('USDT');
   await expect(page.locator('.position-distribution-card')).toContainText('USD');
   await expect(page.locator('.position-distribution-card')).toContainText('oz');
@@ -275,7 +286,9 @@ test('account failure is distinct from unbound, refresh restores both legs, and 
   await page.locator('.pnl-calendar-title').click();
   await expect(page.locator('.pnl-calendar-switch')).toContainText('按月');
   await page.getByRole('button', { name: '上一年', exact: true }).click();
-  await expect(page.locator('.pnl-calendar-cursor')).toContainText('2025');
+  await expect(page.locator('.pnl-calendar-cursor')).toContainText(
+    String(new Date().getFullYear() - 1),
+  );
 
   state.failAccount = accountIds[1];
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));

@@ -8,6 +8,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
   const realWindow = globalThis.window;
   const realDocument = globalThis.document;
   let active = true;
+  let paused = false;
   const listeners = [],
     intervals = [],
     timeouts = [];
@@ -28,14 +29,14 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
   };
   const setInterval = (handler, delay) => {
     const id = realWindow.setInterval(() => {
-      if (active) handler();
+      if (active && !paused) handler();
     }, delay);
     intervals.push(id);
     return id;
   };
   const setTimeout = (handler, delay) => {
     const id = realWindow.setTimeout(() => {
-      if (active) handler();
+      if (active && !paused) handler();
     }, delay);
     timeouts.push(id);
     return id;
@@ -62,7 +63,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     broad = initialData.broadData?.dates || [];
   if (document.getElementById('dailyRange'))
     document.getElementById('dailyRange').textContent =
-      '20只重点ETF · ' + daily[0] + ' ~ ' + daily.at(-1) + '（' + daily.length + '个交易日）';
+      '25只重点ETF · ' + daily[0] + ' ~ ' + daily.at(-1) + '（' + daily.length + '个交易日）';
   if (document.getElementById('broadRange'))
     document.getElementById('broadRange').textContent = broad[0] + ' ~ ' + broad.at(-1);
   const pendingCharts = [];
@@ -88,7 +89,8 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       if (visible(pendingCharts[i].element)) pendingCharts.splice(i, 1)[0].initialize();
     }
     root.querySelectorAll('[_echarts_instance_]').forEach((el) => {
-      if (visible(el)) chartEngine.getInstanceByDom(el)?.resize();
+      if (!el.closest('#allATurnoverForecast') && visible(el))
+        chartEngine.getInstanceByDom(el)?.resize();
     });
   }
   root.addEventListener('toggle', revealCharts, true);
@@ -96,35 +98,14 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
   whenVisible('chart', function () {
     'use strict';
 
-    /* 2026-10-15 换仓后的新篮子：沪深300/科创50/创业板/中证500/中证1000/中证A500/上证50 等
-     按用户给定名单，顺序即重要性顺序（成交额降序）。m: "1"=上交所(sh)、"0"=深交所(sz)。 */
-    var ETFS = [
-      { code: '510310', m: '1' },
-      { code: '588000', m: '1' },
-      { code: '159915', m: '0' },
-      { code: '510300', m: '1' },
-      { code: '563360', m: '1' },
-      { code: '159352', m: '0' },
-      { code: '512100', m: '1' },
-      { code: '159338', m: '0' },
-      { code: '510500', m: '1' },
-      { code: '159949', m: '0' },
-      { code: '588080', m: '1' },
-      { code: '510050', m: '1' },
-      { code: '510210', m: '1' },
-      { code: '159845', m: '0' },
-      { code: '159952', m: '0' },
-      { code: '159361', m: '0' },
-      { code: '512050', m: '1' },
-      { code: '159633', m: '0' },
-      { code: '560010', m: '1' },
-      { code: '159919', m: '0' },
-    ];
-    var INDEX_SECID = '1.000001';
+    var ETFS = initialData.initData.table.map(function (row) {
+      return { code: row.code, m: row.code.startsWith('15') ? '0' : '1' };
+    });
+    var INDEX_SECID = '1.000300';
     var REFRESH_TRADING = 60,
       REFRESH_IDLE = 300;
-    var BAR_LABEL = '20只ETF分钟成交额合计',
-      IDX_LABEL = '上证综指';
+    var BAR_LABEL = '25只ETF分钟成交额合计',
+      IDX_LABEL = '沪深300';
     /* 左轴（分钟成交额）上限，单位亿元。
      两难：开盘集合竞价的第一分钟常有 15~40 亿的脉冲，若按它定标，盘中真正有意义的
      放量变化会被压成一条平线；但若只按「剔除开盘后的峰值」定标，开盘那根就会超出上限
@@ -164,7 +145,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       return base;
     }
 
-    var state = { paused: false, remain: 1, loading: false };
+    var state = { remain: 1, loading: false };
     var chart = null;
     function ensureChart() {
       if (!chart) chart = echarts.init(document.getElementById('chart'));
@@ -188,7 +169,8 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     }
 
     var cum = [],
-      preClose = Number(initData.preClose) || null;
+      cumMissingTimes = [],
+      preClose = initData.indexSymbol === 'sh000300' ? Number(initData.preClose) || null : null;
     var minuteTimes = [],
       minuteBars = [],
       minuteCloses = [];
@@ -203,10 +185,19 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
 
     function buildCum(bars) {
       cum = [];
+      cumMissingTimes = [];
       var acc = 0;
       var gap = false;
-      bars.forEach(function (b) {
-        if (b == null) gap = true;
+      bars.forEach(function (b, i) {
+        // Closing auction is published at 15:00; absent 14:58/14:59 bars stay blank.
+        if (b == null && ['14:58', '14:59'].includes(minuteTimes[i])) {
+          cum.push(null);
+          return;
+        }
+        if (b == null) {
+          gap = true;
+          cumMissingTimes.push(minuteTimes[i]);
+        }
         if (!gap) acc += b;
         cum.push(gap ? null : +acc.toFixed(2));
       });
@@ -304,10 +295,11 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
           r.pct.toFixed(2) +
           '%</td></tr>';
       });
-      tb.innerHTML = html;
+      if (tb) tb.innerHTML = html;
     }
 
     function renderStatic() {
+      if (initData.indexSymbol !== 'sh000300') return;
       var t = initData.times || [],
         b = initData.bars || [],
         c = initData.closes || [],
@@ -318,7 +310,6 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       minuteCloses = c;
       minuteDate = String(initData.date || '');
       buildCum(b);
-      document.getElementById('tagDate').textContent = (initData.date || '') + ' 分时';
       renderTable(
         tb.slice().sort(function (x, y) {
           return y.amount - x.amount;
@@ -326,8 +317,6 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       );
       drawMinuteChart();
       drawCumChart();
-      document.getElementById('tagUpdate').textContent = '已载入收盘数据';
-      document.getElementById('tagUpdate').className = 'tag ok';
     }
 
     function drawMinuteChart() {
@@ -347,7 +336,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       ensureChart().setOption(
         {
           title: {
-            text: '20只ETF分钟成交额与上证综指分时',
+            text: '25只ETF分钟成交额与沪深300分时',
             left: 8,
             top: 6,
             padding: 0,
@@ -356,13 +345,13 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
           legend: {
             data: [BAR_LABEL, IDX_LABEL],
             left: 8,
-            top: 26,
+            top: 48,
             type: 'scroll',
             height: 24,
             itemWidth: 16,
             itemHeight: 10,
           },
-          grid: { top: 76, left: 16, right: 8, bottom: 54, containLabel: true },
+          grid: { top: 98, left: 16, right: 8, bottom: 54, containLabel: true },
           tooltip: { trigger: 'axis', formatter: minuteTooltip },
           xAxis: {
             type: 'category',
@@ -381,8 +370,14 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
             },
             {
               type: 'value',
-              name: '上证综指（点）',
+              name: '沪深300（点）',
               scale: true,
+              axisLabel: {
+                formatter: function (value) {
+                  return Number(value).toFixed(2);
+                },
+              },
+              axisPointer: { label: { precision: 2 } },
               nameTextStyle: { align: 'right' },
             },
           ],
@@ -410,10 +405,11 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       );
     }
 
-    /* ---------- 分钟累计成交额三线图 ----------
-     今日线直接用页面已有的 buildCum()（第 1 张图的分钟 bars 累加），随刷新同步；
-     昨日线与「近20日均值线」由 tools/build_cum.py 每日预生成（新浪 1 分钟 K 只能回溯约 7 个
-     交易日，凑不出 20 天，故历史两条线改用 5 分钟 K 计算，边界处为精确值、中间线性插值）。 */
+    /* Current turnover is sampled at completed five-minute boundaries.
+       Both historical windows use the same 25 members and exclude today. */
+    var CUM_T = FULL_T.filter(function (time) {
+      return Number(time.slice(3)) % 5 === 0;
+    });
     var cumData = (window.__ISLANDS && window.__ISLANDS.cumData) || {};
     var cumChart = null;
     function ensureCumChart() {
@@ -422,13 +418,13 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       if (!cumChart) cumChart = echarts.init(el);
       return cumChart;
     }
-    /* 累计数组对齐到 241 点横轴；尚未走到的时点留 null，线就自然停在当前分钟 */
+    /* 累计数组对齐到49个五分钟时点，尚未观测到的时点留空。 */
     function alignCum(times, arr) {
       var map = {};
       times.forEach(function (t, i) {
         map[t] = i;
       });
-      return FULL_T.map(function (t) {
+      return CUM_T.map(function (t) {
         var i = map[t];
         return i == null ? null : arr[i];
       });
@@ -436,26 +432,31 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     function drawCumChart() {
       var c = ensureCumChart();
       if (!c) return;
-      /* 只有分钟数据确实是「今天」的，才画今日线。
-       开盘前（9:30 之前）与周末，行情接口最新一根仍是上一交易日的数据，
-       此时 minuteBars 与「昨日线」是同一份数据 —— 画出来两条线会完全重合，
-       看起来像黄线和红线叠在一起。宁可少画一条，也不画一条假的「今日」。 */
-      var d = new Date();
-      var nowStr =
-        d.getFullYear() +
-        '-' +
-        ('0' + (d.getMonth() + 1)).slice(-2) +
-        '-' +
-        ('0' + d.getDate()).slice(-2);
-      var isRealToday = !!minuteDate && minuteDate === nowStr;
-      var todayLine = isRealToday && minuteBars.length ? alignCum(minuteTimes, cum) : [];
-      var prevLine = cumData.prev || [];
-      var avgLine = cumData.avg20 || [];
-      var nAvg = cumData.avgDays || 20;
+      // Keep the displayed market session before opening and on non-trading days.
+      // Its actual date stays visible; a new session replaces it when data arrives.
+      var todayLine = minuteDate && minuteBars.length ? alignCum(minuteTimes, cum) : [];
+      var slots = cumData.slots || [];
+      // Before the next session, use the completed original five-minute curve
+      // for this exact displayed date rather than the gapped one-minute feed.
+      if (
+        cumData.prevDate === minuteDate &&
+        cumData.intervalMinutes === 5 &&
+        (cumData.prev || []).length
+      ) {
+        todayLine = alignCum(slots, cumData.prev);
+      }
+      var avg5Line =
+        cumData.avg5Days === 5 && cumData.intervalMinutes === 5
+          ? alignCum(slots, cumData.avg5 || [])
+          : [];
+      var avgLine =
+        cumData.avgDays === 20 && cumData.intervalMinutes === 5
+          ? alignCum(slots, cumData.avg20 || [])
+          : [];
       var s = [];
       if (todayLine.length) {
         s.push({
-          name: '今日',
+          name: '当日累计',
           type: 'line',
           data: todayLine,
           connectNulls: false,
@@ -464,33 +465,76 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
           itemStyle: { color: '#d93630' },
         });
       }
-      if (prevLine.length) {
-        s.push({
-          name: cumData.prevDate || '昨日',
-          type: 'line',
-          data: prevLine,
-          connectNulls: false,
-          showSymbol: false,
-          lineStyle: { width: 1.6, color: '#e8862e' },
-          itemStyle: { color: '#e8862e' },
-        });
+      s.push({
+        name: '近5日均值',
+        type: 'line',
+        data: avg5Line.length
+          ? avg5Line
+          : CUM_T.map(function () {
+              return null;
+            }),
+        connectNulls: false,
+        showSymbol: false,
+        lineStyle: { width: 1.6, color: '#e8862e' },
+        itemStyle: { color: '#e8862e' },
+      });
+      s.push({
+        name: '近20日均值',
+        type: 'line',
+        data: avgLine.length
+          ? avgLine
+          : CUM_T.map(function () {
+              return null;
+            }),
+        connectNulls: false,
+        showSymbol: false,
+        lineStyle: { width: 1.6, color: '#4c7bf3', type: 'dashed' },
+        itemStyle: { color: '#4c7bf3' },
+      });
+      var baselineStatus = [];
+      if (
+        cumMissingTimes.length &&
+        !(
+          cumData.prevDate === minuteDate &&
+          cumData.intervalMinutes === 5 &&
+          (cumData.prev || []).length
+        )
+      ) {
+        baselineStatus.push('累计线缺少 ' + cumMissingTimes[0] + ' 起的成员分钟数据，等待补齐');
       }
-      if (avgLine.length) {
-        s.push({
-          name: '近' + nAvg + '日均值',
-          type: 'line',
-          data: avgLine,
-          connectNulls: false,
-          showSymbol: false,
-          lineStyle: { width: 1.6, color: '#4c7bf3', type: 'dashed' },
-          itemStyle: { color: '#4c7bf3' },
-        });
-      }
-      if (!s.length) return;
+      var requested = cumData.requestedDays || [];
+      var missingDays = cumData.missingDays || [];
+      [
+        [5, avg5Line],
+        [20, avgLine],
+      ].forEach(function (item) {
+        if (
+          item[1].some(function (v) {
+            return v != null;
+          })
+        )
+          return;
+        var selected = requested.slice(-item[0]);
+        var count = selected.filter(function (day) {
+          return missingDays.indexOf(day) < 0;
+        }).length;
+        baselineStatus.push(
+          '近' +
+            item[0] +
+            '日均值待补齐' +
+            (requested.length ? '（' + count + '/' + item[0] + '日完整）' : ''),
+        );
+      });
       c.setOption(
         {
           title: {
-            text: '20只ETF当日分钟累计成交额（亿元）',
+            text: '25只ETF当日分钟累计成交额（亿元）',
+            subtext:
+              '行情日期：' +
+              (minuteDate || '暂无数据') +
+              ' · 5分钟精度' +
+              (baselineStatus.length ? '\n' + baselineStatus.join('；') : ''),
+            subtextStyle: { fontSize: 11 },
             left: 8,
             top: 6,
             padding: 0,
@@ -501,13 +545,19 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
               return x.name;
             }),
             left: 8,
-            top: 26,
+            top: baselineStatus.length ? 64 : 42,
             type: 'scroll',
             height: 24,
             itemWidth: 16,
             itemHeight: 10,
           },
-          grid: { top: 76, left: 16, right: 8, bottom: 54, containLabel: true },
+          grid: {
+            top: baselineStatus.length ? 114 : 92,
+            left: 16,
+            right: 8,
+            bottom: 54,
+            containLabel: true,
+          },
           tooltip: {
             trigger: 'axis',
             formatter: function (ps) {
@@ -524,7 +574,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
           },
           xAxis: {
             type: 'category',
-            data: FULL_T,
+            data: CUM_T,
             axisLabel: { hideOverlap: true },
             boundaryGap: false,
           },
@@ -555,7 +605,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
             'ETF分钟成交额：' + (p.value == null ? '--' : Number(p.value).toFixed(2) + ' 亿'),
           );
         } else {
-          out.push('上证综指：' + (p.value == null ? '--' : Number(p.value).toFixed(2)));
+          out.push('沪深300：' + (p.value == null ? '--' : Number(p.value).toFixed(2)));
         }
       });
       if (minuteTimes.indexOf(t) >= 0 && cum[minuteTimes.indexOf(t)] != null)
@@ -618,7 +668,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
           var idx = null,
             list = [];
           diff.forEach(function (x) {
-            if (x.f12 === '000001' && idx === null) {
+            if (x.f12 === '000300' && idx === null) {
               idx = x;
               return;
             }
@@ -631,11 +681,8 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     function renderLive(indexTr, etfTrs, snap) {
       var idxRows = indexTr.rows;
       if (!idxRows.length) {
-        document.getElementById('tagUpdate').textContent = '暂无分时数据';
-        document.getElementById('tagUpdate').className = 'tag err';
         return;
       }
-      document.getElementById('tagDate').textContent = (idxRows[0].dt || '').slice(0, 10) + ' 分时';
       var sums = {},
         counts = {};
       etfTrs.forEach(function (tr) {
@@ -651,7 +698,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
         closes = [];
       idxRows.forEach(function (r) {
         times.push(r.t);
-        bars.push(counts[r.t] === ETFS.length ? +(sums[r.t] / 1e8).toFixed(2) : null);
+        bars.push(counts[r.t] === ETFS.length ? sums[r.t] / 1e8 : null);
         closes.push(r.close);
       });
       minuteTimes = times;
@@ -679,9 +726,6 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       }
       drawMinuteChart();
       drawCumChart();
-      document.getElementById('tagUpdate').textContent =
-        '分时截至 ' + idxRows[idxRows.length - 1].dt;
-      document.getElementById('tagUpdate').className = 'tag ok';
     }
 
     function isTradingTime() {
@@ -689,14 +733,12 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
         day = d.getDay();
       if (day === 0 || day === 6) return false;
       var hm = d.getHours() * 100 + d.getMinutes();
-      return hm >= 915 && hm <= 1505;
+      return (hm >= 915 && hm <= 1135) || (hm >= 1255 && hm <= 1505);
     }
 
     function loadAll() {
       if (state.loading) return;
       state.loading = true;
-      document.getElementById('tagUpdate').textContent = '加载中…';
-      document.getElementById('tagUpdate').className = 'tag';
       try {
         var jobs = [trends(INDEX_SECID)].concat(
           ETFS.map(function (e) {
@@ -704,10 +746,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
           }),
         );
         jobs.push(snapshot());
-        /* 21 只标的 + 1 个快照并发拉取，任何一个超时都会让 Promise.all 整体失败，
-         页面就一直停在"刷新失败，保留上次数据"。改成逐个容错：
-         指数必须有（没有就没法画），ETF 允许个别缺失，但成功率不足 80% 时宁可不画 ——
-         少几只的合计成交额会偏低，画出来是错的。 */
+        // Update only with the index and all ETFs in the basket; otherwise retain the prior chart.
         var safe = function (p) {
           return p.then(
             function (v) {
@@ -726,54 +765,41 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
             for (var k = 1; k < rs.length - 1; k++) if (rs[k].ok) etfTrs.push(rs[k].v);
             var need = ETFS.length;
             if (!indexTr || !indexTr.rows || !indexTr.rows.length) {
-              document.getElementById('tagUpdate').textContent = '指数分时拉取失败，保留上次数据';
-              document.getElementById('tagUpdate').className = 'tag err';
+              options.onUpdateError?.('指数分时更新失败，保留上次数据');
               state.loading = false;
               return;
             }
             if (etfTrs.length < need) {
-              document.getElementById('tagUpdate').textContent =
-                '仅取到 ' + etfTrs.length + '/' + ETFS.length + ' 只ETF，保留上次数据';
-              document.getElementById('tagUpdate').className = 'tag err';
+              options.onUpdateError?.(
+                '仅取到 ' + etfTrs.length + '/' + ETFS.length + ' 只ETF，保留上次数据',
+              );
               state.loading = false;
               return;
             }
             renderLive(indexTr, etfTrs, snap);
+            options.onUpdateError?.('');
             state.loading = false;
           })
           .catch(function (e) {
-            document.getElementById('tagUpdate').textContent = '刷新失败，保留上次数据';
-            document.getElementById('tagUpdate').className = 'tag err';
+            options.onUpdateError?.('ETF分时更新失败，保留上次数据');
             state.loading = false;
           });
       } catch (e) {
-        document.getElementById('tagUpdate').textContent = '当前环境不支持实时拉取，展示内嵌数据';
-        document.getElementById('tagUpdate').className = 'tag err';
+        options.onUpdateError?.('ETF分时更新失败，保留上次数据');
         state.loading = false;
       }
     }
 
     function tick() {
-      if (state.paused || state.loading) return;
+      if (state.loading) return;
       state.remain -= 1;
-      var tag = document.getElementById('tagCountdown');
       if (state.remain <= 0) {
         state.remain = isTradingTime() ? REFRESH_TRADING : REFRESH_IDLE;
         if (isTradingTime()) loadAll();
         return;
       }
-      tag.style.display = isTradingTime() ? '' : 'none';
-      tag.textContent = '下次刷新 ' + state.remain + 's';
     }
 
-    on(document.getElementById('btnRefresh'), 'click', function () {
-      state.remain = isTradingTime() ? REFRESH_TRADING : REFRESH_IDLE;
-      loadAll();
-    });
-    on(document.getElementById('btnPause'), 'click', function () {
-      state.paused = !state.paused;
-      this.textContent = state.paused ? '恢复自动刷新' : '暂停自动刷新';
-    });
     on(window, 'resize', function () {
       if (chart) chart.resize();
       if (cumChart) cumChart.resize();
@@ -797,6 +823,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       if (t && typeof t.addEventListener === 'function') t.addEventListener(ev, fn, false);
     }
     function fmt(v, n) {
+      if (v == null || !Number.isFinite(Number(v))) return '--';
       return Number(v).toFixed(n == null ? 1 : n);
     }
 
@@ -829,7 +856,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     nfTag.textContent =
       '最新净流入（' +
       latest.date +
-      '，T-1）：' +
+      '）：' +
       fmt(latest.netflow, 1) +
       '亿 ｜ 成交额 ' +
       fmt(latest.amount, 1) +
@@ -1108,8 +1135,11 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     c2 = drawSupportChart('chartNf', 'netflow', nfRowsFor(amtBase), nfTitle(), '当日净流入');
 
     /* live today amount refresh */
-    var SECIDS =
-      '1.510310,1.588000,0.159915,1.510300,1.563360,0.159352,1.512100,0.159338,1.510500,0.159949,1.588080,1.510050,1.510210,0.159845,0.159952,0.159361,1.512050,0.159633,1.560010,0.159919';
+    var SECIDS = initialData.initData.table
+      .map(function (row) {
+        return (row.code.startsWith('15') ? '0.' : '1.') + row.code;
+      })
+      .join(',');
     function isTradingTime() {
       var d = new Date(),
         day = d.getDay();
@@ -1323,14 +1353,14 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     var charts = [];
     var c1 = echarts.init(document.getElementById('chartDAmt'));
     c1.setOption(
-      baseOption('20只ETF日度成交额与上证综指', '20只ETF日度成交额合计', amount, tooltipFmt('amt')),
+      baseOption('25只ETF日度成交额与上证综指', '25只ETF日度成交额合计', amount, tooltipFmt('amt')),
       true,
     );
     var c2 = echarts.init(document.getElementById('chartDNf'));
     c2.setOption(
       baseOption(
-        '20只ETF日度净流入（申赎口径）与上证综指',
-        '20只ETF日度净流入',
+        '25只ETF日度净流入（申赎口径）与上证综指',
+        '25只ETF日度净流入',
         nfData(),
         tooltipFmt('nf'),
       ),
@@ -1350,14 +1380,24 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     var slots = D.slots || [],
       supAmt = D.supAmt || [],
       norAmt = D.norAmt || [],
-      supIdx = D.supIdx || [],
-      norIdx = D.norIdx || [];
+      supIdx =
+        D.indexSymbol === 'sh000300'
+          ? D.supIdx || []
+          : slots.map(function () {
+              return null;
+            }),
+      norIdx =
+        D.indexSymbol === 'sh000300'
+          ? D.norIdx || []
+          : slots.map(function () {
+              return null;
+            });
     if (!slots.length) return;
     function on(t, ev, fn) {
       if (t && typeof t.addEventListener === 'function') t.addEventListener(ev, fn, false);
     }
     function fmt(v, n) {
-      return Number(v).toFixed(n == null ? 1 : n);
+      return v == null ? '--' : Number(v).toFixed(n == null ? 1 : n);
     }
 
     function draw(containerId, title, barName, bars, idxPath, barColor) {
@@ -1366,7 +1406,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
         {
           title: { text: title, left: 8, top: 6, padding: 0, textStyle: { fontSize: 14 } },
           legend: {
-            data: [barName, '上证综指'],
+            data: [barName, '沪深300'],
             left: 8,
             top: 26,
             type: 'scroll',
@@ -1383,7 +1423,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
                 if (p.seriesType === 'bar') out.push(p.seriesName + '：' + fmt(p.value, 1) + ' 亿');
                 else
                   out.push(
-                    '上证综指：' + (p.value > 0 ? '+' : '') + fmt(p.value, 2) + '%（相对开盘）',
+                    '沪深300：' + (p.value > 0 ? '+' : '') + fmt(p.value, 2) + '%（相对开盘）',
                   );
               });
               return out.join('<br/>');
@@ -1394,15 +1434,21 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
             { type: 'value', name: '亿元/15分钟', scale: true, nameTextStyle: { align: 'left' } },
             {
               type: 'value',
-              name: '上证综指（相对开盘%）',
+              name: '沪深300（相对开盘%）',
               scale: true,
+              axisLabel: {
+                formatter: function (value) {
+                  return Number(value).toFixed(2);
+                },
+              },
+              axisPointer: { label: { precision: 2 } },
               nameTextStyle: { align: 'right' },
             },
           ],
           series: [
             { name: barName, type: 'bar', data: bars, itemStyle: { color: barColor } },
             {
-              name: '上证综指',
+              name: '沪深300',
               type: 'line',
               yAxisIndex: 1,
               data: idxPath,
@@ -1419,7 +1465,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
 
     var c1 = draw(
       'chartTypCase',
-      '放量案例日 · 20大ETF量能与上证综指（15分钟均值）',
+      '放量案例日 · 历史20只ETF量能与沪深300（15分钟均值）',
       '放量案例日成交额均值',
       supAmt,
       supIdx,
@@ -1427,7 +1473,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     );
     var c2 = draw(
       'chartTypNorm',
-      '常态交易日 · 20大ETF量能与上证综指（15分钟均值）',
+      '常态交易日 · 历史20只ETF量能与沪深300（15分钟均值）',
       '常态日成交额均值',
       norAmt,
       norIdx,
@@ -1441,7 +1487,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
 
   /* ==========================================================================
    第三部分补充图（2026-10-15 换仓后新增）
-   全市场宽基ETF日度净流入（按跟踪指数分类堆积）+ 累计净流入线（右轴）
+   宽基ETF日度净流入（按跟踪指数分类堆积）+ 累计净流入线（右轴）
    ========================================================================== */
   whenVisible(document.getElementById('chartBroad') ? 'chartBroad' : 'broadTable', function () {
     'use strict';
@@ -1483,7 +1529,7 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
       ch.setOption(
         {
           title: {
-            text: '2026年以来 全市场宽基ETF日度净流入与累计净流入',
+            text: '2026年以来 宽基ETF日度净流入与累计净流入',
             left: 8,
             top: 6,
             padding: 0,
@@ -1602,11 +1648,11 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
   /* ==========================================================================
    区间框选求和
    按住鼠标左键或右键，在图上从左向右拖出一段，松手后显示该区间的合计金额。
-   应用于：分钟图(1) / 日度成交额(8) / 日度净流入(9) / 全市场宽基日度净流入(10)。
+   应用于：分钟图(1) / 日度成交额(8) / 日度净流入(9) / 宽基日度净流入(10)。
 
    两个实现要点：
    1) 求和只累加 type==="bar" 的系列，排除上证综指、累计净流入这些折线，
-      否则会把点位/累计值加进金额里。堆积图（全市场宽基）各分类会自动加总成当日合计。
+      否则会把点位/累计值加进金额里。堆积图（宽基）各分类会自动加总成当日合计。
    2) 这几个图的 inside dataZoom 已改为 moveOnMouseMove:false，
       否则左键拖动会被 ECharts 当成平移缩放，框选永远拖不出来。
    ========================================================================== */
@@ -1755,11 +1801,12 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
 
   const resize = new ResizeObserver(() => {
     root.querySelectorAll('[_echarts_instance_]').forEach((el) => {
-      if (visible(el)) chartEngine.getInstanceByDom(el)?.resize();
+      if (!el.closest('#allATurnoverForecast') && visible(el))
+        chartEngine.getInstanceByDom(el)?.resize();
     });
   });
   resize.observe(root);
-  return () => {
+  const dispose = () => {
     active = false;
     resize.disconnect();
     intervals.forEach((id) => realWindow.clearInterval(id));
@@ -1767,8 +1814,16 @@ export function mountEtfObservation(root, initialData, request, options = {}) {
     listeners.forEach(([type, handler]) => realWindow.removeEventListener(type, handler));
     root.removeEventListener('click', navClick);
     root.removeEventListener('toggle', revealCharts, true);
-    root
-      .querySelectorAll('[_echarts_instance_]')
-      .forEach((el) => chartEngine.getInstanceByDom(el)?.dispose());
+    root.querySelectorAll('[_echarts_instance_]').forEach((el) => {
+      if (!el.closest('#allATurnoverForecast')) chartEngine.getInstanceByDom(el)?.dispose();
+    });
   };
+  dispose.pause = () => {
+    paused = true;
+  };
+  dispose.resume = () => {
+    paused = false;
+    revealCharts();
+  };
+  return dispose;
 }

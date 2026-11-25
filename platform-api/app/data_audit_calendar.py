@@ -1,6 +1,8 @@
 """Independent Sina exchange-session calendar, cached by this platform only."""
 
 import json
+import logging
+import sqlite3
 from datetime import UTC, date, datetime, timedelta
 
 import httpx
@@ -44,3 +46,16 @@ def calendar_snapshot(db, today):
     if not days or days[-1] < today:
         return None
     return {"days": days, "fetchedAt": row["fetched_at"], "source": row["source"]}
+
+
+def cached_sessions(end):
+    """Optional research comparisons cannot prevent independent series reads."""
+    if not end:
+        return []
+    try:
+        with read_only_connection() as db:
+            snapshot = calendar_snapshot(db, end)
+    except sqlite3.OperationalError as exc:
+        logging.getLogger(__name__).warning("Research session calendar unavailable: %s", exc)
+        return []
+    return snapshot["days"] if snapshot else []

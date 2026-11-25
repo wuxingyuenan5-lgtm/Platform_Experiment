@@ -1,0 +1,477 @@
+.cross-asset-screening {
+  min-width: 0;
+  color: #27364b;
+  font-size: 13px;
+}
+.cross-asset-screening h2 {
+  margin: 0 0 6px;
+  font-size: 23px;
+  font-weight: 650;
+}
+.cross-asset-screening h3 {
+  margin: 8px 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.cross-asset-screening h4 {
+  margin-top: 18px;
+  font-weight: 600;
+}
+.screening-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.screening-heading p,
+.screening-muted {
+  color: #7a8797;
+  font-size: 12px;
+}
+.cross-asset-screening button,
+.cross-asset-screening input,
+.cross-asset-screening select,
+.trend-builder button,
+.trend-builder input,
+.trend-builder select {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #dfe5ed;
+  border-radius: 6px;
+  background: #fff;
+  color: #3f5067;
+  font: inherit;
+}
+.cross-asset-screening button,
+.trend-builder button {
+  cursor: pointer;
+}
+.cross-asset-screening button:hover {
+  border-color: #92b2ee;
+  color: #245dc7;
+  background: #f5f8ff;
+}
+.cross-asset-screening button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.cross-asset-screening input[type='checkbox'] {
+  accent-color: #245dc7;
+}
+.cross-asset-screening :is(button, input, select, summary, a):focus-visible {
+  outline: 2px solid #245dc7;
+  outline-offset: 2px;
+}
+.screening-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 11px 14px;
+  border: 1px solid #e0e7ef;
+  border-radius: 8px;
+  background: #f6f8fb;
+  color: #68798f;
+  font-size: 12px;
+}
+.screening-source strong {
+  color: #8a650f;
+}
+.screening-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.cross-asset-screening .screening-metrics button {
+  padding: 11px 16px;
+  border: 1px solid #e3e8ef;
+  border-radius: 10px;
+  background: white;
+  text-align: left;
+}
+.cross-asset-screening .screening-metrics button[aria-pressed='true'] {
+  border-color: #92b2ee;
+  background: #f0f5ff;
+}
+.screening-metrics small {
+  margin-left: 8px;
+  color: #9aa5b5;
+  font-size: 10px;
+}
+.screening-metrics span {
+  display: block;
+  color: #7c8999;
+  font-size: 12px;
+}
+.screening-metrics strong {
+  display: block;
+  margin-top: 4px;
+  color: #243d64;
+  font-size: 27px;
+  font-variant-numeric: tabular-nums;
+}
+.screening-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.screening-tabs button {
+  padding: 8px 16px;
+}
+.screening-tabs button[aria-pressed='true'] {
+  border-color: #bed1f5;
+  color: #245dc7;
+  background: #eaf1ff;
+  font-weight: 600;
+}
+.screening-card {
+  margin: 12px 0;
+  padding: 16px;
+  border: 1px solid #e1e7ef;
+  border-radius: 10px;
+  background: #fff;
+}
+.screening-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+.screening-controls label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: #6a798d;
+  font-size: 12px;
+}
+.screening-controls label:has(select:not([multiple])),
+.screening-controls label:has(input:not([type='checkbox'])) {
+  display: grid;
+}
+.screening-controls input:not([type='checkbox']) {
+  width: 160px;
+}
+.screening-controls .screening-search input {
+  width: 230px;
+}
+.screening-asset-options {
+  margin: 14px 0;
+}
+.screening-asset-options select[multiple] {
+  min-width: 160px;
+  height: 105px;
+}
+.screening-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+}
+.screening-presets button {
+  padding: 5px 9px;
+  color: #5a6e8d;
+  font-size: 12px;
+}
+.screening-results {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 2px;
+  color: #75859a;
+  font-size: 12px;
+}
+.screening-results strong {
+  color: #345780;
+}
+.screening-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.screening-filter-chips button {
+  padding: 4px 9px;
+  background: #f0f5ff;
+  color: #345f9a;
+  font-size: 11px;
+}
+.screening-watchlists summary span {
+  margin-left: 10px;
+  color: #8a95a5;
+  font-size: 11px;
+  font-weight: normal;
+}
+.screening-watchlists[open] .screening-controls {
+  margin-top: 10px;
+}
+.screening-table .screening-reference-quote {
+  color: #506d92;
+}
+.screening-empty {
+  padding: 24px !important;
+  text-align: center !important;
+  color: #7a8797;
+}
+.screening-empty button,
+.screening-empty span {
+  margin-left: 10px;
+}
+.screening-table {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  background: #fff;
+}
+.screening-table table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.screening-table th,
+.screening-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #edf0f4;
+  text-align: left;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.screening-table thead {
+  background: #f5f8fc;
+  color: #6a7c93;
+}
+.screening-table tbody tr:nth-child(even) {
+  background: #fbfcfe;
+}
+.screening-table small {
+  display: block;
+  margin-top: 5px;
+  color: #8a95a5;
+  font-size: 11px;
+  font-weight: normal;
+}
+.screening-table .screening-symbol {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #245dc7;
+  font-size: 13px;
+  font-weight: 650;
+}
+.screening-table .screening-event {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #8390a2;
+  font-size: 10px;
+}
+.screening-direction {
+  min-width: 62px;
+  border: 0 !important;
+  font-weight: 600 !important;
+}
+.cross-asset-screening .is-bull {
+  color: #168578;
+  background: #edf8f4;
+}
+.cross-asset-screening .is-bear {
+  color: #cc5261;
+  background: #fff0f2;
+}
+.cross-asset-screening .is-neutral {
+  color: #718197;
+  background: #f0f3f8;
+}
+.cross-asset-screening .is-short {
+  color: #a98236;
+  background: #fcf7eb;
+}
+.screening-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+.cross-asset-screening summary {
+  padding: 8px 0;
+  cursor: pointer;
+  font-weight: 550;
+}
+.trend-builder summary span {
+  margin-left: 10px;
+  color: #7c8da4;
+  font-size: 12px;
+  font-weight: normal;
+}
+.trend-builder .screening-table {
+  margin: 12px 0;
+}
+.trend-builder input[type='number'] {
+  width: 85px;
+}
+.screening-warning {
+  padding: 12px;
+  border: 1px solid #efdbac;
+  border-radius: 6px;
+  background: #fffbef;
+  color: #946f24;
+}
+.screening-notice {
+  padding: 12px;
+  border: 1px solid #c8dbf2;
+  border-radius: 6px;
+  background: #f2f7fd;
+  color: #3a6498;
+}
+.screening-prose {
+  line-height: 1.9;
+}
+.screening-prose h3 {
+  margin-top: 22px;
+}
+.screening-prose li {
+  margin: 8px 0;
+}
+.screening-prose ol,
+.screening-prose ul {
+  padding-left: 22px;
+}
+.screening-chart-workspace .screening-controls {
+  margin: 0;
+  align-items: center;
+  min-width: 0;
+}
+.screening-chart-workspace label {
+  min-width: 0;
+  max-width: 100%;
+}
+.screening-chart-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--strategy-border, #dbe4ee);
+}
+.screening-chart-overlay-controls,
+.screening-chart-direction-controls {
+  grid-column: 1 / -1;
+}
+.screening-chart-workspace select,
+.screening-chart-workspace input:not([type='checkbox']) {
+  max-width: 100%;
+}
+.screening-chart-main-controls label:has(select[aria-label='图表标的']) {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 310px;
+}
+:is(.cross-asset-chart-modal, .cross-asset-profile-modal) .ant-modal {
+  top: 0;
+  max-width: calc(100vw - 32px);
+  padding-bottom: 0;
+}
+:is(.cross-asset-chart-modal, .cross-asset-profile-modal) .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--strategy-border, #dbe4ee);
+  border-radius: 14px;
+  background: var(--component-background, #fff);
+  color: var(--color-text-1, #334155);
+}
+:is(.cross-asset-chart-modal, .cross-asset-profile-modal) .ant-modal-header {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 16px 54px 16px 20px;
+  border-bottom: 1px solid var(--strategy-border, #dbe4ee);
+  background: inherit;
+}
+:is(.cross-asset-chart-modal, .cross-asset-profile-modal) .ant-modal-title {
+  color: inherit;
+  font-size: 16px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+:is(.cross-asset-chart-modal, .cross-asset-profile-modal) .ant-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+:is(.cross-asset-chart-modal, .cross-asset-profile-modal) .ant-modal-close {
+  top: 12px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--strategy-border, #dbe4ee);
+  border-radius: 7px;
+  color: inherit;
+}
+:is(.cross-asset-chart-modal, .cross-asset-profile-modal) .ant-modal-close-x {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+}
+@media (max-width: 1100px) {
+  .screening-chart-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.screening-chart-expand h3 {
+  padding-right: 52px;
+}
+.screening-chart-expand .chart-expand__toggle {
+  top: 4px;
+}
+.screening-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.screening-chart-workspace article {
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid #edf0f4;
+}
+@media (max-width: 800px) {
+  .screening-heading {
+    display: block;
+  }
+  .screening-heading > div + div {
+    margin-top: 12px;
+  }
+  .screening-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .screening-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .screening-controls input:not([type='checkbox']) {
+    width: 135px;
+  }
+  .screening-card {
+    padding: 12px;
+  }
+  .screening-tabs button {
+    padding: 7px 10px;
+  }
+  .screening-table th,
+  .screening-table td {
+    padding: 10px;
+  }
+}

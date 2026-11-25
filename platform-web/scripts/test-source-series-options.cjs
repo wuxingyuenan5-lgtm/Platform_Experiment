@@ -8,7 +8,43 @@ const source = fs.readFileSync(path.join(__dirname, '../src/views/hedgeBoard/cha
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 const output = { exports: {} };
 vm.runInNewContext(`(function(exports){${compiled}\n})`, {})(output.exports);
-const { buildSourceSeriesOptions, buildSourceCurveOptions, unitText } = output.exports;
+const { buildSourceSeriesOptions, buildSourceCurveOptions, buildIndependentSeriesOptions, unitText } = output.exports;
+
+test('inventory components use separate scales and a shared date window without transforming values', () => {
+  const series = [100, 10000, 10100].map((value, index) => ({
+    seriesId: `inventory-${index}`,
+    label: ['Registered', 'Eligible', 'Total'][index],
+    unit: 'troy oz',
+    observations: [
+      { date: index === 0 ? '2026-10-01' : '2026-10-02', value: String(value) },
+      { date: '2026-10-03', value: null },
+      { date: '2026-10-04', value: String(value + 1) },
+    ],
+  }));
+  const result = buildIndependentSeriesOptions(series, ['blue', 'green', 'orange']);
+  assert.equal(result.grid.length, 3);
+  assert.equal(result.yAxis.length, 3);
+  result.series.forEach((item, index) => {
+    assert.equal(item.xAxisIndex, index);
+    assert.equal(item.yAxisIndex, index);
+    assert.equal(item.data[0][1], Number(series[index].observations[0].value));
+    assert.equal(item.data[1][1], null);
+    assert.equal(item.connectNulls, false);
+    assert.equal(result.yAxis[index].scale, true);
+    assert.equal(result.yAxis[index].min, undefined);
+    assert.equal(result.yAxis[index].max, undefined);
+    assert.equal(result.xAxis[index].min, Date.parse('2026-10-01'));
+    assert.equal(result.xAxis[index].max, Date.parse('2026-10-04'));
+  });
+  assert.deepEqual(Array.from(result.dataZoom[0].xAxisIndex), [0, 1, 2]);
+  assert.equal(result.dataZoom[0].filterMode, 'filter');
+  const hidden = buildIndependentSeriesOptions(series.slice(1), ['green', 'orange']);
+  assert.equal(hidden.yAxis.length, 2);
+  assert.equal(hidden.series[1].yAxisIndex, 1);
+  assert.equal(hidden.series[1].data[0][1], 10100);
+  const empty = buildIndependentSeriesOptions([], []);
+  assert.equal(empty.grid.length, 0);
+});
 
 test('mixed units keep independent axes, native dates, gaps and exact tooltip values', () => {
   const input = [

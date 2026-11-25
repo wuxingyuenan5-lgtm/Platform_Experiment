@@ -1,20 +1,27 @@
 <template>
-  <section class="theme-crowding">
+  <section class="theme-crowding" :class="{ embedded }">
     <header class="panel-heading">
       <div
         ><h2>主题成交与价格</h2
-        ><p>代表股票成交额占全A观察池比例 · {{ data.date || '暂无收盘数据' }}</p></div
+        ><p>代表股票成交额占全A归档成交额比例 · {{ data.date || '暂无收盘数据' }}</p></div
       >
-      <span class="catalog-label">沿用主题与行业分类</span>
+      <RouterLink
+        v-if="!embedded"
+        :to="{
+          path: '/hedge-board/a-share',
+          query: { view: 'themes', section: 'themes', theme, themeView: 'overview' },
+        }"
+        >返回主题画像</RouterLink
+      >
     </header>
     <div class="crowding-workspace">
-      <nav class="theme-nav" aria-label="成交占比主题">
+      <nav v-if="!embedded" class="theme-nav" aria-label="成交占比主题">
         <button
           v-for="item in data.items"
           :key="item.name"
           type="button"
           :aria-pressed="active?.name === item.name"
-          @click="selectTheme(item.name)"
+          @click="emit('select', item.name, '')"
         >
           <span>{{ item.name }}</span
           ><b>{{ format(item.history.at(-1)?.sharePct, '%') }}</b>
@@ -27,7 +34,7 @@
             :key="item.name"
             type="button"
             :aria-pressed="selected.name === item.name"
-            @click="segment = item.name === active.name ? '' : item.name"
+            @click="emit('select', active.name, item.name === active.name ? '' : item.name)"
           >
             {{ item.name === active.name ? '主题整体' : item.name }}
           </button>
@@ -35,6 +42,9 @@
         <div class="basket-heading"
           ><h3>{{ selected.name }}</h3
           ><span>{{ selected.expected }}只代表股票</span></div
+        >
+        <p v-if="route.query.themeDate && route.query.themeDate !== data.date" class="history-note"
+          >主题强弱观测日 {{ route.query.themeDate }} · 成交观测日 {{ data.date || '暂无' }}</p
         >
         <div class="metrics">
           <div
@@ -56,11 +66,34 @@
             <small>{{ lastPrice?.date || '暂无完整价格' }}</small></div
           >
         </div>
+        <component
+          :is="alwaysExpanded ? 'section' : 'details'"
+          v-if="selected.concentration"
+          class="method"
+          :key="chartKey"
+        >
+          <component
+            :is="alwaysExpanded ? 'h3' : 'summary'"
+            :class="{ 'disclosure-title': alwaysExpanded }"
+            >成交额前{{ selected.concentration.leaders.length }}只占本组
+            {{ format(selected.concentration.sharePct, '%') }} ·
+            {{ selected.concentration.date }}</component
+          >
+          <p v-for="row in selected.concentration.leaders" :key="row.code">
+            <RouterLink
+              :to="{ path: '/hedge-board/a-share', query: { view: 'stocks', stock: row.code } }"
+            >
+              {{ row.name || row.code }}{{ row.name ? ' · ' + row.code : '' }} ↗</RouterLink
+            >
+            · {{ format(Number(row.amountYuan) / 1e8, '亿元') }}
+          </p>
+        </component>
+        <p v-else class="history-note">组内成交集中度 —</p>
         <WidgetErrorBoundary :key="chartKey" widget-title="主题成交与价格走势">
           <VibeTimeChart
             :key="chartKey"
             :title="`${selected.name} · 成交额占比与价格`"
-            y-label="成交额 / 全A观察池（%）"
+            y-label="成交额 / 全A归档成交额（%）"
             right-label="等权价格（基期100）"
             :initial-window="250"
             :precision="2"
@@ -99,7 +132,7 @@
                 <th
                   ><button
                     type="button"
-                    @click="segment = item.name === active.name ? '' : item.name"
+                    @click="emit('select', active.name, item.name === active.name ? '' : item.name)"
                     >{{ item.name === active.name ? '主题整体' : item.name }}</button
                   ></th
                 >
@@ -111,11 +144,15 @@
             >
           </table>
         </div>
-        <details class="method"
-          ><summary>计算口径</summary>
+        <component :is="alwaysExpanded ? 'section' : 'details'" class="method"
+          ><component
+            :is="alwaysExpanded ? 'h3' : 'summary'"
+            :class="{ 'disclosure-title': alwaysExpanded }"
+            >计算口径</component
+          >
           <p
             >成交额占比＝本组去重股票成交额合计 /
-            同日全A观察池收盘成交额。观察池沿用既有行情源，剔除ST、N/C新股及无有效成交的股票，与交易所完整全A口径有差异；主题和细分均使用此观察池作分母，组间有交叉，不能相加。仅完整覆盖时计算占比，5日均值需连续5个交易日有效，缺失不补零。</p
+            同日平台全A成交额归档。主题和细分均使用此分母，组间有交叉，不能相加。仅完整覆盖时计算占比，5日均值需连续5个交易日有效，缺失不补零。</p
           >
           <p
             >价格为本组各股票复权价格从共同基日归一为100后的等权平均，基日
@@ -125,35 +162,35 @@
             {{ data.effectiveFrom }} 目录的当前成员回看历史，不代表历史成分。</p
           >
           <p
-            >成交额来源：东方财富全市场收盘快照；价格来源：平台已保存的腾讯复权日线。成交额历史从实际留存日开始，价格与成交额的可用起点可能不同。</p
+            >个股成交额来自东方财富未复权日线及已留存收盘快照；分母为平台全A成交额归档。补采范围以已有价格历史为界，原始成交额不作复权；价格来源为平台已保存的腾讯复权日线。</p
           >
-        </details>
+        </component>
       </div>
-      <p v-else role="status">暂无主题数据</p>
+      <p v-else role="status">{{ segment || theme }}暂无对应成交数据</p>
     </div>
   </section>
 </template>
 <script setup lang="ts">
-  import { computed } from 'vue';
+  import { inject, computed } from 'vue';
+  import { useRoute } from 'vue-router';
   import type { ThemeCrowding, EquityValue } from '@/api/equityObservatory';
   import VibeTimeChart from '../aShare/components/VibeTimeChart.vue';
   import WidgetErrorBoundary from './WidgetErrorBoundary';
-  import { useResearchViewState } from '../composables/researchWorkspace';
 
-  const props = defineProps<{ data: ThemeCrowding }>();
-  const theme = useResearchViewState('crowdingTheme', '机器人／高端制造');
-  const segment = useResearchViewState('crowdingSegment', '');
-  const active = computed(
-    () => props.data.items.find((t) => t.name === theme.value) || props.data.items[0],
-  );
+  const emit = defineEmits<{ select: [name: string, segment: string] }>();
+  const alwaysExpanded = inject('themeResearchAlwaysExpanded', false);
+  const props = defineProps<{
+    data: ThemeCrowding;
+    theme: string;
+    segment: string;
+    embedded?: boolean;
+  }>();
+  const route = useRoute();
+  const active = computed(() => props.data.items.find((t) => t.name === props.theme));
   const baskets = computed(() => (active.value ? [active.value, ...active.value.segments] : []));
-  const selected = computed(
-    () => baskets.value.find((t) => t.name === segment.value) || active.value,
+  const selected = computed(() =>
+    props.segment ? baskets.value.find((t) => t.name === props.segment) : active.value,
   );
-  function selectTheme(name: string) {
-    theme.value = name;
-    segment.value = '';
-  }
   const latest = computed(() => selected.value?.history.at(-1));
   const lastPrice = computed(() =>
     [...(selected.value?.history || [])].reverse().find((p) => p.price != null),
@@ -190,6 +227,10 @@
   ]);
 </script>
 <style scoped>
+  .embedded .crowding-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .theme-crowding {
     min-width: 0;
     padding: 22px;
@@ -463,5 +504,12 @@
     .metrics small {
       width: 100%;
     }
+  }
+
+  .disclosure-title {
+    margin: 0 0 12px;
+    color: #354d68;
+    font-size: 14px;
+    font-weight: 600;
   }
 </style>

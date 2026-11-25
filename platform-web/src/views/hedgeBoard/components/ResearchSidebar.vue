@@ -10,7 +10,24 @@
     <RouterLink
       v-for="item in items"
       :key="item.key"
-      :to="item.path || { path: route.path, query: { ...route.query, view: item.key } }"
+      :to="
+        item.path || {
+          path: route.path,
+          query: {
+            ...route.query,
+            ...(route.path === '/hedge-board/a-share' && active !== item.key
+              ? {
+                  theme: undefined,
+                  themeIndustry: undefined,
+                  segment: undefined,
+                  themeDate: undefined,
+                  stock: undefined,
+                }
+              : {}),
+            view: item.key,
+          },
+        }
+      "
       :class="{ active: active === item.key }"
       :title="item.label"
       :aria-label="item.label"
@@ -47,6 +64,17 @@
     border-radius: 12px;
     background: white;
     gap: 5px;
+    font-family: var(
+      --strategy-font-sans,
+      'Aptos',
+      'PingFang SC',
+      'Hiragino Sans GB',
+      'Microsoft YaHei UI',
+      'Segoe UI',
+      sans-serif
+    );
+    font-weight: 400;
+    line-height: 1.5;
   }
 
   .sidebar-toggle {
@@ -54,8 +82,11 @@
     border: 0;
     background: transparent;
     color: #8793a4;
+    font-family: inherit;
     font-size: 11px;
+    font-weight: 400;
     letter-spacing: 1px;
+    line-height: inherit;
     text-align: left;
     cursor: pointer;
   }
@@ -104,8 +135,11 @@
     }
 
     a {
+      flex: 0 0 auto;
       padding: 9px 12px;
       gap: 10px;
+      white-space: nowrap;
+      overflow-wrap: normal;
     }
 
     a > span:last-child {

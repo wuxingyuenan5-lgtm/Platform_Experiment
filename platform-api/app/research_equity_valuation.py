@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from app.research_choice_index_catalog import CSS_INDEX_SPECS
 from app.research_equity_metrics import number
 
 US_INDICES = [
@@ -311,8 +312,12 @@ def collect_choice_indices():
                 )
                 continue
             merged = {r["date"]: r for r in old[key].get("rows", [])}
-            merged.update({r["date"]: r for r in rows})
+            for row in rows:
+                merged.setdefault(row["date"], {}).update(
+                    {key: value for key, value in row.items() if value is not None}
+                )
             rows = [merged[d] for d in sorted(merged)]
+            backfill_digest = old[key].get("historyBackfillSha256")
             old[key] = dict(
                 id=key,
                 name="Choice / " + name,
@@ -324,6 +329,8 @@ def collect_choice_indices():
                 rawSha256=digest,
                 schemaVersion=2,
             )
+            if backfill_digest:
+                old[key]["historyBackfillSha256"] = backfill_digest
     except Exception as exc:
         for code, _ in due:
             d = old["choice_index_" + code]
@@ -391,14 +398,58 @@ def build_valuation_charts(sources, market):
             status=doc.get("status", "no_data"),
         )
 
+    def closing_prices(doc):
+        return [
+            dict(date=r["date"], value=r["close"])
+            for r in doc.get("rows", [])
+            if (close := number(r.get("close"))) is not None and close > 0
+        ]
+
+    def pair_with_prices(item, prices, *, shared=False):
+        price_dates = {point["date"] for point in prices}
+        paired = [point for point in item["history"] if point["date"] in price_dates]
+        if paired:
+            item["history"] = paired
+            if not shared or len(paired) != len(prices):
+                paired_dates = {point["date"] for point in paired}
+                item["prices"] = [point for point in prices if point["date"] in paired_dates]
+        elif item["history"]:
+            item["prices"] = []
+        return item
+
     if market == "cn":
         for code, name in CN_CHARTS:
             official = sources.get("csi_history_" + code, {})
             choice = sources.get("choice_index_" + code, {})
-            primary = official if official.get("rows") else choice
-            metrics = [metric(primary, "pe", "历史 PE TTM", "pe")]
+            official_prices = closing_prices(official)
+            choice_prices = closing_prices(choice)
+            official_pe = pair_with_prices(
+                metric(official, "official_pe", "中证官方 PE TTM", "pe"), official_prices
+            )
+            choice_pe = pair_with_prices(
+                metric(choice, "pe", "历史 PE TTM · Choice", "pe"), choice_prices
+            )
+            # Coverage can differ across providers and their PE formulas differ.
+            # Use a whole series for each version, never append one PE series to another.
+            use_choice = not official.get("rows") or (
+                choice_pe.get("prices")
+                and official_pe.get("prices")
+                and choice_pe["history"][0]["date"] < official_pe["history"][0]["date"]
+            )
+            if use_choice:
+                metrics = [choice_pe]
+                prices = choice_prices
+                if len(choice_pe.get("prices", [])) == len(prices):
+                    choice_pe.pop("prices", None)
+            else:
+                metrics = [{**official_pe, "id": "pe", "label": "历史 PE TTM"}]
+                prices = official_prices
             metrics += [
-                metric(choice, k, label, k, "%" if k == "dividend" else "倍")
+                pair_with_prices(
+                    metric(choice, k, label, k, "%" if k == "dividend" else "倍"),
+                    prices,
+                    shared=True,
+                )
                 for k, label in [
                     ("pb", "PB MRQ"),
                     ("ps", "PS TTM"),
@@ -407,10 +458,30 @@ def build_valuation_charts(sources, market):
                     ("peLyr", "静态 PE LYR"),
                 ]
             ]
-            prices = [
-                dict(date=r["date"], value=r.get("close"))
-                for r in primary.get("rows", [])
-                if r.get("close") is not None
+            if use_choice and official_pe["history"]:
+                metrics.append(official_pe)
+            if code == "000510" and use_choice:
+                for item in metrics:
+                    if item["id"] != "official_pe":
+                        item["description"] = "中证A500于2024-09-23发布，发布前的观测为来源回算。"
+            charts.append(dict(id=code, name=name, prices=prices, metrics=metrics))
+        for code, name, _, _ in CSS_INDEX_SPECS:
+            document = sources.get("choice_index_" + code, {})
+            if not document.get("rows"):
+                continue
+            prices = closing_prices(document)
+            metrics = [
+                {
+                    **pair_with_prices(metric(document, key, label, key, unit), prices, shared=True),
+                    "rankFrequency": "month",
+                }
+                for key, label, unit in (
+                    ("pe", "PE TTM · Choice CSS", "倍"),
+                    ("peLyr", "PE LYR · Choice CSS", "倍"),
+                    ("pb", "PB MRQ · Choice CSS", "倍"),
+                    ("ps", "PS TTM · Choice CSS", "倍"),
+                    ("dividend", "近12个月股息率 · Choice CSS", "%"),
+                )
             ]
             charts.append(dict(id=code, name=name, prices=prices, metrics=metrics))
     else:

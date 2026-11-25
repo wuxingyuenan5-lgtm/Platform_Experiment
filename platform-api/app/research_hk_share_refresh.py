@@ -82,6 +82,7 @@ async def refresh_hk_share_research(*, force=False):
                 {row["code"]: row for row in previous["focusStocks"]},
                 {},
                 target,
+                codes,
             )
             closed = session < now.date() or now.time() >= time(16, 15)
             missing = sum(

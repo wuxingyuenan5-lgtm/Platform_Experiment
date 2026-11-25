@@ -6,6 +6,8 @@ export interface EtfRow {
   [key: string]: EtfValue;
 }
 export interface EtfSource {
+  priceDate?: string | null;
+  shareDate?: string | null;
   status: string | null;
   fetchedAt: string | null;
   url: string | null;
@@ -29,6 +31,8 @@ export interface EtfCatalog {
   source: EtfSource;
 }
 export interface EtfDetail {
+  sessions?: string[];
+  shareBasis?: 'native';
   groupLabel: string;
   members: Array<{ meta: EtfMeta; series: EtfRow[]; margin: EtfRow[] }>;
   meta: EtfMeta;
@@ -45,9 +49,10 @@ export const getEtfCatalog = (signal?: AbortSignal) =>
     url: '/research/a-share/etf-tracking',
     signal,
   });
-export const getEtfDetail = (code: string, signal?: AbortSignal) =>
+export const getEtfDetail = (code: string, signal?: AbortSignal, includeGroup = false) =>
   researchRequest<EtfDetail>({
     method: 'GET',
     url: `/research/a-share/etf-tracking/${code}`,
+    params: { include_group: includeGroup },
     signal,
   });

@@ -174,7 +174,7 @@
     </div>
 
     <Modal
-      v-model:visible="reauthVisible"
+      v-model:open="reauthVisible"
       title="重新验证身份"
       :confirm-loading="reauthenticating"
       @ok="submitReauth"
@@ -189,7 +189,7 @@
     </Modal>
 
     <Modal
-      v-model:visible="passwordVisible"
+      v-model:open="passwordVisible"
       title="修改密码"
       :confirm-loading="changingPassword"
       @ok="submitPasswordChange"
@@ -499,7 +499,7 @@
   .profile-summary,
   .account-card {
     border-radius: 14px;
-    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
+    box-shadow: 0 8px 28px rgb(15 23 42 / 6%);
   }
 
   .profile-summary__main {
@@ -646,16 +646,16 @@
     }
 
     .sessions-header {
-      align-items: flex-start;
       flex-direction: column;
+      align-items: flex-start;
     }
   }
 
   @media (max-width: 640px) {
     .profile-summary__main,
     .avatar-editor {
-      align-items: flex-start;
       flex-direction: column;
+      align-items: flex-start;
     }
 
     .readonly-grid,

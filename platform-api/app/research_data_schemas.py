@@ -244,6 +244,8 @@ class AShareMarketHistoryRow(ResearchApiModel):
     flat: int | None = Field(default=None, ge=0)
     limit_up: int | None = Field(default=None, ge=0)
     limit_down: int | None = Field(default=None, ge=0)
+    all_a_limit_up: int | None = Field(default=None, ge=0)
+    all_a_limit_down: int | None = Field(default=None, ge=0)
     total_amount_yuan: Decimal | None = Field(default=None, ge=0)
     amount_change_pct: Decimal | None = None
     market_breadth_pct: Decimal | None = None

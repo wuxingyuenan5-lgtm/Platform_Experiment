@@ -51,7 +51,12 @@ const shenwanSectionPath = path.join(
 );
 const stockSnapshotPath = path.join(viewRoot, 'aShare', 'components', 'StockSnapshotSection.vue');
 const vibeStockPoolPath = path.join(viewRoot, 'aShare', 'components', 'VibeStockPoolSection.vue');
-const aShareMarketOverviewParityPath = path.join(viewRoot, 'aShare', 'components', 'AShareMarketOverviewParitySection.vue');
+const aShareMarketOverviewParityPath = path.join(
+  viewRoot,
+  'aShare',
+  'components',
+  'AShareMarketOverviewParitySection.vue',
+);
 const macroExpectationPath = path.join(viewRoot, 'macro', 'MacroExpectationPanel.vue');
 const hedgeBoardPageComposablePath = path.join(viewRoot, 'composables', 'useHedgeBoardPage.ts');
 const routePath = path.join(__dirname, '..', 'src', 'router', 'routes', 'modules', 'hedge.ts');
@@ -85,9 +90,11 @@ const aShareMarketOverviewParitySource = fs.readFileSync(aShareMarketOverviewPar
 const macroExpectationSource = fs.readFileSync(macroExpectationPath, 'utf8');
 const hedgeBoardPageComposableSource = fs.readFileSync(hedgeBoardPageComposablePath, 'utf8');
 const routeSource = fs.readFileSync(routePath, 'utf8');
-const poolApiSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'api', 'platform', 'aShareStockPool.ts'), 'utf8');
+const poolApiSource = fs.readFileSync(
+  path.join(__dirname, '..', 'src', 'api', 'platform', 'aShareStockPool.ts'),
+  'utf8',
+);
 const poolStateSource = fs.readFileSync(path.join(viewRoot, 'aShare', 'useStockPool.ts'), 'utf8');
-
 
 assert(fs.existsSync(marketTerminalPagePath), 'Expected MarketTerminalPage component to exist.');
 assert(fs.existsSync(hedgeBoardSubnavPath), 'Expected HedgeBoardSubnav component to exist.');
@@ -113,7 +120,7 @@ assert(fs.existsSync(macroExpectationPath), 'Expected macro expectation panel to
 
 assert(
   hedgeBoardSource.includes('<MarketTerminalPage') &&
-    hedgeBoardSource.includes('MarketTerminalPage from'),
+    hedgeBoardSource.includes("import('./components/MarketTerminalPage.vue')"),
   'Hedge board terminal categories must use MarketTerminalPage.',
 );
 assert(
@@ -156,10 +163,8 @@ assert(
     widgetErrorBoundarySource.includes('onErrorCaptured') &&
     widgetErrorBoundarySource.includes('return false') &&
     widgetErrorBoundarySource.includes("class: 'local-empty'") &&
-    widgetErrorBoundarySource.includes("minHeight: '360px'") &&
-    widgetErrorBoundarySource.includes(
-      '模块 "${props.widgetTitle}" 渲染失败，已自动跳过，不影响其他内容浏览。',
-    ),
+    widgetErrorBoundarySource.includes("minHeight: '160px'") &&
+    widgetErrorBoundarySource.includes('“${props.widgetTitle}”暂不可用。'),
   'WidgetErrorBoundary must preserve the original error isolation, root class and fallback copy.',
 );
 assert(
@@ -226,13 +231,13 @@ assert(
   'HedgeBoardSubnav must own research subnav rendering and jump event.',
 );
 assert(
-  /\.module-subnav__title-row strong\s*\{[\s\S]*?color:\s*#111827;[\s\S]*?font-size:\s*14px;[\s\S]*?\}/m.test(
+  /\.module-subnav__title-row strong\s*\{[\s\S]*?color:\s*#111827;[\s\S]*?font-size:\s*13px;[\s\S]*?\}/m.test(
     hedgeBoardSubnavSource,
   ) &&
-    /\.module-subnav__index\s*\{[\s\S]*?color:\s*#111827;[\s\S]*?font-size:\s*14px;[\s\S]*?\}/m.test(
+    /\.module-subnav__index\s*\{[\s\S]*?color:\s*#8091a2;[\s\S]*?font-size:\s*13px;[\s\S]*?\}/m.test(
       hedgeBoardSubnavSource,
     ),
-  'HedgeBoardSubnav must keep index and title the same black 14px treatment.',
+  'HedgeBoardSubnav must keep 13px hierarchy with a muted index.',
 );
 assert(
   hedgeResearchModuleSource.includes('HedgeBoardSubnav') &&
@@ -241,17 +246,21 @@ assert(
   'HedgeResearchModule must own research module section and widget rendering.',
 );
 assert(
-  hedgeResearchModuleSource.includes('widget-card--local-chart') &&
-    /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+minmax\(0,\s*1fr\);/m.test(
+  /\.widget-card--local-chart \.widget-card__header-main\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/.test(
+    hedgeResearchModuleSource,
+  ) &&
+    /\.widget-card--local-chart \.widget-card__title-row\s*\{[\s\S]*?flex:\s*1 1 190px;[\s\S]*?text-align:\s*left;/.test(
       hedgeResearchModuleSource,
     ) &&
-    /grid-column:\s*2;[\s\S]*?justify-self:\s*center;/m.test(hedgeResearchModuleSource) &&
-    /grid-column:\s*3;[\s\S]*?justify-self:\s*end;/m.test(hedgeResearchModuleSource) &&
-    /\.widget-card--local-chart\s+\.widget-card__title-row h5\s*\{[\s\S]*?font-size:\s*17px;/m.test(
+    /\.widget-card--local-chart \.widget-card__title-row h5\s*\{[\s\S]*?font-size:\s*16px;/.test(
+      hedgeResearchModuleSource,
+    ) &&
+    /\.widget-card__actions\s*\{[\s\S]*?justify-content:\s*flex-end;/.test(
       hedgeResearchModuleSource,
     ),
-  'Local chart widget headers must center 17px titles and keep source links in the top-right header action area.',
+  'Local chart headers must wrap with left-aligned titles and right-aligned source actions.',
 );
+
 assert(
   !terminalDetailPanelSource.includes('<h3>{{ title }}</h3>') &&
     !terminalDetailPanelSource.includes('.market-terminal__panel-head h3'),
@@ -291,7 +300,8 @@ assert(
     aSharePageSource.includes('<AShareLegacyTerminalSection') &&
     !aSharePageSource.includes('<StockSnapshotSection') &&
     aSharePageSource.includes('<VibeStockPoolSection') &&
-    poolApiSource.includes("const root = '/research/a-share'") && poolApiSource.includes('researchRequest') &&
+    poolApiSource.includes("const root = '/research/a-share'") &&
+    poolApiSource.includes('researchRequest') &&
     !vibeStockPoolSource.includes('/vibe-research/api/') &&
     vibeStockPoolSource.includes('matrixPoints') &&
     vibeStockPoolSource.includes('heatColor') &&
@@ -321,7 +331,9 @@ assert(
 );
 assert(
   aShareResearchComposableSource.includes('getAShareDashboard') &&
-    aShareResearchComposableSource.includes('if (active) return active;') &&
+    aShareResearchComposableSource.includes('if (active) {') &&
+    aShareResearchComposableSource.includes('return active;') &&
+    aShareResearchComposableSource.includes('controller?.signal.aborted') &&
     !aShareResearchComposableSource.includes('localStorage') &&
     !aShareResearchComposableSource.includes('getAccountResearchWatchlist'),
   'A-share page state must share in-flight dashboard reads and keep personal focus in its account-owned composable.',
@@ -388,8 +400,8 @@ assert(
   'Stock snapshot modules must reset collapsed and remain fixed objective-data flows without AI.',
 );
 assert(
-  macroExpectationSource.includes('市场预期与事件概率') &&
-    macroExpectationSource.includes('historyPoints') &&
+  macroExpectationSource.includes('市场隐含概率') &&
+    macroExpectationSource.includes('probabilityHistory(event.history)') &&
     !macroExpectationSource.includes('买卖建议'),
   'Macro page must present probability curves without trading recommendations.',
 );
